@@ -9,12 +9,26 @@
   <link rel="manifest" href="./app.webmanifest">
   <link rel="icon" href="./icon-192.png">
   <link rel="apple-touch-icon" href="./icon-192.png">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <link rel="stylesheet" href="./app.css">
 </head>
 <body>
   <div id="boot" class="boot">Wird geladen …</div>
+  <script>
+    // Wachhund: meldet sich, wenn die App nach 10 Sekunden noch haengt.
+    window.__gestartet = false;
+    setTimeout(function () {
+      if (window.__gestartet) return;
+      var b = document.getElementById("boot");
+      if (b) b.innerHTML = "<div style=\"max-width:340px;text-align:center\">"
+        + "<p><strong>Die App startet nicht.</strong></p>"
+        + "<p>Die Programmbibliothek konnte nicht geladen werden. "
+        + "Meist blockiert ein Werbeblocker oder die Firewall den Zugriff.</p>"
+        + "<p>Drücke F12, Reiter Console, und schick die Meldung weiter.</p></div>";
+    }, 10000);
+  </script>
   <div id="root" hidden></div>
   <script type="module" src="./app.js"></script>
 </body>

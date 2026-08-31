@@ -13,6 +13,7 @@ const wurzel = document.querySelector("#root");
 const boot = document.querySelector("#boot");
 
 async function start() {
+  window.__gestartet = true;
   try {
     const profil = await profilLaden();
     boot.hidden = true;

@@ -13,4 +13,4 @@ export const APP_NAME = "Hofer + Co.";
 
 // Version. Bei jeder Änderung hochzählen, damit die Handys
 // die neue Fassung laden und nicht die alte aus dem Zwischenspeicher.
-export const APP_VERSION = "1.0.1";
+export const APP_VERSION = "1.0.3";

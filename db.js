@@ -1,24 +1,66 @@
 // ---------------------------------------------------------------
 // Verbindung zur Datenbank.
 //
-// WICHTIG: Diese Datei und der Ordner js/data/ sind die einzigen
-// Stellen der App, die Supabase kennen. Alles andere ruft nur
-// Funktionen aus js/data/ auf. Wenn du später auf einen eigenen
-// Server umziehst, tauschst du nur diese Dateien aus.
+// Die Supabase-Bibliothek wird aus dem Internet geladen. Falls der
+// erste Anbieter nicht antwortet, wird nach 6 Sekunden automatisch
+// ein zweiter versucht. So bleibt die App nicht stumm haengen.
 // ---------------------------------------------------------------
 
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 import { SUPABASE_URL, SUPABASE_KEY } from "./config.js";
+
+const ANBIETER = [
+  "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm",
+  "https://esm.sh/@supabase/supabase-js@2",
+  "https://unpkg.com/@supabase/supabase-js@2/dist/module/index.js",
+];
+
+export function mitZeitlimit(versprechen, ms, name = "Datenbank") {
+  return Promise.race([
+    versprechen,
+    new Promise((_, ablehnen) =>
+      setTimeout(() => ablehnen(new Error("Zeitüberschreitung bei " + name)), ms)
+    ),
+  ]);
+}
+
+async function ladeBibliothek() {
+  let letzterFehler;
+  for (const adresse of ANBIETER) {
+    try {
+      const modul = await mitZeitlimit(import(adresse), 6000, adresse);
+      if (modul?.createClient) return modul.createClient;
+    } catch (fehler) {
+      letzterFehler = fehler;
+      console.warn("Anbieter nicht erreichbar:", adresse, fehler.message);
+    }
+  }
+  throw new Error(
+    "Die Supabase-Bibliothek konnte von keinem Anbieter geladen werden. " +
+    "Meist liegt das an einem Werbeblocker oder einer Firewall. " +
+    "Letzter Fehler: " + (letzterFehler?.message || "unbekannt")
+  );
+}
+
+const createClient = await ladeBibliothek();
 
 export const db = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: {
-    persistSession: true,      // Anmeldung bleibt nach dem Schließen erhalten
-    autoRefreshToken: true,    // Sitzung wird automatisch verlängert
+    persistSession: true,
+    autoRefreshToken: true,
     detectSessionInUrl: true,
+
+    // Supabase sperrt normalerweise ueber die Browser-Funktion
+    // navigator.locks, damit mehrere offene Tabs sich nicht in die
+    // Quere kommen. Diese Sperre kann sich in manchen Browsern
+    // selbst blockieren, und dann antwortet die Anmeldung nie.
+    // Wir ersetzen sie durch eine Fassung ohne Sperre. Fuer unseren
+    // Fall ist das unbedenklich: die Anmeldung wird ohnehin nur
+    // beim Start und beim Anmelden geprueft.
+    lock: async (_name, _zeit, aufgabe) => await aufgabe(),
   },
 });
 
-// Kleine Hilfe: wandelt Datenbankfehler in verständliche Sätze um.
+// Wandelt Datenbankfehler in verstaendliche Saetze um.
 export function fehlertext(error) {
   if (!error) return "Unbekannter Fehler";
   const m = error.message || String(error);

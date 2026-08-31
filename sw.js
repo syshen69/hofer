@@ -8,7 +8,7 @@
 // Offline-Betrieb ist nicht nötig, weil im Betrieb überall WLAN ist.
 // ---------------------------------------------------------------
 
-const VERSION = "v1.0.1";
+const VERSION = "v1.0.3";
 const SCHALE = "schale-" + VERSION;
 
 const GRUNDDATEIEN = [
