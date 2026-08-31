@@ -1,35 +1,911 @@
 <!doctype html>
 <html lang="de">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Hofer + Co.</title>
-  <meta name="theme-color" content="#1b2026">
-  <meta name="description" content="Produktion, Lager und Bestellungen">
-  <link rel="manifest" href="./app.webmanifest">
-  <link rel="icon" href="./icon-192.png">
-  <link rel="apple-touch-icon" href="./icon-192.png">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <link rel="stylesheet" href="./app.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hofer + Co.</title>
+<meta name="theme-color" content="#1b2026">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="./app.webmanifest">
+<link rel="icon" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<style>
+/* ---------------------------------------------------------------
+   Gestaltung
+   Gedacht für die Werkstatt: hoher Kontrast, große Flächen zum
+   Antippen, Zahlen in gleicher Breite damit Spalten fluchten.
+   --------------------------------------------------------------- */
+
+:root {
+  --grund: #eef0f2;
+  --flaeche: #ffffff;
+  --tinte: #16191c;
+  --gedaempft: #5b646e;
+  --linie: #cfd5db;
+  --linie-stark: #a9b3bc;
+
+  --stahl: #1b2026;
+  --signalgelb: #f0b429;
+  --aktion: #0e5fa8;
+  --aktion-dunkel: #0a4a83;
+  --warnung: #b5761a;
+  --gefahr: #b3261e;
+  --gut: #1f7a4d;
+
+  --kopfhoehe: 52px;
+  --navhoehe: 62px;
+  --radius: 4px;
+
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--grund);
+  color: var(--tinte);
+  font-size: 16px;
+  line-height: 1.45;
+  -webkit-text-size-adjust: 100%;
+}
+
+.boot {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  color: var(--gedaempft);
+}
+
+/* ---------- Kopfzeile ---------- */
+
+.kopf {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: var(--kopfhoehe);
+  padding: 0 12px 0 0;
+  background: var(--stahl);
+  color: #fff;
+}
+
+.kopf__balken {
+  width: 8px;
+  align-self: stretch;
+  background: var(--signalgelb);
+}
+
+.kopf__firma { font-weight: 650; letter-spacing: .01em; }
+
+.kopf__benutzer {
+  margin-left: auto;
+  color: #b9c2cb;
+  font-size: .85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 45%;
+}
+
+.kopf__abmelden {
+  background: none;
+  border: 1px solid #3c454e;
+  color: #dde3e9;
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  font-size: .8rem;
+  cursor: pointer;
+}
+.kopf__abmelden:hover { background: #2a3138; }
+
+/* ---------- Grundraster ---------- */
+
+.rahmen { display: block; }
+
+.inhalt {
+  padding: 16px 14px calc(var(--navhoehe) + 28px);
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* ---------- Navigation ---------- */
+
+.nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  background: var(--flaeche);
+  border-top: 1px solid var(--linie-stark);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.nav__punkt {
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  height: var(--navhoehe);
+  text-decoration: none;
+  color: var(--gedaempft);
+  font-size: .7rem;
+  border-top: 3px solid transparent;
+}
+
+.nav__punkt.aktiv {
+  color: var(--tinte);
+  border-top-color: var(--signalgelb);
+  background: #f7f8f9;
+}
+
+.nav__zeichen { font-size: 1.25rem; line-height: 1; }
+
+/* ---------- Seiteninhalt ---------- */
+
+.seitentitel {
+  margin: 4px 0 16px;
+  font-size: 1.4rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.karte {
+  background: var(--flaeche);
+  border: 1px solid var(--linie);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+.karte h2 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.karte--hinweis { border-left: 4px solid var(--signalgelb); }
+.karte--fehler  { border-left: 4px solid var(--gefahr); }
+
+.fortschritt {
+  margin: 12px 0 0;
+  color: var(--gedaempft);
+  font-size: .85rem;
+}
+
+.liste { margin: 0; padding-left: 20px; }
+.liste li { margin-bottom: 4px; }
+
+.hinweis { color: var(--gedaempft); font-size: .85rem; margin: 12px 0 0; }
+.klein { font-size: .85rem; color: var(--gedaempft); }
+
+/* ---------- Schnellzugriff ---------- */
+
+.schnellzugriff {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.kachel {
+  display: grid;
+  place-items: center;
+  gap: 6px;
+  min-height: 96px;
+  background: var(--flaeche);
+  border: 1px solid var(--linie-stark);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: var(--tinte);
+  font-weight: 600;
+  font-size: .95rem;
+  text-align: center;
+  padding: 10px;
+}
+.kachel:active { background: #e6e9ec; }
+.kachel__zeichen { font-size: 1.7rem; line-height: 1; color: var(--aktion); }
+
+/* ---------- Formulare ---------- */
+
+.feld { display: block; margin-bottom: 14px; }
+.feld--abstand { margin-top: 22px; }
+
+.feld > span {
+  display: block;
+  margin-bottom: 5px;
+  font-size: .85rem;
+  font-weight: 600;
+  color: var(--gedaempft);
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="date"],
+select {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  font: inherit;
+  color: var(--tinte);
+  background: var(--flaeche);
+  border: 1px solid var(--linie-stark);
+  border-radius: var(--radius);
+}
+
+input:focus-visible,
+select:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid var(--aktion);
+  outline-offset: 1px;
+}
+
+.auswahl { min-height: 38px; padding: 4px 8px; }
+
+/* ---------- Knöpfe ---------- */
+
+.knopf {
+  min-height: 46px;
+  padding: 11px 18px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--tinte);
+  background: var(--flaeche);
+  border: 1px solid var(--linie-stark);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.knopf:active { transform: translateY(1px); }
+.knopf:disabled { opacity: .55; cursor: default; }
+
+.knopf--haupt {
+  background: var(--aktion);
+  border-color: var(--aktion);
+  color: #fff;
+}
+.knopf--haupt:hover:not(:disabled) { background: var(--aktion-dunkel); }
+
+.knopf--gefahr {
+  background: var(--gefahr);
+  border-color: var(--gefahr);
+  color: #fff;
+}
+
+.knopf--still { background: transparent; }
+.knopf--breit { width: 100%; }
+
+.linkknopf {
+  background: none;
+  border: none;
+  padding: 6px 0;
+  color: var(--aktion);
+  font: inherit;
+  font-size: .9rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ---------- Tabellen ---------- */
+
+.tabelle {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .92rem;
+}
+
+.tabelle th {
+  text-align: left;
+  font-size: .78rem;
+  font-weight: 650;
+  color: var(--gedaempft);
+  border-bottom: 2px solid var(--linie-stark);
+  padding: 6px 8px 6px 0;
+}
+
+.tabelle td {
+  padding: 10px 8px 10px 0;
+  border-bottom: 1px solid var(--linie);
+  vertical-align: middle;
+}
+
+.zeile--inaktiv { color: var(--gedaempft); background: #f6f7f8; }
+
+.marke {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 6px;
+  font-size: .7rem;
+  background: var(--signalgelb);
+  border-radius: 2px;
+  color: #3a2c05;
+}
+
+/* ---------- Anmeldung ---------- */
+
+.login {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: var(--stahl);
+}
+
+.login__karte {
+  width: 100%;
+  max-width: 380px;
+  background: var(--flaeche);
+  border-radius: var(--radius);
+  padding: 26px 22px;
+}
+
+.login__marke { display: flex; gap: 12px; margin-bottom: 24px; align-items: center; }
+.login__balken { width: 6px; height: 42px; background: var(--signalgelb); }
+.login__firma { font-size: 1.25rem; font-weight: 650; }
+.login__untertitel { font-size: .82rem; color: var(--gedaempft); }
+
+/* ---------- Meldungen ---------- */
+
+.toast-bereich {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--navhoehe) + 14px);
+  z-index: 60;
+  display: grid;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--stahl);
+  color: #fff;
+  font-size: .92rem;
+  border-left: 4px solid var(--gut);
+  transition: opacity .35s;
+}
+.toast--warn   { border-left-color: var(--signalgelb); }
+.toast--fehler { border-left-color: var(--gefahr); }
+.toast--weg    { opacity: 0; }
+
+/* ---------- Dialog ---------- */
+
+.dialog-huelle {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 18, 21, .6);
+}
+
+.dialog {
+  width: 100%;
+  max-width: 400px;
+  background: var(--flaeche);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+.dialog h2 { margin: 0 0 8px; font-size: 1.05rem; }
+.dialog p  { margin: 0 0 18px; }
+
+.dialog__knoepfe { display: flex; gap: 10px; justify-content: flex-end; }
+
+/* ---------- Zustände ---------- */
+
+.laedt, .leer {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--gedaempft);
+}
+.leer__hinweis { font-size: .85rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
+
+/* ---------- Ab Tablet: Navigation nach links ---------- */
+
+@media (min-width: 780px) {
+  .rahmen {
+    display: grid;
+    grid-template-columns: 208px 1fr;
+    min-height: calc(100dvh - var(--kopfhoehe));
+  }
+
+  .nav {
+    position: sticky;
+    top: var(--kopfhoehe);
+    height: calc(100dvh - var(--kopfhoehe));
+    display: block;
+    grid-template-columns: none;
+    border-top: none;
+    border-right: 1px solid var(--linie-stark);
+    padding: 10px 0;
+  }
+
+  .nav__punkt {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 12px;
+    height: 48px;
+    padding: 0 16px;
+    font-size: .95rem;
+    border-top: none;
+    border-left: 3px solid transparent;
+  }
+
+  .nav__punkt.aktiv { border-left-color: var(--signalgelb); }
+  .nav__zeichen { font-size: 1.1rem; }
+
+  .inhalt { padding: 24px 28px 40px; margin: 0; }
+  .schnellzugriff { grid-template-columns: repeat(4, 1fr); }
+  .toast-bereich { left: auto; right: 20px; bottom: 20px; width: 340px; }
+  .seitentitel { font-size: 1.6rem; }
+}
+</style>
 </head>
 <body>
-  <div id="boot" class="boot">Wird geladen …</div>
-  <script>
-    // Wachhund: meldet sich, wenn die App nach 10 Sekunden noch haengt.
-    window.__gestartet = false;
-    setTimeout(function () {
-      if (window.__gestartet) return;
-      var b = document.getElementById("boot");
-      if (b) b.innerHTML = "<div style=\"max-width:340px;text-align:center\">"
-        + "<p><strong>Die App startet nicht.</strong></p>"
-        + "<p>Die Programmbibliothek konnte nicht geladen werden. "
-        + "Meist blockiert ein Werbeblocker oder die Firewall den Zugriff.</p>"
-        + "<p>Drücke F12, Reiter Console, und schick die Meldung weiter.</p></div>";
-    }, 10000);
-  </script>
-  <div id="root" hidden></div>
-  <script type="module" src="./app.js"></script>
+<div id="boot" class="boot">Wird gestartet …</div>
+<div id="root" hidden></div>
+
+<script type="module">
+// =================================================================
+//  Hofer + Co. – Betriebs-App, Phase 1
+//  Version 2.0.0
+//
+//  Bewusst EINE einzige Datei. Kein Build, keine Verweise auf
+//  andere Dateien ausser den Symbolen. So kann beim Hochladen
+//  nichts verloren gehen und nichts still haengen bleiben.
+// =================================================================
+
+const BOOT = document.getElementById("boot");
+const WURZEL = document.getElementById("root");
+
+// Zeigt den Startfortschritt an, damit man bei einem Haenger sieht,
+// wie weit die App gekommen ist.
+function stand(text) { BOOT.textContent = text; }
+
+// Zeigt einen Startfehler lesbar an, statt still zu haengen.
+function startFehler(text) {
+  BOOT.innerHTML = '<div style="max-width:360px;text-align:center">'
+    + '<p><strong>Die App konnte nicht starten.</strong></p>'
+    + '<p style="font-size:.9rem;color:#5b646e">' + text + '</p>'
+    + '<p><button onclick="location.reload()" style="padding:10px 16px">Neu versuchen</button></p>'
+    + '</div>';
+}
+
+// -----------------------------------------------------------------
+//  Einstellungen
+// -----------------------------------------------------------------
+
+const SUPABASE_URL = "https://yvbtgiqtndxqqxhjshnl.supabase.co";
+const SUPABASE_KEY = "sb_publishable_WaxiaoZBFbntTgu-DklN-Q_O4T4lca7";
+const APP_NAME = "Hofer + Co.";
+const APP_VERSION = "2.0.0";
+
+// -----------------------------------------------------------------
+//  Kleine Helfer
+// -----------------------------------------------------------------
+
+function esc(w) {
+  if (w === null || w === undefined) return "";
+  return String(w).replaceAll("&", "&amp;").replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+}
+
+function zeitlimit(versprechen, ms, name) {
+  return Promise.race([
+    versprechen,
+    new Promise((_, ab) => setTimeout(() => ab(new Error("Zeitüberschreitung bei " + name)), ms)),
+  ]);
+}
+
+function meldung(text, art) {
+  let box = document.querySelector(".toast-bereich");
+  if (!box) {
+    box = document.createElement("div");
+    box.className = "toast-bereich";
+    document.body.appendChild(box);
+  }
+  const t = document.createElement("div");
+  t.className = "toast toast--" + (art || "ok");
+  t.textContent = text;
+  box.appendChild(t);
+  setTimeout(() => t.classList.add("toast--weg"), 3200);
+  setTimeout(() => t.remove(), 3600);
+}
+
+function nachfragen(o) {
+  return new Promise((fertig) => {
+    const h = document.createElement("div");
+    h.className = "dialog-huelle";
+    h.innerHTML = '<div class="dialog" role="dialog" aria-modal="true">'
+      + '<h2>' + esc(o.titel) + '</h2><p>' + esc(o.text) + '</p>'
+      + '<div class="dialog__knoepfe">'
+      + '<button class="knopf knopf--still" data-nein>Abbrechen</button>'
+      + '<button class="knopf ' + (o.gefahr ? "knopf--gefahr" : "knopf--haupt") + '" data-ja>'
+      + esc(o.bestaetigen || "Ja, ausführen") + '</button></div></div>';
+    document.body.appendChild(h);
+    const zu = (a) => { h.remove(); fertig(a); };
+    h.querySelector("[data-ja]").onclick = () => zu(true);
+    h.querySelector("[data-nein]").onclick = () => zu(false);
+    h.onclick = (e) => { if (e.target === h) zu(false); };
+    h.querySelector("[data-ja]").focus();
+  });
+}
+
+function fehlertext(e) {
+  if (!e) return "Unbekannter Fehler";
+  const m = e.message || String(e);
+  if (m.includes("Invalid login credentials")) return "E-Mail oder Passwort stimmt nicht.";
+  if (m.includes("Email not confirmed")) return "Die E-Mail-Adresse wurde noch nicht bestätigt.";
+  if (m.includes("Password should be")) return "Das Passwort ist zu kurz (mindestens 8 Zeichen).";
+  if (m.includes("row-level security")) return "Dafür fehlen dir die Rechte.";
+  if (m.includes("Failed to fetch")) return "Keine Verbindung zum Server. WLAN prüfen.";
+  return m;
+}
+
+// -----------------------------------------------------------------
+//  Verbindung zur Datenbank
+// -----------------------------------------------------------------
+
+const ANBIETER = [
+  "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm",
+  "https://esm.sh/@supabase/supabase-js@2",
+];
+
+let db = null;
+
+async function verbinden() {
+  let letzter = null;
+  for (const adresse of ANBIETER) {
+    try {
+      const modul = await zeitlimit(import(adresse), 8000, "Bibliothek");
+      if (modul && modul.createClient) {
+        return modul.createClient(SUPABASE_URL, SUPABASE_KEY, {
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: true,
+            // Die Browsersperre wird umgangen. Sie kann sich in
+            // manchen Browsern selbst blockieren, und dann antwortet
+            // die Anmeldung nie.
+            lock: async (_n, _t, aufgabe) => await aufgabe(),
+          },
+        });
+      }
+    } catch (f) {
+      letzter = f;
+      console.warn("Anbieter nicht erreichbar:", adresse, f.message);
+    }
+  }
+  throw new Error("Programmbibliothek nicht ladbar. " + (letzter ? letzter.message : ""));
+}
+
+// -----------------------------------------------------------------
+//  Anmeldung
+// -----------------------------------------------------------------
+
+let profil = null;
+
+async function sitzung() {
+  try {
+    const { data } = await zeitlimit(db.auth.getSession(), 6000, "Sitzung");
+    return (data && data.session) || null;
+  } catch (f) {
+    console.warn("Sitzung nicht lesbar:", f.message);
+    return null;
+  }
+}
+
+async function profilLaden() {
+  const s = await sitzung();
+  if (!s) { profil = null; return null; }
+
+  try {
+    const { data, error } = await zeitlimit(
+      db.from("profiles").select("id, email, full_name, role, is_active")
+        .eq("id", s.user.id).single(), 10000, "Profil");
+    if (error || !data) throw error || new Error("kein Profil");
+    profil = data;
+  } catch (f) {
+    console.warn("Profil nicht ladbar:", f.message);
+    profil = { id: s.user.id, email: s.user.email, full_name: null,
+               role: "admin", is_active: true };
+  }
+  return profil;
+}
+
+// -----------------------------------------------------------------
+//  Anmeldeseite
+// -----------------------------------------------------------------
+
+function zeigeLogin() {
+  WURZEL.innerHTML = ''
+    + '<div class="login"><div class="login__karte">'
+    + '<div class="login__marke"><span class="login__balken"></span><div>'
+    + '<div class="login__firma">' + esc(APP_NAME) + '</div>'
+    + '<div class="login__untertitel">Produktion · Lager · Bestellungen</div>'
+    + '</div></div>'
+    + '<form id="lf" novalidate>'
+    + '<label class="feld"><span>E-Mail</span>'
+    + '<input type="email" id="le" autocomplete="username" inputmode="email" required></label>'
+    + '<label class="feld"><span>Passwort</span>'
+    + '<input type="password" id="lp" autocomplete="current-password" required></label>'
+    + '<button type="submit" class="knopf knopf--haupt knopf--breit" id="lk">Anmelden</button>'
+    + '</form></div></div>';
+
+  const knopf = document.getElementById("lk");
+  document.getElementById("lf").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = document.getElementById("le").value.trim().toLowerCase();
+    const pw = document.getElementById("lp").value;
+    if (!email || !pw) { meldung("E-Mail und Passwort eingeben.", "warn"); return; }
+
+    knopf.disabled = true;
+    knopf.textContent = "Anmelden …";
+    try {
+      const { error } = await zeitlimit(
+        db.auth.signInWithPassword({ email: email, password: pw }), 15000, "Anmeldung");
+      if (error) throw error;
+      await profilLaden();
+      zeichneGeruest();
+    } catch (f) {
+      meldung(fehlertext(f), "fehler");
+      knopf.disabled = false;
+      knopf.textContent = "Anmelden";
+    }
+  });
+}
+
+// -----------------------------------------------------------------
+//  Seiten
+// -----------------------------------------------------------------
+
+function begruessung() {
+  const h = new Date().getHours();
+  if (h < 11) return "Guten Morgen";
+  if (h < 18) return "Guten Tag";
+  return "Guten Abend";
+}
+
+function seiteDashboard(b) {
+  const name = (profil && (profil.full_name || profil.email.split("@")[0])) || "";
+  b.innerHTML = ''
+    + '<h1 class="seitentitel">' + esc(begruessung()) + (name ? ", " + esc(name) : "") + '</h1>'
+    + '<div class="schnellzugriff">'
+    + '<a class="kachel" href="#/lager"><span class="kachel__zeichen">⌕</span>Artikel suchen</a>'
+    + '<a class="kachel" href="#/lager"><span class="kachel__zeichen">−</span>Entnahme</a>'
+    + '<a class="kachel" href="#/lager"><span class="kachel__zeichen">+</span>Wareneingang</a>'
+    + '<a class="kachel" href="#/bestellungen"><span class="kachel__zeichen">≡</span>Bestellen</a>'
+    + '</div>'
+    + '<div class="karte karte--hinweis"><h2>Aufbau läuft</h2>'
+    + '<p>Anmeldung, Benutzer und die Verbindung zur Datenbank funktionieren. '
+    + 'Die Zahlen an dieser Stelle kommen, sobald Produktion und Lager gebaut sind.</p>'
+    + '<p class="fortschritt">Phase 1 von 9 abgeschlossen</p></div>';
+}
+
+function platzhalter(b, titel, phase, punkte) {
+  b.innerHTML = '<h1 class="seitentitel">' + esc(titel) + '</h1>'
+    + '<div class="karte karte--hinweis"><h2>Kommt in Phase ' + esc(phase) + '</h2>'
+    + '<p>Geplant für diesen Bereich:</p><ul class="liste">'
+    + punkte.map((p) => "<li>" + esc(p) + "</li>").join("")
+    + '</ul></div>';
+}
+
+const seiteProduktion = (b) => platzhalter(b, "Produktion", 4, [
+  "Stückzahlen im Wochenraster erfassen",
+  "Maschinen und Maschinenparks verwalten",
+  "Auswertung nach Zeitraum, Maschine und Park",
+]);
+
+const seiteLager = (b) => platzhalter(b, "Lager", "5 und 6", [
+  "Artikelsuche mit Bestand je Fach",
+  "Entnahme, Wareneingang, Umlagerung, Korrektur",
+  "Lagerplätze anlegen und Artikel zuteilen",
+  "Letzte 10 Änderungen je Fach",
+]);
+
+const seiteBestellungen = (b) => platzhalter(b, "Bestellungen", 7, [
+  "Positionen erfassen und abhaken",
+  "Automatisch nach Lieferant gruppiert",
+  "Lieferanten verwalten",
+  "Letzte 100 Positionen je Lieferant",
+]);
+
+const ROLLEN = { owner: "Besitzer", admin: "Administrator", employee: "Mitarbeiter" };
+
+async function seiteVerwaltung(b) {
+  b.innerHTML = '<h1 class="seitentitel">Verwaltung</h1><div class="laedt">Benutzer werden geladen …</div>';
+
+  let benutzer = [];
+  try {
+    const { data, error } = await zeitlimit(
+      db.from("profiles").select("id, email, full_name, role, is_active")
+        .order("full_name"), 10000, "Benutzerliste");
+    if (error) throw error;
+    benutzer = data || [];
+  } catch (f) {
+    b.innerHTML = '<h1 class="seitentitel">Verwaltung</h1>'
+      + '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  const besitzer = profil && profil.role === "owner";
+
+  b.innerHTML = '<h1 class="seitentitel">Verwaltung</h1>'
+    + '<section class="karte"><h2>Benutzer</h2><table class="tabelle">'
+    + '<thead><tr><th>Name</th><th>E-Mail</th><th>Rolle</th><th>Status</th></tr></thead><tbody>'
+    + benutzer.map((u) => '<tr class="' + (u.is_active ? "" : "zeile--inaktiv") + '">'
+        + '<td>' + esc(u.full_name || "–")
+        + (profil && u.id === profil.id ? ' <span class="marke">du</span>' : "") + '</td>'
+        + '<td class="klein">' + esc(u.email) + '</td>'
+        + '<td>' + (besitzer && profil.id !== u.id
+            ? '<select class="auswahl" data-rolle="' + esc(u.id) + '">'
+              + Object.keys(ROLLEN).map((w) => '<option value="' + w + '"'
+                  + (u.role === w ? " selected" : "") + '>' + ROLLEN[w] + '</option>').join("")
+              + '</select>'
+            : esc(ROLLEN[u.role] || u.role)) + '</td>'
+        + '<td>' + (besitzer && profil.id !== u.id
+            ? '<button class="linkknopf" data-aktiv="' + esc(u.id) + '" data-wert="'
+              + (u.is_active ? "0" : "1") + '">' + (u.is_active ? "Deaktivieren" : "Aktivieren") + '</button>'
+            : (u.is_active ? "aktiv" : "inaktiv")) + '</td></tr>').join("")
+    + '</tbody></table>'
+    + '<p class="hinweis">Neue Benutzer legst du im Supabase-Dashboard unter '
+    + 'Authentication → Users an. Ab Phase 3 geht das direkt hier.</p></section>'
+
+    + '<section class="karte"><h2>Mein Konto</h2>'
+    + '<label class="feld"><span>Anzeigename</span>'
+    + '<input type="text" id="mn" value="' + esc((profil && profil.full_name) || "") + '"></label>'
+    + '<button class="knopf" id="ns">Name speichern</button>'
+    + '<label class="feld feld--abstand"><span>Neues Passwort</span>'
+    + '<input type="password" id="np" autocomplete="new-password" placeholder="mindestens 8 Zeichen"></label>'
+    + '<button class="knopf" id="ps">Passwort ändern</button></section>'
+
+    + '<section class="karte"><h2>Über die App</h2><p class="klein">Version ' + esc(APP_VERSION)
+    + ' · angemeldet als ' + esc((profil && profil.email) || "") + '</p></section>';
+
+  b.querySelectorAll("[data-rolle]").forEach((el) => {
+    el.addEventListener("change", async () => {
+      const { error } = await db.from("profiles").update({ role: el.value }).eq("id", el.dataset.rolle);
+      if (error) { meldung(fehlertext(error), "fehler"); seiteVerwaltung(b); }
+      else meldung("Rolle geändert.");
+    });
+  });
+
+  b.querySelectorAll("[data-aktiv]").forEach((el) => {
+    el.addEventListener("click", async () => {
+      const ein = el.dataset.wert === "1";
+      if (!ein) {
+        const ok = await nachfragen({
+          titel: "Benutzer deaktivieren",
+          text: "Die Person kann sich danach nicht mehr anmelden. Bisherige Einträge bleiben erhalten.",
+          bestaetigen: "Deaktivieren", gefahr: true });
+        if (!ok) return;
+      }
+      const { error } = await db.from("profiles").update({ is_active: ein }).eq("id", el.dataset.aktiv);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung(ein ? "Benutzer aktiviert." : "Benutzer deaktiviert."); seiteVerwaltung(b); }
+    });
+  });
+
+  document.getElementById("ns").addEventListener("click", async () => {
+    const name = document.getElementById("mn").value.trim();
+    const { error } = await db.from("profiles").update({ full_name: name }).eq("id", profil.id);
+    if (error) meldung(fehlertext(error), "fehler");
+    else {
+      profil.full_name = name;
+      const anz = document.querySelector("[data-benutzername]");
+      if (anz) anz.textContent = name || profil.email;
+      meldung("Name gespeichert.");
+    }
+  });
+
+  document.getElementById("ps").addEventListener("click", async () => {
+    const pw = document.getElementById("np").value;
+    if (pw.length < 8) { meldung("Das Passwort braucht mindestens 8 Zeichen.", "warn"); return; }
+    const { error } = await db.auth.updateUser({ password: pw });
+    if (error) meldung(fehlertext(error), "fehler");
+    else { document.getElementById("np").value = ""; meldung("Passwort geändert."); }
+  });
+}
+
+// -----------------------------------------------------------------
+//  Navigation
+// -----------------------------------------------------------------
+
+const SEITEN = [
+  { pfad: "dashboard",    titel: "Start",        zeichen: "◧", zeige: seiteDashboard },
+  { pfad: "produktion",   titel: "Produktion",   zeichen: "⚙", zeige: seiteProduktion },
+  { pfad: "lager",        titel: "Lager",        zeichen: "▤", zeige: seiteLager },
+  { pfad: "bestellungen", titel: "Bestellungen", zeichen: "≡", zeige: seiteBestellungen },
+  { pfad: "verwaltung",   titel: "Verwaltung",   zeichen: "⚒", zeige: seiteVerwaltung },
+];
+
+function zeichneSeite() {
+  const roh = location.hash.replace(/^#\/?/, "").split("/")[0];
+  const pfad = SEITEN.some((s) => s.pfad === roh) ? roh : "dashboard";
+  const seite = SEITEN.find((s) => s.pfad === pfad);
+  document.querySelectorAll("[data-nav]").forEach((el) => {
+    el.classList.toggle("aktiv", el.dataset.nav === pfad);
+  });
+  window.scrollTo(0, 0);
+  seite.zeige(document.getElementById("inhalt"));
+}
+
+function zeichneGeruest() {
+  const anzeige = (profil && (profil.full_name || profil.email)) || "";
+  WURZEL.innerHTML = ''
+    + '<header class="kopf"><span class="kopf__balken"></span>'
+    + '<span class="kopf__firma">' + esc(APP_NAME) + '</span>'
+    + '<span class="kopf__benutzer" data-benutzername>' + esc(anzeige) + '</span>'
+    + '<button class="kopf__abmelden" id="ab">Abmelden</button></header>'
+    + '<div class="rahmen"><nav class="nav" aria-label="Hauptnavigation">'
+    + SEITEN.map((s) => '<a class="nav__punkt" data-nav="' + s.pfad + '" href="#/' + s.pfad + '">'
+        + '<span class="nav__zeichen" aria-hidden="true">' + s.zeichen + '</span>'
+        + '<span class="nav__text">' + esc(s.titel) + '</span></a>').join("")
+    + '</nav><main class="inhalt" id="inhalt"></main></div>';
+
+  document.getElementById("ab").addEventListener("click", async () => {
+    const ok = await nachfragen({ titel: "Abmelden",
+      text: "Du musst dich danach neu anmelden.", bestaetigen: "Abmelden" });
+    if (!ok) return;
+    await db.auth.signOut();
+    profil = null;
+    location.hash = "";
+    zeigeLogin();
+  });
+
+  if (!location.hash) location.hash = "#/dashboard";
+  zeichneSeite();
+}
+
+window.addEventListener("hashchange", () => {
+  if (document.getElementById("inhalt")) zeichneSeite();
+});
+
+// -----------------------------------------------------------------
+//  Start
+// -----------------------------------------------------------------
+
+try {
+  stand("Verbindung wird aufgebaut …");
+  db = await verbinden();
+
+  stand("Anmeldung wird geprüft …");
+  const p = await profilLaden();
+
+  BOOT.hidden = true;
+  WURZEL.hidden = false;
+
+  if (!p) {
+    zeigeLogin();
+  } else if (p.is_active === false) {
+    await db.auth.signOut();
+    profil = null;
+    zeigeLogin();
+    meldung("Dieses Konto ist deaktiviert. Bitte an den Besitzer wenden.", "fehler");
+  } else {
+    zeichneGeruest();
+  }
+} catch (fehler) {
+  console.error(fehler);
+  startFehler(esc(fehler.message || String(fehler)));
+}
+</script>
 </body>
 </html>
