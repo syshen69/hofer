@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Hofer + Co.</title>
-<meta name="theme-color" content="#1b2026">
+<title>Hudson Tool – Hofer + Co.</title>
+<meta name="theme-color" content="#003884">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="manifest" href="./app.webmanifest">
@@ -18,17 +18,22 @@
    --------------------------------------------------------------- */
 
 :root {
-  --grund: #eef0f2;
+  --grund: #f3f5f8;
   --flaeche: #ffffff;
-  --tinte: #16191c;
-  --gedaempft: #5b646e;
-  --linie: #cfd5db;
-  --linie-stark: #a9b3bc;
+  --tinte: #1d2430;
+  --gedaempft: #5c6675;
+  --linie: #d6dbe3;
+  --linie-stark: #aeb7c4;
 
-  --stahl: #1b2026;
-  --signalgelb: #f0b429;
-  --aktion: #0e5fa8;
-  --aktion-dunkel: #0a4a83;
+  /* Firmenblau aus dem Logo */
+  --marke: #003884;
+  --marke-dunkel: #002b66;
+  --marke-hell: #e8eef7;
+
+  --stahl: #003884;
+  --signalgelb: #003884;
+  --aktion: #003884;
+  --aktion-dunkel: #002b66;
   --warnung: #b5761a;
   --gefahr: #b3261e;
   --gut: #1f7a4d;
@@ -60,6 +65,10 @@ html, body {
   color: var(--gedaempft);
 }
 
+/* Ohne diese Zeile bleibt die Ladeanzeige sichtbar: das display:grid
+   oben ueberstimmt sonst das Ausblenden ueber das hidden-Attribut. */
+.boot[hidden] { display: none; }
+
 /* ---------- Kopfzeile ---------- */
 
 .kopf {
@@ -68,41 +77,37 @@ html, body {
   z-index: 20;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   height: var(--kopfhoehe);
-  padding: 0 12px 0 0;
-  background: var(--stahl);
-  color: #fff;
+  padding: 0 12px;
+  background: var(--flaeche);
+  color: var(--tinte);
+  border-bottom: 2px solid var(--marke);
 }
 
-.kopf__balken {
-  width: 8px;
-  align-self: stretch;
-  background: var(--signalgelb);
-}
-
-.kopf__firma { font-weight: 650; letter-spacing: .01em; }
+.kopf__logo { height: 30px; width: auto; display: block; }
 
 .kopf__benutzer {
   margin-left: auto;
-  color: #b9c2cb;
+  color: var(--gedaempft);
   font-size: .85rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 45%;
+  max-width: 42%;
 }
 
 .kopf__abmelden {
   background: none;
-  border: 1px solid #3c454e;
-  color: #dde3e9;
+  border: 1px solid var(--linie-stark);
+  color: var(--marke);
   border-radius: var(--radius);
   padding: 6px 10px;
   font-size: .8rem;
+  font-weight: 600;
   cursor: pointer;
 }
-.kopf__abmelden:hover { background: #2a3138; }
+.kopf__abmelden:hover { background: var(--marke-hell); }
 
 /* ---------- Grundraster ---------- */
 
@@ -141,9 +146,10 @@ html, body {
 }
 
 .nav__punkt.aktiv {
-  color: var(--tinte);
-  border-top-color: var(--signalgelb);
-  background: #f7f8f9;
+  color: var(--marke);
+  font-weight: 600;
+  border-top-color: var(--marke);
+  background: var(--marke-hell);
 }
 
 .nav__zeichen { font-size: 1.25rem; line-height: 1; }
@@ -171,7 +177,7 @@ html, body {
   font-weight: 650;
 }
 
-.karte--hinweis { border-left: 4px solid var(--signalgelb); }
+.karte--hinweis { border-left: 4px solid var(--marke); }
 .karte--fehler  { border-left: 4px solid var(--gefahr); }
 
 .fortschritt {
@@ -210,8 +216,8 @@ html, body {
   text-align: center;
   padding: 10px;
 }
-.kachel:active { background: #e6e9ec; }
-.kachel__zeichen { font-size: 1.7rem; line-height: 1; color: var(--aktion); }
+.kachel:active { background: var(--marke-hell); }
+.kachel__zeichen { font-size: 1.7rem; line-height: 1; color: var(--marke); }
 
 /* ---------- Formulare ---------- */
 
@@ -325,9 +331,9 @@ a:focus-visible {
   margin-left: 4px;
   padding: 1px 6px;
   font-size: .7rem;
-  background: var(--signalgelb);
+  background: var(--marke);
   border-radius: 2px;
-  color: #3a2c05;
+  color: #fff;
 }
 
 /* ---------- Anmeldung ---------- */
@@ -345,13 +351,22 @@ a:focus-visible {
   max-width: 380px;
   background: var(--flaeche);
   border-radius: var(--radius);
-  padding: 26px 22px;
+  padding: 28px 24px 26px;
 }
 
-.login__marke { display: flex; gap: 12px; margin-bottom: 24px; align-items: center; }
-.login__balken { width: 6px; height: 42px; background: var(--signalgelb); }
-.login__firma { font-size: 1.25rem; font-weight: 650; }
-.login__untertitel { font-size: .82rem; color: var(--gedaempft); }
+.login__marke {
+  margin-bottom: 26px;
+  padding-bottom: 18px;
+  border-bottom: 2px solid var(--marke);
+  text-align: center;
+}
+.login__logo { width: 100%; max-width: 240px; height: auto; }
+.login__untertitel {
+  margin-top: 10px;
+  font-size: .8rem;
+  letter-spacing: .12em;
+  color: var(--gedaempft);
+}
 
 /* ---------- Meldungen ---------- */
 
@@ -369,13 +384,13 @@ a:focus-visible {
 .toast {
   padding: 12px 14px;
   border-radius: var(--radius);
-  background: var(--stahl);
+  background: #1d2430;
   color: #fff;
   font-size: .92rem;
   border-left: 4px solid var(--gut);
   transition: opacity .35s;
 }
-.toast--warn   { border-left-color: var(--signalgelb); }
+.toast--warn   { border-left-color: #c08415; }
 .toast--fehler { border-left-color: var(--gefahr); }
 .toast--weg    { opacity: 0; }
 
@@ -448,7 +463,7 @@ a:focus-visible {
     border-left: 3px solid transparent;
   }
 
-  .nav__punkt.aktiv { border-left-color: var(--signalgelb); }
+  .nav__punkt.aktiv { border-left-color: var(--marke); }
   .nav__zeichen { font-size: 1.1rem; }
 
   .inhalt { padding: 24px 28px 40px; margin: 0; }
@@ -495,7 +510,8 @@ function startFehler(text) {
 const SUPABASE_URL = "https://yvbtgiqtndxqqxhjshnl.supabase.co";
 const SUPABASE_KEY = "sb_publishable_WaxiaoZBFbntTgu-DklN-Q_O4T4lca7";
 const APP_NAME = "Hofer + Co.";
-const APP_VERSION = "2.0.0";
+const APP_UNTERTITEL = "HUDSON TOOL";
+const APP_VERSION = "2.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -637,10 +653,10 @@ async function profilLaden() {
 function zeigeLogin() {
   WURZEL.innerHTML = ''
     + '<div class="login"><div class="login__karte">'
-    + '<div class="login__marke"><span class="login__balken"></span><div>'
-    + '<div class="login__firma">' + esc(APP_NAME) + '</div>'
-    + '<div class="login__untertitel">Produktion · Lager · Bestellungen</div>'
-    + '</div></div>'
+    + '<div class="login__marke">'
+    + '<img class="login__logo" src="./logo.png" alt="Hofer + Co. Präzisionsdrehteile">'
+    + '<div class="login__untertitel">' + esc(APP_UNTERTITEL) + '</div>'
+    + '</div>'
     + '<form id="lf" novalidate>'
     + '<label class="feld"><span>E-Mail</span>'
     + '<input type="email" id="le" autocomplete="username" inputmode="email" required></label>'
@@ -850,8 +866,8 @@ function zeichneSeite() {
 function zeichneGeruest() {
   const anzeige = (profil && (profil.full_name || profil.email)) || "";
   WURZEL.innerHTML = ''
-    + '<header class="kopf"><span class="kopf__balken"></span>'
-    + '<span class="kopf__firma">' + esc(APP_NAME) + '</span>'
+    + '<header class="kopf">'
+    + '<img class="kopf__logo" src="./logo.png" alt="Hofer + Co.">'
     + '<span class="kopf__benutzer" data-benutzername>' + esc(anzeige) + '</span>'
     + '<button class="kopf__abmelden" id="ab">Abmelden</button></header>'
     + '<div class="rahmen"><nav class="nav" aria-label="Hauptnavigation">'
