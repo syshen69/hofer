@@ -882,8 +882,9 @@ const SUPABASE_KEY = "sb_publishable_WaxiaoZBFbntTgu-DklN-Q_O4T4lca7";
 const APP_NAME = "Hofer + Co.";
 const APP_UNTERTITEL = "HUDSON TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
-const LOGIN_ENDUNG = "@hudson.local";
-const APP_VERSION = "6.1.0";
+// Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
+const LOGIN_ENDUNG = "@hoferco.ch";
+const APP_VERSION = "6.2.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -3936,7 +3937,7 @@ async function seiteEinstellungen(b) {
     + '<div><strong>Kontrolle</strong> darf nur Ausschuss und Notizen erfassen.</div>'
     + '<div>Ansehen darf jeder alles.</div></div>'
     + '<p class="hinweis">Neue Benutzer legst du im Supabase-Dashboard unter '
-    + 'Authentication → Users an.</p></section>'
+    + 'Authentication → Users an, als E-Mail den Namen mit @hoferco.ch.</p></section>'
 
     + '<section class="karte"><h2>Mein Konto</h2>'
     + '<label class="feld"><span>Anzeigename</span>'
