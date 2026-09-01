@@ -841,6 +841,27 @@ a:focus-visible {
                     display: inline-block; margin: 1px 0; }
 .platzchip--klein b { font-weight: 700; }
 .suchleiste .knopf--scan { flex: none; }
+
+/* ---------- Großer Foto-Knopf als Overlay ---------- */
+.scan-gross {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 56, 132, 0.9);
+  color: #fff;
+  border: 2px solid rgba(255,255,255,.4);
+  border-radius: 40px;
+  padding: 14px 28px;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 650;
+  cursor: pointer;
+  white-space: nowrap;
+  z-index: 10;
+  -webkit-tap-highlight-color: transparent;
+}
+.scan-gross:active { background: var(--marke); }
 </style>
 </head>
 <body>
@@ -884,7 +905,7 @@ const APP_UNTERTITEL = "HUDSON TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "6.2.0";
+const APP_VERSION = "6.3.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -1382,10 +1403,16 @@ async function zeichneNotizen() {
 
   ziel.querySelectorAll("[data-erledigt]").forEach((el) => {
     el.onchange = async () => {
+      el.checked = false;   // erst nach Bestätigung wirklich abhaken
+      const ok = await nachfragen({
+        titel: "Notiz erledigt?",
+        text: "Ist diese Aufgabe wirklich abgeschlossen?",
+        bestaetigen: "Ja, erledigt" });
+      if (!ok) return;
       const { error } = await db.from("todos").update({
         is_done: true, done_at: new Date().toISOString(), done_by: profil.id
       }).eq("id", el.dataset.erledigt);
-      if (error) { meldung(fehlertext(error), "fehler"); el.checked = false; }
+      if (error) { meldung(fehlertext(error), "fehler"); }
       else { meldung("Erledigt."); zeichneNotizen(); }
     };
   });
@@ -1575,6 +1602,21 @@ async function loeschen(o) {
   if (error) { meldung(fehlertext(error), "fehler"); return false; }
   meldung("Gelöscht.");
   return true;
+}
+
+// Drei Rückfragen für Admins bei besonders kritischen Aktionen.
+async function dreiNachfragen(was, was2, warnung) {
+  const a = await nachfragen({ titel: was + " – Schritt 1 von 3",
+    text: 'Soll ' + was2 + ' wirklich gelöscht werden? Deaktivieren wäre der sichere Weg.',
+    bestaetigen: "Weiter", gefahr: true });
+  if (!a) return false;
+  const b = await nachfragen({ titel: was + " – Schritt 2 von 3",
+    text: (warnung ? warnung + " " : "") + "Alles daran (Stückzahlen, Aufträge) geht verloren.",
+    bestaetigen: "Ja, ich will löschen", gefahr: true });
+  if (!b) return false;
+  return await nachfragen({ titel: was + " – Letzte Bestätigung",
+    text: "Das ist unwiderruflich. Danach gibt es kein Zurück.",
+    bestaetigen: "Endgültig löschen", gefahr: true });
 }
 
 // Zwei Rückfragen hintereinander für wirklich kritische Aktionen.
@@ -2257,17 +2299,19 @@ function ansichtMaschinen(ziel, b) {
       const p = prod.parks.find((x) => x.id === el.dataset.parkWeg) || {};
       const anzahl = prod.maschinen.filter((m) => m.park_id === p.id).length;
 
-      const ok = await doppeltNachfragen(
-        { titel: "Maschinenpark löschen",
-          text: 'Soll "' + p.name + '" wirklich gelöscht werden? '
-              + "Löschen ist endgültig. Deaktivieren wäre der sichere Weg.",
-          bestaetigen: "Weiter zum Löschen", gefahr: true },
-        { titel: "Wirklich endgültig löschen?",
-          text: anzahl > 0
-            ? "Achtung: In diesem Park sind noch " + anzahl + " Maschinen. "
-              + "Das Löschen wird deshalb voraussichtlich abgelehnt."
-            : "Letzte Rückfrage. Danach ist der Maschinenpark unwiderruflich weg.",
-          bestaetigen: "Endgültig löschen", gefahr: true });
+      const bestPark = istAdmin()
+        ? await dreiNachfragen(
+            "Maschinenpark löschen",
+            'Park "' + p.name + '"',
+            anzahl > 0 ? "Achtung: " + anzahl + " Maschinen sind noch zugeordnet." : "")
+        : await doppeltNachfragen(
+            { titel: "Maschinenpark löschen",
+              text: 'Soll "' + p.name + '" wirklich gelöscht werden? Deaktivieren wäre sicherer.',
+              bestaetigen: "Weiter zum Löschen", gefahr: true },
+            { titel: "Wirklich endgültig löschen?",
+              text: "Letzte Rückfrage. Danach ist der Park unwiderruflich weg.",
+              bestaetigen: "Endgültig löschen", gefahr: true });
+      const ok = bestPark;
       if (!ok) return;
 
       const { error } = await db.from("machine_parks").delete().eq("id", p.id);
@@ -2279,15 +2323,15 @@ function ansichtMaschinen(ziel, b) {
   ziel.querySelectorAll("[data-masch-weg]").forEach((el) => {
     el.onclick = async () => {
       const m = prod.maschinen.find((x) => x.id === el.dataset.maschWeg) || {};
-      const ok = await doppeltNachfragen(
-        { titel: "Maschine löschen",
-          text: 'Soll "' + m.name + '" wirklich gelöscht werden? '
-              + "Wenn daran Stückzahlen oder Aufträge hängen, lehnt die Datenbank das ab. "
-              + "Deaktivieren wäre der sichere Weg.",
-          bestaetigen: "Weiter zum Löschen", gefahr: true },
-        { titel: "Wirklich endgültig löschen?",
-          text: "Letzte Rückfrage. Danach ist die Maschine unwiderruflich weg.",
-          bestaetigen: "Endgültig löschen", gefahr: true });
+      const ok = istAdmin()
+        ? await dreiNachfragen("Maschine löschen", '"' + m.name + '"', "")
+        : await doppeltNachfragen(
+            { titel: "Maschine löschen",
+              text: 'Soll "' + m.name + '" wirklich gelöscht werden? Deaktivieren wäre sicherer.',
+              bestaetigen: "Weiter zum Löschen", gefahr: true },
+            { titel: "Wirklich endgültig löschen?",
+              text: "Letzte Rückfrage. Danach ist die Maschine unwiderruflich weg.",
+              bestaetigen: "Endgültig löschen", gefahr: true });
       if (!ok) return;
 
       const { error } = await db.from("machines").delete().eq("id", m.id);
@@ -2463,13 +2507,14 @@ async function scannen(startModus) {
     + '<canvas id="scan-bild" hidden></canvas>'
     + '<div class="scanner__rahmen" id="scan-rahmen" hidden></div>'
     + '<div class="scanner__auswahl" id="scan-auswahl" hidden></div>'
+    + '<button id="scan-gross" class="scan-gross" hidden>📷 Foto aufnehmen</button>'
     + '</div>'
     + '<div class="scanner__vorschlaege" id="scan-vorschlaege" hidden></div>'
     + '<div class="scanner__leiste">'
     + '<div id="scan-text">Kamera wird gestartet …</div>'
     + '<div class="scanner__knoepfe">'
     + '<button class="knopf knopf--still" id="scan-zu">Abbrechen</button>'
-    + '<button class="knopf knopf--haupt" id="scan-tun" hidden>Foto aufnehmen</button>'
+    + '<button class="knopf knopf--haupt" id="scan-tun" hidden>Weiter</button>'
     + '</div></div></div>';
   document.body.appendChild(huelle);
 
@@ -2527,10 +2572,10 @@ async function scannen(startModus) {
 
       if (neu === "foto") {
         rahmen.hidden = true;
-        tun.hidden = false;
+        tun.hidden = true;
         zustand = "aufnehmen";
-        tun.textContent = "Foto aufnehmen";
-        text.textContent = "Nummer gut lesbar ins Bild bringen";
+        gross.hidden = false;
+        text.textContent = "Nummer ins Bild bringen, dann Knopf drücken";
       } else {
         rahmen.hidden = false;
         tun.hidden = true;
@@ -2618,6 +2663,7 @@ async function scannen(startModus) {
       start = null;
       if (kasten && kasten.w > 20 && kasten.h > 12) {
         tun.hidden = false;
+        gross.hidden = true;
         zustand = "erkennen";
         tun.textContent = "Text erkennen";
         text.textContent = "Rahmen passt? Dann auf Text erkennen";
@@ -2648,6 +2694,7 @@ async function scannen(startModus) {
       bildAufgenommen = true;
       kasten = null;
       auswahl.hidden = true;
+      gross.hidden = true;
       tun.hidden = true;
       text.textContent = "Rahmen über die Artikelnummer ziehen";
     };
@@ -2747,15 +2794,16 @@ async function scannen(startModus) {
       auswahl.hidden = true;
       kasten = null;
       zustand = "aufnehmen";
-      tun.hidden = false;
-      tun.textContent = "Foto aufnehmen";
-      text.textContent = "Nummer gut lesbar ins Bild bringen";
+      gross.hidden = false;
+      tun.hidden = true;
+      text.textContent = "Nummer ins Bild bringen, dann Knopf drücken";
     };
 
     const zeigeNeuKnopf = () => {
       zustand = "neu";
       tun.hidden = false;
       tun.textContent = "Neues Foto";
+      gross.hidden = true;
     };
 
     // Ein einziger Knopf, der je nach Zustand etwas anderes tut.
@@ -2767,6 +2815,11 @@ async function scannen(startModus) {
 
     tun.onclick = knopfDruck;
     tun.addEventListener("touchend", (e) => { e.preventDefault(); knopfDruck(); });
+
+    const gross = document.getElementById("scan-gross");
+    gross.onclick = fotoAufnehmen;
+    gross.addEventListener("touchend", (e) => { e.preventDefault(); fotoAufnehmen(); });
+
     modusSetzen(modus);
   });
 }
@@ -3369,8 +3422,14 @@ async function artikelDialog(artikel, b, vorgabeNummer) {
     seiteLager(b);
   };
 
-  document.getElementById("ad-ja").onclick = speichern;
+  const adJa = document.getElementById("ad-ja");
+  adJa.type = "button";
+  adJa.onclick = (e) => { e.preventDefault(); speichern(); };
   document.getElementById("ad-form").onsubmit = (e) => { e.preventDefault(); speichern(); };
+  // Sicherstellung: Enter in jedem Feld des Formulars löst auch speichern aus.
+  document.getElementById("ad-form").querySelectorAll("input").forEach((el) => {
+    el.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); speichern(); } });
+  });
 
   const weg = document.getElementById("ad-weg");
   if (weg) weg.onclick = async () => {
@@ -3644,6 +3703,27 @@ async function bestOffen(ziel, b) {
     };
   });
 
+  ziel.querySelectorAll("[data-bearb-best]").forEach((el) => {
+    el.onclick = async () => {
+      const z = liste.find((x) => x.id === el.dataset.bearbBest);
+      if (!z) return;
+      const w = await dialogFelder({ titel: "Bestellung bearbeiten",
+        felder: [
+          { name: "menge", label: "Menge", typ: "number", wert: z.quantity, pflicht: true },
+          { name: "frist", label: "Bis wann", typ: "date", wert: z.needed_by || "" },
+          { name: "notiz", label: "Notiz", wert: z.note || "" },
+        ], bestaetigen: "Speichern" });
+      if (!w) return;
+      const { error } = await db.from("order_items").update({
+        quantity: Math.max(1, Math.round(w.menge)),
+        needed_by: w.frist || null,
+        note: w.notiz || null,
+      }).eq("id", z.id);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Gespeichert."); seiteBestellungen(b); }
+    };
+  });
+
   ziel.querySelectorAll("[data-bweg]").forEach((el) => {
     el.onclick = async () => {
       const z = liste.find((x) => x.id === el.dataset.bweg) || {};
@@ -3653,6 +3733,27 @@ async function bestOffen(ziel, b) {
         text: (a.article_number || "Die Position") + " wird endgültig aus der Liste entfernt. "
             + "Zum Nachvollziehen wäre \"Storniert\" der bessere Weg." });
       if (w) seiteBestellungen(b);
+    };
+  });
+
+  ziel.querySelectorAll("[data-bearb-best]").forEach((el) => {
+    el.onclick = async () => {
+      const z = liste.find((x) => x.id === el.dataset.bearbBest);
+      if (!z) return;
+      const w = await dialogFelder({ titel: "Bestellung bearbeiten",
+        felder: [
+          { name: "menge", label: "Menge", typ: "number", wert: z.quantity, pflicht: true },
+          { name: "frist", label: "Bis wann", typ: "date", wert: z.needed_by || "" },
+          { name: "notiz", label: "Notiz", wert: z.note || "" },
+        ], bestaetigen: "Speichern" });
+      if (!w) return;
+      const { error } = await db.from("order_items").update({
+        quantity: Math.max(1, Math.round(w.menge)),
+        needed_by: w.frist || null,
+        note: w.notiz || null,
+      }).eq("id", z.id);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Gespeichert."); seiteBestellungen(b); }
     };
   });
 
