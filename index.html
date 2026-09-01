@@ -1,0 +1,2305 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hudson Tool – Hofer + Co.</title>
+<meta name="theme-color" content="#003884">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="./app.webmanifest">
+<link rel="icon" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<style>
+/* ---------------------------------------------------------------
+   Gestaltung
+   Gedacht für die Werkstatt: hoher Kontrast, große Flächen zum
+   Antippen, Zahlen in gleicher Breite damit Spalten fluchten.
+   --------------------------------------------------------------- */
+
+:root {
+  --grund: #f3f5f8;
+  --flaeche: #ffffff;
+  --tinte: #1d2430;
+  --gedaempft: #5c6675;
+  --linie: #d6dbe3;
+  --linie-stark: #aeb7c4;
+
+  /* Firmenblau aus dem Logo */
+  --marke: #003884;
+  --marke-dunkel: #002b66;
+  --marke-hell: #e8eef7;
+
+  --stahl: #003884;
+  --signalgelb: #003884;
+  --aktion: #003884;
+  --aktion-dunkel: #002b66;
+  --warnung: #b5761a;
+  --gefahr: #b3261e;
+  --gut: #1f7a4d;
+
+  --kopfhoehe: 52px;
+  --navhoehe: 62px;
+  --radius: 4px;
+
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--grund);
+  color: var(--tinte);
+  font-size: 16px;
+  line-height: 1.45;
+  -webkit-text-size-adjust: 100%;
+}
+
+.boot {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  color: var(--gedaempft);
+}
+
+/* Ohne diese Zeile bleibt die Ladeanzeige sichtbar: das display:grid
+   oben ueberstimmt sonst das Ausblenden ueber das hidden-Attribut. */
+.boot[hidden] { display: none; }
+
+/* ---------- Kopfzeile ---------- */
+
+.kopf {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: var(--kopfhoehe);
+  padding: 0 12px;
+  background: var(--flaeche);
+  color: var(--tinte);
+  border-bottom: 2px solid var(--marke);
+}
+
+.kopf__logo { height: 30px; width: auto; display: block; }
+
+.kopf__benutzer {
+  margin-left: auto;
+  color: var(--gedaempft);
+  font-size: .85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 42%;
+}
+
+.kopf__abmelden {
+  background: none;
+  border: 1px solid var(--linie-stark);
+  color: var(--marke);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  font-size: .8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.kopf__abmelden:hover { background: var(--marke-hell); }
+
+/* ---------- Grundraster ---------- */
+
+.rahmen { display: block; }
+
+.inhalt {
+  padding: 16px 14px calc(var(--navhoehe) + 28px);
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* ---------- Navigation ---------- */
+
+.nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  background: var(--flaeche);
+  border-top: 1px solid var(--linie-stark);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.nav__punkt {
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  height: var(--navhoehe);
+  text-decoration: none;
+  color: var(--gedaempft);
+  font-size: .7rem;
+  border-top: 3px solid transparent;
+}
+
+.nav__punkt.aktiv {
+  color: var(--marke);
+  font-weight: 600;
+  border-top-color: var(--marke);
+  background: var(--marke-hell);
+}
+
+.nav__zeichen { font-size: 1.25rem; line-height: 1; }
+
+/* ---------- Seiteninhalt ---------- */
+
+.seitentitel {
+  margin: 4px 0 16px;
+  font-size: 1.4rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.karte {
+  background: var(--flaeche);
+  border: 1px solid var(--linie);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+.karte h2 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.karte--hinweis { border-left: 4px solid var(--marke); }
+.karte--fehler  { border-left: 4px solid var(--gefahr); }
+
+.fortschritt {
+  margin: 12px 0 0;
+  color: var(--gedaempft);
+  font-size: .85rem;
+}
+
+.liste { margin: 0; padding-left: 20px; }
+.liste li { margin-bottom: 4px; }
+
+.hinweis { color: var(--gedaempft); font-size: .85rem; margin: 12px 0 0; }
+.klein { font-size: .85rem; color: var(--gedaempft); }
+
+/* ---------- Schnellzugriff ---------- */
+
+.schnellzugriff {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.kachel {
+  display: grid;
+  place-items: center;
+  gap: 6px;
+  min-height: 96px;
+  background: var(--flaeche);
+  border: 1px solid var(--linie-stark);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: var(--tinte);
+  font-weight: 600;
+  font-size: .95rem;
+  text-align: center;
+  padding: 10px;
+}
+.kachel:active { background: var(--marke-hell); }
+.kachel__zeichen { font-size: 1.7rem; line-height: 1; color: var(--marke); }
+
+/* ---------- Formulare ---------- */
+
+.feld { display: block; margin-bottom: 14px; }
+.feld--abstand { margin-top: 22px; }
+
+.feld > span {
+  display: block;
+  margin-bottom: 5px;
+  font-size: .85rem;
+  font-weight: 600;
+  color: var(--gedaempft);
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="date"],
+select {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  font: inherit;
+  color: var(--tinte);
+  background: var(--flaeche);
+  border: 1px solid var(--linie-stark);
+  border-radius: var(--radius);
+}
+
+input:focus-visible,
+select:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid var(--aktion);
+  outline-offset: 1px;
+}
+
+.auswahl { min-height: 38px; padding: 4px 8px; }
+
+/* ---------- Knöpfe ---------- */
+
+.knopf {
+  min-height: 46px;
+  padding: 11px 18px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--tinte);
+  background: var(--flaeche);
+  border: 1px solid var(--linie-stark);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.knopf:active { transform: translateY(1px); }
+.knopf:disabled { opacity: .55; cursor: default; }
+
+.knopf--haupt {
+  background: var(--aktion);
+  border-color: var(--aktion);
+  color: #fff;
+}
+.knopf--haupt:hover:not(:disabled) { background: var(--aktion-dunkel); }
+
+.knopf--gefahr {
+  background: var(--gefahr);
+  border-color: var(--gefahr);
+  color: #fff;
+}
+
+.knopf--still { background: transparent; }
+.knopf--breit { width: 100%; }
+
+.linkknopf {
+  background: none;
+  border: none;
+  padding: 6px 0;
+  color: var(--aktion);
+  font: inherit;
+  font-size: .9rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ---------- Tabellen ---------- */
+
+.tabelle {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .92rem;
+}
+
+.tabelle th {
+  text-align: left;
+  font-size: .78rem;
+  font-weight: 650;
+  color: var(--gedaempft);
+  border-bottom: 2px solid var(--linie-stark);
+  padding: 6px 8px 6px 0;
+}
+
+.tabelle td {
+  padding: 10px 8px 10px 0;
+  border-bottom: 1px solid var(--linie);
+  vertical-align: middle;
+}
+
+.zeile--inaktiv { color: var(--gedaempft); background: #f6f7f8; }
+
+.marke {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 6px;
+  font-size: .7rem;
+  background: var(--marke);
+  border-radius: 2px;
+  color: #fff;
+}
+
+/* ---------- Anmeldung ---------- */
+
+.login {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: var(--stahl);
+}
+
+.login__karte {
+  width: 100%;
+  max-width: 380px;
+  background: var(--flaeche);
+  border-radius: var(--radius);
+  padding: 28px 24px 26px;
+}
+
+.login__marke {
+  margin-bottom: 26px;
+  padding-bottom: 18px;
+  border-bottom: 2px solid var(--marke);
+  text-align: center;
+}
+.login__logo { width: 100%; max-width: 240px; height: auto; }
+.login__untertitel {
+  margin-top: 10px;
+  font-size: .8rem;
+  letter-spacing: .12em;
+  color: var(--gedaempft);
+}
+
+/* ---------- Meldungen ---------- */
+
+.toast-bereich {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--navhoehe) + 14px);
+  z-index: 60;
+  display: grid;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: #1d2430;
+  color: #fff;
+  font-size: .92rem;
+  border-left: 4px solid var(--gut);
+  transition: opacity .35s;
+}
+.toast--warn   { border-left-color: #c08415; }
+.toast--fehler { border-left-color: var(--gefahr); }
+.toast--weg    { opacity: 0; }
+
+/* ---------- Dialog ---------- */
+
+.dialog-huelle {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 18, 21, .6);
+}
+
+.dialog {
+  width: 100%;
+  max-width: 400px;
+  background: var(--flaeche);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+.dialog h2 { margin: 0 0 8px; font-size: 1.05rem; }
+.dialog p  { margin: 0 0 18px; }
+
+.dialog__knoepfe { display: flex; gap: 10px; justify-content: flex-end; }
+
+/* ---------- Zustände ---------- */
+
+.laedt, .leer {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--gedaempft);
+}
+.leer__hinweis { font-size: .85rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
+
+/* ---------- Ab Tablet: Navigation nach links ---------- */
+
+@media (min-width: 780px) {
+  .rahmen {
+    display: grid;
+    grid-template-columns: 208px 1fr;
+    min-height: calc(100dvh - var(--kopfhoehe));
+  }
+
+  .nav {
+    position: sticky;
+    top: var(--kopfhoehe);
+    height: calc(100dvh - var(--kopfhoehe));
+    display: block;
+    grid-template-columns: none;
+    border-top: none;
+    border-right: 1px solid var(--linie-stark);
+    padding: 10px 0;
+  }
+
+  .nav__punkt {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 12px;
+    height: 48px;
+    padding: 0 16px;
+    font-size: .95rem;
+    border-top: none;
+    border-left: 3px solid transparent;
+  }
+
+  .nav__punkt.aktiv { border-left-color: var(--marke); }
+  .nav__zeichen { font-size: 1.1rem; }
+
+  .inhalt { padding: 24px 28px 40px; margin: 0; }
+  .schnellzugriff { grid-template-columns: repeat(4, 1fr); }
+  .toast-bereich { left: auto; right: 20px; bottom: 20px; width: 340px; }
+  .seitentitel { font-size: 1.6rem; }
+}
+
+/* ---------- Reiter innerhalb einer Seite ---------- */
+.reiter { display: flex; gap: 4px; margin-bottom: 16px;
+          border-bottom: 1px solid var(--linie-stark); }
+.reiter__knopf { background: none; border: none; border-bottom: 3px solid transparent;
+                 padding: 10px 14px; font: inherit; font-weight: 600;
+                 color: var(--gedaempft); cursor: pointer; }
+.reiter__knopf.aktiv { color: var(--marke); border-bottom-color: var(--marke); }
+
+/* ---------- Auswahl des Maschinenparks ---------- */
+.parkwahl { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.parkwahl__knopf { background: var(--flaeche); border: 1px solid var(--linie-stark);
+                   border-radius: 999px; padding: 8px 16px; font: inherit;
+                   font-size: .9rem; cursor: pointer; }
+.parkwahl__knopf.aktiv { background: var(--marke); border-color: var(--marke); color: #fff;
+                         font-weight: 600; }
+
+/* ---------- Zeitsteuerung ---------- */
+.steuerung { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.steuerung__mitte { flex: 1; text-align: center; }
+.steuerung__titel { font-weight: 650; }
+.knopf--klein { min-height: 40px; padding: 8px 14px; font-size: .9rem; }
+
+.moduswahl { display: inline-flex; margin-bottom: 14px;
+             border: 1px solid var(--linie-stark); border-radius: var(--radius);
+             overflow: hidden; }
+.moduswahl__knopf { background: var(--flaeche); border: none; padding: 8px 20px;
+                    font: inherit; font-size: .9rem; cursor: pointer; }
+.moduswahl__knopf.aktiv { background: var(--marke); color: #fff; font-weight: 600; }
+
+/* ---------- Tagesansicht ---------- */
+.tagzeile { display: flex; align-items: center; gap: 12px;
+            padding: 10px 0; border-bottom: 1px solid var(--linie); }
+.tagzeile:last-of-type { border-bottom: none; }
+.tagzeile__name { flex: 1; font-weight: 600; }
+.tagzeile__nr { display: block; font-size: .78rem; font-weight: 400; color: var(--gedaempft); }
+.tagzeile .menge { width: 110px; text-align: right; font-size: 1.1rem; }
+.tagsumme { display: flex; justify-content: space-between; align-items: center;
+            margin-top: 14px; padding-top: 14px; border-top: 2px solid var(--marke);
+            font-size: 1.05rem; }
+.tagsumme strong { font-size: 1.3rem; }
+
+/* ---------- Wochenraster ---------- */
+.karte--raster { padding: 0; overflow: hidden; }
+.rasterrolle { overflow-x: auto; }
+.raster { border-collapse: collapse; width: 100%; font-size: .92rem; }
+.raster th, .raster td { padding: 6px 8px; border-bottom: 1px solid var(--linie);
+                         text-align: center; white-space: nowrap; }
+.raster thead th { font-size: .78rem; color: var(--gedaempft);
+                   border-bottom: 2px solid var(--linie-stark); }
+.th__datum { display: block; font-weight: 400; font-size: .72rem; }
+.raster .fest { position: sticky; left: 0; z-index: 1; background: var(--flaeche);
+                text-align: left; font-weight: 600; min-width: 110px;
+                box-shadow: 1px 0 0 var(--linie); }
+.raster .heute { background: var(--marke-hell); }
+.raster .summe { font-weight: 650; background: #f7f9fc; }
+.raster .fusszeile td, .raster .fusszeile th { border-top: 2px solid var(--marke);
+                                               font-weight: 650; border-bottom: none; }
+.raster .menge { width: 68px; text-align: center; padding: 6px 4px; min-height: 40px; }
+
+/* ---------- Eingabefelder für Mengen ---------- */
+.menge { font-variant-numeric: tabular-nums; }
+.menge--speichert { border-color: var(--marke); background: var(--marke-hell); }
+.menge--gespeichert { border-color: var(--gut); background: #eaf6ef; }
+.menge--fehler { border-color: var(--gefahr); background: #fdeeed; }
+
+/* ---------- Kennzahlen ---------- */
+.kennzahlen { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.kennzahl { background: var(--flaeche); border: 1px solid var(--linie);
+            border-left: 3px solid var(--marke); border-radius: var(--radius); padding: 12px 14px; }
+.kennzahl__titel { font-size: .78rem; color: var(--gedaempft); }
+.kennzahl__wert { font-size: 1.45rem; font-weight: 650; line-height: 1.2; }
+
+/* ---------- Balken je Maschine ---------- */
+.balken { margin-bottom: 12px; }
+.balken__kopf { display: flex; justify-content: space-between; font-size: .9rem;
+                margin-bottom: 4px; }
+.balken__spur { height: 8px; background: var(--grund); border-radius: 999px; overflow: hidden; }
+.balken__fuellung { height: 100%; background: var(--marke); }
+
+/* ---------- Balken der letzten sieben Tage ---------- */
+.wochenbalken { display: grid; grid-template-columns: repeat(7, 1fr);
+                gap: 6px; align-items: end; }
+.wb { text-align: center; }
+.wb__spur { height: 90px; display: flex; align-items: flex-end;
+            background: var(--grund); border-radius: 3px; overflow: hidden; }
+.wb__fuellung { width: 100%; background: var(--marke); min-height: 2px; }
+.wb__wert { font-size: .72rem; margin-top: 4px; }
+.wb__tag { font-size: .75rem; color: var(--gedaempft); }
+.wb__tag--heute { color: var(--marke); font-weight: 650; }
+
+/* ---------- Statusliste auf dem Dashboard ---------- */
+.statusliste { display: grid; gap: 8px; }
+.statuszeile { display: flex; align-items: baseline; gap: 12px; padding: 8px 12px;
+               border-radius: var(--radius); background: var(--grund); }
+.statuszeile__zahl { font-size: 1.2rem; font-weight: 650; min-width: 34px; }
+.statuszeile--warn    { background: #fdf4e3; }
+.statuszeile--gefahr  { background: #fdeeed; }
+.statuszeile--gut     { background: #eef6f1; }
+
+/* ---------- Zeitraumwahl ---------- */
+.zeitraumwahl { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.zeitraumwahl .feld { margin-bottom: 0; }
+.schnellwahl { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; }
+
+/* ---------- Verwaltung von Maschinen ---------- */
+.karte__kopf { display: flex; justify-content: space-between; align-items: baseline;
+               gap: 12px; flex-wrap: wrap; }
+.karte__aktionen { display: flex; gap: 12px; }
+.karte--inaktiv { opacity: .65; }
+.rechts { text-align: right; }
+.stark { font-weight: 650; }
+
+/* ---------- Schalter in den Einstellungen ---------- */
+.schalter { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px;
+            cursor: pointer; }
+.schalter input { width: 20px; height: 20px; margin-top: 2px; flex: none; }
+
+@media (min-width: 780px) {
+  .kennzahlen { grid-template-columns: repeat(4, 1fr); }
+  .wb__spur { height: 120px; }
+}
+
+/* ---------- Startseite ---------- */
+.kopfkarte { display: flex; gap: 16px; align-items: stretch; justify-content: space-between;
+             background: var(--marke); color: #fff; border-radius: var(--radius);
+             padding: 18px 20px; margin-bottom: 14px; }
+.uhr { font-size: 2.6rem; font-weight: 300; line-height: 1; letter-spacing: -.02em; }
+.kopfkarte__datum { font-size: .85rem; opacity: .85; margin-top: 6px; }
+.kopfkarte__wetter { text-align: right; }
+.wetter__grad { font-size: 1.9rem; font-weight: 350; line-height: 1; }
+.wetter__text { font-size: .85rem; opacity: .9; }
+.wetter__rand { font-size: .75rem; opacity: .7; margin-top: 2px; }
+.wetter__feiertag { font-size: .75rem; margin-top: 6px; padding-top: 6px;
+                    border-top: 1px solid rgba(255,255,255,.25); }
+.gruss { margin: 0 0 14px; font-size: 1.15rem; font-weight: 600; }
+
+.warnpunkt { display: inline-block; width: 8px; height: 8px; margin-left: 7px;
+             border-radius: 50%; background: #c08415; vertical-align: middle; }
+
+/* ---------- Notizen ---------- */
+.notizen { display: grid; gap: 2px; }
+.notiz { display: flex; align-items: flex-start; gap: 10px; padding: 9px 0;
+         border-bottom: 1px solid var(--linie); cursor: pointer; }
+.notiz:last-child { border-bottom: none; }
+.notiz input { width: 20px; height: 20px; margin-top: 1px; flex: none; }
+.notiz__text { flex: 1; }
+.notiz__frist { font-size: .78rem; color: var(--gedaempft); white-space: nowrap; }
+.notiz__frist--spaet { color: var(--gefahr); font-weight: 600; }
+
+/* ---------- Maschinenkarten in der Tagesansicht ---------- */
+.mkarten { display: grid; gap: 12px; }
+.mkarte { background: var(--flaeche); border: 1px solid var(--linie);
+          border-radius: var(--radius); padding: 14px 16px; }
+.mkarte__name { font-weight: 650; font-size: 1.05rem; }
+.mkarte__nr { display: block; font-size: .78rem; font-weight: 400; color: var(--gedaempft); }
+.mkarte__eingabe { display: flex; align-items: center; justify-content: space-between;
+                   gap: 12px; margin-top: 12px; }
+.mkarte__label { font-size: .85rem; font-weight: 600; color: var(--gedaempft); }
+.mkarte__label span { display: block; font-weight: 400; font-size: .75rem; }
+.mkarte__eingabe .menge { width: 130px; text-align: right; font-size: 1.25rem; min-height: 52px; }
+.mkarte__leistung { margin-top: 8px; font-size: .85rem; color: var(--gedaempft); }
+.kein-feld { color: var(--gedaempft); }
+
+/* ---------- Auftragszeile ---------- */
+.auftrag { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+           margin-top: 8px; padding: 7px 10px; background: var(--marke-hell);
+           border-radius: var(--radius); font-size: .9rem; }
+.auftrag--leer { background: var(--grund); color: var(--gedaempft); }
+.auftrag__nr { font-weight: 650; letter-spacing: .02em; }
+.auftrag__seit { font-size: .78rem; color: var(--gedaempft); }
+.auftrag .linkknopf { margin-left: auto; }
+
+/* ---------- Wochenraster: Auftrag und Leistung ---------- */
+.fest__auftrag { display: block; font-size: .72rem; font-weight: 400; color: var(--marke); }
+.zelle__leistung { display: block; font-size: .7rem; color: var(--gedaempft); margin-top: 2px; }
+
+/* ---------- Kontrolle ---------- */
+.kzeile { padding: 12px 0; border-bottom: 1px solid var(--linie); }
+.kzeile:last-child { border-bottom: none; }
+.kzeile__oben { display: flex; gap: 10px; align-items: baseline; }
+.kzeile__nr { font-weight: 650; }
+.kzeile__maschine { font-size: .85rem; color: var(--gedaempft); }
+.kzeile__unten { display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+                 margin-top: 8px; font-size: .9rem; }
+.kzeile__ausschuss { color: var(--gefahr); font-weight: 600; }
+.kzeile__unten .knopf { margin-left: auto; }
+.knotiz { font-size: .82rem; color: var(--gedaempft); margin-top: 2px; }
+
+/* ---------- Hinweis bei fehlenden Rechten ---------- */
+.nurlesen { background: var(--marke-hell); border-left: 3px solid var(--marke);
+            padding: 10px 14px; border-radius: var(--radius); font-size: .88rem;
+            margin-bottom: 14px; }
+.rollenhilfe { margin-top: 12px; font-size: .85rem; color: var(--gedaempft);
+               display: grid; gap: 4px; }
+
+/* ---------- Dialoge mit Feldern ---------- */
+.dialog textarea { width: 100%; padding: 10px 12px; font: inherit; color: var(--tinte);
+                   background: var(--flaeche); border: 1px solid var(--linie-stark);
+                   border-radius: var(--radius); resize: vertical; }
+.dialog .feld { margin-bottom: 14px; }
+.feldhinweis { display: block; margin-top: 4px; font-size: .78rem; color: var(--gedaempft); }
+.linkknopf--gefahr { color: var(--gefahr); }
+.nowrap { white-space: nowrap; }
+.balken__fuellung--minus { background: var(--gefahr); }
+
+@media (min-width: 780px) {
+  .uhr { font-size: 3.2rem; }
+  .mkarten { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+<div id="boot" class="boot">Wird gestartet …</div>
+<div id="root" hidden></div>
+
+<script type="module">
+// =================================================================
+//  Hofer + Co. – Betriebs-App, Phase 1
+//  Version 2.0.0
+//
+//  Bewusst EINE einzige Datei. Kein Build, keine Verweise auf
+//  andere Dateien ausser den Symbolen. So kann beim Hochladen
+//  nichts verloren gehen und nichts still haengen bleiben.
+// =================================================================
+
+const BOOT = document.getElementById("boot");
+const WURZEL = document.getElementById("root");
+
+// Zeigt den Startfortschritt an, damit man bei einem Haenger sieht,
+// wie weit die App gekommen ist.
+function stand(text) { BOOT.textContent = text; }
+
+// Zeigt einen Startfehler lesbar an, statt still zu haengen.
+function startFehler(text) {
+  BOOT.innerHTML = '<div style="max-width:360px;text-align:center">'
+    + '<p><strong>Die App konnte nicht starten.</strong></p>'
+    + '<p style="font-size:.9rem;color:#5b646e">' + text + '</p>'
+    + '<p><button onclick="location.reload()" style="padding:10px 16px">Neu versuchen</button></p>'
+    + '</div>';
+}
+
+// -----------------------------------------------------------------
+//  Einstellungen
+// -----------------------------------------------------------------
+
+const SUPABASE_URL = "https://yvbtgiqtndxqqxhjshnl.supabase.co";
+const SUPABASE_KEY = "sb_publishable_WaxiaoZBFbntTgu-DklN-Q_O4T4lca7";
+const APP_NAME = "Hofer + Co.";
+const APP_UNTERTITEL = "HUDSON TOOL";
+const APP_VERSION = "4.0.0";
+
+// -----------------------------------------------------------------
+//  Kleine Helfer
+// -----------------------------------------------------------------
+
+function esc(w) {
+  if (w === null || w === undefined) return "";
+  return String(w).replaceAll("&", "&amp;").replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+}
+
+function zeitlimit(versprechen, ms, name) {
+  return Promise.race([
+    versprechen,
+    new Promise((_, ab) => setTimeout(() => ab(new Error("Zeitüberschreitung bei " + name)), ms)),
+  ]);
+}
+
+function meldung(text, art) {
+  let box = document.querySelector(".toast-bereich");
+  if (!box) {
+    box = document.createElement("div");
+    box.className = "toast-bereich";
+    document.body.appendChild(box);
+  }
+  const t = document.createElement("div");
+  t.className = "toast toast--" + (art || "ok");
+  t.textContent = text;
+  box.appendChild(t);
+  setTimeout(() => t.classList.add("toast--weg"), 3200);
+  setTimeout(() => t.remove(), 3600);
+}
+
+function nachfragen(o) {
+  return new Promise((fertig) => {
+    const h = document.createElement("div");
+    h.className = "dialog-huelle";
+    h.innerHTML = '<div class="dialog" role="dialog" aria-modal="true">'
+      + '<h2>' + esc(o.titel) + '</h2><p>' + esc(o.text) + '</p>'
+      + '<div class="dialog__knoepfe">'
+      + '<button class="knopf knopf--still" data-nein>Abbrechen</button>'
+      + '<button class="knopf ' + (o.gefahr ? "knopf--gefahr" : "knopf--haupt") + '" data-ja>'
+      + esc(o.bestaetigen || "Ja, ausführen") + '</button></div></div>';
+    document.body.appendChild(h);
+    const zu = (a) => { h.remove(); fertig(a); };
+    h.querySelector("[data-ja]").onclick = () => zu(true);
+    h.querySelector("[data-nein]").onclick = () => zu(false);
+    h.onclick = (e) => { if (e.target === h) zu(false); };
+    h.querySelector("[data-ja]").focus();
+  });
+}
+
+// Einstellungen, die nur dieses Gerät betreffen
+function einstellung(name) {
+  try { return localStorage.getItem("hudson." + name) === "1"; }
+  catch (e) { return false; }
+}
+function einstellungSetzen(name, wert) {
+  try { localStorage.setItem("hudson." + name, wert ? "1" : "0"); }
+  catch (e) { /* z. B. im privaten Modus nicht verfügbar */ }
+}
+
+function fehlertext(e) {
+  if (!e) return "Unbekannter Fehler";
+  const m = e.message || String(e);
+  if (m.includes("Invalid login credentials")) return "E-Mail oder Passwort stimmt nicht.";
+  if (m.includes("Email not confirmed")) return "Die E-Mail-Adresse wurde noch nicht bestätigt.";
+  if (m.includes("Password should be")) return "Das Passwort ist zu kurz (mindestens 8 Zeichen).";
+  if (m.includes("row-level security")) return "Dafür fehlen dir die Rechte.";
+  if (m.includes("Failed to fetch")) return "Keine Verbindung zum Server. WLAN prüfen.";
+  return m;
+}
+
+// -----------------------------------------------------------------
+//  Verbindung zur Datenbank
+// -----------------------------------------------------------------
+
+const ANBIETER = [
+  "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm",
+  "https://esm.sh/@supabase/supabase-js@2",
+];
+
+let db = null;
+
+async function verbinden() {
+  let letzter = null;
+  for (const adresse of ANBIETER) {
+    try {
+      const modul = await zeitlimit(import(adresse), 8000, "Bibliothek");
+      if (modul && modul.createClient) {
+        return modul.createClient(SUPABASE_URL, SUPABASE_KEY, {
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: true,
+            // Die Browsersperre wird umgangen. Sie kann sich in
+            // manchen Browsern selbst blockieren, und dann antwortet
+            // die Anmeldung nie.
+            lock: async (_n, _t, aufgabe) => await aufgabe(),
+          },
+        });
+      }
+    } catch (f) {
+      letzter = f;
+      console.warn("Anbieter nicht erreichbar:", adresse, f.message);
+    }
+  }
+  throw new Error("Programmbibliothek nicht ladbar. " + (letzter ? letzter.message : ""));
+}
+
+// -----------------------------------------------------------------
+//  Anmeldung
+// -----------------------------------------------------------------
+
+let profil = null;
+
+async function sitzung() {
+  try {
+    const { data } = await zeitlimit(db.auth.getSession(), 6000, "Sitzung");
+    return (data && data.session) || null;
+  } catch (f) {
+    console.warn("Sitzung nicht lesbar:", f.message);
+    return null;
+  }
+}
+
+async function profilLaden() {
+  const s = await sitzung();
+  if (!s) { profil = null; return null; }
+
+  try {
+    const { data, error } = await zeitlimit(
+      db.from("profiles").select("id, email, full_name, role, is_active")
+        .eq("id", s.user.id).single(), 10000, "Profil");
+    if (error || !data) throw error || new Error("kein Profil");
+    profil = data;
+  } catch (f) {
+    console.warn("Profil nicht ladbar:", f.message);
+    profil = { id: s.user.id, email: s.user.email, full_name: null,
+               role: "admin", is_active: true };
+  }
+  return profil;
+}
+
+// -----------------------------------------------------------------
+//  Anmeldeseite
+// -----------------------------------------------------------------
+
+function zeigeLogin() {
+  WURZEL.innerHTML = ''
+    + '<div class="login"><div class="login__karte">'
+    + '<div class="login__marke">'
+    + '<img class="login__logo" src="./logo.png" alt="Hofer + Co. Präzisionsdrehteile">'
+    + '<div class="login__untertitel">' + esc(APP_UNTERTITEL) + '</div>'
+    + '</div>'
+    + '<form id="lf" novalidate>'
+    + '<label class="feld"><span>E-Mail</span>'
+    + '<input type="email" id="le" autocomplete="username" inputmode="email" required></label>'
+    + '<label class="feld"><span>Passwort</span>'
+    + '<input type="password" id="lp" autocomplete="current-password" required></label>'
+    + '<button type="submit" class="knopf knopf--haupt knopf--breit" id="lk">Anmelden</button>'
+    + '</form></div></div>';
+
+  const knopf = document.getElementById("lk");
+  document.getElementById("lf").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = document.getElementById("le").value.trim().toLowerCase();
+    const pw = document.getElementById("lp").value;
+    if (!email || !pw) { meldung("E-Mail und Passwort eingeben.", "warn"); return; }
+
+    knopf.disabled = true;
+    knopf.textContent = "Anmelden …";
+    try {
+      const { error } = await zeitlimit(
+        db.auth.signInWithPassword({ email: email, password: pw }), 15000, "Anmeldung");
+      if (error) throw error;
+      await profilLaden();
+      zeichneGeruest();
+    } catch (f) {
+      meldung(fehlertext(f), "fehler");
+      knopf.disabled = false;
+      knopf.textContent = "Anmelden";
+    }
+  });
+}
+
+// -----------------------------------------------------------------
+//  Seiten
+// -----------------------------------------------------------------
+
+// =================================================================
+//  STARTSEITE
+// =================================================================
+
+// Solothurn
+const ORT = { lat: 47.2088, lon: 7.5323, name: "Solothurn" };
+
+let uhrTakt = null;
+
+// ---------- Feiertage Kanton Solothurn ----------
+
+// Ostersonntag nach der Gaußschen Formel
+function ostersonntag(jahr) {
+  const a = jahr % 19, b = Math.floor(jahr / 100), c = jahr % 100;
+  const d = Math.floor(b / 4), e = b % 4;
+  const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const monat = Math.floor((h + l - 7 * m + 114) / 31);
+  const tag = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(jahr, monat - 1, tag);
+}
+
+function feiertage(jahr) {
+  const o = ostersonntag(jahr);
+  const ab = (n) => {
+    const d = new Date(o); d.setDate(d.getDate() + n); return isoDatum(d);
+  };
+  const fest = (m, t) => isoDatum(new Date(jahr, m - 1, t));
+
+  return [
+    { datum: fest(1, 1),   name: "Neujahr" },
+    { datum: fest(1, 2),   name: "Berchtoldstag" },
+    { datum: fest(3, 19),  name: "Josefstag" },
+    { datum: ab(-2),       name: "Karfreitag" },
+    { datum: ab(1),        name: "Ostermontag" },
+    { datum: fest(5, 1),   name: "Tag der Arbeit" },
+    { datum: ab(39),       name: "Auffahrt" },
+    { datum: ab(50),       name: "Pfingstmontag" },
+    { datum: ab(60),       name: "Fronleichnam" },
+    { datum: fest(8, 1),   name: "Bundesfeier" },
+    { datum: fest(8, 15),  name: "Mariä Himmelfahrt" },
+    { datum: fest(11, 1),  name: "Allerheiligen" },
+    { datum: fest(12, 8),  name: "Mariä Empfängnis" },
+    { datum: fest(12, 25), name: "Weihnachten" },
+    { datum: fest(12, 26), name: "Stephanstag" },
+  ].sort((a, b) => a.datum.localeCompare(b.datum));
+}
+
+function naechsterFeiertag() {
+  const heute = isoDatum(new Date());
+  const jahr = new Date().getFullYear();
+  const alle = feiertage(jahr).concat(feiertage(jahr + 1));
+  const kommend = alle.find((f) => f.datum >= heute);
+  if (!kommend) return null;
+
+  const tage = Math.round((ausIso(kommend.datum) - ausIso(heute)) / 86400000);
+  return { name: kommend.name, datum: kommend.datum, tage: tage };
+}
+
+// ---------- Wetter ----------
+
+const WETTER_TEXT = {
+  0: "klar", 1: "meist klar", 2: "teils bewölkt", 3: "bewölkt",
+  45: "Nebel", 48: "Reifnebel",
+  51: "leichter Niesel", 53: "Niesel", 55: "starker Niesel",
+  61: "leichter Regen", 63: "Regen", 65: "starker Regen",
+  66: "gefrierender Regen", 67: "gefrierender Regen",
+  71: "leichter Schneefall", 73: "Schneefall", 75: "starker Schneefall",
+  77: "Schneegriesel",
+  80: "Regenschauer", 81: "Regenschauer", 82: "kräftige Schauer",
+  85: "Schneeschauer", 86: "Schneeschauer",
+  95: "Gewitter", 96: "Gewitter mit Hagel", 99: "Gewitter mit Hagel",
+};
+
+async function holeWetter() {
+  const adresse = "https://api.open-meteo.com/v1/forecast"
+    + "?latitude=" + ORT.lat + "&longitude=" + ORT.lon
+    + "&current=temperature_2m,weather_code"
+    + "&daily=temperature_2m_max,temperature_2m_min"
+    + "&timezone=Europe%2FZurich&forecast_days=1";
+
+  const antwort = await zeitlimit(fetch(adresse), 6000, "Wetter");
+  if (!antwort.ok) throw new Error("Wetterdienst antwortet nicht");
+  const d = await antwort.json();
+
+  return {
+    temperatur: Math.round(d.current.temperature_2m),
+    text: WETTER_TEXT[d.current.weather_code] || "",
+    hoch: Math.round(d.daily.temperature_2m_max[0]),
+    tief: Math.round(d.daily.temperature_2m_min[0]),
+  };
+}
+
+// ---------- Notizen ----------
+
+async function ladeTodos() {
+  const { data, error } = await zeitlimit(
+    db.from("todos").select("*").eq("is_done", false)
+      .order("due_date", { ascending: true, nullsFirst: false })
+      .order("created_at").limit(20),
+    8000, "Notizen");
+  if (error) throw error;
+  return data || [];
+}
+
+// ---------- Seite ----------
+
+async function seiteDashboard(b) {
+  const name = (profil && (profil.full_name || profil.email.split("@")[0])) || "";
+
+  b.innerHTML = ''
+    + '<section class="kopfkarte">'
+    + '<div class="kopfkarte__zeit"><div class="uhr" id="uhr">--:--</div>'
+    + '<div class="kopfkarte__datum" id="datum"></div></div>'
+    + '<div class="kopfkarte__wetter" id="wetter"><span class="klein">Wetter wird geladen …</span></div>'
+    + '</section>'
+
+    + '<p class="gruss">' + esc(begruessung()) + (name ? ", " + esc(name) : "") + '</p>'
+
+    + '<div id="db-auftraege"><div class="laedt">Aufträge werden geladen …</div></div>'
+    + '<div id="db-notizen"></div>'
+    + '<div id="db-status"></div>';
+
+  // Uhr
+  const uhrEl = document.getElementById("uhr");
+  const datumEl = document.getElementById("datum");
+  const tick = () => {
+    if (!document.getElementById("uhr")) { clearInterval(uhrTakt); return; }
+    const j = new Date();
+    const p = (n) => String(n).padStart(2, "0");
+    uhrEl.textContent = p(j.getHours()) + ":" + p(j.getMinutes());
+    datumEl.textContent = j.toLocaleDateString("de-CH",
+      { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  };
+  tick();
+  if (uhrTakt) clearInterval(uhrTakt);
+  uhrTakt = setInterval(tick, 20000);
+
+  // Wetter und Feiertag
+  const fei = naechsterFeiertag();
+  const feiText = fei
+    ? (fei.tage === 0 ? "Heute ist " + fei.name
+      : fei.tage === 1 ? "Morgen ist " + fei.name
+      : fei.name + " in " + fei.tage + " Tagen")
+    : "";
+
+  holeWetter().then((w) => {
+    const el = document.getElementById("wetter");
+    if (!el) return;
+    el.innerHTML = '<div class="wetter__grad">' + w.temperatur + '°</div>'
+      + '<div class="wetter__text">' + esc(w.text) + '</div>'
+      + '<div class="wetter__rand">' + ORT.name + ' · ' + w.tief + '° bis ' + w.hoch + '°</div>'
+      + (feiText ? '<div class="wetter__feiertag">' + esc(feiText) + '</div>' : "");
+  }).catch(() => {
+    const el = document.getElementById("wetter");
+    if (el) el.innerHTML = '<span class="klein">Wetter nicht verfügbar</span>'
+      + (feiText ? '<div class="wetter__feiertag">' + esc(feiText) + '</div>' : "");
+  });
+
+  // Laufende Aufträge
+  try {
+    const { data, error } = await zeitlimit(
+      db.from("laufende_auftraege").select("*").order("park").order("maschine"), 10000, "Aufträge");
+    if (error) throw error;
+    const auftraege = data || [];
+    const heute = isoDatum(new Date());
+
+    document.getElementById("db-auftraege").innerHTML =
+      '<section class="karte"><h2>Laufende Aufträge</h2>'
+      + (auftraege.length
+        ? '<table class="tabelle"><thead><tr><th>Auftrag</th><th>Maschine</th>'
+          + '<th class="rechts">Stand</th></tr></thead><tbody>'
+          + auftraege.map((j) => '<tr><td><strong>' + esc(j.job_number) + '</strong>'
+              + (j.letzter_eintrag === heute
+                  ? '' : '<span class="warnpunkt" title="Heute noch nichts erfasst"></span>')
+              + '</td>'
+              + '<td class="klein">' + esc(j.maschine) + '</td>'
+              + '<td class="rechts stark">' + zahlText(j.stand)
+              + (j.ausschuss > 0 ? '<span class="klein"> −' + zahlText(j.ausschuss) + '</span>' : "")
+              + '</td></tr>').join("")
+          + '</tbody></table>'
+          + '<p class="hinweis">Ein Punkt neben der Auftragsnummer heisst: heute noch keine Zahl erfasst.</p>'
+        : '<p class="hinweis">Zurzeit läuft kein Auftrag.</p>')
+      + '</section>';
+  } catch (f) {
+    document.getElementById("db-auftraege").innerHTML =
+      '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+  }
+
+  await zeichneNotizen();
+
+  // Lager und Bestellungen
+  let knapp = 0, offene = 0, ueberfaellig = 0;
+  const heute = isoDatum(new Date());
+  try {
+    const r = await zeitlimit(db.from("order_items").select("id, status, needed_by")
+      .in("status", ["offen", "bestellt", "teilweise_geliefert"]), 8000, "Bestellungen");
+    if (!r.error) {
+      offene = (r.data || []).length;
+      ueberfaellig = (r.data || []).filter((z) => z.needed_by && z.needed_by < heute).length;
+    }
+  } catch (f) { /* Bereich existiert noch nicht */ }
+
+  try {
+    const r = await zeitlimit(db.from("artikel_uebersicht").select("id")
+      .eq("is_active", true).eq("unter_mindestbestand", true), 8000, "Lager");
+    if (!r.error) knapp = (r.data || []).length;
+  } catch (f) { /* Bereich existiert noch nicht */ }
+
+  const statusEl = document.getElementById("db-status");
+  if (statusEl) {
+    statusEl.innerHTML = '<section class="karte"><h2>Lager und Bestellungen</h2>'
+      + '<div class="statusliste">'
+      + statuszeile(knapp, "Artikel unter Mindestbestand", knapp ? "warn" : "gut")
+      + statuszeile(ueberfaellig, "Bestellungen überfällig", ueberfaellig ? "gefahr" : "gut")
+      + statuszeile(offene, "Bestellungen offen", "neutral")
+      + '</div></section>';
+  }
+}
+
+function statuszeile(anzahl, text, art) {
+  return '<div class="statuszeile statuszeile--' + art + '">'
+    + '<span class="statuszeile__zahl">' + zahlText(anzahl) + '</span>'
+    + '<span>' + esc(text) + '</span></div>';
+}
+
+async function zeichneNotizen() {
+  const ziel = document.getElementById("db-notizen");
+  if (!ziel) return;
+
+  let todos = [];
+  try { todos = await ladeTodos(); }
+  catch (f) {
+    ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  const heute = isoDatum(new Date());
+
+  ziel.innerHTML = '<section class="karte">'
+    + '<div class="karte__kopf"><h2>Notizen</h2>'
+    + (darfSchreiben() ? '<button class="linkknopf" id="notiz-neu">+ Neue Notiz</button>' : "")
+    + '</div>'
+    + (todos.length
+      ? '<div class="notizen">' + todos.map((t) => '<label class="notiz">'
+          + '<input type="checkbox" data-erledigt="' + esc(t.id) + '">'
+          + '<span class="notiz__text">' + esc(t.text) + '</span>'
+          + (t.due_date
+            ? '<span class="notiz__frist' + (t.due_date < heute ? " notiz__frist--spaet" : "") + '">'
+              + kurzDatum(t.due_date) + '</span>' : "")
+          + '</label>').join("") + '</div>'
+      : '<p class="hinweis">Keine offenen Notizen.</p>')
+    + '</section>';
+
+  const neu = document.getElementById("notiz-neu");
+  if (neu) neu.onclick = async () => {
+    const w = await dialogFelder({ titel: "Neue Notiz",
+      felder: [
+        { name: "text", label: "Was ist zu tun?", typ: "textarea", pflicht: true },
+        { name: "frist", label: "Bis wann", typ: "date" }],
+      bestaetigen: "Speichern" });
+    if (!w) return;
+    const { error } = await db.from("todos").insert({
+      text: w.text, due_date: w.frist || null });
+    if (error) meldung(fehlertext(error), "fehler");
+    else { meldung("Notiz gespeichert."); zeichneNotizen(); }
+  };
+
+  ziel.querySelectorAll("[data-erledigt]").forEach((el) => {
+    el.onchange = async () => {
+      const { error } = await db.from("todos").update({
+        is_done: true, done_at: new Date().toISOString(), done_by: profil.id
+      }).eq("id", el.dataset.erledigt);
+      if (error) { meldung(fehlertext(error), "fehler"); el.checked = false; }
+      else { meldung("Erledigt."); zeichneNotizen(); }
+    };
+  });
+}
+
+function begruessung() {
+  const h = new Date().getHours();
+  if (h < 11) return "Guten Morgen";
+  if (h < 18) return "Guten Tag";
+  return "Guten Abend";
+}
+
+function platzhalter(b, titel, phase, punkte) {
+  b.innerHTML = '<h1 class="seitentitel">' + esc(titel) + '</h1>'
+    + '<div class="karte karte--hinweis"><h2>Kommt in Phase ' + esc(phase) + '</h2>'
+    + '<p>Geplant für diesen Bereich:</p><ul class="liste">'
+    + punkte.map((p) => "<li>" + esc(p) + "</li>").join("")
+    + '</ul></div>';
+}
+
+// =================================================================
+//  RECHTE
+// =================================================================
+
+function meineRolle() { return (profil && profil.role) || "produktion"; }
+function istAdmin() { return meineRolle() === "admin"; }
+function darfSchreiben() { return meineRolle() === "admin" || meineRolle() === "produktion"; }
+function darfKontrolle() { return meineRolle() === "admin" || meineRolle() === "kontrolle"; }
+
+const ROLLEN = {
+  admin: "Administrator",
+  produktion: "Produktion",
+  kontrolle: "Kontrolle",
+};
+
+// Hinweisbalken, wenn jemand einen Bereich nur ansehen darf
+function nurLesenHinweis(text) {
+  return '<div class="nurlesen">' + esc(text) + '</div>';
+}
+
+// =================================================================
+//  DIALOGE
+//  Ersetzt die Browser-Abfragen durch eigene Fenster.
+// =================================================================
+
+//  felder: [{ name, label, typ, wert, platzhalter, pflicht, hinweis }]
+//  Gibt ein Objekt mit den Werten zurück, oder null bei Abbruch.
+function dialogFelder(o) {
+  return new Promise((fertig) => {
+    const huelle = document.createElement("div");
+    huelle.className = "dialog-huelle";
+
+    const felder = (o.felder || []).map((f) => {
+      const id = "df-" + f.name;
+      if (f.typ === "textarea") {
+        return '<label class="feld"><span>' + esc(f.label) + '</span>'
+          + '<textarea id="' + id + '" rows="3" placeholder="' + esc(f.platzhalter || "") + '">'
+          + esc(f.wert || "") + '</textarea>'
+          + (f.hinweis ? '<span class="feldhinweis">' + esc(f.hinweis) + '</span>' : "")
+          + '</label>';
+      }
+      return '<label class="feld"><span>' + esc(f.label) + '</span>'
+        + '<input id="' + id + '" type="' + (f.typ || "text") + '"'
+        + (f.typ === "number" ? ' inputmode="numeric" min="0" step="1"' : "")
+        + ' value="' + esc(f.wert === null || f.wert === undefined ? "" : f.wert) + '"'
+        + ' placeholder="' + esc(f.platzhalter || "") + '">'
+        + (f.hinweis ? '<span class="feldhinweis">' + esc(f.hinweis) + '</span>' : "")
+        + '</label>';
+    }).join("");
+
+    huelle.innerHTML = '<div class="dialog" role="dialog" aria-modal="true">'
+      + '<h2>' + esc(o.titel) + '</h2>'
+      + (o.text ? '<p>' + esc(o.text) + '</p>' : "")
+      + '<form id="df-form">' + felder + '</form>'
+      + '<div class="dialog__knoepfe">'
+      + '<button class="knopf knopf--still" data-nein>Abbrechen</button>'
+      + '<button class="knopf ' + (o.gefahr ? "knopf--gefahr" : "knopf--haupt") + '" data-ja>'
+      + esc(o.bestaetigen || "Speichern") + '</button></div></div>';
+
+    document.body.appendChild(huelle);
+
+    const schliessen = (wert) => { huelle.remove(); fertig(wert); };
+
+    const absenden = () => {
+      const ergebnis = {};
+      for (const f of (o.felder || [])) {
+        const el = document.getElementById("df-" + f.name);
+        const wert = (el.value || "").trim();
+        if (f.pflicht && !wert) {
+          el.focus();
+          el.classList.add("menge--fehler");
+          meldung(f.label + " wird benötigt.", "warn");
+          return;
+        }
+        ergebnis[f.name] = f.typ === "number" ? (wert === "" ? 0 : Number(wert)) : wert;
+      }
+      schliessen(ergebnis);
+    };
+
+    huelle.querySelector("[data-ja]").onclick = absenden;
+    huelle.querySelector("[data-nein]").onclick = () => schliessen(null);
+    huelle.onclick = (e) => { if (e.target === huelle) schliessen(null); };
+    document.getElementById("df-form").onsubmit = (e) => { e.preventDefault(); absenden(); };
+
+    const erstes = huelle.querySelector("input, textarea");
+    if (erstes) erstes.focus();
+  });
+}
+
+// Zwei Rückfragen hintereinander für wirklich kritische Aktionen.
+async function doppeltNachfragen(erste, zweite) {
+  const a = await nachfragen(erste);
+  if (!a) return false;
+  return await nachfragen(zweite);
+}
+
+// =================================================================
+//  PRODUKTION
+// =================================================================
+
+const prod = {
+  ansicht: "erfassen",
+  parkId: null,
+  tag: null,
+  modus: null,
+  vonDatum: null,
+  bisDatum: null,
+  parks: null,
+  maschinen: null,
+  auftraege: null,
+};
+
+// ---------- Datumshelfer ----------
+
+function isoDatum(d) {
+  const p = (n) => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+}
+
+function ausIso(text) {
+  const [j, m, t] = text.split("-").map(Number);
+  return new Date(j, m - 1, t);
+}
+
+function plusTage(text, n) {
+  const d = ausIso(text);
+  d.setDate(d.getDate() + n);
+  return isoDatum(d);
+}
+
+function wochenStart(text) {
+  const d = ausIso(text);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return isoDatum(d);
+}
+
+function kurzDatum(text) {
+  const d = ausIso(text);
+  return String(d.getDate()).padStart(2, "0") + "." + String(d.getMonth() + 1).padStart(2, "0") + ".";
+}
+
+const WOCHENTAGE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
+const WT_KURZ = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+
+function wochentagName(text) { return WOCHENTAGE[(ausIso(text).getDay() + 6) % 7]; }
+function zahlText(n) { return Number(n || 0).toLocaleString("de-CH"); }
+
+function leistungText(n) {
+  if (n === null || n === undefined) return "";
+  return (n > 0 ? "+" : "") + zahlText(n);
+}
+
+// ---------- Daten ----------
+
+async function ladeParks(auchInaktive) {
+  let a = db.from("machine_parks").select("*").order("sort_order").order("name");
+  if (!auchInaktive) a = a.eq("is_active", true);
+  const { data, error } = await zeitlimit(a, 10000, "Maschinenparks");
+  if (error) throw error;
+  return data || [];
+}
+
+async function ladeMaschinen(auchInaktive) {
+  let a = db.from("machines").select("*").order("sort_order").order("name");
+  if (!auchInaktive) a = a.eq("is_active", true);
+  const { data, error } = await zeitlimit(a, 10000, "Maschinen");
+  if (error) throw error;
+  return data || [];
+}
+
+async function ladeLaufendeAuftraege() {
+  const { data, error } = await zeitlimit(
+    db.from("jobs").select("*").is("ended_at", null), 10000, "Aufträge");
+  if (error) throw error;
+  const karte = {};
+  (data || []).forEach((j) => { karte[j.machine_id] = j; });
+  return karte;
+}
+
+// Holt Einträge im Zeitraum plus etwas Vorlauf, damit die
+// Tagesleistung als Differenz berechnet werden kann.
+async function ladeZaehlerstaende(von, bis, maschinenIds) {
+  if (!maschinenIds.length) return { proSchluessel: {}, proMaschine: {} };
+
+  const { data, error } = await zeitlimit(
+    db.from("production_records")
+      .select("machine_id, record_date, quantity, job_id, updated_at")
+      .gte("record_date", plusTage(von, -120)).lte("record_date", bis)
+      .in("machine_id", maschinenIds)
+      .order("record_date"),
+    12000, "Stückzahlen");
+  if (error) throw error;
+
+  const proMaschine = {};
+  (data || []).forEach((z) => {
+    (proMaschine[z.machine_id] = proMaschine[z.machine_id] || []).push(z);
+  });
+
+  // Tagesleistung = Differenz zum vorherigen Eintrag desselben Auftrags
+  const proSchluessel = {};
+  Object.keys(proMaschine).forEach((mid) => {
+    const liste = proMaschine[mid];
+    liste.forEach((z, i) => {
+      const vorher = i > 0 ? liste[i - 1] : null;
+      z.leistung = (vorher && vorher.job_id === z.job_id)
+        ? z.quantity - vorher.quantity
+        : z.quantity;
+      proSchluessel[mid + "|" + z.record_date] = z;
+    });
+  });
+
+  return { proSchluessel: proSchluessel, proMaschine: proMaschine };
+}
+
+async function speichereStand(maschineId, datum, stand, auftragId) {
+  const { error } = await zeitlimit(
+    db.from("production_records").upsert(
+      { machine_id: maschineId, record_date: datum, quantity: stand, job_id: auftragId },
+      { onConflict: "machine_id,record_date" }),
+    12000, "Speichern");
+  if (error) throw error;
+}
+
+// ---------- Einstieg ----------
+
+async function seiteProduktion(b) {
+  if (!prod.tag) prod.tag = isoDatum(new Date());
+  if (!prod.modus) prod.modus = einstellung("wochestart") ? "woche"
+    : (window.innerWidth < 780 ? "tag" : "woche");
+  if (!prod.vonDatum) {
+    const h = new Date();
+    prod.bisDatum = isoDatum(h);
+    prod.vonDatum = isoDatum(new Date(h.getFullYear(), h.getMonth(), 1));
+  }
+
+  b.innerHTML = '<h1 class="seitentitel">Produktion</h1>'
+    + '<div class="reiter">'
+    + [["erfassen", "Erfassen"], ["auswertung", "Auswertung"], ["maschinen", "Maschinen"]]
+        .map(([w, t]) => '<button class="reiter__knopf' + (prod.ansicht === w ? " aktiv" : "")
+          + '" data-ansicht="' + w + '">' + t + '</button>').join("")
+    + '</div>'
+    + (darfSchreiben() ? "" : nurLesenHinweis("Du kannst hier alles ansehen, aber nichts ändern."))
+    + '<div id="prod-inhalt"><div class="laedt">Wird geladen …</div></div>';
+
+  b.querySelectorAll("[data-ansicht]").forEach((el) => {
+    el.onclick = () => { prod.ansicht = el.dataset.ansicht; seiteProduktion(b); };
+  });
+
+  const ziel = document.getElementById("prod-inhalt");
+  try {
+    prod.parks = await ladeParks(prod.ansicht === "maschinen");
+    prod.maschinen = await ladeMaschinen(prod.ansicht === "maschinen");
+    prod.auftraege = await ladeLaufendeAuftraege();
+  } catch (f) {
+    ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  if (prod.ansicht === "maschinen") return ansichtMaschinen(ziel, b);
+
+  if (!prod.parks.length) {
+    ziel.innerHTML = '<div class="karte karte--hinweis"><h2>Noch keine Maschinen</h2>'
+      + '<p>Lege zuerst einen Maschinenpark und Maschinen an.</p>'
+      + (darfSchreiben() ? '<button class="knopf knopf--haupt" id="zu-maschinen">Maschinen einrichten</button>' : "")
+      + '</div>';
+    const k = document.getElementById("zu-maschinen");
+    if (k) k.onclick = () => { prod.ansicht = "maschinen"; seiteProduktion(b); };
+    return;
+  }
+
+  if (!prod.parkId || !prod.parks.some((p) => p.id === prod.parkId)) prod.parkId = prod.parks[0].id;
+
+  if (prod.ansicht === "auswertung") return ansichtAuswertung(ziel, b);
+  return ansichtErfassen(ziel, b);
+}
+
+function parkAuswahl() {
+  if (prod.parks.length < 2) return "";
+  return '<div class="parkwahl">'
+    + prod.parks.map((p) => '<button class="parkwahl__knopf' + (p.id === prod.parkId ? " aktiv" : "")
+        + '" data-park="' + esc(p.id) + '">' + esc(p.name) + '</button>').join("")
+    + '</div>';
+}
+
+function parkAuswahlBinden(b) {
+  document.querySelectorAll("[data-park]").forEach((el) => {
+    el.onclick = () => { prod.parkId = el.dataset.park; seiteProduktion(b); };
+  });
+}
+
+// =================================================================
+//  ERFASSEN
+// =================================================================
+
+async function ansichtErfassen(ziel, b) {
+  const maschinen = prod.maschinen.filter((m) => m.park_id === prod.parkId);
+
+  if (!maschinen.length) {
+    ziel.innerHTML = parkAuswahl()
+      + '<div class="karte karte--hinweis"><p>In diesem Maschinenpark ist noch keine Maschine angelegt.</p></div>';
+    parkAuswahlBinden(b);
+    return;
+  }
+
+  const istWoche = prod.modus === "woche";
+  const tageProWoche = einstellung("wochenende") ? 7 : 5;
+  const von = istWoche ? wochenStart(prod.tag) : prod.tag;
+  const bis = istWoche ? plusTage(von, tageProWoche - 1) : prod.tag;
+
+  ziel.innerHTML = parkAuswahl()
+    + '<div class="steuerung">'
+    + '<button class="knopf knopf--klein" id="zurueck">‹</button>'
+    + '<div class="steuerung__mitte"><div class="steuerung__titel" id="zeitraum"></div>'
+    + '<button class="linkknopf" id="heute">Heute</button></div>'
+    + '<button class="knopf knopf--klein" id="vor">›</button></div>'
+    + '<div class="moduswahl">'
+    + '<button class="moduswahl__knopf' + (!istWoche ? " aktiv" : "") + '" data-modus="tag">Tag</button>'
+    + '<button class="moduswahl__knopf' + (istWoche ? " aktiv" : "") + '" data-modus="woche">Woche</button>'
+    + '</div>'
+    + '<div id="raster"><div class="laedt">Zahlen werden geladen …</div></div>';
+
+  parkAuswahlBinden(b);
+
+  document.getElementById("zeitraum").textContent = istWoche
+    ? "Woche " + kurzDatum(von) + " – " + kurzDatum(bis)
+    : wochentagName(prod.tag) + ", " + kurzDatum(prod.tag) + ausIso(prod.tag).getFullYear();
+
+  document.getElementById("zurueck").onclick = () => {
+    prod.tag = plusTage(prod.tag, istWoche ? -7 : -1); seiteProduktion(b); };
+  document.getElementById("vor").onclick = () => {
+    prod.tag = plusTage(prod.tag, istWoche ? 7 : 1); seiteProduktion(b); };
+  document.getElementById("heute").onclick = () => {
+    prod.tag = isoDatum(new Date()); seiteProduktion(b); };
+  document.querySelectorAll("[data-modus]").forEach((el) => {
+    el.onclick = () => { prod.modus = el.dataset.modus; seiteProduktion(b); };
+  });
+
+  let staende;
+  try {
+    staende = await ladeZaehlerstaende(von, bis, maschinen.map((m) => m.id));
+  } catch (f) {
+    document.getElementById("raster").innerHTML =
+      '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  const raster = document.getElementById("raster");
+  raster.innerHTML = istWoche
+    ? wochenRaster(maschinen, von, tageProWoche, staende)
+    : tagesRaster(maschinen, prod.tag, staende);
+
+  eingabenBinden(raster, staende, b);
+  auftragsKnoepfeBinden(raster, b);
+}
+
+function auftragsZeile(maschine) {
+  const j = prod.auftraege[maschine.id];
+  if (!j) {
+    return '<div class="auftrag auftrag--leer">'
+      + '<span class="auftrag__nr">Kein Auftrag</span>'
+      + (darfSchreiben() ? '<button class="linkknopf" data-auftrag-start="' + esc(maschine.id)
+          + '">Auftrag starten</button>' : "")
+      + '</div>';
+  }
+  return '<div class="auftrag">'
+    + '<span class="auftrag__nr">' + esc(j.job_number) + '</span>'
+    + '<span class="auftrag__seit">seit ' + kurzDatum(isoDatum(new Date(j.started_at))) + '</span>'
+    + (darfSchreiben() ? '<button class="linkknopf" data-auftrag-ende="' + esc(j.id)
+        + '" data-maschine="' + esc(maschine.id) + '">Beenden</button>' : "")
+    + '</div>';
+}
+
+function standFeld(maschine, datum, eintrag) {
+  const j = prod.auftraege[maschine.id];
+  if (!j) return '<div class="kein-feld">–</div>';
+  return '<input class="menge" type="number" inputmode="numeric" min="0" step="1"'
+    + ' data-maschine="' + esc(maschine.id) + '" data-datum="' + datum + '"'
+    + ' data-auftrag="' + esc(j.id) + '"'
+    + (darfSchreiben() ? "" : " disabled")
+    + ' value="' + (eintrag ? eintrag.quantity : "") + '">';
+}
+
+function tagesRaster(maschinen, datum, staende) {
+  const zeilen = maschinen.map((m) => {
+    const e = staende.proSchluessel[m.id + "|" + datum];
+    return '<div class="mkarte">'
+      + '<div class="mkarte__kopf"><div class="mkarte__name">' + esc(m.name)
+      + (m.machine_number ? '<span class="mkarte__nr">' + esc(m.machine_number) + '</span>' : "")
+      + '</div></div>'
+      + auftragsZeile(m)
+      + '<div class="mkarte__eingabe">'
+      + '<div class="mkarte__label">Zählerstand<span>gesamt seit Auftragsbeginn</span></div>'
+      + standFeld(m, datum, e)
+      + '</div>'
+      + '<div class="mkarte__leistung" data-leistung="' + esc(m.id) + '">'
+      + (e ? "Tagesleistung " + leistungText(e.leistung) : "")
+      + '</div>'
+      + '</div>';
+  }).join("");
+
+  return '<div class="mkarten">' + zeilen + '</div>';
+}
+
+function wochenRaster(maschinen, von, anzahl, staende) {
+  const tage = [];
+  for (let i = 0; i < anzahl; i++) tage.push(plusTage(von, i));
+  const heute = isoDatum(new Date());
+
+  const kopf = '<tr><th class="fest">Maschine</th>'
+    + tage.map((t, i) => '<th class="' + (t === heute ? "heute" : "") + '">' + WT_KURZ[i]
+        + '<span class="th__datum">' + kurzDatum(t) + '</span></th>').join("")
+    + '</tr>';
+
+  const zeilen = maschinen.map((m) => {
+    const j = prod.auftraege[m.id];
+    const zellen = tage.map((t) => {
+      const e = staende.proSchluessel[m.id + "|" + t];
+      return '<td class="' + (t === heute ? "heute" : "") + '">'
+        + standFeld(m, t, e)
+        + '<span class="zelle__leistung" data-zelle="' + esc(m.id) + "|" + t + '">'
+        + (e ? leistungText(e.leistung) : "") + '</span></td>';
+    }).join("");
+
+    return '<tr><th class="fest">' + esc(m.name)
+      + '<span class="fest__auftrag">' + (j ? esc(j.job_number) : "kein Auftrag") + '</span>'
+      + '</th>' + zellen + '</tr>';
+  }).join("");
+
+  return '<div class="karte karte--raster"><div class="rasterrolle"><table class="raster">'
+    + '<thead>' + kopf + '</thead><tbody>' + zeilen + '</tbody></table></div></div>'
+    + '<p class="hinweis">Die große Zahl ist der Zählerstand seit Auftragsbeginn. '
+    + 'Darunter steht die daraus errechnete Tagesleistung.</p>';
+}
+
+function eingabenBinden(raster, staende, b) {
+  raster.querySelectorAll(".menge").forEach((el) => {
+    el.addEventListener("focus", () => el.select());
+    el.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); el.blur(); } });
+
+    el.addEventListener("change", async () => {
+      const roh = el.value.trim();
+      if (roh === "") return;
+
+      const stand = Math.max(0, Math.round(Number(roh)));
+      if (!Number.isFinite(stand)) { meldung("Bitte eine Zahl eingeben.", "warn"); return; }
+
+      const schluessel = el.dataset.maschine + "|" + el.dataset.datum;
+      const alt = staende.proSchluessel[schluessel];
+      if (alt && alt.quantity === stand) return;
+
+      el.classList.add("menge--speichert");
+      try {
+        await speichereStand(el.dataset.maschine, el.dataset.datum, stand, el.dataset.auftrag);
+        el.classList.remove("menge--speichert");
+        el.classList.add("menge--gespeichert");
+        setTimeout(() => el.classList.remove("menge--gespeichert"), 900);
+        seiteProduktion(b);   // neu berechnen, damit die Leistungen stimmen
+      } catch (f) {
+        el.classList.remove("menge--speichert");
+        el.classList.add("menge--fehler");
+        el.value = alt ? alt.quantity : "";
+        meldung(fehlertext(f), "fehler");
+      }
+    });
+  });
+}
+
+function auftragsKnoepfeBinden(raster, b) {
+  raster.querySelectorAll("[data-auftrag-start]").forEach((el) => {
+    el.onclick = async () => {
+      const maschine = prod.maschinen.find((m) => m.id === el.dataset.auftragStart);
+      const werte = await dialogFelder({
+        titel: "Auftrag starten",
+        text: maschine ? "Maschine " + maschine.name : "",
+        felder: [
+          { name: "nummer", label: "Auftragsnummer", pflicht: true,
+            platzhalter: "10007-0381", hinweis: "Kunde und Teil, getrennt durch einen Bindestrich" },
+          { name: "notiz", label: "Notiz", typ: "textarea", platzhalter: "kann leer bleiben" },
+        ],
+        bestaetigen: "Auftrag starten",
+      });
+      if (!werte) return;
+
+      const { error } = await db.from("jobs").insert({
+        machine_id: el.dataset.auftragStart,
+        job_number: werte.nummer,
+        note: werte.notiz || null,
+      });
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Auftrag " + werte.nummer + " gestartet."); seiteProduktion(b); }
+    };
+  });
+
+  raster.querySelectorAll("[data-auftrag-ende]").forEach((el) => {
+    el.onclick = async () => {
+      const j = prod.auftraege[el.dataset.maschine];
+      const ok = await nachfragen({
+        titel: "Auftrag beenden",
+        text: "Auftrag " + (j ? j.job_number : "") + " wird abgeschlossen. "
+            + "Der Zähler beginnt beim nächsten Auftrag wieder bei null. "
+            + "Die erfassten Zahlen bleiben erhalten.",
+        bestaetigen: "Auftrag beenden",
+      });
+      if (!ok) return;
+
+      const { error } = await db.from("jobs")
+        .update({ ended_at: new Date().toISOString(), ended_by: profil.id })
+        .eq("id", el.dataset.auftragEnde);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Auftrag beendet."); seiteProduktion(b); }
+    };
+  });
+}
+
+// =================================================================
+//  AUSWERTUNG
+// =================================================================
+
+async function ansichtAuswertung(ziel, b) {
+  ziel.innerHTML = '<div class="karte"><div class="zeitraumwahl">'
+    + '<label class="feld"><span>Von</span><input type="date" id="von" value="' + prod.vonDatum + '"></label>'
+    + '<label class="feld"><span>Bis</span><input type="date" id="bis" value="' + prod.bisDatum + '"></label>'
+    + '</div><div class="schnellwahl">'
+    + '<button class="linkknopf" data-zeit="woche">Diese Woche</button>'
+    + '<button class="linkknopf" data-zeit="monat">Dieser Monat</button>'
+    + '<button class="linkknopf" data-zeit="vormonat">Letzter Monat</button>'
+    + '<button class="linkknopf" data-zeit="jahr">Dieses Jahr</button>'
+    + '</div></div><div id="auswertung"><div class="laedt">Wird berechnet …</div></div>';
+
+  const neu = () => {
+    prod.vonDatum = document.getElementById("von").value;
+    prod.bisDatum = document.getElementById("bis").value;
+    seiteProduktion(b);
+  };
+  document.getElementById("von").onchange = neu;
+  document.getElementById("bis").onchange = neu;
+
+  document.querySelectorAll("[data-zeit]").forEach((el) => {
+    el.onclick = () => {
+      const h = new Date();
+      if (el.dataset.zeit === "woche") {
+        prod.vonDatum = wochenStart(isoDatum(h));
+        prod.bisDatum = plusTage(prod.vonDatum, 6);
+      } else if (el.dataset.zeit === "monat") {
+        prod.vonDatum = isoDatum(new Date(h.getFullYear(), h.getMonth(), 1));
+        prod.bisDatum = isoDatum(new Date(h.getFullYear(), h.getMonth() + 1, 0));
+      } else if (el.dataset.zeit === "vormonat") {
+        prod.vonDatum = isoDatum(new Date(h.getFullYear(), h.getMonth() - 1, 1));
+        prod.bisDatum = isoDatum(new Date(h.getFullYear(), h.getMonth(), 0));
+      } else {
+        prod.vonDatum = isoDatum(new Date(h.getFullYear(), 0, 1));
+        prod.bisDatum = isoDatum(new Date(h.getFullYear(), 11, 31));
+      }
+      seiteProduktion(b);
+    };
+  });
+
+  const kasten = document.getElementById("auswertung");
+  let staende;
+  try {
+    staende = await ladeZaehlerstaende(prod.vonDatum, prod.bisDatum, prod.maschinen.map((m) => m.id));
+  } catch (f) {
+    kasten.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  const proMaschine = {}, proPark = {}, proTag = {};
+  let gesamt = 0;
+
+  Object.values(staende.proSchluessel).forEach((z) => {
+    if (z.record_date < prod.vonDatum || z.record_date > prod.bisDatum) return;
+    const m = prod.maschinen.find((x) => x.id === z.machine_id);
+    if (!m) return;
+    const l = z.leistung || 0;
+    proMaschine[m.id] = (proMaschine[m.id] || 0) + l;
+    proPark[m.park_id] = (proPark[m.park_id] || 0) + l;
+    proTag[z.record_date] = (proTag[z.record_date] || 0) + l;
+    gesamt += l;
+  });
+
+  const tage = Object.keys(proTag).length;
+  const schnitt = tage ? Math.round(gesamt / tage) : 0;
+
+  const liste = prod.maschinen
+    .map((m) => ({ m: m, menge: proMaschine[m.id] || 0 }))
+    .filter((x) => x.menge !== 0)
+    .sort((a, c) => c.menge - a.menge);
+  const hoechst = Math.max(1, ...liste.map((x) => Math.abs(x.menge)));
+
+  kasten.innerHTML = '<div class="kennzahlen">'
+    + kennzahl("Gesamt", zahlText(gesamt))
+    + kennzahl("Tagesdurchschnitt", zahlText(schnitt))
+    + kennzahl("Erfasste Tage", zahlText(tage))
+    + kennzahl("Maschinen aktiv", zahlText(liste.length))
+    + '</div>'
+
+    + (prod.parks.length > 1
+      ? '<section class="karte"><h2>Je Maschinenpark</h2><table class="tabelle">'
+        + prod.parks.map((p) => '<tr><td>' + esc(p.name) + '</td><td class="rechts stark">'
+            + zahlText(proPark[p.id] || 0) + '</td></tr>').join("")
+        + '</table></section>' : "")
+
+    + '<section class="karte"><h2>Je Maschine</h2>'
+    + (liste.length
+      ? liste.map((x) => '<div class="balken"><div class="balken__kopf">'
+          + '<span>' + esc(x.m.name) + '</span><strong>' + zahlText(x.menge) + '</strong></div>'
+          + '<div class="balken__spur"><div class="balken__fuellung'
+          + (x.menge < 0 ? " balken__fuellung--minus" : "") + '" style="width:'
+          + Math.round(Math.abs(x.menge) / hoechst * 100) + '%"></div></div></div>').join("")
+      : '<p class="hinweis">Im gewählten Zeitraum wurde nichts erfasst.</p>')
+    + '<p class="hinweis">Die Zahlen sind Tagesleistungen, also Differenzen der Zählerstände. '
+    + 'Ein negativer Wert bedeutet, dass Ausschuss abgezogen wurde.</p>'
+    + '</section>';
+}
+
+function kennzahl(titel, wert) {
+  return '<div class="kennzahl"><div class="kennzahl__titel">' + esc(titel) + '</div>'
+    + '<div class="kennzahl__wert">' + wert + '</div></div>';
+}
+
+// =================================================================
+//  MASCHINEN VERWALTEN
+// =================================================================
+
+function ansichtMaschinen(ziel, b) {
+  const darf = darfSchreiben();
+
+  ziel.innerHTML = prod.parks.map((p) => {
+    const maschinen = prod.maschinen.filter((m) => m.park_id === p.id);
+    return '<section class="karte' + (p.is_active ? "" : " karte--inaktiv") + '">'
+      + '<div class="karte__kopf"><h2>' + esc(p.name)
+      + (p.is_active ? "" : ' <span class="marke">inaktiv</span>') + '</h2>'
+      + (darf ? '<div class="karte__aktionen">'
+          + '<button class="linkknopf" data-park-um="' + esc(p.id) + '">Umbenennen</button>'
+          + '<button class="linkknopf" data-park-aktiv="' + esc(p.id) + '" data-wert="'
+          + (p.is_active ? "0" : "1") + '">' + (p.is_active ? "Deaktivieren" : "Aktivieren") + '</button>'
+          + '<button class="linkknopf linkknopf--gefahr" data-park-weg="' + esc(p.id) + '">Löschen</button>'
+          + '</div>' : "") + '</div>'
+
+      + (maschinen.length
+        ? '<table class="tabelle"><tbody>' + maschinen.map((m) =>
+            '<tr class="' + (m.is_active ? "" : "zeile--inaktiv") + '"><td>' + esc(m.name)
+            + (m.machine_number ? ' <span class="klein">' + esc(m.machine_number) + '</span>' : "")
+            + '</td>' + (darf ? '<td class="rechts nowrap">'
+              + '<button class="linkknopf" data-masch-um="' + esc(m.id) + '">Bearbeiten</button> '
+              + '<button class="linkknopf" data-masch-aktiv="' + esc(m.id) + '" data-wert="'
+              + (m.is_active ? "0" : "1") + '">' + (m.is_active ? "Aus" : "Ein") + '</button> '
+              + '<button class="linkknopf linkknopf--gefahr" data-masch-weg="' + esc(m.id) + '">Löschen</button>'
+              + '</td>' : '<td class="rechts klein">' + (m.is_active ? "aktiv" : "inaktiv") + '</td>')
+            + '</tr>').join("") + '</tbody></table>'
+        : '<p class="hinweis">Noch keine Maschine in diesem Park.</p>')
+
+      + (darf ? '<button class="knopf knopf--klein" data-masch-neu="' + esc(p.id) + '">+ Maschine</button>' : "")
+      + '</section>';
+  }).join("")
+  + (darf ? '<button class="knopf knopf--haupt knopf--breit" id="park-neu">+ Maschinenpark</button>' : "");
+
+  if (!darf) return;
+  const neuLaden = () => seiteProduktion(b);
+
+  document.getElementById("park-neu").onclick = async () => {
+    const w = await dialogFelder({ titel: "Neuer Maschinenpark",
+      felder: [{ name: "name", label: "Name", pflicht: true, platzhalter: "z. B. Langdreherpark" }],
+      bestaetigen: "Anlegen" });
+    if (!w) return;
+    const { error } = await db.from("machine_parks").insert({ name: w.name });
+    if (error) meldung(fehlertext(error), "fehler");
+    else { meldung("Maschinenpark angelegt."); neuLaden(); }
+  };
+
+  ziel.querySelectorAll("[data-masch-neu]").forEach((el) => {
+    el.onclick = async () => {
+      const w = await dialogFelder({ titel: "Neue Maschine",
+        felder: [
+          { name: "name", label: "Name", pflicht: true, platzhalter: "z. B. Maschine 01" },
+          { name: "nummer", label: "Maschinennummer", platzhalter: "kann leer bleiben" }],
+        bestaetigen: "Anlegen" });
+      if (!w) return;
+      const { error } = await db.from("machines").insert({
+        park_id: el.dataset.maschNeu, name: w.name, machine_number: w.nummer || null });
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Maschine angelegt."); neuLaden(); }
+    };
+  });
+
+  ziel.querySelectorAll("[data-park-um]").forEach((el) => {
+    el.onclick = async () => {
+      const p = prod.parks.find((x) => x.id === el.dataset.parkUm) || {};
+      const w = await dialogFelder({ titel: "Maschinenpark umbenennen",
+        felder: [{ name: "name", label: "Name", wert: p.name, pflicht: true }] });
+      if (!w || w.name === p.name) return;
+      const { error } = await db.from("machine_parks").update({ name: w.name }).eq("id", p.id);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Umbenannt."); neuLaden(); }
+    };
+  });
+
+  ziel.querySelectorAll("[data-masch-um]").forEach((el) => {
+    el.onclick = async () => {
+      const m = prod.maschinen.find((x) => x.id === el.dataset.maschUm) || {};
+      const w = await dialogFelder({ titel: "Maschine bearbeiten",
+        felder: [
+          { name: "name", label: "Name", wert: m.name, pflicht: true },
+          { name: "nummer", label: "Maschinennummer", wert: m.machine_number || "" }] });
+      if (!w) return;
+      const { error } = await db.from("machines")
+        .update({ name: w.name, machine_number: w.nummer || null }).eq("id", m.id);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Gespeichert."); neuLaden(); }
+    };
+  });
+
+  ziel.querySelectorAll("[data-park-aktiv]").forEach((el) => {
+    el.onclick = async () => {
+      const ein = el.dataset.wert === "1";
+      if (!ein) {
+        const ok = await nachfragen({ titel: "Maschinenpark deaktivieren",
+          text: "Der Park verschwindet aus der Erfassung. Alle Zahlen bleiben erhalten.",
+          bestaetigen: "Deaktivieren", gefahr: true });
+        if (!ok) return;
+      }
+      const { error } = await db.from("machine_parks").update({ is_active: ein }).eq("id", el.dataset.parkAktiv);
+      if (error) meldung(fehlertext(error), "fehler"); else neuLaden();
+    };
+  });
+
+  ziel.querySelectorAll("[data-masch-aktiv]").forEach((el) => {
+    el.onclick = async () => {
+      const ein = el.dataset.wert === "1";
+      if (!ein) {
+        const ok = await nachfragen({ titel: "Maschine deaktivieren",
+          text: "Die Maschine verschwindet aus der Erfassung. Alle Zahlen bleiben erhalten.",
+          bestaetigen: "Deaktivieren", gefahr: true });
+        if (!ok) return;
+      }
+      const { error } = await db.from("machines").update({ is_active: ein }).eq("id", el.dataset.maschAktiv);
+      if (error) meldung(fehlertext(error), "fehler"); else neuLaden();
+    };
+  });
+
+  // ----- Löschen: zwei Rückfragen -----
+
+  ziel.querySelectorAll("[data-park-weg]").forEach((el) => {
+    el.onclick = async () => {
+      const p = prod.parks.find((x) => x.id === el.dataset.parkWeg) || {};
+      const anzahl = prod.maschinen.filter((m) => m.park_id === p.id).length;
+
+      const ok = await doppeltNachfragen(
+        { titel: "Maschinenpark löschen",
+          text: 'Soll "' + p.name + '" wirklich gelöscht werden? '
+              + "Löschen ist endgültig. Deaktivieren wäre der sichere Weg.",
+          bestaetigen: "Weiter zum Löschen", gefahr: true },
+        { titel: "Wirklich endgültig löschen?",
+          text: anzahl > 0
+            ? "Achtung: In diesem Park sind noch " + anzahl + " Maschinen. "
+              + "Das Löschen wird deshalb voraussichtlich abgelehnt."
+            : "Letzte Rückfrage. Danach ist der Maschinenpark unwiderruflich weg.",
+          bestaetigen: "Endgültig löschen", gefahr: true });
+      if (!ok) return;
+
+      const { error } = await db.from("machine_parks").delete().eq("id", p.id);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Maschinenpark gelöscht."); neuLaden(); }
+    };
+  });
+
+  ziel.querySelectorAll("[data-masch-weg]").forEach((el) => {
+    el.onclick = async () => {
+      const m = prod.maschinen.find((x) => x.id === el.dataset.maschWeg) || {};
+      const ok = await doppeltNachfragen(
+        { titel: "Maschine löschen",
+          text: 'Soll "' + m.name + '" wirklich gelöscht werden? '
+              + "Wenn daran Stückzahlen oder Aufträge hängen, lehnt die Datenbank das ab. "
+              + "Deaktivieren wäre der sichere Weg.",
+          bestaetigen: "Weiter zum Löschen", gefahr: true },
+        { titel: "Wirklich endgültig löschen?",
+          text: "Letzte Rückfrage. Danach ist die Maschine unwiderruflich weg.",
+          bestaetigen: "Endgültig löschen", gefahr: true });
+      if (!ok) return;
+
+      const { error } = await db.from("machines").delete().eq("id", m.id);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Maschine gelöscht."); neuLaden(); }
+    };
+  });
+}
+
+// =================================================================
+//  KONTROLLE
+// =================================================================
+
+async function seiteKontrolle(b) {
+  b.innerHTML = '<h1 class="seitentitel">Kontrolle</h1>'
+    + (darfKontrolle() ? "" : nurLesenHinweis(
+        "Du kannst die Meldungen ansehen. Erfassen dürfen nur Benutzer mit der Rolle Kontrolle."))
+    + '<div id="k-inhalt"><div class="laedt">Wird geladen …</div></div>';
+
+  const ziel = document.getElementById("k-inhalt");
+  let auftraege = [], meldungen = [];
+
+  try {
+    const a = await zeitlimit(db.from("laufende_auftraege").select("*").order("maschine"),
+      10000, "Aufträge");
+    if (a.error) throw a.error;
+    auftraege = a.data || [];
+
+    const m = await zeitlimit(db.from("kontrolle_lesbar").select("*")
+      .order("created_at", { ascending: false }).limit(30), 10000, "Meldungen");
+    if (!m.error) meldungen = m.data || [];
+  } catch (f) {
+    ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  ziel.innerHTML = '<section class="karte"><h2>Laufende Aufträge</h2>'
+    + (auftraege.length
+      ? auftraege.map((j) => '<div class="kzeile">'
+          + '<div class="kzeile__oben"><span class="kzeile__nr">' + esc(j.job_number) + '</span>'
+          + '<span class="kzeile__maschine">' + esc(j.maschine) + '</span></div>'
+          + '<div class="kzeile__unten">'
+          + '<span>Stand ' + zahlText(j.stand) + '</span>'
+          + '<span class="' + (j.ausschuss > 0 ? "kzeile__ausschuss" : "") + '">Ausschuss '
+          + zahlText(j.ausschuss) + '</span>'
+          + (darfKontrolle() ? '<button class="knopf knopf--klein" data-melden="' + esc(j.id)
+              + '" data-nr="' + esc(j.job_number) + '">Ausschuss melden</button>' : "")
+          + '</div></div>').join("")
+      : '<p class="hinweis">Zurzeit läuft kein Auftrag.</p>')
+    + '</section>'
+
+    + '<section class="karte"><h2>Letzte Meldungen</h2>'
+    + (meldungen.length
+      ? '<table class="tabelle"><thead><tr><th>Wann</th><th>Auftrag</th>'
+        + '<th class="rechts">Ausschuss</th><th>Wer</th></tr></thead><tbody>'
+        + meldungen.map((m) => '<tr><td class="klein">' + esc(datumZeitKurz(m.created_at)) + '</td>'
+            + '<td>' + esc(m.job_number) + '<span class="klein"> ' + esc(m.maschine) + '</span>'
+            + (m.note ? '<div class="knotiz">' + esc(m.note) + '</div>' : "") + '</td>'
+            + '<td class="rechts stark">' + zahlText(m.scrap_count) + '</td>'
+            + '<td class="klein">' + esc(m.benutzer_name || m.benutzer_email || "") + '</td></tr>').join("")
+        + '</tbody></table>'
+      : '<p class="hinweis">Noch keine Meldungen erfasst.</p>')
+    + '</section>';
+
+  ziel.querySelectorAll("[data-melden]").forEach((el) => {
+    el.onclick = async () => {
+      const w = await dialogFelder({
+        titel: "Ausschuss melden",
+        text: "Auftrag " + el.dataset.nr,
+        felder: [
+          { name: "anzahl", label: "Anzahl Ausschussteile", typ: "number", pflicht: true },
+          { name: "notiz", label: "Was war nicht in Ordnung?", typ: "textarea",
+            platzhalter: "z. B. Durchmesser zu gross, Grat an der Stirnseite" },
+        ],
+        bestaetigen: "Melden",
+      });
+      if (!w) return;
+
+      const { error } = await db.from("quality_reports").insert({
+        job_id: el.dataset.melden,
+        scrap_count: Math.max(0, Math.round(w.anzahl)),
+        note: w.notiz || null,
+      });
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Meldung erfasst."); seiteKontrolle(b); }
+    };
+  });
+}
+
+function datumZeitKurz(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const p = (n) => String(n).padStart(2, "0");
+  return p(d.getDate()) + "." + p(d.getMonth() + 1) + ". " + p(d.getHours()) + ":" + p(d.getMinutes());
+}
+
+const seiteLager = (b) => platzhalter(b, "Lager", "5 und 6", [
+  "Artikelsuche mit Bestand je Fach",
+  "Entnahme, Wareneingang, Umlagerung, Korrektur",
+  "Lagerplätze anlegen und Artikel zuteilen",
+  "Letzte 10 Änderungen je Fach",
+]);
+
+const seiteBestellungen = (b) => platzhalter(b, "Bestellungen", 7, [
+  "Positionen erfassen und abhaken",
+  "Automatisch nach Lieferant gruppiert",
+  "Lieferanten verwalten",
+  "Letzte 100 Positionen je Lieferant",
+]);
+
+async function seiteEinstellungen(b) {
+  b.innerHTML = '<h1 class="seitentitel">Einstellungen</h1><div class="laedt">Benutzer werden geladen …</div>';
+
+  let benutzer = [];
+  try {
+    const { data, error } = await zeitlimit(
+      db.from("profiles").select("id, email, full_name, role, is_active")
+        .order("full_name"), 10000, "Benutzerliste");
+    if (error) throw error;
+    benutzer = data || [];
+  } catch (f) {
+    b.innerHTML = '<h1 class="seitentitel">Einstellungen</h1>'
+      + '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  const besitzer = istAdmin();
+
+  b.innerHTML = '<h1 class="seitentitel">Einstellungen</h1>'
+    + '<section class="karte"><h2>Benutzer</h2><table class="tabelle">'
+    + '<thead><tr><th>Name</th><th>E-Mail</th><th>Rolle</th><th>Status</th></tr></thead><tbody>'
+    + benutzer.map((u) => '<tr class="' + (u.is_active ? "" : "zeile--inaktiv") + '">'
+        + '<td>' + esc(u.full_name || "–")
+        + (profil && u.id === profil.id ? ' <span class="marke">du</span>' : "") + '</td>'
+        + '<td class="klein">' + esc(u.email) + '</td>'
+        + '<td>' + (besitzer && profil.id !== u.id
+            ? '<select class="auswahl" data-rolle="' + esc(u.id) + '">'
+              + Object.keys(ROLLEN).map((w) => '<option value="' + w + '"'
+                  + (u.role === w ? " selected" : "") + '>' + ROLLEN[w] + '</option>').join("")
+              + '</select>'
+            : esc(ROLLEN[u.role] || u.role)) + '</td>'
+        + '<td>' + (besitzer && profil.id !== u.id
+            ? '<button class="linkknopf" data-aktiv="' + esc(u.id) + '" data-wert="'
+              + (u.is_active ? "0" : "1") + '">' + (u.is_active ? "Deaktivieren" : "Aktivieren") + '</button>'
+            : (u.is_active ? "aktiv" : "inaktiv")) + '</td></tr>').join("")
+    + '</tbody></table>'
+    + '<div class="rollenhilfe">'
+    + '<div><strong>Administrator</strong> darf alles, auch Benutzer verwalten.</div>'
+    + '<div><strong>Produktion</strong> darf alles ausser Kontrolle-Einträge und Benutzer.</div>'
+    + '<div><strong>Kontrolle</strong> darf nur Ausschuss und Notizen erfassen.</div>'
+    + '<div>Ansehen darf jeder alles.</div></div>'
+    + '<p class="hinweis">Neue Benutzer legst du im Supabase-Dashboard unter '
+    + 'Authentication → Users an.</p></section>'
+
+    + '<section class="karte"><h2>Mein Konto</h2>'
+    + '<label class="feld"><span>Anzeigename</span>'
+    + '<input type="text" id="mn" value="' + esc((profil && profil.full_name) || "") + '"></label>'
+    + '<button class="knopf" id="ns">Name speichern</button>'
+    + '<label class="feld feld--abstand"><span>Neues Passwort</span>'
+    + '<input type="password" id="np" autocomplete="new-password" placeholder="mindestens 8 Zeichen"></label>'
+    + '<button class="knopf" id="ps">Passwort ändern</button></section>'
+
+    + '<section class="karte"><h2>Darstellung</h2>'
+    + '<label class="schalter"><input type="checkbox" id="e-wochenende"'
+    + (einstellung("wochenende") ? " checked" : "") + '>'
+    + '<span>Samstag und Sonntag in der Wochenansicht zeigen</span></label>'
+    + '<label class="schalter"><input type="checkbox" id="e-wochestart"'
+    + (einstellung("wochestart") ? " checked" : "") + '>'
+    + '<span>Erfassung immer mit der Wochenansicht öffnen</span></label>'
+    + '<p class="hinweis">Diese Einstellungen gelten nur auf diesem Gerät.</p>'
+    + '</section>'
+
+    + '<section class="karte"><h2>Über die App</h2><p class="klein">Version ' + esc(APP_VERSION)
+    + ' · angemeldet als ' + esc((profil && profil.email) || "") + '</p></section>';
+
+  b.querySelectorAll("[data-rolle]").forEach((el) => {
+    el.addEventListener("change", async () => {
+      const { error } = await db.from("profiles").update({ role: el.value }).eq("id", el.dataset.rolle);
+      if (error) { meldung(fehlertext(error), "fehler"); seiteEinstellungen(b); }
+      else meldung("Rolle geändert.");
+    });
+  });
+
+  b.querySelectorAll("[data-aktiv]").forEach((el) => {
+    el.addEventListener("click", async () => {
+      const ein = el.dataset.wert === "1";
+      if (!ein) {
+        const ok = await nachfragen({
+          titel: "Benutzer deaktivieren",
+          text: "Die Person kann sich danach nicht mehr anmelden. Bisherige Einträge bleiben erhalten.",
+          bestaetigen: "Deaktivieren", gefahr: true });
+        if (!ok) return;
+      }
+      const { error } = await db.from("profiles").update({ is_active: ein }).eq("id", el.dataset.aktiv);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung(ein ? "Benutzer aktiviert." : "Benutzer deaktiviert."); seiteEinstellungen(b); }
+    });
+  });
+
+  document.getElementById("ns").addEventListener("click", async () => {
+    const name = document.getElementById("mn").value.trim();
+    const { error } = await db.from("profiles").update({ full_name: name }).eq("id", profil.id);
+    if (error) meldung(fehlertext(error), "fehler");
+    else {
+      profil.full_name = name;
+      const anz = document.querySelector("[data-benutzername]");
+      if (anz) anz.textContent = name || profil.email;
+      meldung("Name gespeichert.");
+    }
+  });
+
+  document.getElementById("e-wochenende").addEventListener("change", (e) => {
+    einstellungSetzen("wochenende", e.target.checked);
+    meldung("Gespeichert.");
+  });
+  document.getElementById("e-wochestart").addEventListener("change", (e) => {
+    einstellungSetzen("wochestart", e.target.checked);
+    prod.modus = e.target.checked ? "woche" : "tag";
+    meldung("Gespeichert.");
+  });
+
+  document.getElementById("ps").addEventListener("click", async () => {
+    const pw = document.getElementById("np").value;
+    if (pw.length < 8) { meldung("Das Passwort braucht mindestens 8 Zeichen.", "warn"); return; }
+    const { error } = await db.auth.updateUser({ password: pw });
+    if (error) meldung(fehlertext(error), "fehler");
+    else { document.getElementById("np").value = ""; meldung("Passwort geändert."); }
+  });
+}
+
+// -----------------------------------------------------------------
+//  Navigation
+// -----------------------------------------------------------------
+
+const SEITEN = [
+  { pfad: "dashboard",    titel: "Start",        zeichen: "◧", zeige: seiteDashboard },
+  { pfad: "produktion",   titel: "Produktion",   zeichen: "▶", zeige: seiteProduktion },
+  { pfad: "kontrolle",    titel: "Kontrolle",    zeichen: "✓", zeige: seiteKontrolle },
+  { pfad: "lager",        titel: "Lager",        zeichen: "▤", zeige: seiteLager },
+  { pfad: "bestellungen", titel: "Bestellungen", zeichen: "≡", zeige: seiteBestellungen },
+  { pfad: "einstellungen", titel: "Einstellungen", zeichen: "⚙", zeige: seiteEinstellungen },
+];
+
+function zeichneSeite() {
+  const roh = location.hash.replace(/^#\/?/, "").split("/")[0];
+  const pfad = SEITEN.some((s) => s.pfad === roh) ? roh : "dashboard";
+  const seite = SEITEN.find((s) => s.pfad === pfad);
+  document.querySelectorAll("[data-nav]").forEach((el) => {
+    el.classList.toggle("aktiv", el.dataset.nav === pfad);
+  });
+  window.scrollTo(0, 0);
+  seite.zeige(document.getElementById("inhalt"));
+}
+
+function zeichneGeruest() {
+  const anzeige = (profil && (profil.full_name || profil.email)) || "";
+  WURZEL.innerHTML = ''
+    + '<header class="kopf">'
+    + '<img class="kopf__logo" src="./logo.png" alt="Hofer + Co.">'
+    + '<span class="kopf__benutzer" data-benutzername>' + esc(anzeige) + '</span>'
+    + '<button class="kopf__abmelden" id="ab">Abmelden</button></header>'
+    + '<div class="rahmen"><nav class="nav" aria-label="Hauptnavigation">'
+    + SEITEN.map((s) => '<a class="nav__punkt" data-nav="' + s.pfad + '" href="#/' + s.pfad + '">'
+        + '<span class="nav__zeichen" aria-hidden="true">' + s.zeichen + '</span>'
+        + '<span class="nav__text">' + esc(s.titel) + '</span></a>').join("")
+    + '</nav><main class="inhalt" id="inhalt"></main></div>';
+
+  document.getElementById("ab").addEventListener("click", async () => {
+    const ok = await nachfragen({ titel: "Abmelden",
+      text: "Du musst dich danach neu anmelden.", bestaetigen: "Abmelden" });
+    if (!ok) return;
+    await db.auth.signOut();
+    profil = null;
+    location.hash = "";
+    zeigeLogin();
+  });
+
+  if (!location.hash) location.hash = "#/dashboard";
+  zeichneSeite();
+}
+
+window.addEventListener("hashchange", () => {
+  if (document.getElementById("inhalt")) zeichneSeite();
+});
+
+// -----------------------------------------------------------------
+//  Start
+// -----------------------------------------------------------------
+
+try {
+  stand("Verbindung wird aufgebaut …");
+  db = await verbinden();
+
+  stand("Anmeldung wird geprüft …");
+  const p = await profilLaden();
+
+  BOOT.hidden = true;
+  WURZEL.hidden = false;
+
+  if (!p) {
+    zeigeLogin();
+  } else if (p.is_active === false) {
+    await db.auth.signOut();
+    profil = null;
+    zeigeLogin();
+    meldung("Dieses Konto ist deaktiviert. Bitte an den Besitzer wenden.", "fehler");
+  } else {
+    zeichneGeruest();
+  }
+} catch (fehler) {
+  console.error(fehler);
+  startFehler(esc(fehler.message || String(fehler)));
+}
+</script>
+</body>
+</html>
