@@ -830,6 +830,17 @@ a:focus-visible {
 .dialog__blocktitel { font-size: .85rem; font-weight: 650; color: var(--gedaempft);
                       margin-bottom: 10px; }
 .dialog { max-height: 88vh; overflow-y: auto; }
+
+/* ---------- Kamera: Knöpfe auf eigener Zeile ---------- */
+.scanner__leiste { flex-direction: column; align-items: stretch; gap: 10px; }
+.scanner__knoepfe { display: flex; gap: 8px; }
+.scanner__knoepfe .knopf { flex: 1; }
+#scan-text { text-align: center; line-height: 1.35; }
+
+.platzchip--klein { padding: 2px 7px; font-size: .76rem; font-weight: 500;
+                    display: inline-block; margin: 1px 0; }
+.platzchip--klein b { font-weight: 700; }
+.suchleiste .knopf--scan { flex: none; }
 </style>
 </head>
 <body>
@@ -872,7 +883,7 @@ const APP_NAME = "Hofer + Co.";
 const APP_UNTERTITEL = "HUDSON TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 const LOGIN_ENDUNG = "@hudson.local";
-const APP_VERSION = "6.0.0";
+const APP_VERSION = "6.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -1041,7 +1052,7 @@ function zeigeLogin() {
     + '<form id="lf" novalidate>'
     + '<label class="feld"><span>Benutzername</span>'
     + '<input type="text" id="le" autocomplete="username" autocapitalize="none"'
-    + ' spellcheck="false" placeholder="z. B. saheesan" required></label>'
+    + ' spellcheck="false" required></label>'
     + '<label class="feld"><span>Passwort</span>'
     + '<input type="password" id="lp" autocomplete="current-password" required></label>'
     + '<button type="submit" class="knopf knopf--haupt knopf--breit" id="lk">Anmelden</button>'
@@ -1272,7 +1283,7 @@ async function seiteDashboard(b) {
   await zeichneNotizen();
 
   // Lager und Bestellungen
-  let knapp = 0, offene = 0, ueberfaellig = 0;
+  let offene = 0, ueberfaellig = 0;
   const heute = isoDatum(new Date());
   try {
     const r = await zeitlimit(db.from("order_items").select("id, status, needed_by")
@@ -1283,17 +1294,10 @@ async function seiteDashboard(b) {
     }
   } catch (f) { /* Bereich existiert noch nicht */ }
 
-  try {
-    const r = await zeitlimit(db.from("artikel_uebersicht").select("id")
-      .eq("is_active", true).eq("unter_mindestbestand", true), 8000, "Lager");
-    if (!r.error) knapp = (r.data || []).length;
-  } catch (f) { /* Bereich existiert noch nicht */ }
-
   const statusEl = document.getElementById("db-status");
   if (statusEl) {
     statusEl.innerHTML = '<section class="karte"><h2>Lager und Bestellungen</h2>'
       + '<div class="statusliste">'
-      + statuszeile(knapp, "Artikel unter Mindestbestand", knapp ? "warn" : "gut")
       + statuszeile(ueberfaellig, "Bestellungen überfällig", ueberfaellig ? "gefahr" : "gut")
       + statuszeile(offene, "Bestellungen offen", "neutral")
       + '</div></section>';
@@ -2089,9 +2093,7 @@ async function ansichtUebersicht(ziel, b) {
       + '<div class="rasterrolle"><table class="raster">'
       + '<thead>' + kopf + '</thead><tbody>' + zeilen + '</tbody></table></div></section>';
   }).join("")
-  + '<p class="hinweis">Grosse Zahl: Zählerstand seit Auftragsbeginn. '
-  + 'Kleine Zahl darunter: Leistung an diesem Tag. '
-  + 'Spalte Woche: Summe der Tagesleistungen.</p>';
+  + '<p class="hinweis">Die Zahlen sind die Zählerstände seit Auftragsbeginn.</p>';
 }
 
 // =================================================================
@@ -2463,7 +2465,7 @@ async function scannen(startModus) {
     + '</div>'
     + '<div class="scanner__vorschlaege" id="scan-vorschlaege" hidden></div>'
     + '<div class="scanner__leiste">'
-    + '<span id="scan-text">Kamera wird gestartet …</span>'
+    + '<div id="scan-text">Kamera wird gestartet …</div>'
     + '<div class="scanner__knoepfe">'
     + '<button class="knopf knopf--still" id="scan-zu">Abbrechen</button>'
     + '<button class="knopf knopf--haupt" id="scan-tun" hidden>Foto aufnehmen</button>'
@@ -2481,6 +2483,7 @@ async function scannen(startModus) {
   let strom = null, laeuft = true, steuerung = null;
   let modus = startModus || "foto";
   let bildAufgenommen = false;
+  let zustand = "aufnehmen";
 
   return new Promise(async (fertig) => {
 
@@ -2524,6 +2527,7 @@ async function scannen(startModus) {
       if (neu === "foto") {
         rahmen.hidden = true;
         tun.hidden = false;
+        zustand = "aufnehmen";
         tun.textContent = "Foto aufnehmen";
         text.textContent = "Nummer gut lesbar ins Bild bringen";
       } else {
@@ -2613,6 +2617,7 @@ async function scannen(startModus) {
       start = null;
       if (kasten && kasten.w > 20 && kasten.h > 12) {
         tun.hidden = false;
+        zustand = "erkennen";
         tun.textContent = "Text erkennen";
         text.textContent = "Rahmen passt? Dann auf Text erkennen";
       }
@@ -2626,9 +2631,17 @@ async function scannen(startModus) {
     window.addEventListener("touchend", loslassen);
 
     const fotoAufnehmen = () => {
+      // Wenn das Videobild noch keine Grösse hat, entsteht ein leeres
+      // Foto. Dann kurz warten und erneut versuchen.
+      if (!video.videoWidth || !video.videoHeight) {
+        text.textContent = "Kamera ist noch nicht bereit, einen Moment …";
+        setTimeout(fotoAufnehmen, 400);
+        return;
+      }
+
       leinwand.width = video.videoWidth;
       leinwand.height = video.videoHeight;
-      leinwand.getContext("2d").drawImage(video, 0, 0);
+      leinwand.getContext("2d").drawImage(video, 0, 0, leinwand.width, leinwand.height);
       leinwand.hidden = false;
       video.hidden = true;
       bildAufgenommen = true;
@@ -2724,29 +2737,35 @@ async function scannen(startModus) {
       }
     };
 
-    const zeigeNeuKnopf = () => {
+    const neuesFoto = () => {
+      vorschlaege.hidden = true;
+      vorschlaege.innerHTML = "";
+      video.hidden = false;
+      leinwand.hidden = true;
+      bildAufgenommen = false;
+      auswahl.hidden = true;
+      kasten = null;
+      zustand = "aufnehmen";
       tun.hidden = false;
-      tun.textContent = "Neues Foto";
-      tun.onclick = () => {
-        vorschlaege.hidden = true;
-        vorschlaege.innerHTML = "";
-        video.hidden = false;
-        leinwand.hidden = true;
-        bildAufgenommen = false;
-        auswahl.hidden = true;
-        kasten = null;
-        tun.textContent = "Foto aufnehmen";
-        tun.onclick = knopfDruck;
-        text.textContent = "Nummer gut lesbar ins Bild bringen";
-      };
+      tun.textContent = "Foto aufnehmen";
+      text.textContent = "Nummer gut lesbar ins Bild bringen";
     };
 
+    const zeigeNeuKnopf = () => {
+      zustand = "neu";
+      tun.hidden = false;
+      tun.textContent = "Neues Foto";
+    };
+
+    // Ein einziger Knopf, der je nach Zustand etwas anderes tut.
     const knopfDruck = () => {
-      if (!bildAufgenommen) fotoAufnehmen();
-      else textErkennen();
+      if (zustand === "neu") return neuesFoto();
+      if (!bildAufgenommen) return fotoAufnehmen();
+      return textErkennen();
     };
 
     tun.onclick = knopfDruck;
+    tun.addEventListener("touchend", (e) => { e.preventDefault(); knopfDruck(); });
     modusSetzen(modus);
   });
 }
@@ -2935,7 +2954,7 @@ async function trefferZeichnen(b) {
   kasten.innerHTML = '<div class="trefferliste">' + liste.map((a) =>
     '<button class="treffer" data-artikel="' + esc(a.id) + '">'
     + '<div class="treffer__kopf"><span class="treffer__nr">' + esc(a.article_number) + '</span>'
-    + '<span class="treffer__bestand' + (a.unter_mindestbestand ? " treffer__bestand--knapp" : "") + '">'
+    + '<span class="treffer__bestand">'
     + zahlText(a.gesamtbestand) + ' ' + esc(a.unit) + '</span></div>'
     + '<div class="treffer__name">' + esc(a.name) + '</div>'
     + (a.supplier_name ? '<div class="treffer__lief">' + esc(a.supplier_name) + '</div>' : "")
@@ -2970,11 +2989,9 @@ async function artikelDetail(kasten, artikel, b) {
     + (artikel.supplier_name
         ? '<div class="artikel__lief">Lieferant: ' + esc(artikel.supplier_name) + '</div>' : "")
     + '</div>'
-    + '<div class="artikel__gesamt' + (artikel.unter_mindestbestand ? " artikel__gesamt--knapp" : "") + '">'
+    + '<div class="artikel__gesamt">'
     + zahlText(artikel.gesamtbestand) + '<span>' + esc(artikel.unit) + '</span></div>'
     + '</div>'
-    + (artikel.unter_mindestbestand
-        ? '<div class="warnbalken">Unter Mindestbestand von ' + zahlText(artikel.min_stock) + '</div>' : "")
 
     + '<h3 class="untertitel">Lagerplätze</h3>'
     + (plaetze.length
@@ -3178,9 +3195,17 @@ async function lagerBewegungen(ziel, b) {
 
 async function lagerArtikel(ziel, b) {
   ziel.innerHTML = '<div class="laedt">Artikel werden geladen …</div>';
-  let liste;
-  try { liste = await sucheArtikel(""); }
-  catch (f) {
+  let liste, plaetzeJeArtikel = {};
+  try {
+    liste = await sucheArtikel("");
+    const r = await zeitlimit(db.from("bestand_je_platz").select("article_id, lagerplatz, quantity"),
+      10000, "Lagerplätze");
+    if (!r.error) {
+      (r.data || []).forEach((z) => {
+        (plaetzeJeArtikel[z.article_id] = plaetzeJeArtikel[z.article_id] || []).push(z);
+      });
+    }
+  } catch (f) {
     ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
     return;
   }
@@ -3195,7 +3220,7 @@ async function lagerArtikel(ziel, b) {
         + liste.map((a) => '<tr><td class="stark">' + esc(a.article_number) + '</td>'
             + '<td>' + esc(a.name)
             + (a.supplier_name ? '<div class="klein">' + esc(a.supplier_name) + '</div>' : "") + '</td>'
-            + '<td class="mitte' + (a.unter_mindestbestand ? " minus stark" : "") + '">'
+            + '<td class="mitte">'
             + zahlText(a.gesamtbestand) + '</td>'
             + (darfSchreiben() ? '<td class="rechts"><button class="linkknopf" data-bearb="'
                 + esc(a.id) + '">Bearbeiten</button></td>' : "")
@@ -3234,9 +3259,6 @@ async function artikelDialog(artikel, b, vorgabeNummer) {
     + '<div class="zeitraumwahl">'
     + '<label class="feld"><span>Einheit</span>'
     + '<input id="ad-einheit" type="text" value="' + esc(artikel ? artikel.unit : "Stück") + '"></label>'
-    + '<label class="feld"><span>Mindestbestand</span>'
-    + '<input id="ad-min" type="number" min="0" step="1" value="'
-    + (artikel ? artikel.min_stock : 0) + '"></label>'
     + '</div>'
     + '<label class="feld"><span>Lieferant</span><select id="ad-lief">'
     + '<option value="">– kein Lieferant –</option>'
@@ -3250,7 +3272,6 @@ async function artikelDialog(artikel, b, vorgabeNummer) {
       ? '<div class="dialog__block"><div class="dialog__blocktitel">Wohin kommt der Artikel?</div>'
         + '<div class="zeitraumwahl">'
         + '<label class="feld"><span>Lagerplatz</span><select id="ad-platz">'
-        + '<option value="">– später zuteilen –</option>'
         + plaetze.map((p) => '<option value="' + esc(p.id) + '">' + esc(p.code) + '</option>').join("")
         + '<option value="__neu">+ Neuer Lagerplatz …</option>'
         + '</select></label>'
@@ -3270,6 +3291,12 @@ async function artikelDialog(artikel, b, vorgabeNummer) {
   document.getElementById("ad-nein").onclick = zu;
   huelle.onclick = (e) => { if (e.target === huelle) zu(); };
   document.getElementById("ad-nr").focus();
+
+  // Artikelnummer mit der Kamera erfassen
+  document.getElementById("ad-kamera").onclick = async () => {
+    const code = await scannen();
+    if (code) document.getElementById("ad-nr").value = code;
+  };
 
   // Neuen Lieferanten direkt hier anlegen
   const liefWahl = document.getElementById("ad-lief");
@@ -3304,7 +3331,6 @@ async function artikelDialog(artikel, b, vorgabeNummer) {
       article_number: document.getElementById("ad-nr").value.trim(),
       name: document.getElementById("ad-name").value.trim(),
       unit: document.getElementById("ad-einheit").value.trim() || "Stück",
-      min_stock: Math.max(0, Math.round(Number(document.getElementById("ad-min").value) || 0)),
       supplier_id: liefWahl.value && liefWahl.value !== "__neu" ? liefWahl.value : null,
     };
     if (!daten.article_number || !daten.name) {
