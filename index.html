@@ -681,6 +681,23 @@ a:focus-visible {
   .uhr { font-size: 3.2rem; }
   .mkarten { grid-template-columns: 1fr 1fr; }
 }
+
+/* ---------- Übersicht ---------- */
+.raster__titel { padding: 14px 16px 8px; margin: 0; font-size: 1rem; font-weight: 650; }
+.uzelle__stand { display: block; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ---------- Meldungsliste ---------- */
+.tabelle--meldungen td, .tabelle--meldungen th { vertical-align: top; }
+.mitte { text-align: center; }
+.tabelle--meldungen .mitte { font-variant-numeric: tabular-nums; }
+
+/* ---------- Reihenfolge der Maschinen ---------- */
+.sortspalte { width: 1%; white-space: nowrap; padding-right: 10px; }
+.sortknopf { background: none; border: 1px solid var(--linie-stark); border-radius: 3px;
+             width: 30px; height: 30px; font-size: .9rem; line-height: 1;
+             color: var(--marke); cursor: pointer; }
+.sortknopf:disabled { opacity: .3; cursor: default; }
+.sortknopf + .sortknopf { margin-left: 3px; }
 </style>
 </head>
 <body>
@@ -721,7 +738,9 @@ const SUPABASE_URL = "https://yvbtgiqtndxqqxhjshnl.supabase.co";
 const SUPABASE_KEY = "sb_publishable_WaxiaoZBFbntTgu-DklN-Q_O4T4lca7";
 const APP_NAME = "Hofer + Co.";
 const APP_UNTERTITEL = "HUDSON TOOL";
-const APP_VERSION = "4.0.0";
+// Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
+const LOGIN_ENDUNG = "@hudson.local";
+const APP_VERSION = "4.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -878,8 +897,9 @@ function zeigeLogin() {
     + '<div class="login__untertitel">' + esc(APP_UNTERTITEL) + '</div>'
     + '</div>'
     + '<form id="lf" novalidate>'
-    + '<label class="feld"><span>E-Mail</span>'
-    + '<input type="email" id="le" autocomplete="username" inputmode="email" required></label>'
+    + '<label class="feld"><span>Benutzername</span>'
+    + '<input type="text" id="le" autocomplete="username" autocapitalize="none"'
+    + ' spellcheck="false" placeholder="z. B. saheesan" required></label>'
     + '<label class="feld"><span>Passwort</span>'
     + '<input type="password" id="lp" autocomplete="current-password" required></label>'
     + '<button type="submit" class="knopf knopf--haupt knopf--breit" id="lk">Anmelden</button>'
@@ -888,9 +908,12 @@ function zeigeLogin() {
   const knopf = document.getElementById("lk");
   document.getElementById("lf").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const email = document.getElementById("le").value.trim().toLowerCase();
+    const eingabe = document.getElementById("le").value.trim().toLowerCase();
     const pw = document.getElementById("lp").value;
-    if (!email || !pw) { meldung("E-Mail und Passwort eingeben.", "warn"); return; }
+    if (!eingabe || !pw) { meldung("Benutzername und Passwort eingeben.", "warn"); return; }
+
+    // Ohne @ wird daraus automatisch eine gültige Adresse.
+    const email = eingabe.includes("@") ? eingabe : eingabe + LOGIN_ENDUNG;
 
     knopf.disabled = true;
     knopf.textContent = "Anmelden …";
@@ -1446,7 +1469,7 @@ async function seiteProduktion(b) {
 
   b.innerHTML = '<h1 class="seitentitel">Produktion</h1>'
     + '<div class="reiter">'
-    + [["erfassen", "Erfassen"], ["auswertung", "Auswertung"], ["maschinen", "Maschinen"]]
+    + [["erfassen", "Erfassen"], ["uebersicht", "Übersicht"], ["maschinen", "Maschinen"]]
         .map(([w, t]) => '<button class="reiter__knopf' + (prod.ansicht === w ? " aktiv" : "")
           + '" data-ansicht="' + w + '">' + t + '</button>').join("")
     + '</div>'
@@ -1481,7 +1504,7 @@ async function seiteProduktion(b) {
 
   if (!prod.parkId || !prod.parks.some((p) => p.id === prod.parkId)) prod.parkId = prod.parks[0].id;
 
-  if (prod.ansicht === "auswertung") return ansichtAuswertung(ziel, b);
+  if (prod.ansicht === "uebersicht") return ansichtUebersicht(ziel, b);
   return ansichtErfassen(ziel, b);
 }
 
@@ -1684,8 +1707,8 @@ function auftragsKnoepfeBinden(raster, b) {
         titel: "Auftrag starten",
         text: maschine ? "Maschine " + maschine.name : "",
         felder: [
-          { name: "nummer", label: "Auftragsnummer", pflicht: true,
-            platzhalter: "10007-0381", hinweis: "Kunde und Teil, getrennt durch einen Bindestrich" },
+          { name: "nummer", label: "HOCO Nr.", pflicht: true,
+            platzhalter: "HOCO Nr. eingeben" },
           { name: "notiz", label: "Notiz", typ: "textarea", platzhalter: "kann leer bleiben" },
         ],
         bestaetigen: "Auftrag starten",
@@ -1724,109 +1747,79 @@ function auftragsKnoepfeBinden(raster, b) {
 }
 
 // =================================================================
-//  AUSWERTUNG
+//  ÜBERSICHT
+//  Alle Maschinenparks untereinander, je Maschine die ganze Woche.
 // =================================================================
 
-async function ansichtAuswertung(ziel, b) {
-  ziel.innerHTML = '<div class="karte"><div class="zeitraumwahl">'
-    + '<label class="feld"><span>Von</span><input type="date" id="von" value="' + prod.vonDatum + '"></label>'
-    + '<label class="feld"><span>Bis</span><input type="date" id="bis" value="' + prod.bisDatum + '"></label>'
-    + '</div><div class="schnellwahl">'
-    + '<button class="linkknopf" data-zeit="woche">Diese Woche</button>'
-    + '<button class="linkknopf" data-zeit="monat">Dieser Monat</button>'
-    + '<button class="linkknopf" data-zeit="vormonat">Letzter Monat</button>'
-    + '<button class="linkknopf" data-zeit="jahr">Dieses Jahr</button>'
-    + '</div></div><div id="auswertung"><div class="laedt">Wird berechnet …</div></div>';
+async function ansichtUebersicht(ziel, b) {
+  const tageProWoche = einstellung("wochenende") ? 7 : 5;
+  const von = wochenStart(prod.tag);
+  const bis = plusTage(von, tageProWoche - 1);
 
-  const neu = () => {
-    prod.vonDatum = document.getElementById("von").value;
-    prod.bisDatum = document.getElementById("bis").value;
-    seiteProduktion(b);
-  };
-  document.getElementById("von").onchange = neu;
-  document.getElementById("bis").onchange = neu;
+  ziel.innerHTML = '<div class="steuerung">'
+    + '<button class="knopf knopf--klein" id="u-zurueck">‹</button>'
+    + '<div class="steuerung__mitte"><div class="steuerung__titel">Woche '
+    + kurzDatum(von) + ' – ' + kurzDatum(bis) + '</div>'
+    + '<button class="linkknopf" id="u-heute">Heute</button></div>'
+    + '<button class="knopf knopf--klein" id="u-vor">›</button></div>'
+    + '<div id="u-inhalt"><div class="laedt">Zahlen werden geladen …</div></div>';
 
-  document.querySelectorAll("[data-zeit]").forEach((el) => {
-    el.onclick = () => {
-      const h = new Date();
-      if (el.dataset.zeit === "woche") {
-        prod.vonDatum = wochenStart(isoDatum(h));
-        prod.bisDatum = plusTage(prod.vonDatum, 6);
-      } else if (el.dataset.zeit === "monat") {
-        prod.vonDatum = isoDatum(new Date(h.getFullYear(), h.getMonth(), 1));
-        prod.bisDatum = isoDatum(new Date(h.getFullYear(), h.getMonth() + 1, 0));
-      } else if (el.dataset.zeit === "vormonat") {
-        prod.vonDatum = isoDatum(new Date(h.getFullYear(), h.getMonth() - 1, 1));
-        prod.bisDatum = isoDatum(new Date(h.getFullYear(), h.getMonth(), 0));
-      } else {
-        prod.vonDatum = isoDatum(new Date(h.getFullYear(), 0, 1));
-        prod.bisDatum = isoDatum(new Date(h.getFullYear(), 11, 31));
-      }
-      seiteProduktion(b);
-    };
-  });
+  document.getElementById("u-zurueck").onclick = () => {
+    prod.tag = plusTage(prod.tag, -7); seiteProduktion(b); };
+  document.getElementById("u-vor").onclick = () => {
+    prod.tag = plusTage(prod.tag, 7); seiteProduktion(b); };
+  document.getElementById("u-heute").onclick = () => {
+    prod.tag = isoDatum(new Date()); seiteProduktion(b); };
 
-  const kasten = document.getElementById("auswertung");
   let staende;
   try {
-    staende = await ladeZaehlerstaende(prod.vonDatum, prod.bisDatum, prod.maschinen.map((m) => m.id));
+    staende = await ladeZaehlerstaende(von, bis, prod.maschinen.map((m) => m.id));
   } catch (f) {
-    kasten.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    document.getElementById("u-inhalt").innerHTML =
+      '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
     return;
   }
 
-  const proMaschine = {}, proPark = {}, proTag = {};
-  let gesamt = 0;
+  const tage = [];
+  for (let i = 0; i < tageProWoche; i++) tage.push(plusTage(von, i));
+  const heute = isoDatum(new Date());
 
-  Object.values(staende.proSchluessel).forEach((z) => {
-    if (z.record_date < prod.vonDatum || z.record_date > prod.bisDatum) return;
-    const m = prod.maschinen.find((x) => x.id === z.machine_id);
-    if (!m) return;
-    const l = z.leistung || 0;
-    proMaschine[m.id] = (proMaschine[m.id] || 0) + l;
-    proPark[m.park_id] = (proPark[m.park_id] || 0) + l;
-    proTag[z.record_date] = (proTag[z.record_date] || 0) + l;
-    gesamt += l;
-  });
+  document.getElementById("u-inhalt").innerHTML = prod.parks.map((park) => {
+    const maschinen = prod.maschinen.filter((m) => m.park_id === park.id);
+    if (!maschinen.length) return "";
 
-  const tage = Object.keys(proTag).length;
-  const schnitt = tage ? Math.round(gesamt / tage) : 0;
+    const kopf = '<tr><th class="fest">Maschine</th>'
+      + tage.map((t, i) => '<th class="' + (t === heute ? "heute" : "") + '">' + WT_KURZ[i]
+          + '<span class="th__datum">' + kurzDatum(t) + '</span></th>').join("")
+      + '<th class="summe">Woche</th></tr>';
 
-  const liste = prod.maschinen
-    .map((m) => ({ m: m, menge: proMaschine[m.id] || 0 }))
-    .filter((x) => x.menge !== 0)
-    .sort((a, c) => c.menge - a.menge);
-  const hoechst = Math.max(1, ...liste.map((x) => Math.abs(x.menge)));
+    const zeilen = maschinen.map((m) => {
+      const j = prod.auftraege[m.id];
+      let wochenLeistung = 0;
 
-  kasten.innerHTML = '<div class="kennzahlen">'
-    + kennzahl("Gesamt", zahlText(gesamt))
-    + kennzahl("Tagesdurchschnitt", zahlText(schnitt))
-    + kennzahl("Erfasste Tage", zahlText(tage))
-    + kennzahl("Maschinen aktiv", zahlText(liste.length))
-    + '</div>'
+      const zellen = tage.map((t) => {
+        const e = staende.proSchluessel[m.id + "|" + t];
+        if (e) wochenLeistung += (e.leistung || 0);
+        return '<td class="' + (t === heute ? "heute" : "") + '">'
+          + '<span class="uzelle__stand">' + (e ? zahlText(e.quantity) : "–") + '</span>'
+          + '<span class="zelle__leistung">' + (e ? leistungText(e.leistung) : "") + '</span>'
+          + '</td>';
+      }).join("");
 
-    + (prod.parks.length > 1
-      ? '<section class="karte"><h2>Je Maschinenpark</h2><table class="tabelle">'
-        + prod.parks.map((p) => '<tr><td>' + esc(p.name) + '</td><td class="rechts stark">'
-            + zahlText(proPark[p.id] || 0) + '</td></tr>').join("")
-        + '</table></section>' : "")
+      return '<tr><th class="fest">' + esc(m.name)
+        + '<span class="fest__auftrag">' + (j ? esc(j.job_number) : "kein Auftrag") + '</span>'
+        + '</th>' + zellen
+        + '<td class="summe">' + zahlText(wochenLeistung) + '</td></tr>';
+    }).join("");
 
-    + '<section class="karte"><h2>Je Maschine</h2>'
-    + (liste.length
-      ? liste.map((x) => '<div class="balken"><div class="balken__kopf">'
-          + '<span>' + esc(x.m.name) + '</span><strong>' + zahlText(x.menge) + '</strong></div>'
-          + '<div class="balken__spur"><div class="balken__fuellung'
-          + (x.menge < 0 ? " balken__fuellung--minus" : "") + '" style="width:'
-          + Math.round(Math.abs(x.menge) / hoechst * 100) + '%"></div></div></div>').join("")
-      : '<p class="hinweis">Im gewählten Zeitraum wurde nichts erfasst.</p>')
-    + '<p class="hinweis">Die Zahlen sind Tagesleistungen, also Differenzen der Zählerstände. '
-    + 'Ein negativer Wert bedeutet, dass Ausschuss abgezogen wurde.</p>'
-    + '</section>';
-}
-
-function kennzahl(titel, wert) {
-  return '<div class="kennzahl"><div class="kennzahl__titel">' + esc(titel) + '</div>'
-    + '<div class="kennzahl__wert">' + wert + '</div></div>';
+    return '<section class="karte karte--raster">'
+      + '<h2 class="raster__titel">' + esc(park.name) + '</h2>'
+      + '<div class="rasterrolle"><table class="raster">'
+      + '<thead>' + kopf + '</thead><tbody>' + zeilen + '</tbody></table></div></section>';
+  }).join("")
+  + '<p class="hinweis">Grosse Zahl: Zählerstand seit Auftragsbeginn. '
+  + 'Kleine Zahl darunter: Leistung an diesem Tag. '
+  + 'Spalte Woche: Summe der Tagesleistungen.</p>';
 }
 
 // =================================================================
@@ -1849,8 +1842,15 @@ function ansichtMaschinen(ziel, b) {
           + '</div>' : "") + '</div>'
 
       + (maschinen.length
-        ? '<table class="tabelle"><tbody>' + maschinen.map((m) =>
-            '<tr class="' + (m.is_active ? "" : "zeile--inaktiv") + '"><td>' + esc(m.name)
+        ? '<table class="tabelle"><tbody>' + maschinen.map((m, i) =>
+            '<tr class="' + (m.is_active ? "" : "zeile--inaktiv") + '">'
+            + (darf ? '<td class="sortspalte">'
+                + '<button class="sortknopf" data-hoch="' + esc(m.id) + '"'
+                + (i === 0 ? " disabled" : "") + ' title="nach oben">↑</button>'
+                + '<button class="sortknopf" data-runter="' + esc(m.id) + '"'
+                + (i === maschinen.length - 1 ? " disabled" : "") + ' title="nach unten">↓</button>'
+                + '</td>' : "")
+            + '<td>' + esc(m.name)
             + (m.machine_number ? ' <span class="klein">' + esc(m.machine_number) + '</span>' : "")
             + '</td>' + (darf ? '<td class="rechts nowrap">'
               + '<button class="linkknopf" data-masch-um="' + esc(m.id) + '">Bearbeiten</button> '
@@ -1949,6 +1949,32 @@ function ansichtMaschinen(ziel, b) {
     };
   });
 
+  // ----- Reihenfolge ändern -----
+
+  async function verschieben(maschineId, richtung) {
+    const m = prod.maschinen.find((x) => x.id === maschineId);
+    if (!m) return;
+    const liste = prod.maschinen.filter((x) => x.park_id === m.park_id);
+    const i = liste.findIndex((x) => x.id === maschineId);
+    const j = i + richtung;
+    if (j < 0 || j >= liste.length) return;
+
+    // Tauschen und die ganze Liste neu durchnummerieren
+    liste.splice(j, 0, liste.splice(i, 1)[0]);
+    for (let k = 0; k < liste.length; k++) {
+      const { error } = await db.from("machines").update({ sort_order: k }).eq("id", liste[k].id);
+      if (error) { meldung(fehlertext(error), "fehler"); return; }
+    }
+    neuLaden();
+  }
+
+  ziel.querySelectorAll("[data-hoch]").forEach((el) => {
+    el.onclick = () => verschieben(el.dataset.hoch, -1);
+  });
+  ziel.querySelectorAll("[data-runter]").forEach((el) => {
+    el.onclick = () => verschieben(el.dataset.runter, 1);
+  });
+
   // ----- Löschen: zwei Rückfragen -----
 
   ziel.querySelectorAll("[data-park-weg]").forEach((el) => {
@@ -2003,7 +2029,7 @@ function ansichtMaschinen(ziel, b) {
 async function seiteKontrolle(b) {
   b.innerHTML = '<h1 class="seitentitel">Kontrolle</h1>'
     + (darfKontrolle() ? "" : nurLesenHinweis(
-        "Du kannst die Meldungen ansehen. Erfassen dürfen nur Benutzer mit der Rolle Kontrolle."))
+        "Du kannst Meldungen ansehen und quittieren. Erfassen dürfen nur Benutzer mit der Rolle Kontrolle."))
     + '<div id="k-inhalt"><div class="laedt">Wird geladen …</div></div>';
 
   const ziel = document.getElementById("k-inhalt");
@@ -2016,7 +2042,8 @@ async function seiteKontrolle(b) {
     auftraege = a.data || [];
 
     const m = await zeitlimit(db.from("kontrolle_lesbar").select("*")
-      .order("created_at", { ascending: false }).limit(30), 10000, "Meldungen");
+      .is("acknowledged_at", null)
+      .order("created_at", { ascending: false }).limit(50), 10000, "Meldungen");
     if (!m.error) meldungen = m.data || [];
   } catch (f) {
     ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
@@ -2030,25 +2057,36 @@ async function seiteKontrolle(b) {
           + '<span class="kzeile__maschine">' + esc(j.maschine) + '</span></div>'
           + '<div class="kzeile__unten">'
           + '<span>Stand ' + zahlText(j.stand) + '</span>'
-          + '<span class="' + (j.ausschuss > 0 ? "kzeile__ausschuss" : "") + '">Ausschuss '
-          + zahlText(j.ausschuss) + '</span>'
+          + (j.ausschuss > 0
+              ? '<span class="kzeile__ausschuss">offen ' + zahlText(j.ausschuss) + '</span>' : "")
           + (darfKontrolle() ? '<button class="knopf knopf--klein" data-melden="' + esc(j.id)
               + '" data-nr="' + esc(j.job_number) + '">Ausschuss melden</button>' : "")
           + '</div></div>').join("")
       : '<p class="hinweis">Zurzeit läuft kein Auftrag.</p>')
     + '</section>'
 
-    + '<section class="karte"><h2>Letzte Meldungen</h2>'
+    + '<section class="karte"><h2>Offene Meldungen'
+    + (meldungen.length ? ' <span class="marke">' + meldungen.length + '</span>' : "")
+    + '</h2>'
     + (meldungen.length
-      ? '<table class="tabelle"><thead><tr><th>Wann</th><th>Auftrag</th>'
-        + '<th class="rechts">Ausschuss</th><th>Wer</th></tr></thead><tbody>'
-        + meldungen.map((m) => '<tr><td class="klein">' + esc(datumZeitKurz(m.created_at)) + '</td>'
+      ? '<table class="tabelle tabelle--meldungen"><thead><tr>'
+        + '<th>Wann</th><th>Auftrag</th><th class="mitte">Ausschuss</th><th>Wer</th>'
+        + (darfSchreiben() ? '<th></th>' : "")
+        + '</tr></thead><tbody>'
+        + meldungen.map((m) => '<tr>'
+            + '<td class="klein">' + esc(datumZeitKurz(m.created_at)) + '</td>'
             + '<td>' + esc(m.job_number) + '<span class="klein"> ' + esc(m.maschine) + '</span>'
             + (m.note ? '<div class="knotiz">' + esc(m.note) + '</div>' : "") + '</td>'
-            + '<td class="rechts stark">' + zahlText(m.scrap_count) + '</td>'
-            + '<td class="klein">' + esc(m.benutzer_name || m.benutzer_email || "") + '</td></tr>').join("")
+            + '<td class="mitte stark">' + zahlText(m.scrap_count) + '</td>'
+            + '<td class="klein">' + esc(m.benutzer_name || m.benutzer_email || "") + '</td>'
+            + (darfSchreiben()
+                ? '<td class="rechts"><button class="linkknopf" data-quit="' + esc(m.id)
+                  + '">Quittieren</button></td>' : "")
+            + '</tr>').join("")
         + '</tbody></table>'
-      : '<p class="hinweis">Noch keine Meldungen erfasst.</p>')
+        + '<p class="hinweis">Quittieren heisst: gesehen und erledigt. '
+        + 'Die Meldung verschwindet aus der Liste.</p>'
+      : '<p class="hinweis">Keine offenen Meldungen.</p>')
     + '</section>';
 
   ziel.querySelectorAll("[data-melden]").forEach((el) => {
@@ -2072,6 +2110,17 @@ async function seiteKontrolle(b) {
       });
       if (error) meldung(fehlertext(error), "fehler");
       else { meldung("Meldung erfasst."); seiteKontrolle(b); }
+    };
+  });
+
+  ziel.querySelectorAll("[data-quit]").forEach((el) => {
+    el.onclick = async () => {
+      const { error } = await db.from("quality_reports").update({
+        acknowledged_at: new Date().toISOString(),
+        acknowledged_by: profil.id,
+      }).eq("id", el.dataset.quit);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Quittiert."); seiteKontrolle(b); }
     };
   });
 }
