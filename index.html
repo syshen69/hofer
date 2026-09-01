@@ -689,6 +689,8 @@ a:focus-visible {
 /* ---------- Meldungsliste ---------- */
 .tabelle--meldungen td, .tabelle--meldungen th { vertical-align: top; }
 .mitte { text-align: center; }
+.tabelle th.mitte { text-align: center; }
+.tabelle th.rechts { text-align: right; }
 .tabelle--meldungen .mitte { font-variant-numeric: tabular-nums; }
 
 /* ---------- Reihenfolge der Maschinen ---------- */
@@ -698,6 +700,87 @@ a:focus-visible {
              color: var(--marke); cursor: pointer; }
 .sortknopf:disabled { opacity: .3; cursor: default; }
 .sortknopf + .sortknopf { margin-left: 3px; }
+
+/* ---------- Suchleiste ---------- */
+.suchleiste { display: flex; gap: 8px; margin-bottom: 14px; }
+.suchleiste input { flex: 1; }
+.knopf--scan { white-space: nowrap; }
+
+/* ---------- Trefferliste ---------- */
+.trefferliste { display: grid; gap: 8px; }
+.treffer { display: block; width: 100%; text-align: left; background: var(--flaeche);
+           border: 1px solid var(--linie); border-radius: var(--radius);
+           padding: 12px 14px; font: inherit; cursor: pointer; }
+.treffer:hover { border-color: var(--marke); }
+.treffer__kopf { display: flex; justify-content: space-between; gap: 12px; }
+.treffer__nr { font-weight: 650; }
+.treffer__bestand { font-variant-numeric: tabular-nums; color: var(--gedaempft); }
+.treffer__bestand--knapp { color: var(--gefahr); font-weight: 650; }
+.treffer__name { font-size: .92rem; }
+.treffer__lief { font-size: .78rem; color: var(--gedaempft); }
+
+/* ---------- Artikelkarte ---------- */
+.artikel__kopf { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+.artikel__nr { font-size: 1.2rem; font-weight: 650; }
+.artikel__name { font-size: .95rem; }
+.artikel__lief { font-size: .8rem; color: var(--gedaempft); margin-top: 4px; }
+.artikel__gesamt { font-size: 2rem; font-weight: 650; line-height: 1; text-align: right;
+                   font-variant-numeric: tabular-nums; }
+.artikel__gesamt span { display: block; font-size: .75rem; font-weight: 400;
+                        color: var(--gedaempft); }
+.artikel__gesamt--knapp { color: var(--gefahr); }
+.warnbalken { margin-top: 12px; padding: 8px 12px; background: #fdf4e3;
+              border-left: 3px solid #c08415; border-radius: var(--radius); font-size: .88rem; }
+.untertitel { margin: 18px 0 8px; font-size: .85rem; font-weight: 650;
+              text-transform: uppercase; letter-spacing: .06em; color: var(--gedaempft); }
+.platzcode { font-weight: 650; letter-spacing: .04em; }
+.aktionen { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.karte__fuss { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--linie); }
+.plus { color: var(--gut); }
+.minus { color: var(--gefahr); }
+
+/* ---------- Lagerplätze ---------- */
+.platzgitter { display: flex; flex-wrap: wrap; gap: 6px; }
+.platzchip { padding: 6px 12px; background: var(--marke-hell); color: var(--marke);
+             border-radius: var(--radius); font-weight: 650; font-size: .88rem;
+             letter-spacing: .04em; }
+
+/* ---------- Scanner ---------- */
+.scanner { position: relative; width: 100%; max-width: 460px; background: #000;
+           border-radius: var(--radius); overflow: hidden; }
+.scanner video { width: 100%; display: block; max-height: 70vh; object-fit: cover; }
+.scanner__rahmen { position: absolute; inset: 22% 12%; border: 2px solid var(--signalgelb);
+                   border-radius: 6px; pointer-events: none; }
+.scanner__leiste { display: flex; align-items: center; justify-content: space-between;
+                   gap: 12px; padding: 12px 14px; background: #1d2430; color: #fff;
+                   font-size: .88rem; }
+.scanner__leiste .knopf { background: transparent; border-color: #47505c; color: #fff; }
+
+/* ---------- Bestellungen ---------- */
+.statuschip { display: inline-block; padding: 1px 8px; border-radius: 999px;
+              font-size: .72rem; font-weight: 600; background: var(--grund);
+              color: var(--gedaempft); }
+.statuschip--offen { background: #fdf4e3; color: #8a5c10; }
+.statuschip--bestellt { background: var(--marke-hell); color: var(--marke); }
+.statuschip--teilweise_geliefert { background: #e7f0fb; color: var(--marke); }
+.statuschip--geliefert, .statuschip--erledigt { background: #eef6f1; color: var(--gut); }
+.statuschip--storniert { background: #f1f2f4; color: var(--gedaempft); }
+.statuswahl { display: grid; gap: 8px; margin-bottom: 16px; }
+.lieferdaten { display: grid; gap: 3px; font-size: .92rem; }
+.lieferdaten a { color: var(--marke); }
+
+.pd-treffer { display: grid; gap: 4px; margin-bottom: 12px; }
+.pd-zeile { display: block; width: 100%; text-align: left; background: var(--flaeche);
+            border: 1px solid var(--linie); border-radius: var(--radius);
+            padding: 9px 12px; font: inherit; font-size: .9rem; cursor: pointer; }
+.pd-zeile:hover { border-color: var(--marke); }
+.pd-gewaehlt { padding: 10px 12px; background: var(--marke-hell);
+               border-radius: var(--radius); margin-bottom: 14px; }
+
+@media (min-width: 780px) {
+  .trefferliste { grid-template-columns: 1fr 1fr; }
+  .statuswahl { grid-template-columns: 1fr 1fr; }
+}
 </style>
 </head>
 <body>
@@ -740,7 +823,7 @@ const APP_NAME = "Hofer + Co.";
 const APP_UNTERTITEL = "HUDSON TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 const LOGIN_ENDUNG = "@hudson.local";
-const APP_VERSION = "4.1.0";
+const APP_VERSION = "5.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -1224,13 +1307,6 @@ function begruessung() {
   return "Guten Abend";
 }
 
-function platzhalter(b, titel, phase, punkte) {
-  b.innerHTML = '<h1 class="seitentitel">' + esc(titel) + '</h1>'
-    + '<div class="karte karte--hinweis"><h2>Kommt in Phase ' + esc(phase) + '</h2>'
-    + '<p>Geplant für diesen Bereich:</p><ul class="liste">'
-    + punkte.map((p) => "<li>" + esc(p) + "</li>").join("")
-    + '</ul></div>';
-}
 
 // =================================================================
 //  RECHTE
@@ -2132,19 +2208,981 @@ function datumZeitKurz(iso) {
   return p(d.getDate()) + "." + p(d.getMonth() + 1) + ". " + p(d.getHours()) + ":" + p(d.getMinutes());
 }
 
-const seiteLager = (b) => platzhalter(b, "Lager", "5 und 6", [
-  "Artikelsuche mit Bestand je Fach",
-  "Entnahme, Wareneingang, Umlagerung, Korrektur",
-  "Lagerplätze anlegen und Artikel zuteilen",
-  "Letzte 10 Änderungen je Fach",
-]);
+// =================================================================
+//  BARCODE-SCANNER
+//  Nutzt die eingebaute Erkennung des Browsers, wenn vorhanden.
+//  Sonst wird ZXing nachgeladen. Klappt beides nicht, bleibt die
+//  Eingabe von Hand.
+// =================================================================
 
-const seiteBestellungen = (b) => platzhalter(b, "Bestellungen", 7, [
-  "Positionen erfassen und abhaken",
-  "Automatisch nach Lieferant gruppiert",
-  "Lieferanten verwalten",
-  "Letzte 100 Positionen je Lieferant",
-]);
+async function scannen() {
+  const huelle = document.createElement("div");
+  huelle.className = "dialog-huelle";
+  huelle.innerHTML = '<div class="scanner">'
+    + '<video id="scan-video" playsinline muted></video>'
+    + '<div class="scanner__rahmen"></div>'
+    + '<div class="scanner__leiste">'
+    + '<span id="scan-text">Kamera wird gestartet …</span>'
+    + '<button class="knopf knopf--still" id="scan-zu">Abbrechen</button>'
+    + '</div></div>';
+  document.body.appendChild(huelle);
+
+  const video = document.getElementById("scan-video");
+  const text = document.getElementById("scan-text");
+  let strom = null, laeuft = true, steuerung = null;
+
+  const beenden = (ergebnis, fertig) => {
+    laeuft = false;
+    if (steuerung && steuerung.stop) { try { steuerung.stop(); } catch (e) {} }
+    if (strom) strom.getTracks().forEach((t) => t.stop());
+    huelle.remove();
+    fertig(ergebnis);
+  };
+
+  return new Promise(async (fertig) => {
+    document.getElementById("scan-zu").onclick = () => beenden(null, fertig);
+    huelle.onclick = (e) => { if (e.target === huelle) beenden(null, fertig); };
+
+    try {
+      strom = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" }, audio: false });
+      video.srcObject = strom;
+      await video.play();
+    } catch (f) {
+      text.textContent = "Kamera nicht verfügbar: " + f.message;
+      setTimeout(() => beenden(null, fertig), 2500);
+      return;
+    }
+
+    // Weg 1: eingebaute Erkennung (Chrome auf Android und PC)
+    if ("BarcodeDetector" in window) {
+      try {
+        const erkenner = new window.BarcodeDetector();
+        text.textContent = "Code vor die Kamera halten";
+        const suchen = async () => {
+          if (!laeuft) return;
+          try {
+            const treffer = await erkenner.detect(video);
+            if (treffer && treffer.length) {
+              return beenden(treffer[0].rawValue, fertig);
+            }
+          } catch (e) { /* einzelne Bilder dürfen fehlschlagen */ }
+          requestAnimationFrame(suchen);
+        };
+        suchen();
+        return;
+      } catch (e) { /* weiter mit Weg 2 */ }
+    }
+
+    // Weg 2: ZXing nachladen (iPhone und ältere Browser)
+    try {
+      text.textContent = "Scanner wird geladen …";
+      const zx = await zeitlimit(
+        import("https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/+esm"), 8000, "Scanner");
+      const leser = new zx.BrowserMultiFormatReader();
+      text.textContent = "Code vor die Kamera halten";
+      steuerung = await leser.decodeFromVideoElement(video, (ergebnis) => {
+        if (ergebnis && laeuft) beenden(ergebnis.getText(), fertig);
+      });
+    } catch (f) {
+      text.textContent = "Scannen auf diesem Gerät nicht möglich. Bitte von Hand eingeben.";
+      setTimeout(() => beenden(null, fertig), 3000);
+    }
+  });
+}
+
+// =================================================================
+//  LAGER
+// =================================================================
+
+const lag = {
+  ansicht: "suche",
+  suchtext: "",
+  treffer: null,
+  artikel: null,
+};
+
+const BEWEGUNGSARTEN = {
+  eingang: "Eingang",
+  entnahme: "Entnahme",
+  umlagerung: "Umlagerung",
+  korrektur: "Korrektur",
+  inventur: "Inventur",
+};
+
+async function ladeLagerplaetze() {
+  const { data, error } = await zeitlimit(
+    db.from("storage_locations").select("*").eq("is_active", true).order("code"),
+    10000, "Lagerplätze");
+  if (error) throw error;
+  return data || [];
+}
+
+async function ladeLieferanten() {
+  const { data, error } = await zeitlimit(
+    db.from("suppliers").select("*").eq("is_active", true).order("name"),
+    10000, "Lieferanten");
+  if (error) throw error;
+  return data || [];
+}
+
+async function sucheArtikel(text) {
+  const t = (text || "").trim();
+  let abfrage = db.from("artikel_uebersicht").select("*").eq("is_active", true);
+  if (t) {
+    abfrage = abfrage.or("article_number.ilike.%" + t + "%,name.ilike.%" + t
+      + "%,supplier_name.ilike.%" + t + "%");
+  }
+  const { data, error } = await zeitlimit(abfrage.order("article_number").limit(50),
+    12000, "Artikelsuche");
+  if (error) throw error;
+  return data || [];
+}
+
+async function ladeBestandJeArtikel(artikelId) {
+  const { data, error } = await zeitlimit(
+    db.from("bestand_je_platz").select("*").eq("article_id", artikelId).order("lagerplatz"),
+    10000, "Bestand");
+  if (error) throw error;
+  return data || [];
+}
+
+async function ladeBewegungen(filter) {
+  let a = db.from("bewegungen_lesbar").select("*")
+    .order("created_at", { ascending: false }).limit(30);
+  if (filter && filter.artikel) a = a.eq("article_id", filter.artikel);
+  if (filter && filter.platz) a = a.eq("location_id", filter.platz);
+  const { data, error } = await zeitlimit(a, 10000, "Bewegungen");
+  if (error) throw error;
+  return data || [];
+}
+
+async function bucheBewegung(eintrag) {
+  const { error } = await zeitlimit(db.from("stock_movements").insert(eintrag),
+    12000, "Buchung");
+  if (error) throw error;
+}
+
+// ---------- Seite ----------
+
+async function seiteLager(b) {
+  b.innerHTML = '<h1 class="seitentitel">Lager</h1>'
+    + '<div class="reiter">'
+    + [["suche", "Suche"], ["bewegungen", "Bewegungen"],
+       ["artikel", "Artikel"], ["plaetze", "Lagerplätze"]]
+      .map(([w, t]) => '<button class="reiter__knopf' + (lag.ansicht === w ? " aktiv" : "")
+        + '" data-lager="' + w + '">' + t + '</button>').join("")
+    + '</div>'
+    + (darfSchreiben() ? "" : nurLesenHinweis("Du kannst hier alles ansehen, aber nichts buchen."))
+    + '<div id="lag-inhalt"></div>';
+
+  b.querySelectorAll("[data-lager]").forEach((el) => {
+    el.onclick = () => { lag.ansicht = el.dataset.lager; seiteLager(b); };
+  });
+
+  const ziel = document.getElementById("lag-inhalt");
+  if (lag.ansicht === "bewegungen") return lagerBewegungen(ziel, b);
+  if (lag.ansicht === "artikel") return lagerArtikel(ziel, b);
+  if (lag.ansicht === "plaetze") return lagerPlaetze(ziel, b);
+  return lagerSuche(ziel, b);
+}
+
+// ---------- Suche ----------
+
+async function lagerSuche(ziel, b) {
+  ziel.innerHTML = '<div class="suchleiste">'
+    + '<input type="text" id="l-such" placeholder="Artikelnummer, Name oder Lieferant"'
+    + ' value="' + esc(lag.suchtext) + '" autocomplete="off">'
+    + '<button class="knopf knopf--scan" id="l-scan" title="Barcode scannen">Scannen</button>'
+    + '</div>'
+    + '<div id="l-treffer"><div class="laedt">Wird gesucht …</div></div>';
+
+  const feld = document.getElementById("l-such");
+  let taste = null;
+  feld.oninput = () => {
+    lag.suchtext = feld.value;
+    clearTimeout(taste);
+    taste = setTimeout(() => trefferZeichnen(b), 300);
+  };
+  feld.onkeydown = (e) => { if (e.key === "Enter") { clearTimeout(taste); trefferZeichnen(b); } };
+  feld.focus();
+
+  document.getElementById("l-scan").onclick = async () => {
+    const code = await scannen();
+    if (!code) return;
+    lag.suchtext = code;
+    feld.value = code;
+    trefferZeichnen(b);
+  };
+
+  trefferZeichnen(b);
+}
+
+async function trefferZeichnen(b) {
+  const kasten = document.getElementById("l-treffer");
+  if (!kasten) return;
+  kasten.innerHTML = '<div class="laedt">Wird gesucht …</div>';
+
+  let liste;
+  try { liste = await sucheArtikel(lag.suchtext); }
+  catch (f) {
+    kasten.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  if (!liste.length) {
+    kasten.innerHTML = '<div class="karte karte--hinweis">'
+      + '<p>Kein Artikel gefunden' + (lag.suchtext ? ' für "' + esc(lag.suchtext) + '"' : "") + '.</p>'
+      + (darfSchreiben() ? '<button class="knopf" id="l-neu-hier">Artikel anlegen</button>' : "")
+      + '</div>';
+    const k = document.getElementById("l-neu-hier");
+    if (k) k.onclick = () => artikelDialog(null, b, lag.suchtext);
+    return;
+  }
+
+  // Ein einziger Treffer: gleich die Details zeigen
+  if (liste.length === 1) return artikelDetail(kasten, liste[0], b);
+
+  kasten.innerHTML = '<div class="trefferliste">' + liste.map((a) =>
+    '<button class="treffer" data-artikel="' + esc(a.id) + '">'
+    + '<div class="treffer__kopf"><span class="treffer__nr">' + esc(a.article_number) + '</span>'
+    + '<span class="treffer__bestand' + (a.unter_mindestbestand ? " treffer__bestand--knapp" : "") + '">'
+    + zahlText(a.gesamtbestand) + ' ' + esc(a.unit) + '</span></div>'
+    + '<div class="treffer__name">' + esc(a.name) + '</div>'
+    + (a.supplier_name ? '<div class="treffer__lief">' + esc(a.supplier_name) + '</div>' : "")
+    + '</button>').join("") + '</div>';
+
+  kasten.querySelectorAll("[data-artikel]").forEach((el) => {
+    el.onclick = () => {
+      const a = liste.find((x) => x.id === el.dataset.artikel);
+      artikelDetail(kasten, a, b);
+    };
+  });
+}
+
+async function artikelDetail(kasten, artikel, b) {
+  kasten.innerHTML = '<div class="laedt">Bestand wird geladen …</div>';
+
+  let plaetze = [], bewegungen = [];
+  try {
+    plaetze = await ladeBestandJeArtikel(artikel.id);
+    bewegungen = await ladeBewegungen({ artikel: artikel.id });
+  } catch (f) {
+    kasten.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  const darf = darfSchreiben();
+
+  kasten.innerHTML = '<section class="karte artikelkarte">'
+    + '<div class="artikel__kopf">'
+    + '<div><div class="artikel__nr">' + esc(artikel.article_number) + '</div>'
+    + '<div class="artikel__name">' + esc(artikel.name) + '</div>'
+    + (artikel.supplier_name
+        ? '<div class="artikel__lief">Lieferant: ' + esc(artikel.supplier_name) + '</div>' : "")
+    + '</div>'
+    + '<div class="artikel__gesamt' + (artikel.unter_mindestbestand ? " artikel__gesamt--knapp" : "") + '">'
+    + zahlText(artikel.gesamtbestand) + '<span>' + esc(artikel.unit) + '</span></div>'
+    + '</div>'
+    + (artikel.unter_mindestbestand
+        ? '<div class="warnbalken">Unter Mindestbestand von ' + zahlText(artikel.min_stock) + '</div>' : "")
+
+    + '<h3 class="untertitel">Lagerplätze</h3>'
+    + (plaetze.length
+      ? '<table class="tabelle"><tbody>' + plaetze.map((p) =>
+          '<tr><td class="platzcode">' + esc(p.lagerplatz) + '</td>'
+          + '<td class="rechts stark">' + zahlText(p.quantity) + '</td></tr>').join("")
+        + '</tbody></table>'
+      : '<p class="hinweis">Dieser Artikel liegt noch auf keinem Lagerplatz.</p>')
+
+    + (darf ? '<div class="aktionen">'
+        + '<button class="knopf knopf--haupt" data-tun="entnahme">Entnahme</button>'
+        + '<button class="knopf" data-tun="eingang">Wareneingang</button>'
+        + '<button class="knopf" data-tun="umlagerung">Umlagern</button>'
+        + '<button class="knopf" data-tun="korrektur">Korrektur</button>'
+        + '</div>' : "")
+
+    + '<h3 class="untertitel">Letzte Bewegungen</h3>'
+    + (bewegungen.length
+      ? '<table class="tabelle"><tbody>' + bewegungen.slice(0, 10).map((m) =>
+          '<tr><td class="klein">' + esc(datumZeitKurz(m.created_at)) + '</td>'
+          + '<td>' + esc(BEWEGUNGSARTEN[m.movement_type] || m.movement_type)
+          + '<span class="klein"> ' + esc(m.lagerplatz) + '</span></td>'
+          + '<td class="rechts stark ' + (m.quantity < 0 ? "minus" : "plus") + '">'
+          + leistungText(m.quantity) + '</td>'
+          + '<td class="klein">' + esc(m.benutzer_name || "") + '</td></tr>').join("")
+        + '</tbody></table>'
+      : '<p class="hinweis">Noch keine Bewegungen.</p>')
+
+    + '<div class="karte__fuss">'
+    + '<button class="linkknopf" id="l-zurueck">Zurück zur Suche</button>'
+    + (darf ? ' <button class="linkknopf" id="l-bearbeiten">Artikel bearbeiten</button>' : "")
+    + '</div></section>';
+
+  document.getElementById("l-zurueck").onclick = () => trefferZeichnen(b);
+  const bear = document.getElementById("l-bearbeiten");
+  if (bear) bear.onclick = () => artikelDialog(artikel, b);
+
+  kasten.querySelectorAll("[data-tun]").forEach((el) => {
+    el.onclick = () => buchungsDialog(el.dataset.tun, artikel, plaetze, b);
+  });
+}
+
+// ---------- Buchungen ----------
+
+async function buchungsDialog(art, artikel, plaetze, b) {
+  let alle;
+  try { alle = await ladeLagerplaetze(); }
+  catch (f) { meldung(fehlertext(f), "fehler"); return; }
+
+  if (!alle.length) {
+    meldung("Lege zuerst einen Lagerplatz an.", "warn");
+    return;
+  }
+
+  const belegte = plaetze.map((p) => ({ id: p.location_id, code: p.lagerplatz, menge: p.quantity }));
+
+  const auswahl = (name, label, liste, hinweis) =>
+    '<label class="feld"><span>' + label + '</span>'
+    + '<select id="df-' + name + '">'
+    + liste.map((p) => '<option value="' + esc(p.id) + '">' + esc(p.code)
+        + (p.menge !== undefined ? " (" + zahlText(p.menge) + ")" : "") + '</option>').join("")
+    + '</select>'
+    + (hinweis ? '<span class="feldhinweis">' + esc(hinweis) + '</span>' : "")
+    + '</label>';
+
+  const titel = { entnahme: "Entnahme", eingang: "Wareneingang",
+                  umlagerung: "Umlagern", korrektur: "Bestand korrigieren" }[art];
+
+  const huelle = document.createElement("div");
+  huelle.className = "dialog-huelle";
+  huelle.innerHTML = '<div class="dialog">'
+    + '<h2>' + titel + '</h2>'
+    + '<p>' + esc(artikel.article_number) + ' · ' + esc(artikel.name) + '</p>'
+    + '<form id="bd-form">'
+    + (art === "entnahme"
+        ? auswahl("von", "Von welchem Lagerplatz", belegte.length ? belegte : alle)
+      : art === "eingang"
+        ? auswahl("nach", "Auf welchen Lagerplatz", alle)
+      : art === "umlagerung"
+        ? auswahl("von", "Von", belegte.length ? belegte : alle) + auswahl("nach", "Nach", alle)
+        : auswahl("von", "Welcher Lagerplatz", belegte.length ? belegte : alle))
+    + '<label class="feld"><span>'
+    + (art === "korrektur" ? "Tatsächlicher Bestand" : "Menge") + '</span>'
+    + '<input id="df-menge" type="number" inputmode="numeric" min="0" step="1">'
+    + (art === "korrektur"
+        ? '<span class="feldhinweis">Der gezählte Bestand. Die Differenz wird gebucht.</span>' : "")
+    + '</label>'
+    + '<label class="feld"><span>Notiz</span>'
+    + '<textarea id="df-notiz" rows="2" placeholder="kann leer bleiben"></textarea></label>'
+    + '</form>'
+    + '<div class="dialog__knoepfe">'
+    + '<button class="knopf knopf--still" id="bd-nein">Abbrechen</button>'
+    + '<button class="knopf knopf--haupt" id="bd-ja">' + titel + '</button>'
+    + '</div></div>';
+  document.body.appendChild(huelle);
+
+  const zu = () => huelle.remove();
+  document.getElementById("bd-nein").onclick = zu;
+  huelle.onclick = (e) => { if (e.target === huelle) zu(); };
+  document.getElementById("df-menge").focus();
+
+  const ausfuehren = async () => {
+    const menge = Math.round(Number(document.getElementById("df-menge").value));
+    const notiz = (document.getElementById("df-notiz").value || "").trim() || null;
+
+    if (!Number.isFinite(menge) || menge < 0) { meldung("Bitte eine Menge eingeben.", "warn"); return; }
+    if (art !== "korrektur" && menge === 0) { meldung("Menge muss grösser als null sein.", "warn"); return; }
+
+    const vonEl = document.getElementById("df-von");
+    const nachEl = document.getElementById("df-nach");
+    const vonId = vonEl ? vonEl.value : null;
+    const nachId = nachEl ? nachEl.value : null;
+
+    const code = (id) => (alle.find((p) => p.id === id) || {}).code || "";
+
+    try {
+      if (art === "eingang") {
+        const ok = await nachfragen({ titel: "Wareneingang buchen",
+          text: zahlText(menge) + " Stück " + artikel.article_number + " auf " + code(nachId) + " einlagern?",
+          bestaetigen: "Buchen" });
+        if (!ok) return;
+        await bucheBewegung({ article_id: artikel.id, location_id: nachId,
+          movement_type: "eingang", quantity: menge, note: notiz });
+
+      } else if (art === "entnahme") {
+        const b1 = belegte.find((p) => p.id === vonId);
+        const rest = (b1 ? b1.menge : 0) - menge;
+        const ok = await nachfragen({ titel: "Entnahme buchen",
+          text: zahlText(menge) + " Stück " + artikel.article_number + " von " + code(vonId)
+              + " entnehmen? Danach dort: " + zahlText(rest) + ".",
+          bestaetigen: "Entnehmen", gefahr: rest < 0 });
+        if (!ok) return;
+        await bucheBewegung({ article_id: artikel.id, location_id: vonId,
+          movement_type: "entnahme", quantity: -menge, note: notiz });
+
+      } else if (art === "umlagerung") {
+        if (vonId === nachId) { meldung("Von und Nach sind gleich.", "warn"); return; }
+        const ok = await nachfragen({ titel: "Umlagern",
+          text: zahlText(menge) + " Stück von " + code(vonId) + " nach " + code(nachId) + " umlagern?",
+          bestaetigen: "Umlagern" });
+        if (!ok) return;
+        const gruppe = crypto.randomUUID();
+        await bucheBewegung({ article_id: artikel.id, location_id: vonId,
+          movement_type: "umlagerung", quantity: -menge, note: notiz, transfer_group_id: gruppe });
+        await bucheBewegung({ article_id: artikel.id, location_id: nachId,
+          movement_type: "umlagerung", quantity: menge, note: notiz, transfer_group_id: gruppe });
+
+      } else {
+        const b1 = belegte.find((p) => p.id === vonId);
+        const ist = b1 ? b1.menge : 0;
+        const diff = menge - ist;
+        if (diff === 0) { meldung("Bestand stimmt bereits.", "warn"); return; }
+        const ok = await nachfragen({ titel: "Bestand korrigieren",
+          text: "Auf " + code(vonId) + " sind " + zahlText(ist) + " gebucht, gezählt wurden "
+              + zahlText(menge) + ". Es wird " + leistungText(diff) + " gebucht.",
+          bestaetigen: "Korrigieren", gefahr: true });
+        if (!ok) return;
+        await bucheBewegung({ article_id: artikel.id, location_id: vonId,
+          movement_type: "inventur", quantity: diff, note: notiz });
+      }
+
+      zu();
+      meldung("Gebucht.");
+      lag.suchtext = artikel.article_number;
+      seiteLager(b);
+    } catch (f) {
+      meldung(fehlertext(f), "fehler");
+    }
+  };
+
+  document.getElementById("bd-ja").onclick = ausfuehren;
+  document.getElementById("bd-form").onsubmit = (e) => { e.preventDefault(); ausfuehren(); };
+}
+
+// ---------- Bewegungen ----------
+
+async function lagerBewegungen(ziel, b) {
+  ziel.innerHTML = '<div class="laedt">Bewegungen werden geladen …</div>';
+  let liste;
+  try { liste = await ladeBewegungen(null); }
+  catch (f) {
+    ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  ziel.innerHTML = '<section class="karte"><h2>Letzte Bewegungen</h2>'
+    + (liste.length
+      ? '<table class="tabelle"><thead><tr><th>Wann</th><th>Artikel</th>'
+        + '<th>Platz</th><th class="mitte">Menge</th><th>Wer</th></tr></thead><tbody>'
+        + liste.map((m) => '<tr><td class="klein">' + esc(datumZeitKurz(m.created_at)) + '</td>'
+            + '<td>' + esc(m.article_number)
+            + '<div class="klein">' + esc(BEWEGUNGSARTEN[m.movement_type] || "") + '</div></td>'
+            + '<td class="platzcode">' + esc(m.lagerplatz) + '</td>'
+            + '<td class="mitte stark ' + (m.quantity < 0 ? "minus" : "plus") + '">'
+            + leistungText(m.quantity) + '</td>'
+            + '<td class="klein">' + esc(m.benutzer_name || "") + '</td></tr>').join("")
+        + '</tbody></table>'
+      : '<p class="hinweis">Noch keine Bewegungen erfasst.</p>')
+    + '</section>';
+}
+
+// ---------- Artikel ----------
+
+async function lagerArtikel(ziel, b) {
+  ziel.innerHTML = '<div class="laedt">Artikel werden geladen …</div>';
+  let liste;
+  try { liste = await sucheArtikel(""); }
+  catch (f) {
+    ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  ziel.innerHTML = (darfSchreiben()
+      ? '<button class="knopf knopf--haupt knopf--breit" id="a-neu">+ Neuer Artikel</button>' : "")
+    + '<section class="karte"><h2>Artikel <span class="marke">' + liste.length + '</span></h2>'
+    + (liste.length
+      ? '<table class="tabelle"><thead><tr><th>Nummer</th><th>Bezeichnung</th>'
+        + '<th class="mitte">Bestand</th>' + (darfSchreiben() ? '<th></th>' : "")
+        + '</tr></thead><tbody>'
+        + liste.map((a) => '<tr><td class="stark">' + esc(a.article_number) + '</td>'
+            + '<td>' + esc(a.name)
+            + (a.supplier_name ? '<div class="klein">' + esc(a.supplier_name) + '</div>' : "") + '</td>'
+            + '<td class="mitte' + (a.unter_mindestbestand ? " minus stark" : "") + '">'
+            + zahlText(a.gesamtbestand) + '</td>'
+            + (darfSchreiben() ? '<td class="rechts"><button class="linkknopf" data-bearb="'
+                + esc(a.id) + '">Bearbeiten</button></td>' : "")
+            + '</tr>').join("")
+        + '</tbody></table>'
+      : '<p class="hinweis">Noch keine Artikel angelegt.</p>')
+    + '</section>';
+
+  const neu = document.getElementById("a-neu");
+  if (neu) neu.onclick = () => artikelDialog(null, b);
+
+  ziel.querySelectorAll("[data-bearb]").forEach((el) => {
+    el.onclick = () => artikelDialog(liste.find((x) => x.id === el.dataset.bearb), b);
+  });
+}
+
+async function artikelDialog(artikel, b, vorgabeNummer) {
+  let lieferanten = [];
+  try { lieferanten = await ladeLieferanten(); } catch (f) { /* geht auch ohne */ }
+
+  const huelle = document.createElement("div");
+  huelle.className = "dialog-huelle";
+  huelle.innerHTML = '<div class="dialog">'
+    + '<h2>' + (artikel ? "Artikel bearbeiten" : "Neuer Artikel") + '</h2>'
+    + '<form id="ad-form">'
+    + '<label class="feld"><span>Artikelnummer</span>'
+    + '<input id="ad-nr" type="text" value="'
+    + esc(artikel ? artikel.article_number : (vorgabeNummer || "")) + '"></label>'
+    + '<label class="feld"><span>Bezeichnung</span>'
+    + '<input id="ad-name" type="text" value="' + esc(artikel ? artikel.name : "") + '"></label>'
+    + '<div class="zeitraumwahl">'
+    + '<label class="feld"><span>Einheit</span>'
+    + '<input id="ad-einheit" type="text" value="' + esc(artikel ? artikel.unit : "Stück") + '"></label>'
+    + '<label class="feld"><span>Mindestbestand</span>'
+    + '<input id="ad-min" type="number" min="0" step="1" value="'
+    + (artikel ? artikel.min_stock : 0) + '"></label>'
+    + '</div>'
+    + '<label class="feld"><span>Lieferant</span><select id="ad-lief">'
+    + '<option value="">– kein Lieferant –</option>'
+    + lieferanten.map((l) => '<option value="' + esc(l.id) + '"'
+        + (artikel && artikel.supplier_id === l.id ? " selected" : "") + '>'
+        + esc(l.name) + '</option>').join("")
+    + '</select><span class="feldhinweis">Ein Artikel wird immer beim selben Lieferanten bestellt.</span></label>'
+    + '</form>'
+    + '<div class="dialog__knoepfe">'
+    + (artikel ? '<button class="knopf knopf--gefahr" id="ad-weg">Deaktivieren</button>' : "")
+    + '<button class="knopf knopf--still" id="ad-nein">Abbrechen</button>'
+    + '<button class="knopf knopf--haupt" id="ad-ja">Speichern</button>'
+    + '</div></div>';
+  document.body.appendChild(huelle);
+
+  const zu = () => huelle.remove();
+  document.getElementById("ad-nein").onclick = zu;
+  huelle.onclick = (e) => { if (e.target === huelle) zu(); };
+  document.getElementById("ad-nr").focus();
+
+  const speichern = async () => {
+    const daten = {
+      article_number: document.getElementById("ad-nr").value.trim(),
+      name: document.getElementById("ad-name").value.trim(),
+      unit: document.getElementById("ad-einheit").value.trim() || "Stück",
+      min_stock: Math.max(0, Math.round(Number(document.getElementById("ad-min").value) || 0)),
+      supplier_id: document.getElementById("ad-lief").value || null,
+    };
+    if (!daten.article_number || !daten.name) {
+      meldung("Artikelnummer und Bezeichnung werden benötigt.", "warn");
+      return;
+    }
+
+    const { error } = artikel
+      ? await db.from("articles").update(daten).eq("id", artikel.id)
+      : await db.from("articles").insert(daten);
+
+    if (error) meldung(fehlertext(error), "fehler");
+    else { zu(); meldung("Gespeichert."); seiteLager(b); }
+  };
+
+  document.getElementById("ad-ja").onclick = speichern;
+  document.getElementById("ad-form").onsubmit = (e) => { e.preventDefault(); speichern(); };
+
+  const weg = document.getElementById("ad-weg");
+  if (weg) weg.onclick = async () => {
+    const ok = await nachfragen({ titel: "Artikel deaktivieren",
+      text: "Der Artikel verschwindet aus Suche und Listen. Bestand und Bewegungen bleiben erhalten.",
+      bestaetigen: "Deaktivieren", gefahr: true });
+    if (!ok) return;
+    const { error } = await db.from("articles").update({ is_active: false }).eq("id", artikel.id);
+    if (error) meldung(fehlertext(error), "fehler");
+    else { zu(); meldung("Deaktiviert."); seiteLager(b); }
+  };
+}
+
+// ---------- Lagerplätze ----------
+
+async function lagerPlaetze(ziel, b) {
+  ziel.innerHTML = '<div class="laedt">Lagerplätze werden geladen …</div>';
+  let liste;
+  try { liste = await ladeLagerplaetze(); }
+  catch (f) {
+    ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  // Nach Schrank gruppieren
+  const gruppen = {};
+  liste.forEach((p) => { (gruppen[p.cabinet || "Ohne Schrank"] =
+    gruppen[p.cabinet || "Ohne Schrank"] || []).push(p); });
+
+  ziel.innerHTML = (darfSchreiben()
+      ? '<button class="knopf knopf--haupt knopf--breit" id="p-neu">+ Lagerplatz anlegen</button>' : "")
+    + (liste.length
+      ? Object.keys(gruppen).sort().map((schrank) =>
+          '<section class="karte"><h2>Schrank ' + esc(schrank) + '</h2>'
+          + '<div class="platzgitter">' + gruppen[schrank].map((p) =>
+              '<span class="platzchip" title="' + esc(p.description || "") + '">'
+              + esc(p.code) + '</span>').join("") + '</div></section>').join("")
+      : '<div class="karte karte--hinweis"><p>Noch keine Lagerplätze angelegt. '
+        + 'Ein Lagerplatz besteht aus Schrank, Ebene und Koordinate, zum Beispiel A, 1, B4 '
+        + 'ergibt den Code A1B4.</p></div>');
+
+  const neu = document.getElementById("p-neu");
+  if (neu) neu.onclick = async () => {
+    const w = await dialogFelder({ titel: "Lagerplatz anlegen",
+      text: "Aus Schrank, Ebene und Koordinate wird der Code gebildet.",
+      felder: [
+        { name: "schrank", label: "Schrank", pflicht: true, platzhalter: "A" },
+        { name: "ebene", label: "Ebene", pflicht: true, platzhalter: "1" },
+        { name: "koordinate", label: "Koordinate", pflicht: true, platzhalter: "B4" },
+        { name: "notiz", label: "Beschreibung", platzhalter: "kann leer bleiben" },
+      ],
+      bestaetigen: "Anlegen" });
+    if (!w) return;
+
+    const code = (w.schrank + w.ebene + w.koordinate).toUpperCase().replace(/\s+/g, "");
+    const { error } = await db.from("storage_locations").insert({
+      code: code, cabinet: w.schrank.toUpperCase(), level: w.ebene,
+      coordinate: w.koordinate.toUpperCase(), description: w.notiz || null });
+
+    if (error) meldung(fehlertext(error), "fehler");
+    else { meldung("Lagerplatz " + code + " angelegt."); seiteLager(b); }
+  };
+}
+
+// =================================================================
+//  BESTELLUNGEN
+// =================================================================
+
+const best = {
+  ansicht: "offen",
+  lieferantId: null,
+};
+
+const BESTELLSTATUS = {
+  offen: "Offen",
+  bestellt: "Bestellt",
+  teilweise_geliefert: "Teilweise geliefert",
+  geliefert: "Geliefert",
+  erledigt: "Erledigt",
+  storniert: "Storniert",
+};
+
+async function ladeBestellungen(offen) {
+  let a = db.from("order_items")
+    .select("*, articles(article_number, name, unit), suppliers(name)")
+    .order("needed_by", { ascending: true, nullsFirst: false })
+    .order("created_at");
+  if (offen) a = a.in("status", ["offen", "bestellt", "teilweise_geliefert"]);
+  else a = a.limit(100).order("created_at", { ascending: false });
+
+  const { data, error } = await zeitlimit(a, 12000, "Bestellungen");
+  if (error) throw error;
+  return data || [];
+}
+
+async function seiteBestellungen(b) {
+  b.innerHTML = '<h1 class="seitentitel">Bestellungen</h1>'
+    + '<div class="reiter">'
+    + [["offen", "Offen"], ["historie", "Historie"], ["lieferanten", "Lieferanten"]]
+      .map(([w, t]) => '<button class="reiter__knopf' + (best.ansicht === w ? " aktiv" : "")
+        + '" data-best="' + w + '">' + t + '</button>').join("")
+    + '</div>'
+    + (darfSchreiben() ? "" : nurLesenHinweis("Du kannst hier alles ansehen, aber nichts ändern."))
+    + '<div id="best-inhalt"><div class="laedt">Wird geladen …</div></div>';
+
+  b.querySelectorAll("[data-best]").forEach((el) => {
+    el.onclick = () => { best.ansicht = el.dataset.best; seiteBestellungen(b); };
+  });
+
+  const ziel = document.getElementById("best-inhalt");
+  if (best.ansicht === "lieferanten") return bestLieferanten(ziel, b);
+  if (best.ansicht === "historie") return bestHistorie(ziel, b);
+  return bestOffen(ziel, b);
+}
+
+// ---------- Offene Positionen, nach Lieferant gruppiert ----------
+
+async function bestOffen(ziel, b) {
+  let liste;
+  try { liste = await ladeBestellungen(true); }
+  catch (f) {
+    ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  const heute = isoDatum(new Date());
+  const gruppen = {};
+  liste.forEach((z) => {
+    const name = (z.suppliers && z.suppliers.name) || "Ohne Lieferant";
+    (gruppen[name] = gruppen[name] || []).push(z);
+  });
+
+  ziel.innerHTML = (darfSchreiben()
+      ? '<button class="knopf knopf--haupt knopf--breit" id="b-neu">+ Neue Position</button>' : "")
+    + (liste.length
+      ? Object.keys(gruppen).sort().map((name) => {
+          const zeilen = gruppen[name];
+          return '<section class="karte"><div class="karte__kopf">'
+            + '<h2>' + esc(name) + '</h2>'
+            + '<span class="klein">' + zeilen.length + ' Position'
+            + (zeilen.length === 1 ? "" : "en") + '</span></div>'
+            + '<table class="tabelle"><tbody>'
+            + zeilen.map((z) => {
+                const a = z.articles || {};
+                const spaet = z.needed_by && z.needed_by < heute;
+                return '<tr><td>'
+                  + '<strong>' + esc(a.article_number || "?") + '</strong> '
+                  + esc(a.name || "")
+                  + '<div class="klein">'
+                  + '<span class="statuschip statuschip--' + esc(z.status) + '">'
+                  + esc(BESTELLSTATUS[z.status] || z.status) + '</span>'
+                  + (z.needed_by ? ' <span class="' + (spaet ? "minus stark" : "") + '">bis '
+                      + kurzDatum(z.needed_by) + '</span>' : "")
+                  + (z.note ? ' · ' + esc(z.note) : "")
+                  + '</div></td>'
+                  + '<td class="mitte stark">' + zahlText(z.quantity) + '</td>'
+                  + (darfSchreiben()
+                      ? '<td class="rechts nowrap">'
+                        + '<button class="linkknopf" data-bstatus="' + esc(z.id) + '">Status</button> '
+                        + '<button class="linkknopf" data-berledigt="' + esc(z.id) + '">Erledigt</button>'
+                        + '</td>' : "")
+                  + '</tr>';
+              }).join("")
+            + '</tbody></table></section>';
+        }).join("")
+      : '<div class="karte karte--hinweis"><p>Keine offenen Bestellpositionen.</p></div>');
+
+  const neu = document.getElementById("b-neu");
+  if (neu) neu.onclick = () => positionDialog(b);
+
+  ziel.querySelectorAll("[data-berledigt]").forEach((el) => {
+    el.onclick = async () => {
+      const { error } = await db.from("order_items").update({
+        status: "erledigt", completed_at: new Date().toISOString() }).eq("id", el.dataset.berledigt);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Als erledigt markiert."); seiteBestellungen(b); }
+    };
+  });
+
+  ziel.querySelectorAll("[data-bstatus]").forEach((el) => {
+    el.onclick = async () => {
+      const z = liste.find((x) => x.id === el.dataset.bstatus);
+      const huelle = document.createElement("div");
+      huelle.className = "dialog-huelle";
+      huelle.innerHTML = '<div class="dialog"><h2>Status ändern</h2>'
+        + '<div class="statuswahl">'
+        + Object.keys(BESTELLSTATUS).map((s) => '<button class="knopf'
+            + (z.status === s ? " knopf--haupt" : "") + '" data-neu="' + s + '">'
+            + BESTELLSTATUS[s] + '</button>').join("")
+        + '</div><div class="dialog__knoepfe">'
+        + '<button class="knopf knopf--still" data-nein>Abbrechen</button></div></div>';
+      document.body.appendChild(huelle);
+
+      huelle.querySelector("[data-nein]").onclick = () => huelle.remove();
+      huelle.onclick = (e) => { if (e.target === huelle) huelle.remove(); };
+
+      huelle.querySelectorAll("[data-neu]").forEach((k) => {
+        k.onclick = async () => {
+          const neuStatus = k.dataset.neu;
+          const daten = { status: neuStatus };
+          if (neuStatus === "bestellt") daten.ordered_at = new Date().toISOString();
+          if (neuStatus === "erledigt") daten.completed_at = new Date().toISOString();
+
+          const { error } = await db.from("order_items").update(daten).eq("id", z.id);
+          huelle.remove();
+          if (error) meldung(fehlertext(error), "fehler");
+          else { meldung("Status geändert."); seiteBestellungen(b); }
+        };
+      });
+    };
+  });
+}
+
+// ---------- Neue Position ----------
+
+async function positionDialog(b) {
+  const huelle = document.createElement("div");
+  huelle.className = "dialog-huelle";
+  huelle.innerHTML = '<div class="dialog"><h2>Neue Bestellposition</h2>'
+    + '<div class="suchleiste">'
+    + '<input type="text" id="pd-such" placeholder="Artikelnummer oder Name" autocomplete="off">'
+    + '<button class="knopf knopf--scan" id="pd-scan">Scannen</button></div>'
+    + '<div id="pd-treffer" class="pd-treffer"></div>'
+    + '<div id="pd-rest" hidden>'
+    + '<div class="pd-gewaehlt" id="pd-gewaehlt"></div>'
+    + '<div class="zeitraumwahl">'
+    + '<label class="feld"><span>Menge</span>'
+    + '<input id="pd-menge" type="number" min="1" step="1" value="1"></label>'
+    + '<label class="feld"><span>Bis wann</span><input id="pd-frist" type="date"></label>'
+    + '</div>'
+    + '<label class="feld"><span>Notiz</span>'
+    + '<textarea id="pd-notiz" rows="2" placeholder="kann leer bleiben"></textarea></label>'
+    + '</div>'
+    + '<div class="dialog__knoepfe">'
+    + '<button class="knopf knopf--still" id="pd-nein">Abbrechen</button>'
+    + '<button class="knopf knopf--haupt" id="pd-ja" disabled>Hinzufügen</button>'
+    + '</div></div>';
+  document.body.appendChild(huelle);
+
+  let gewaehlt = null;
+  const zu = () => huelle.remove();
+  document.getElementById("pd-nein").onclick = zu;
+  huelle.onclick = (e) => { if (e.target === huelle) zu(); };
+
+  const feld = document.getElementById("pd-such");
+  const trefferBox = document.getElementById("pd-treffer");
+  feld.focus();
+
+  const suchen = async () => {
+    const t = feld.value.trim();
+    if (t.length < 1) { trefferBox.innerHTML = ""; return; }
+    trefferBox.innerHTML = '<div class="laedt">Wird gesucht …</div>';
+    try {
+      const liste = await sucheArtikel(t);
+      trefferBox.innerHTML = liste.length
+        ? liste.slice(0, 8).map((a) => '<button class="pd-zeile" data-w="' + esc(a.id) + '">'
+            + '<strong>' + esc(a.article_number) + '</strong> ' + esc(a.name)
+            + '<span class="klein"> ' + esc(a.supplier_name || "ohne Lieferant") + '</span>'
+            + '</button>').join("")
+        : '<p class="hinweis">Kein Artikel gefunden.</p>';
+
+      trefferBox.querySelectorAll("[data-w]").forEach((el) => {
+        el.onclick = () => {
+          gewaehlt = liste.find((x) => x.id === el.dataset.w);
+          trefferBox.innerHTML = "";
+          feld.value = "";
+          document.getElementById("pd-rest").hidden = false;
+          document.getElementById("pd-gewaehlt").innerHTML =
+            '<strong>' + esc(gewaehlt.article_number) + '</strong> ' + esc(gewaehlt.name)
+            + '<div class="klein">Lieferant: ' + esc(gewaehlt.supplier_name || "keiner hinterlegt")
+            + ' · Bestand ' + zahlText(gewaehlt.gesamtbestand) + '</div>';
+          document.getElementById("pd-ja").disabled = false;
+          document.getElementById("pd-menge").focus();
+        };
+      });
+    } catch (f) { trefferBox.innerHTML = '<p class="hinweis">' + esc(fehlertext(f)) + '</p>'; }
+  };
+
+  let taste = null;
+  feld.oninput = () => { clearTimeout(taste); taste = setTimeout(suchen, 300); };
+  feld.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); clearTimeout(taste); suchen(); } };
+
+  document.getElementById("pd-scan").onclick = async () => {
+    const code = await scannen();
+    if (!code) return;
+    feld.value = code;
+    suchen();
+  };
+
+  document.getElementById("pd-ja").onclick = async () => {
+    if (!gewaehlt) return;
+    const menge = Math.round(Number(document.getElementById("pd-menge").value));
+    if (!Number.isFinite(menge) || menge < 1) { meldung("Menge muss mindestens 1 sein.", "warn"); return; }
+
+    const { error } = await db.from("order_items").insert({
+      article_id: gewaehlt.id,
+      supplier_id: gewaehlt.supplier_id || null,
+      quantity: menge,
+      needed_by: document.getElementById("pd-frist").value || null,
+      note: (document.getElementById("pd-notiz").value || "").trim() || null,
+    });
+
+    if (error) meldung(fehlertext(error), "fehler");
+    else { zu(); meldung("Position hinzugefügt."); seiteBestellungen(b); }
+  };
+}
+
+// ---------- Historie ----------
+
+async function bestHistorie(ziel, b) {
+  let liste;
+  try { liste = await ladeBestellungen(false); }
+  catch (f) {
+    ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  ziel.innerHTML = '<section class="karte"><h2>Letzte 100 Positionen</h2>'
+    + (liste.length
+      ? '<table class="tabelle"><thead><tr><th>Datum</th><th>Artikel</th>'
+        + '<th class="mitte">Menge</th><th>Status</th></tr></thead><tbody>'
+        + liste.map((z) => {
+            const a = z.articles || {};
+            return '<tr><td class="klein">' + esc(kurzDatum(z.created_at.slice(0, 10))) + '</td>'
+              + '<td><strong>' + esc(a.article_number || "?") + '</strong> ' + esc(a.name || "")
+              + '<div class="klein">' + esc((z.suppliers && z.suppliers.name) || "") + '</div></td>'
+              + '<td class="mitte stark">' + zahlText(z.quantity) + '</td>'
+              + '<td><span class="statuschip statuschip--' + esc(z.status) + '">'
+              + esc(BESTELLSTATUS[z.status] || z.status) + '</span></td></tr>';
+          }).join("")
+        + '</tbody></table>'
+      : '<p class="hinweis">Noch keine Bestellungen erfasst.</p>')
+    + '</section>';
+}
+
+// ---------- Lieferanten ----------
+
+async function bestLieferanten(ziel, b) {
+  let liste;
+  try { liste = await ladeLieferanten(); }
+  catch (f) {
+    ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  ziel.innerHTML = (darfSchreiben()
+      ? '<button class="knopf knopf--haupt knopf--breit" id="lf-neu">+ Neuer Lieferant</button>' : "")
+    + (liste.length
+      ? liste.map((l) => '<section class="karte"><div class="karte__kopf">'
+          + '<h2>' + esc(l.name) + '</h2>'
+          + (darfSchreiben() ? '<button class="linkknopf" data-lf="' + esc(l.id)
+              + '">Bearbeiten</button>' : "") + '</div>'
+          + '<div class="lieferdaten">'
+          + (l.contact_person ? '<div>' + esc(l.contact_person) + '</div>' : "")
+          + (l.email ? '<div><a href="mailto:' + esc(l.email) + '">' + esc(l.email) + '</a></div>' : "")
+          + (l.phone ? '<div><a href="tel:' + esc(l.phone) + '">' + esc(l.phone) + '</a></div>' : "")
+          + (l.address ? '<div class="klein">' + esc(l.address) + '</div>' : "")
+          + (l.note ? '<div class="klein">' + esc(l.note) + '</div>' : "")
+          + '</div></section>').join("")
+      : '<div class="karte karte--hinweis"><p>Noch keine Lieferanten angelegt.</p></div>');
+
+  const neu = document.getElementById("lf-neu");
+  if (neu) neu.onclick = () => lieferantDialog(null, b);
+
+  ziel.querySelectorAll("[data-lf]").forEach((el) => {
+    el.onclick = () => lieferantDialog(liste.find((x) => x.id === el.dataset.lf), b);
+  });
+}
+
+async function lieferantDialog(lieferant, b) {
+  const w = await dialogFelder({
+    titel: lieferant ? "Lieferant bearbeiten" : "Neuer Lieferant",
+    felder: [
+      { name: "name", label: "Name", pflicht: true, wert: lieferant ? lieferant.name : "" },
+      { name: "kontakt", label: "Kontaktperson", wert: lieferant ? (lieferant.contact_person || "") : "" },
+      { name: "email", label: "E-Mail", typ: "email", wert: lieferant ? (lieferant.email || "") : "" },
+      { name: "telefon", label: "Telefon", wert: lieferant ? (lieferant.phone || "") : "" },
+      { name: "adresse", label: "Adresse", typ: "textarea", wert: lieferant ? (lieferant.address || "") : "" },
+      { name: "notiz", label: "Notiz", wert: lieferant ? (lieferant.note || "") : "" },
+    ],
+    bestaetigen: "Speichern",
+  });
+  if (!w) return;
+
+  const daten = { name: w.name, contact_person: w.kontakt || null, email: w.email || null,
+                  phone: w.telefon || null, address: w.adresse || null, note: w.notiz || null };
+
+  const { error } = lieferant
+    ? await db.from("suppliers").update(daten).eq("id", lieferant.id)
+    : await db.from("suppliers").insert(daten);
+
+  if (error) meldung(fehlertext(error), "fehler");
+  else { meldung("Gespeichert."); seiteBestellungen(b); }
+}
+
 
 async function seiteEinstellungen(b) {
   b.innerHTML = '<h1 class="seitentitel">Einstellungen</h1><div class="laedt">Benutzer werden geladen …</div>';
