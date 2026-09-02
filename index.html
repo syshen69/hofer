@@ -1065,7 +1065,7 @@ const APP_UNTERTITEL = "HUDSON TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "9.6.0";
+const APP_VERSION = "9.7.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -4633,7 +4633,6 @@ async function bestOffen(ziel, b) {
           ? '<td class="rechts">'
             + '<button class="linkknopf" data-bearb-best="' + esc(z.id) + '">Bearbeiten</button>'
             + '<button class="linkknopf" data-bstatus="' + esc(z.id) + '">Status</button>'
-            + '<button class="linkknopf" data-bgeliefert="' + esc(z.id) + '">Geliefert</button>'
             + '<button class="linkknopf linkknopf--gefahr" data-bweg="' + esc(z.id)
             + '" data-nr="' + esc(a2.article_number || "") + '">Löschen</button>'
             + '</td>' : "")
@@ -4706,13 +4705,6 @@ async function bestOffen(ziel, b) {
       const { error } = await db.from("order_items").delete().eq("id", el.dataset.bweg);
       if (error) meldung(fehlertext(error), "fehler");
       else { meldung("Position gelöscht."); seiteBestellungen(b); }
-    };
-  });
-
-  ziel.querySelectorAll("[data-bgeliefert]").forEach((el) => {
-    el.onclick = async () => {
-      const z = liste.find((x) => x.id === el.dataset.bgeliefert);
-      if (z) await lieferungEinlagern(z, b);
     };
   });
 
