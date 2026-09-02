@@ -1,0 +1,4307 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hudson Tool – Hofer + Co.</title>
+<meta name="theme-color" content="#003884">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="./app.webmanifest">
+<link rel="icon" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<style>
+/* ---------------------------------------------------------------
+   Gestaltung
+   Gedacht für die Werkstatt: hoher Kontrast, große Flächen zum
+   Antippen, Zahlen in gleicher Breite damit Spalten fluchten.
+   --------------------------------------------------------------- */
+
+:root {
+  --grund: #f3f5f8;
+  --flaeche: #ffffff;
+  --tinte: #1d2430;
+  --gedaempft: #5c6675;
+  --linie: #d6dbe3;
+  --linie-stark: #aeb7c4;
+
+  /* Firmenblau aus dem Logo */
+  --marke: #003884;
+  --marke-dunkel: #002b66;
+  --marke-hell: #e8eef7;
+
+  --stahl: #003884;
+  --signalgelb: #003884;
+  --aktion: #003884;
+  --aktion-dunkel: #002b66;
+  --warnung: #b5761a;
+  --gefahr: #b3261e;
+  --gut: #1f7a4d;
+
+  --kopfhoehe: 52px;
+  --navhoehe: 62px;
+  --radius: 4px;
+
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--grund);
+  color: var(--tinte);
+  font-size: 16px;
+  line-height: 1.45;
+  -webkit-text-size-adjust: 100%;
+}
+
+.boot {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  color: var(--gedaempft);
+}
+
+/* Ohne diese Zeile bleibt die Ladeanzeige sichtbar: das display:grid
+   oben ueberstimmt sonst das Ausblenden ueber das hidden-Attribut. */
+.boot[hidden] { display: none; }
+
+/* ---------- Kopfzeile ---------- */
+
+.kopf {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: var(--kopfhoehe);
+  padding: 0 12px;
+  background: var(--flaeche);
+  color: var(--tinte);
+  border-bottom: 2px solid var(--marke);
+}
+
+.kopf__logo { height: 30px; width: auto; display: block; }
+
+.kopf__benutzer {
+  margin-left: auto;
+  color: var(--gedaempft);
+  font-size: .85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 42%;
+}
+
+.kopf__abmelden {
+  background: none;
+  border: 1px solid var(--linie-stark);
+  color: var(--marke);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  font-size: .8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.kopf__abmelden:hover { background: var(--marke-hell); }
+
+/* ---------- Grundraster ---------- */
+
+.rahmen { display: block; }
+
+.inhalt {
+  padding: 16px 14px calc(var(--navhoehe) + 28px);
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* ---------- Navigation ---------- */
+
+.nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  background: var(--flaeche);
+  border-top: 1px solid var(--linie-stark);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.nav__punkt {
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  height: var(--navhoehe);
+  text-decoration: none;
+  color: var(--gedaempft);
+  font-size: .7rem;
+  border-top: 3px solid transparent;
+}
+
+.nav__punkt.aktiv {
+  color: var(--marke);
+  font-weight: 600;
+  border-top-color: var(--marke);
+  background: var(--marke-hell);
+}
+
+.nav__zeichen { font-size: 1.25rem; line-height: 1; }
+
+/* ---------- Seiteninhalt ---------- */
+
+.seitentitel {
+  margin: 4px 0 16px;
+  font-size: 1.4rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.karte {
+  background: var(--flaeche);
+  border: 1px solid var(--linie);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+.karte h2 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.karte--hinweis { border-left: 4px solid var(--marke); }
+.karte--fehler  { border-left: 4px solid var(--gefahr); }
+
+.fortschritt {
+  margin: 12px 0 0;
+  color: var(--gedaempft);
+  font-size: .85rem;
+}
+
+.liste { margin: 0; padding-left: 20px; }
+.liste li { margin-bottom: 4px; }
+
+.hinweis { color: var(--gedaempft); font-size: .85rem; margin: 12px 0 0; }
+.klein { font-size: .85rem; color: var(--gedaempft); }
+
+/* ---------- Schnellzugriff ---------- */
+
+.schnellzugriff {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.kachel {
+  display: grid;
+  place-items: center;
+  gap: 6px;
+  min-height: 96px;
+  background: var(--flaeche);
+  border: 1px solid var(--linie-stark);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: var(--tinte);
+  font-weight: 600;
+  font-size: .95rem;
+  text-align: center;
+  padding: 10px;
+}
+.kachel:active { background: var(--marke-hell); }
+.kachel__zeichen { font-size: 1.7rem; line-height: 1; color: var(--marke); }
+
+/* ---------- Formulare ---------- */
+
+.feld { display: block; margin-bottom: 14px; }
+.feld--abstand { margin-top: 22px; }
+
+.feld > span {
+  display: block;
+  margin-bottom: 5px;
+  font-size: .85rem;
+  font-weight: 600;
+  color: var(--gedaempft);
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="date"],
+select {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  font: inherit;
+  color: var(--tinte);
+  background: var(--flaeche);
+  border: 1px solid var(--linie-stark);
+  border-radius: var(--radius);
+}
+
+input:focus-visible,
+select:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid var(--aktion);
+  outline-offset: 1px;
+}
+
+.auswahl { min-height: 38px; padding: 4px 8px; }
+
+/* ---------- Knöpfe ---------- */
+
+.knopf {
+  min-height: 46px;
+  padding: 11px 18px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--tinte);
+  background: var(--flaeche);
+  border: 1px solid var(--linie-stark);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.knopf:active { transform: translateY(1px); }
+.knopf:disabled { opacity: .55; cursor: default; }
+
+.knopf--haupt {
+  background: var(--aktion);
+  border-color: var(--aktion);
+  color: #fff;
+}
+.knopf--haupt:hover:not(:disabled) { background: var(--aktion-dunkel); }
+
+.knopf--gefahr {
+  background: var(--gefahr);
+  border-color: var(--gefahr);
+  color: #fff;
+}
+
+.knopf--still { background: transparent; }
+.knopf--breit { width: 100%; }
+
+.linkknopf {
+  background: none;
+  border: none;
+  padding: 6px 0;
+  color: var(--aktion);
+  font: inherit;
+  font-size: .9rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ---------- Tabellen ---------- */
+
+.tabelle {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .92rem;
+}
+
+.tabelle th {
+  text-align: left;
+  font-size: .78rem;
+  font-weight: 650;
+  color: var(--gedaempft);
+  border-bottom: 2px solid var(--linie-stark);
+  padding: 6px 8px 6px 0;
+}
+
+.tabelle td {
+  padding: 10px 8px 10px 0;
+  border-bottom: 1px solid var(--linie);
+  vertical-align: middle;
+}
+
+.zeile--inaktiv { color: var(--gedaempft); background: #f6f7f8; }
+
+.marke {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 6px;
+  font-size: .7rem;
+  background: var(--marke);
+  border-radius: 2px;
+  color: #fff;
+}
+
+/* ---------- Anmeldung ---------- */
+
+.login {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: var(--stahl);
+}
+
+.login__karte {
+  width: 100%;
+  max-width: 380px;
+  background: var(--flaeche);
+  border-radius: var(--radius);
+  padding: 28px 24px 26px;
+}
+
+.login__marke {
+  margin-bottom: 26px;
+  padding-bottom: 18px;
+  border-bottom: 2px solid var(--marke);
+  text-align: center;
+}
+.login__logo { width: 100%; max-width: 240px; height: auto; }
+.login__untertitel {
+  margin-top: 10px;
+  font-size: .8rem;
+  letter-spacing: .12em;
+  color: var(--gedaempft);
+}
+
+/* ---------- Meldungen ---------- */
+
+.toast-bereich {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--navhoehe) + 14px);
+  z-index: 60;
+  display: grid;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: #1d2430;
+  color: #fff;
+  font-size: .92rem;
+  border-left: 4px solid var(--gut);
+  transition: opacity .35s;
+}
+.toast--warn   { border-left-color: #c08415; }
+.toast--fehler { border-left-color: var(--gefahr); }
+.toast--weg    { opacity: 0; }
+
+/* ---------- Dialog ---------- */
+
+.dialog-huelle {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 18, 21, .6);
+}
+
+.dialog {
+  width: 100%;
+  max-width: 400px;
+  background: var(--flaeche);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+.dialog h2 { margin: 0 0 8px; font-size: 1.05rem; }
+.dialog p  { margin: 0 0 18px; }
+
+/* Knöpfe dürfen umbrechen, sonst laufen sie auf dem Handy
+   seitlich aus dem Bild und sind nicht mehr erreichbar. */
+.dialog__knoepfe { display: flex; flex-wrap: wrap; gap: 8px;
+                   justify-content: stretch; position: sticky; bottom: -20px;
+                   background: var(--flaeche); padding-top: 12px; margin-top: 4px; }
+.dialog__knoepfe .knopf { flex: 1 1 auto; min-width: 120px; }
+
+/* ---------- Zustände ---------- */
+
+.laedt, .leer {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--gedaempft);
+}
+.leer__hinweis { font-size: .85rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
+
+/* ---------- Ab Tablet: Navigation nach links ---------- */
+
+@media (min-width: 780px) {
+  .rahmen {
+    display: grid;
+    grid-template-columns: 208px 1fr;
+    min-height: calc(100dvh - var(--kopfhoehe));
+  }
+
+  .nav {
+    position: sticky;
+    top: var(--kopfhoehe);
+    height: calc(100dvh - var(--kopfhoehe));
+    display: block;
+    grid-template-columns: none;
+    border-top: none;
+    border-right: 1px solid var(--linie-stark);
+    padding: 10px 0;
+  }
+
+  .nav__punkt {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 12px;
+    height: 48px;
+    padding: 0 16px;
+    font-size: .95rem;
+    border-top: none;
+    border-left: 3px solid transparent;
+  }
+
+  .nav__punkt.aktiv { border-left-color: var(--marke); }
+  .nav__zeichen { font-size: 1.1rem; }
+
+  .inhalt { padding: 24px 28px 40px; margin: 0; }
+  .schnellzugriff { grid-template-columns: repeat(4, 1fr); }
+  .toast-bereich { left: auto; right: 20px; bottom: 20px; width: 340px; }
+  .seitentitel { font-size: 1.6rem; }
+}
+
+/* ---------- Reiter innerhalb einer Seite ---------- */
+.reiter { display: flex; gap: 4px; margin-bottom: 16px;
+          border-bottom: 1px solid var(--linie-stark); }
+.reiter__knopf { background: none; border: none; border-bottom: 3px solid transparent;
+                 padding: 10px 14px; font: inherit; font-weight: 600;
+                 color: var(--gedaempft); cursor: pointer; }
+.reiter__knopf.aktiv { color: var(--marke); border-bottom-color: var(--marke); }
+
+/* ---------- Auswahl des Maschinenparks ---------- */
+.parkwahl { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.parkwahl__knopf { background: var(--flaeche); border: 1px solid var(--linie-stark);
+                   border-radius: 999px; padding: 8px 16px; font: inherit;
+                   font-size: .9rem; cursor: pointer; }
+.parkwahl__knopf.aktiv { background: var(--marke); border-color: var(--marke); color: #fff;
+                         font-weight: 600; }
+
+/* ---------- Zeitsteuerung ---------- */
+.steuerung { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.steuerung__mitte { flex: 1; text-align: center; }
+.steuerung__titel { font-weight: 650; }
+.knopf--klein { min-height: 40px; padding: 8px 14px; font-size: .9rem; }
+
+.moduswahl { display: inline-flex; margin-bottom: 14px;
+             border: 1px solid var(--linie-stark); border-radius: var(--radius);
+             overflow: hidden; }
+.moduswahl__knopf { background: var(--flaeche); border: none; padding: 8px 20px;
+                    font: inherit; font-size: .9rem; cursor: pointer; }
+.moduswahl__knopf.aktiv { background: var(--marke); color: #fff; font-weight: 600; }
+
+/* ---------- Tagesansicht ---------- */
+.tagzeile { display: flex; align-items: center; gap: 12px;
+            padding: 10px 0; border-bottom: 1px solid var(--linie); }
+.tagzeile:last-of-type { border-bottom: none; }
+.tagzeile__name { flex: 1; font-weight: 600; }
+.tagzeile__nr { display: block; font-size: .78rem; font-weight: 400; color: var(--gedaempft); }
+.tagzeile .menge { width: 110px; text-align: right; font-size: 1.1rem; }
+.tagsumme { display: flex; justify-content: space-between; align-items: center;
+            margin-top: 14px; padding-top: 14px; border-top: 2px solid var(--marke);
+            font-size: 1.05rem; }
+.tagsumme strong { font-size: 1.3rem; }
+
+/* ---------- Wochenraster ---------- */
+.karte--raster { padding: 0; overflow: hidden; }
+.rasterrolle { overflow-x: auto; }
+.raster { border-collapse: collapse; width: 100%; font-size: .92rem; }
+.raster th, .raster td { padding: 6px 8px; border-bottom: 1px solid var(--linie);
+                         text-align: center; white-space: nowrap; }
+.raster thead th { font-size: .78rem; color: var(--gedaempft);
+                   border-bottom: 2px solid var(--linie-stark); }
+.th__datum { display: block; font-weight: 400; font-size: .72rem; }
+.raster .fest { position: sticky; left: 0; z-index: 1; background: var(--flaeche);
+                text-align: left; font-weight: 600; min-width: 110px;
+                box-shadow: 1px 0 0 var(--linie); }
+.raster .heute { background: var(--marke-hell); }
+.raster .summe { font-weight: 650; background: #f7f9fc; }
+.raster .fusszeile td, .raster .fusszeile th { border-top: 2px solid var(--marke);
+                                               font-weight: 650; border-bottom: none; }
+.raster .menge { width: 68px; text-align: center; padding: 6px 4px; min-height: 40px; }
+
+/* ---------- Eingabefelder für Mengen ---------- */
+.menge { font-variant-numeric: tabular-nums; }
+.menge--speichert { border-color: var(--marke); background: var(--marke-hell); }
+.menge--gespeichert { border-color: var(--gut); background: #eaf6ef; }
+.menge--fehler { border-color: var(--gefahr); background: #fdeeed; }
+
+/* ---------- Kennzahlen ---------- */
+.kennzahlen { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.kennzahl { background: var(--flaeche); border: 1px solid var(--linie);
+            border-left: 3px solid var(--marke); border-radius: var(--radius); padding: 12px 14px; }
+.kennzahl__titel { font-size: .78rem; color: var(--gedaempft); }
+.kennzahl__wert { font-size: 1.45rem; font-weight: 650; line-height: 1.2; }
+
+/* ---------- Balken je Maschine ---------- */
+.balken { margin-bottom: 12px; }
+.balken__kopf { display: flex; justify-content: space-between; font-size: .9rem;
+                margin-bottom: 4px; }
+.balken__spur { height: 8px; background: var(--grund); border-radius: 999px; overflow: hidden; }
+.balken__fuellung { height: 100%; background: var(--marke); }
+
+/* ---------- Balken der letzten sieben Tage ---------- */
+.wochenbalken { display: grid; grid-template-columns: repeat(7, 1fr);
+                gap: 6px; align-items: end; }
+.wb { text-align: center; }
+.wb__spur { height: 90px; display: flex; align-items: flex-end;
+            background: var(--grund); border-radius: 3px; overflow: hidden; }
+.wb__fuellung { width: 100%; background: var(--marke); min-height: 2px; }
+.wb__wert { font-size: .72rem; margin-top: 4px; }
+.wb__tag { font-size: .75rem; color: var(--gedaempft); }
+.wb__tag--heute { color: var(--marke); font-weight: 650; }
+
+/* ---------- Statusliste auf dem Dashboard ---------- */
+.statusliste { display: grid; gap: 8px; }
+.statuszeile { display: flex; align-items: baseline; gap: 12px; padding: 8px 12px;
+               border-radius: var(--radius); background: var(--grund); }
+.statuszeile__zahl { font-size: 1.2rem; font-weight: 650; min-width: 34px; }
+.statuszeile--warn    { background: #fdf4e3; }
+.statuszeile--gefahr  { background: #fdeeed; }
+.statuszeile--gut     { background: #eef6f1; }
+
+/* ---------- Zeitraumwahl ---------- */
+.zeitraumwahl { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.zeitraumwahl .feld { margin-bottom: 0; }
+.schnellwahl { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; }
+
+/* ---------- Verwaltung von Maschinen ---------- */
+.karte__kopf { display: flex; justify-content: space-between; align-items: baseline;
+               gap: 12px; flex-wrap: wrap; }
+.karte__aktionen { display: flex; gap: 12px; }
+.karte--inaktiv { opacity: .65; }
+.rechts { text-align: right; }
+.stark { font-weight: 650; }
+
+/* ---------- Schalter in den Einstellungen ---------- */
+.schalter { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px;
+            cursor: pointer; }
+.schalter input { width: 20px; height: 20px; margin-top: 2px; flex: none; }
+
+@media (min-width: 780px) {
+  .kennzahlen { grid-template-columns: repeat(4, 1fr); }
+  .wb__spur { height: 120px; }
+}
+
+/* ---------- Startseite ---------- */
+.kopfkarte { display: flex; gap: 16px; align-items: stretch; justify-content: space-between;
+             background: var(--marke); color: #fff; border-radius: var(--radius);
+             padding: 18px 20px; margin-bottom: 14px; }
+.uhr { font-size: 2.6rem; font-weight: 300; line-height: 1; letter-spacing: -.02em; }
+.kopfkarte__datum { font-size: .85rem; opacity: .85; margin-top: 6px; }
+.kopfkarte__wetter { text-align: right; }
+.wetter__grad { font-size: 1.9rem; font-weight: 350; line-height: 1; }
+.wetter__text { font-size: .85rem; opacity: .9; }
+.wetter__rand { font-size: .75rem; opacity: .7; margin-top: 2px; }
+.wetter__feiertag { font-size: .75rem; margin-top: 6px; padding-top: 6px;
+                    border-top: 1px solid rgba(255,255,255,.25); }
+.gruss { margin: 0 0 14px; font-size: 1.15rem; font-weight: 600; }
+
+.warnpunkt { display: inline-block; width: 8px; height: 8px; margin-left: 7px;
+             border-radius: 50%; background: #c08415; vertical-align: middle; }
+
+/* ---------- Notizen ---------- */
+.notizen { display: grid; gap: 2px; }
+.notiz { display: flex; align-items: flex-start; gap: 10px; padding: 9px 0;
+         border-bottom: 1px solid var(--linie); cursor: pointer; }
+.notiz:last-child { border-bottom: none; }
+.notiz input { width: 20px; height: 20px; margin-top: 1px; flex: none; }
+.notiz__text { flex: 1; }
+.notiz__frist { font-size: .78rem; color: var(--gedaempft); white-space: nowrap; }
+.notiz__frist--spaet { color: var(--gefahr); font-weight: 600; }
+
+/* ---------- Maschinenkarten in der Tagesansicht ---------- */
+.mkarten { display: grid; gap: 12px; }
+.mkarte { background: var(--flaeche); border: 1px solid var(--linie);
+          border-radius: var(--radius); padding: 14px 16px; }
+.mkarte__name { font-weight: 650; font-size: 1.05rem; }
+.mkarte__nr { display: block; font-size: .78rem; font-weight: 400; color: var(--gedaempft); }
+.mkarte__eingabe { display: flex; align-items: center; justify-content: space-between;
+                   gap: 12px; margin-top: 12px; }
+.mkarte__label { font-size: .85rem; font-weight: 600; color: var(--gedaempft); }
+.mkarte__label span { display: block; font-weight: 400; font-size: .75rem; }
+.mkarte__eingabe .menge { width: 130px; text-align: right; font-size: 1.25rem; min-height: 52px; }
+.mkarte__leistung { margin-top: 8px; font-size: .85rem; color: var(--gedaempft); }
+.kein-feld { color: var(--gedaempft); }
+
+/* ---------- Auftragszeile ---------- */
+.auftrag { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+           margin-top: 8px; padding: 7px 10px; background: var(--marke-hell);
+           border-radius: var(--radius); font-size: .9rem; }
+.auftrag--leer { background: var(--grund); color: var(--gedaempft); }
+.auftrag__nr { font-weight: 650; letter-spacing: .02em; }
+.auftrag__seit { font-size: .78rem; color: var(--gedaempft); }
+.auftrag .linkknopf { margin-left: auto; }
+
+/* ---------- Wochenraster: Auftrag und Leistung ---------- */
+.fest__auftrag { display: block; font-size: .72rem; font-weight: 400; color: var(--marke); }
+.zelle__leistung { display: block; font-size: .7rem; color: var(--gedaempft); margin-top: 2px; }
+
+/* ---------- Kontrolle ---------- */
+.kzeile { padding: 12px 0; border-bottom: 1px solid var(--linie); }
+.kzeile:last-child { border-bottom: none; }
+.kzeile__oben { display: flex; gap: 10px; align-items: baseline; }
+.kzeile__nr { font-weight: 650; }
+.kzeile__maschine { font-size: .85rem; color: var(--gedaempft); }
+.kzeile__unten { display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+                 margin-top: 8px; font-size: .9rem; }
+.kzeile__ausschuss { color: var(--gefahr); font-weight: 600; }
+.kzeile__unten .knopf { margin-left: auto; }
+.knotiz { font-size: .82rem; color: var(--gedaempft); margin-top: 2px; }
+
+/* ---------- Hinweis bei fehlenden Rechten ---------- */
+.nurlesen { background: var(--marke-hell); border-left: 3px solid var(--marke);
+            padding: 10px 14px; border-radius: var(--radius); font-size: .88rem;
+            margin-bottom: 14px; }
+.rollenhilfe { margin-top: 12px; font-size: .85rem; color: var(--gedaempft);
+               display: grid; gap: 4px; }
+
+/* ---------- Dialoge mit Feldern ---------- */
+.dialog textarea { width: 100%; padding: 10px 12px; font: inherit; color: var(--tinte);
+                   background: var(--flaeche); border: 1px solid var(--linie-stark);
+                   border-radius: var(--radius); resize: vertical; }
+.dialog .feld { margin-bottom: 14px; }
+.feldhinweis { display: block; margin-top: 4px; font-size: .78rem; color: var(--gedaempft); }
+.linkknopf--gefahr { color: var(--gefahr); }
+.nowrap { white-space: normal; }
+/* Aktionsknöpfe in Tabellen dürfen auf schmalen Bildschirmen umbrechen */
+.tabelle td.rechts .linkknopf { display: inline-block; margin: 2px 0 2px 8px; }
+.balken__fuellung--minus { background: var(--gefahr); }
+
+@media (min-width: 780px) {
+  .uhr { font-size: 3.2rem; }
+  .mkarten { grid-template-columns: 1fr 1fr; }
+}
+
+/* ---------- Übersicht ---------- */
+.raster__titel { padding: 14px 16px 8px; margin: 0; font-size: 1rem; font-weight: 650; }
+.uzelle__stand { display: block; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ---------- Meldungsliste ---------- */
+.tabelle--meldungen td, .tabelle--meldungen th { vertical-align: top; }
+.mitte { text-align: center; }
+.tabelle th.mitte { text-align: center; }
+.tabelle th.rechts { text-align: right; }
+.tabelle--meldungen .mitte { font-variant-numeric: tabular-nums; }
+
+/* ---------- Reihenfolge der Maschinen ---------- */
+.sortspalte { width: 1%; white-space: nowrap; padding-right: 10px; }
+.sortknopf { background: none; border: 1px solid var(--linie-stark); border-radius: 3px;
+             width: 30px; height: 30px; font-size: .9rem; line-height: 1;
+             color: var(--marke); cursor: pointer; }
+.sortknopf:disabled { opacity: .3; cursor: default; }
+.sortknopf + .sortknopf { margin-left: 3px; }
+
+/* ---------- Suchleiste ---------- */
+.suchleiste { display: flex; gap: 8px; margin-bottom: 14px; }
+.suchleiste input { flex: 1; }
+.knopf--scan { white-space: nowrap; }
+
+/* ---------- Trefferliste ---------- */
+.trefferliste { display: grid; gap: 8px; }
+.treffer { display: block; width: 100%; text-align: left; background: var(--flaeche);
+           border: 1px solid var(--linie); border-radius: var(--radius);
+           padding: 12px 14px; font: inherit; cursor: pointer; }
+.treffer:hover { border-color: var(--marke); }
+.treffer__kopf { display: flex; justify-content: space-between; gap: 12px; }
+.treffer__nr { font-weight: 650; }
+.treffer__bestand { font-variant-numeric: tabular-nums; color: var(--gedaempft); }
+.treffer__bestand--knapp { color: var(--gefahr); font-weight: 650; }
+.treffer__name { font-size: .92rem; }
+.treffer__lief { font-size: .78rem; color: var(--gedaempft); }
+
+/* ---------- Artikelkarte ---------- */
+.artikel__kopf { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+.artikel__nr { font-size: 1.2rem; font-weight: 650; }
+.artikel__name { font-size: .95rem; }
+.artikel__lief { font-size: .8rem; color: var(--gedaempft); margin-top: 4px; }
+.artikel__gesamt { font-size: 2rem; font-weight: 650; line-height: 1; text-align: right;
+                   font-variant-numeric: tabular-nums; }
+.artikel__gesamt span { display: block; font-size: .75rem; font-weight: 400;
+                        color: var(--gedaempft); }
+.artikel__gesamt--knapp { color: var(--gefahr); }
+.warnbalken { margin-top: 12px; padding: 8px 12px; background: #fdf4e3;
+              border-left: 3px solid #c08415; border-radius: var(--radius); font-size: .88rem; }
+.untertitel { margin: 18px 0 8px; font-size: .85rem; font-weight: 650;
+              text-transform: uppercase; letter-spacing: .06em; color: var(--gedaempft); }
+.platzcode { font-weight: 650; letter-spacing: .04em; }
+.aktionen { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.karte__fuss { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--linie); }
+.plus { color: var(--gut); }
+.minus { color: var(--gefahr); }
+
+/* ---------- Lagerplätze ---------- */
+.platzgitter { display: flex; flex-wrap: wrap; gap: 6px; }
+.platzchip { padding: 6px 12px; background: var(--marke-hell); color: var(--marke);
+             border-radius: var(--radius); font-weight: 650; font-size: .88rem;
+             letter-spacing: .04em; }
+
+/* ---------- Kamera ---------- */
+.scanner { position: relative; width: 100%; max-width: 520px; background: #12161b;
+           border-radius: var(--radius); overflow: hidden; }
+.scanner__modus { display: flex; background: #1d2430; }
+.scanner__tab { flex: 1; background: none; border: none; border-bottom: 3px solid transparent;
+                padding: 11px 0; font: inherit; font-weight: 600; font-size: .9rem;
+                color: #9aa5b1; cursor: pointer; }
+.scanner__tab.aktiv { color: #fff; border-bottom-color: var(--signalgelb); }
+.scanner__buehne { position: relative; background: #000; }
+.scanner video, .scanner canvas { width: 100%; display: block; max-height: 62vh;
+                                  object-fit: contain; }
+.scanner canvas { cursor: crosshair; touch-action: none; }
+.scanner__rahmen { position: absolute; inset: 26% 12%; border: 2px solid var(--signalgelb);
+                   border-radius: 6px; pointer-events: none; }
+.scanner__auswahl { position: absolute; border: 2px solid var(--signalgelb);
+                    background: rgba(240,180,41,.16); pointer-events: none; }
+.scanner__vorschlaege { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 14px;
+                        background: #1d2430; }
+.vorschlag { background: #fff; border: none; border-radius: var(--radius);
+             padding: 10px 14px; font: inherit; font-weight: 650; letter-spacing: .03em;
+             cursor: pointer; }
+.vorschlag--hand { background: transparent; border: 1px solid #47505c; color: #dde3e9;
+                   font-weight: 400; }
+.scanner__leiste { display: flex; align-items: center; justify-content: space-between;
+                   gap: 12px; padding: 12px 14px; background: #1d2430; color: #fff;
+                   font-size: .85rem; }
+.scanner__knoepfe { display: flex; gap: 8px; flex: none; }
+.scanner__leiste .knopf--still { background: transparent; border-color: #47505c; color: #fff; }
+
+/* ---------- Bestellungen ---------- */
+.statuschip { display: inline-block; padding: 1px 8px; border-radius: 999px;
+              font-size: .72rem; font-weight: 600; background: var(--grund);
+              color: var(--gedaempft); }
+.statuschip--offen { background: #fdf4e3; color: #8a5c10; }
+.statuschip--bestellt { background: var(--marke-hell); color: var(--marke); }
+.statuschip--teilweise_geliefert { background: #e7f0fb; color: var(--marke); }
+.statuschip--geliefert, .statuschip--erledigt { background: #eef6f1; color: var(--gut); }
+.statuschip--storniert { background: #f1f2f4; color: var(--gedaempft); }
+.statuswahl { display: grid; gap: 8px; margin-bottom: 16px; }
+.lieferdaten { display: grid; gap: 3px; font-size: .92rem; }
+.lieferdaten a { color: var(--marke); }
+
+.pd-treffer { display: grid; gap: 4px; margin-bottom: 12px; }
+.pd-zeile { display: block; width: 100%; text-align: left; background: var(--flaeche);
+            border: 1px solid var(--linie); border-radius: var(--radius);
+            padding: 9px 12px; font: inherit; font-size: .9rem; cursor: pointer; }
+.pd-zeile:hover { border-color: var(--marke); }
+.pd-gewaehlt { padding: 10px 12px; background: var(--marke-hell);
+               border-radius: var(--radius); margin-bottom: 14px; }
+
+@media (min-width: 780px) {
+  .trefferliste { grid-template-columns: 1fr 1fr; }
+  .statuswahl { grid-template-columns: 1fr 1fr; }
+}
+
+/* ---------- Vorschläge der Texterkennung ---------- */
+.vorschlagreihe { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.uebernehmen { display: flex; gap: 8px; }
+.uebernehmen input { flex: 1; min-height: 46px; padding: 10px 12px; font: inherit;
+                     font-weight: 650; letter-spacing: .04em; border-radius: var(--radius);
+                     border: 1px solid #47505c; background: #fff; }
+.scanner__vorschlaege { display: block; }
+
+/* ---------- Auftragsstand im Raster ---------- */
+.fest__stand { display: block; font-size: .72rem; font-weight: 600; color: var(--gedaempft);
+               font-variant-numeric: tabular-nums; }
+
+/* ---------- Eingabefeld nach der Texterkennung ---------- */
+.vorschlag__eingabe { display: flex; gap: 8px; width: 100%; }
+.vorschlag__eingabe input { flex: 1; min-height: 46px; }
+.vorschlag__liste { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; width: 100%; }
+
+.platzchip--klick { border: none; cursor: pointer; font-family: inherit; }
+.platzchip--klick:hover { background: var(--marke); color: #fff; }
+.notiz .linkknopf { flex: none; font-size: .78rem; }
+
+/* ---------- Kleine Löschknöpfe ---------- */
+.chipweg { background: none; border: none; margin-left: 6px; padding: 0 2px;
+           color: var(--gefahr); font-size: 1rem; line-height: 1; cursor: pointer; }
+.chipweg--notiz { margin-left: auto; opacity: .5; }
+.chipweg--notiz:hover { opacity: 1; }
+.dialog__block { margin-top: 6px; padding-top: 14px; border-top: 1px solid var(--linie); }
+.dialog__blocktitel { font-size: .85rem; font-weight: 650; color: var(--gedaempft);
+                      margin-bottom: 10px; }
+.dialog { max-height: 88vh; overflow-y: auto; }
+
+/* ---------- Kamera: Knöpfe auf eigener Zeile ---------- */
+.scanner__leiste { flex-direction: column; align-items: stretch; gap: 10px; }
+.scanner__knoepfe { display: flex; gap: 8px; }
+.scanner__knoepfe .knopf { flex: 1; }
+#scan-text { text-align: center; line-height: 1.35; }
+
+.platzchip--klein { padding: 2px 7px; font-size: .76rem; font-weight: 500;
+                    display: inline-block; margin: 1px 0; }
+.platzchip--klein b { font-weight: 700; }
+.suchleiste .knopf--scan { flex: none; }
+
+/* ---------- Großer Foto-Knopf als Overlay ---------- */
+.scan-gross {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 56, 132, 0.9);
+  color: #fff;
+  border: 2px solid rgba(255,255,255,.4);
+  border-radius: 40px;
+  padding: 14px 28px;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 650;
+  cursor: pointer;
+  white-space: nowrap;
+  z-index: 10;
+  -webkit-tap-highlight-color: transparent;
+}
+.scan-gross:active { background: var(--marke); }
+
+.chipweg--bearb { color: var(--marke); }
+</style>
+</head>
+<body>
+<div id="boot" class="boot">Wird gestartet …</div>
+<div id="root" hidden></div>
+
+<script type="module">
+// =================================================================
+//  Hofer + Co. – Betriebs-App, Phase 1
+//  Version 2.0.0
+//
+//  Bewusst EINE einzige Datei. Kein Build, keine Verweise auf
+//  andere Dateien ausser den Symbolen. So kann beim Hochladen
+//  nichts verloren gehen und nichts still haengen bleiben.
+// =================================================================
+
+const BOOT = document.getElementById("boot");
+const WURZEL = document.getElementById("root");
+
+// Zeigt den Startfortschritt an, damit man bei einem Haenger sieht,
+// wie weit die App gekommen ist.
+function stand(text) { BOOT.textContent = text; }
+
+// Zeigt einen Startfehler lesbar an, statt still zu haengen.
+function startFehler(text) {
+  BOOT.innerHTML = '<div style="max-width:360px;text-align:center">'
+    + '<p><strong>Die App konnte nicht starten.</strong></p>'
+    + '<p style="font-size:.9rem;color:#5b646e">' + text + '</p>'
+    + '<p><button onclick="location.reload()" style="padding:10px 16px">Neu versuchen</button></p>'
+    + '</div>';
+}
+
+// -----------------------------------------------------------------
+//  Einstellungen
+// -----------------------------------------------------------------
+
+const SUPABASE_URL = "https://yvbtgiqtndxqqxhjshnl.supabase.co";
+const SUPABASE_KEY = "sb_publishable_WaxiaoZBFbntTgu-DklN-Q_O4T4lca7";
+const APP_NAME = "Hofer + Co.";
+const APP_UNTERTITEL = "HUDSON TOOL";
+// Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
+// Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
+const LOGIN_ENDUNG = "@hoferco.ch";
+const APP_VERSION = "6.7.0";
+
+// -----------------------------------------------------------------
+//  Kleine Helfer
+// -----------------------------------------------------------------
+
+function esc(w) {
+  if (w === null || w === undefined) return "";
+  return String(w).replaceAll("&", "&amp;").replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+}
+
+function zeitlimit(versprechen, ms, name) {
+  return Promise.race([
+    versprechen,
+    new Promise((_, ab) => setTimeout(() => ab(new Error("Zeitüberschreitung bei " + name)), ms)),
+  ]);
+}
+
+function meldung(text, art) {
+  let box = document.querySelector(".toast-bereich");
+  if (!box) {
+    box = document.createElement("div");
+    box.className = "toast-bereich";
+    document.body.appendChild(box);
+  }
+  const t = document.createElement("div");
+  t.className = "toast toast--" + (art || "ok");
+  t.textContent = text;
+  box.appendChild(t);
+  setTimeout(() => t.classList.add("toast--weg"), 3200);
+  setTimeout(() => t.remove(), 3600);
+}
+
+function nachfragen(o) {
+  return new Promise((fertig) => {
+    const h = document.createElement("div");
+    h.className = "dialog-huelle";
+    h.innerHTML = '<div class="dialog" role="dialog" aria-modal="true">'
+      + '<h2>' + esc(o.titel) + '</h2><p>' + esc(o.text) + '</p>'
+      + '<div class="dialog__knoepfe">'
+      + '<button class="knopf knopf--still" data-nein>Abbrechen</button>'
+      + '<button class="knopf ' + (o.gefahr ? "knopf--gefahr" : "knopf--haupt") + '" data-ja>'
+      + esc(o.bestaetigen || "Ja, ausführen") + '</button></div></div>';
+    document.body.appendChild(h);
+    const zu = (a) => { h.remove(); fertig(a); };
+    h.querySelector("[data-ja]").onclick = () => zu(true);
+    h.querySelector("[data-nein]").onclick = () => zu(false);
+    h.onclick = (e) => { if (e.target === h) zu(false); };
+    h.querySelector("[data-ja]").focus();
+  });
+}
+
+// Einstellungen, die nur dieses Gerät betreffen
+function einstellung(name) {
+  try { return localStorage.getItem("hudson." + name) === "1"; }
+  catch (e) { return false; }
+}
+function einstellungSetzen(name, wert) {
+  try { localStorage.setItem("hudson." + name, wert ? "1" : "0"); }
+  catch (e) { /* z. B. im privaten Modus nicht verfügbar */ }
+}
+
+function fehlertext(e) {
+  if (!e) return "Unbekannter Fehler";
+  const m = e.message || String(e);
+  if (m.includes("Invalid login credentials")) return "E-Mail oder Passwort stimmt nicht.";
+  if (m.includes("Email not confirmed")) return "Die E-Mail-Adresse wurde noch nicht bestätigt.";
+  if (m.includes("Password should be")) return "Das Passwort ist zu kurz (mindestens 8 Zeichen).";
+  if (m.includes("row-level security")) return "Dafür fehlen dir die Rechte.";
+  if (m.includes("Failed to fetch")) return "Keine Verbindung zum Server. WLAN prüfen.";
+  if (m.includes("foreign key") || m.includes("violates foreign key"))
+    return "Das lässt sich nicht löschen, weil noch Buchungen oder Bestellungen daran hängen. "
+         + "Deaktivieren geht aber immer.";
+  if (m.includes("duplicate key")) return "Diese Nummer gibt es bereits.";
+  if (m.includes("duplicate key") || m.includes("bereits vorhanden"))
+    return "Dieser Eintrag existiert bereits.";
+  if (m.includes("foreign key"))
+    return "Das lässt sich nicht löschen, weil noch Daten daran hängen "
+         + "(zum Beispiel Bestände, Bewegungen oder Bestellungen). "
+         + "Bitte stattdessen deaktivieren.";
+  return m;
+}
+
+// -----------------------------------------------------------------
+//  Verbindung zur Datenbank
+// -----------------------------------------------------------------
+
+const ANBIETER = [
+  "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm",
+  "https://esm.sh/@supabase/supabase-js@2",
+];
+
+let db = null;
+
+async function verbinden() {
+  let letzter = null;
+  for (const adresse of ANBIETER) {
+    try {
+      const modul = await zeitlimit(import(adresse), 8000, "Bibliothek");
+      if (modul && modul.createClient) {
+        return modul.createClient(SUPABASE_URL, SUPABASE_KEY, {
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: true,
+            // Die Browsersperre wird umgangen. Sie kann sich in
+            // manchen Browsern selbst blockieren, und dann antwortet
+            // die Anmeldung nie.
+            lock: async (_n, _t, aufgabe) => await aufgabe(),
+          },
+        });
+      }
+    } catch (f) {
+      letzter = f;
+      console.warn("Anbieter nicht erreichbar:", adresse, f.message);
+    }
+  }
+  throw new Error("Programmbibliothek nicht ladbar. " + (letzter ? letzter.message : ""));
+}
+
+// -----------------------------------------------------------------
+//  Anmeldung
+// -----------------------------------------------------------------
+
+let profil = null;
+
+async function sitzung() {
+  try {
+    const { data } = await zeitlimit(db.auth.getSession(), 6000, "Sitzung");
+    return (data && data.session) || null;
+  } catch (f) {
+    console.warn("Sitzung nicht lesbar:", f.message);
+    return null;
+  }
+}
+
+async function profilLaden() {
+  const s = await sitzung();
+  if (!s) { profil = null; return null; }
+
+  try {
+    const { data, error } = await zeitlimit(
+      db.from("profiles").select("id, email, full_name, role, is_active")
+        .eq("id", s.user.id).single(), 10000, "Profil");
+    if (error || !data) throw error || new Error("kein Profil");
+    profil = data;
+  } catch (f) {
+    console.warn("Profil nicht ladbar:", f.message);
+    profil = { id: s.user.id, email: s.user.email, full_name: null,
+               role: "admin", is_active: true };
+  }
+  return profil;
+}
+
+// -----------------------------------------------------------------
+//  Anmeldeseite
+// -----------------------------------------------------------------
+
+function zeigeLogin() {
+  WURZEL.innerHTML = ''
+    + '<div class="login"><div class="login__karte">'
+    + '<div class="login__marke">'
+    + '<img class="login__logo" src="./logo.png" alt="Hofer + Co. Präzisionsdrehteile">'
+    + '<div class="login__untertitel">' + esc(APP_UNTERTITEL) + '</div>'
+    + '</div>'
+    + '<form id="lf" novalidate>'
+    + '<label class="feld"><span>Benutzername</span>'
+    + '<input type="text" id="le" autocomplete="username" autocapitalize="none"'
+    + ' spellcheck="false" required></label>'
+    + '<label class="feld"><span>Passwort</span>'
+    + '<input type="password" id="lp" autocomplete="current-password" required></label>'
+    + '<button type="submit" class="knopf knopf--haupt knopf--breit" id="lk">Anmelden</button>'
+    + '</form></div></div>';
+
+  const knopf = document.getElementById("lk");
+  document.getElementById("lf").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const eingabe = document.getElementById("le").value.trim().toLowerCase();
+    const pw = document.getElementById("lp").value;
+    if (!eingabe || !pw) { meldung("Benutzername und Passwort eingeben.", "warn"); return; }
+
+    // Ohne @ wird daraus automatisch eine gültige Adresse.
+    const email = eingabe.includes("@") ? eingabe : eingabe + LOGIN_ENDUNG;
+
+    knopf.disabled = true;
+    knopf.textContent = "Anmelden …";
+    try {
+      const { error } = await zeitlimit(
+        db.auth.signInWithPassword({ email: email, password: pw }), 15000, "Anmeldung");
+      if (error) throw error;
+      await profilLaden();
+      zeichneGeruest();
+    } catch (f) {
+      meldung(fehlertext(f), "fehler");
+      knopf.disabled = false;
+      knopf.textContent = "Anmelden";
+    }
+  });
+}
+
+// -----------------------------------------------------------------
+//  Seiten
+// -----------------------------------------------------------------
+
+// =================================================================
+//  STARTSEITE
+// =================================================================
+
+// Solothurn
+const ORT = { lat: 47.2088, lon: 7.5323, name: "Solothurn" };
+
+let uhrTakt = null;
+
+// ---------- Feiertage Kanton Solothurn ----------
+
+// Ostersonntag nach der Gaußschen Formel
+function ostersonntag(jahr) {
+  const a = jahr % 19, b = Math.floor(jahr / 100), c = jahr % 100;
+  const d = Math.floor(b / 4), e = b % 4;
+  const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const monat = Math.floor((h + l - 7 * m + 114) / 31);
+  const tag = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(jahr, monat - 1, tag);
+}
+
+function feiertage(jahr) {
+  const o = ostersonntag(jahr);
+  const ab = (n) => {
+    const d = new Date(o); d.setDate(d.getDate() + n); return isoDatum(d);
+  };
+  const fest = (m, t) => isoDatum(new Date(jahr, m - 1, t));
+
+  return [
+    { datum: fest(1, 1),   name: "Neujahr" },
+    { datum: fest(1, 2),   name: "Berchtoldstag" },
+    { datum: fest(3, 19),  name: "Josefstag" },
+    { datum: ab(-2),       name: "Karfreitag" },
+    { datum: ab(1),        name: "Ostermontag" },
+    { datum: fest(5, 1),   name: "Tag der Arbeit" },
+    { datum: ab(39),       name: "Auffahrt" },
+    { datum: ab(50),       name: "Pfingstmontag" },
+    { datum: ab(60),       name: "Fronleichnam" },
+    { datum: fest(8, 1),   name: "Bundesfeier" },
+    { datum: fest(8, 15),  name: "Mariä Himmelfahrt" },
+    { datum: fest(11, 1),  name: "Allerheiligen" },
+    { datum: fest(12, 8),  name: "Mariä Empfängnis" },
+    { datum: fest(12, 25), name: "Weihnachten" },
+    { datum: fest(12, 26), name: "Stephanstag" },
+  ].sort((a, b) => a.datum.localeCompare(b.datum));
+}
+
+function naechsterFeiertag() {
+  const heute = isoDatum(new Date());
+  const jahr = new Date().getFullYear();
+  const alle = feiertage(jahr).concat(feiertage(jahr + 1));
+  const kommend = alle.find((f) => f.datum >= heute);
+  if (!kommend) return null;
+
+  const tage = Math.round((ausIso(kommend.datum) - ausIso(heute)) / 86400000);
+  return { name: kommend.name, datum: kommend.datum, tage: tage };
+}
+
+// ---------- Wetter ----------
+
+const WETTER_TEXT = {
+  0: "klar", 1: "meist klar", 2: "teils bewölkt", 3: "bewölkt",
+  45: "Nebel", 48: "Reifnebel",
+  51: "leichter Niesel", 53: "Niesel", 55: "starker Niesel",
+  61: "leichter Regen", 63: "Regen", 65: "starker Regen",
+  66: "gefrierender Regen", 67: "gefrierender Regen",
+  71: "leichter Schneefall", 73: "Schneefall", 75: "starker Schneefall",
+  77: "Schneegriesel",
+  80: "Regenschauer", 81: "Regenschauer", 82: "kräftige Schauer",
+  85: "Schneeschauer", 86: "Schneeschauer",
+  95: "Gewitter", 96: "Gewitter mit Hagel", 99: "Gewitter mit Hagel",
+};
+
+async function holeWetter() {
+  const adresse = "https://api.open-meteo.com/v1/forecast"
+    + "?latitude=" + ORT.lat + "&longitude=" + ORT.lon
+    + "&current=temperature_2m,weather_code"
+    + "&daily=temperature_2m_max,temperature_2m_min"
+    + "&timezone=Europe%2FZurich&forecast_days=1";
+
+  const antwort = await zeitlimit(fetch(adresse), 6000, "Wetter");
+  if (!antwort.ok) throw new Error("Wetterdienst antwortet nicht");
+  const d = await antwort.json();
+
+  return {
+    temperatur: Math.round(d.current.temperature_2m),
+    text: WETTER_TEXT[d.current.weather_code] || "",
+    hoch: Math.round(d.daily.temperature_2m_max[0]),
+    tief: Math.round(d.daily.temperature_2m_min[0]),
+  };
+}
+
+// ---------- Notizen ----------
+
+async function ladeTodos() {
+  const { data, error } = await zeitlimit(
+    db.from("todos").select("*").eq("is_done", false)
+      .order("due_date", { ascending: true, nullsFirst: false })
+      .order("created_at").limit(20),
+    8000, "Notizen");
+  if (error) throw error;
+  return data || [];
+}
+
+// ---------- Seite ----------
+
+async function seiteDashboard(b) {
+  const name = (profil && (profil.full_name || profil.email.split("@")[0])) || "";
+
+  b.innerHTML = ''
+    + '<section class="kopfkarte">'
+    + '<div class="kopfkarte__zeit"><div class="uhr" id="uhr">--:--</div>'
+    + '<div class="kopfkarte__datum" id="datum"></div></div>'
+    + '<div class="kopfkarte__wetter" id="wetter"><span class="klein">Wetter wird geladen …</span></div>'
+    + '</section>'
+
+    + '<p class="gruss">' + esc(begruessung()) + (name ? ", " + esc(name) : "") + '</p>'
+
+    + '<div id="db-auftraege"><div class="laedt">Aufträge werden geladen …</div></div>'
+    + '<div id="db-notizen"></div>'
+    + '<div id="db-status"></div>';
+
+  // Uhr
+  const uhrEl = document.getElementById("uhr");
+  const datumEl = document.getElementById("datum");
+  const tick = () => {
+    if (!document.getElementById("uhr")) { clearInterval(uhrTakt); return; }
+    const j = new Date();
+    const p = (n) => String(n).padStart(2, "0");
+    uhrEl.textContent = p(j.getHours()) + ":" + p(j.getMinutes());
+    datumEl.textContent = j.toLocaleDateString("de-CH",
+      { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  };
+  tick();
+  if (uhrTakt) clearInterval(uhrTakt);
+  uhrTakt = setInterval(tick, 20000);
+
+  // Wetter und Feiertag
+  const fei = naechsterFeiertag();
+  const feiText = fei
+    ? (fei.tage === 0 ? "Heute ist " + fei.name
+      : fei.tage === 1 ? "Morgen ist " + fei.name
+      : fei.name + " in " + fei.tage + " Tagen")
+    : "";
+
+  holeWetter().then((w) => {
+    const el = document.getElementById("wetter");
+    if (!el) return;
+    el.innerHTML = '<div class="wetter__grad">' + w.temperatur + '°</div>'
+      + '<div class="wetter__text">' + esc(w.text) + '</div>'
+      + '<div class="wetter__rand">' + ORT.name + ' · ' + w.tief + '° bis ' + w.hoch + '°</div>'
+      + (feiText ? '<div class="wetter__feiertag">' + esc(feiText) + '</div>' : "");
+  }).catch(() => {
+    const el = document.getElementById("wetter");
+    if (el) el.innerHTML = '<span class="klein">Wetter nicht verfügbar</span>'
+      + (feiText ? '<div class="wetter__feiertag">' + esc(feiText) + '</div>' : "");
+  });
+
+  // Laufende Aufträge
+  try {
+    const { data, error } = await zeitlimit(
+      db.from("laufende_auftraege").select("*").order("park").order("maschine"), 10000, "Aufträge");
+    if (error) throw error;
+    const auftraege = data || [];
+    const heute = isoDatum(new Date());
+
+    document.getElementById("db-auftraege").innerHTML =
+      '<section class="karte"><h2>Laufende Aufträge</h2>'
+      + (auftraege.length
+        ? '<table class="tabelle"><thead><tr><th>Auftrag</th><th>Maschine</th>'
+          + '<th class="rechts">Stand</th></tr></thead><tbody>'
+          + auftraege.map((j) => '<tr><td><strong>' + esc(j.job_number) + '</strong>'
+              + (j.letzter_eintrag === heute
+                  ? '' : '<span class="warnpunkt" title="Heute noch nichts erfasst"></span>')
+              + '</td>'
+              + '<td class="klein">' + esc(j.maschine)
+              + (j.maschine_nr ? '<div>' + esc(j.maschine_nr) + '</div>' : "") + '</td>'
+              + '<td class="rechts stark">' + zahlText(j.stand)
+              + (j.ausschuss > 0 ? '<span class="klein"> −' + zahlText(j.ausschuss) + '</span>' : "")
+              + '</td></tr>').join("")
+          + '</tbody></table>'
+          + '<p class="hinweis">Ein Punkt neben der Auftragsnummer heisst: heute noch keine Zahl erfasst.</p>'
+        : '<p class="hinweis">Zurzeit läuft kein Auftrag.</p>')
+      + '</section>';
+  } catch (f) {
+    document.getElementById("db-auftraege").innerHTML =
+      '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+  }
+
+  await zeichneNotizen();
+
+  // Lager und Bestellungen
+  let offene = 0, ueberfaellig = 0;
+  const heute = isoDatum(new Date());
+  try {
+    const r = await zeitlimit(db.from("order_items").select("id, status, needed_by")
+      .in("status", ["offen", "bestellt", "teilweise_geliefert"]), 8000, "Bestellungen");
+    if (!r.error) {
+      offene = (r.data || []).length;
+      ueberfaellig = (r.data || []).filter((z) => z.needed_by && z.needed_by < heute).length;
+    }
+  } catch (f) { /* Bereich existiert noch nicht */ }
+
+  const statusEl = document.getElementById("db-status");
+  if (statusEl) {
+    statusEl.innerHTML = '<section class="karte"><h2>Lager und Bestellungen</h2>'
+      + '<div class="statusliste">'
+      + statuszeile(ueberfaellig, "Bestellungen überfällig", ueberfaellig ? "gefahr" : "gut")
+      + statuszeile(offene, "Bestellungen offen", "neutral")
+      + '</div></section>';
+  }
+}
+
+function statuszeile(anzahl, text, art) {
+  return '<div class="statuszeile statuszeile--' + art + '">'
+    + '<span class="statuszeile__zahl">' + zahlText(anzahl) + '</span>'
+    + '<span>' + esc(text) + '</span></div>';
+}
+
+async function zeichneNotizen() {
+  const ziel = document.getElementById("db-notizen");
+  if (!ziel) return;
+
+  let todos = [];
+  try { todos = await ladeTodos(); }
+  catch (f) {
+    ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  const heute = isoDatum(new Date());
+
+  ziel.innerHTML = '<section class="karte">'
+    + '<div class="karte__kopf"><h2>Notizen</h2>'
+    + (darfSchreiben() ? '<button class="linkknopf" id="notiz-neu">+ Neue Notiz</button>' : "")
+    + '</div>'
+    + (todos.length
+      ? '<div class="notizen">' + todos.map((t) => '<label class="notiz">'
+          + '<input type="checkbox" data-erledigt="' + esc(t.id) + '">'
+          + '<span class="notiz__text">' + esc(t.text) + '</span>'
+          + (t.due_date
+            ? '<span class="notiz__frist' + (t.due_date < heute ? " notiz__frist--spaet" : "") + '">'
+              + kurzDatum(t.due_date) + '</span>' : "")
+          + (istAdmin() ? '<button class="linkknopf linkknopf--gefahr" data-nweg="'
+              + esc(t.id) + '">Löschen</button>' : "")
+          + '</label>').join("") + '</div>'
+      : '<p class="hinweis">Keine offenen Notizen.</p>')
+    + '</section>';
+
+  const neu = document.getElementById("notiz-neu");
+  if (neu) neu.onclick = async () => {
+    const w = await dialogFelder({ titel: "Neue Notiz",
+      felder: [
+        { name: "text", label: "Was ist zu tun?", typ: "textarea", pflicht: true },
+        { name: "frist", label: "Bis wann", typ: "date" }],
+      bestaetigen: "Speichern" });
+    if (!w) return;
+    const { error } = await db.from("todos").insert({
+      text: w.text, due_date: w.frist || null });
+    if (error) meldung(fehlertext(error), "fehler");
+    else { meldung("Notiz gespeichert."); zeichneNotizen(); }
+  };
+
+  ziel.querySelectorAll("[data-nweg]").forEach((el) => {
+    el.onclick = async (e) => {
+      e.preventDefault();
+      const t = todos.find((x) => x.id === el.dataset.nweg) || {};
+      const w = await loeschen({ tabelle: "todos", id: t.id,
+        titel: "Notiz löschen", text: '"' + (t.text || "") + '" wird endgültig entfernt.' });
+      if (w) zeichneNotizen();
+    };
+  });
+
+  ziel.querySelectorAll("[data-notizbearb]").forEach((el) => {
+    el.onclick = async (e) => {
+      e.preventDefault();
+      const t = todos.find((x) => x.id === el.dataset.notizbearb);
+      if (!t) return;
+      const w = await dialogFelder({ titel: "Notiz bearbeiten",
+        felder: [
+          { name: "text", label: "Was ist zu tun?", typ: "textarea", wert: t.text, pflicht: true },
+          { name: "frist", label: "Bis wann", typ: "date", wert: t.due_date || "" }],
+        bestaetigen: "Speichern" });
+      if (!w) return;
+      const { error } = await db.from("todos")
+        .update({ text: w.text, due_date: w.frist || null }).eq("id", t.id);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Gespeichert."); zeichneNotizen(); }
+    };
+  });
+
+  ziel.querySelectorAll("[data-notizweg]").forEach((el) => {
+    el.onclick = async (e) => {
+      e.preventDefault();
+      const ok = await doppeltNachfragen(
+        { titel: "Notiz löschen", text: "Soll diese Notiz gelöscht werden?",
+          bestaetigen: "Weiter zum Löschen", gefahr: true },
+        { titel: "Wirklich löschen?", text: "Letzte Rückfrage.",
+          bestaetigen: "Endgültig löschen", gefahr: true });
+      if (!ok) return;
+      const { error } = await db.from("todos").delete().eq("id", el.dataset.notizweg);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Notiz gelöscht."); zeichneNotizen(); }
+    };
+  });
+
+  ziel.querySelectorAll("[data-erledigt]").forEach((el) => {
+    el.onchange = async () => {
+      el.checked = false;   // erst nach Bestätigung wirklich abhaken
+      const ok = await nachfragen({
+        titel: "Notiz erledigt?",
+        text: "Ist diese Aufgabe wirklich abgeschlossen?",
+        bestaetigen: "Ja, erledigt" });
+      if (!ok) return;
+      const { error } = await db.from("todos").update({
+        is_done: true, done_at: new Date().toISOString(), done_by: profil.id
+      }).eq("id", el.dataset.erledigt);
+      if (error) { meldung(fehlertext(error), "fehler"); }
+      else { meldung("Erledigt."); zeichneNotizen(); }
+    };
+  });
+}
+
+function begruessung() {
+  const h = new Date().getHours();
+  if (h < 11) return "Guten Morgen";
+  if (h < 18) return "Guten Tag";
+  return "Guten Abend";
+}
+
+
+
+// =================================================================
+//  DATENSICHERUNG
+//  Lädt alle Daten als eine Datei herunter. Wichtig, weil der
+//  kostenlose Tarif keine automatischen Sicherungen macht.
+// =================================================================
+
+const SICHERUNG_TABELLEN = [
+  "profiles", "machine_parks", "machines", "jobs", "production_records",
+  "quality_reports", "suppliers", "articles", "storage_locations",
+  "stock_movements", "stock_balances", "order_items", "todos",
+];
+
+async function datenSichern(knopf) {
+  const urspruenglich = knopf.textContent;
+  knopf.disabled = true;
+
+  const alles = { erstellt_am: new Date().toISOString(), version: APP_VERSION, daten: {} };
+  const fehler = [];
+
+  for (let i = 0; i < SICHERUNG_TABELLEN.length; i++) {
+    const t = SICHERUNG_TABELLEN[i];
+    knopf.textContent = "Sichere … " + (i + 1) + "/" + SICHERUNG_TABELLEN.length;
+    try {
+      const { data, error } = await zeitlimit(db.from(t).select("*"), 20000, t);
+      if (error) throw error;
+      alles.daten[t] = data || [];
+    } catch (f) {
+      fehler.push(t);
+      alles.daten[t] = { fehler: f.message };
+    }
+  }
+
+  const datum = isoDatum(new Date());
+  ladeHerunter(JSON.stringify(alles, null, 2),
+    "hudson-tool-sicherung-" + datum + ".json", "application/json");
+
+  // Zusätzlich die wichtigsten Tabellen als CSV für Excel
+  const csvTabellen = ["articles", "stock_balances", "production_records", "order_items"];
+  csvTabellen.forEach((t) => {
+    const zeilen = alles.daten[t];
+    if (Array.isArray(zeilen) && zeilen.length) {
+      ladeHerunter(alsCsv(zeilen), "hudson-" + t + "-" + datum + ".csv", "text/csv");
+    }
+  });
+
+  knopf.disabled = false;
+  knopf.textContent = urspruenglich;
+
+  if (fehler.length) meldung("Gesichert, aber nicht lesbar: " + fehler.join(", "), "warn");
+  else meldung("Sicherung heruntergeladen.");
+}
+
+function alsCsv(zeilen) {
+  const spalten = Object.keys(zeilen[0]);
+  const feld = (w) => {
+    if (w === null || w === undefined) return "";
+    const t = typeof w === "object" ? JSON.stringify(w) : String(w);
+    return /[";\n]/.test(t) ? '"' + t.replaceAll('"', '""') + '"' : t;
+  };
+  return "\uFEFF" + spalten.join(";") + "\n"
+    + zeilen.map((z) => spalten.map((sp) => feld(z[sp])).join(";")).join("\n");
+}
+
+function ladeHerunter(inhalt, dateiname, art) {
+  const blob = new Blob([inhalt], { type: art + ";charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = dateiname;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+
+// =================================================================
+//  RECHTE
+// =================================================================
+
+function meineRolle() { return (profil && profil.role) || "produktion"; }
+function istAdmin() { return meineRolle() === "admin"; }
+function darfSchreiben() { return meineRolle() === "admin" || meineRolle() === "produktion"; }
+function darfKontrolle() { return meineRolle() === "admin" || meineRolle() === "kontrolle"; }
+
+const ROLLEN = {
+  admin: "Administrator",
+  produktion: "Produktion",
+  kontrolle: "Kontrolle",
+};
+
+// Hinweisbalken, wenn jemand einen Bereich nur ansehen darf
+function nurLesenHinweis(text) {
+  return '<div class="nurlesen">' + esc(text) + '</div>';
+}
+
+// =================================================================
+//  DIALOGE
+//  Ersetzt die Browser-Abfragen durch eigene Fenster.
+// =================================================================
+
+//  felder: [{ name, label, typ, wert, platzhalter, pflicht, hinweis }]
+//  Gibt ein Objekt mit den Werten zurück, oder null bei Abbruch.
+function dialogFelder(o) {
+  return new Promise((fertig) => {
+    const huelle = document.createElement("div");
+    huelle.className = "dialog-huelle";
+
+    const felder = (o.felder || []).map((f) => {
+      const id = "df-" + f.name;
+      if (f.typ === "textarea") {
+        return '<label class="feld"><span>' + esc(f.label) + '</span>'
+          + '<textarea id="' + id + '" rows="3" placeholder="' + esc(f.platzhalter || "") + '">'
+          + esc(f.wert || "") + '</textarea>'
+          + (f.hinweis ? '<span class="feldhinweis">' + esc(f.hinweis) + '</span>' : "")
+          + '</label>';
+      }
+      return '<label class="feld"><span>' + esc(f.label) + '</span>'
+        + '<input id="' + id + '" type="' + (f.typ || "text") + '"'
+        + (f.typ === "number" ? ' inputmode="numeric" min="0" step="1"' : "")
+        + ' value="' + esc(f.wert === null || f.wert === undefined ? "" : f.wert) + '"'
+        + ' placeholder="' + esc(f.platzhalter || "") + '">'
+        + (f.hinweis ? '<span class="feldhinweis">' + esc(f.hinweis) + '</span>' : "")
+        + '</label>';
+    }).join("");
+
+    huelle.innerHTML = '<div class="dialog" role="dialog" aria-modal="true">'
+      + '<h2>' + esc(o.titel) + '</h2>'
+      + (o.text ? '<p>' + esc(o.text) + '</p>' : "")
+      + '<form id="df-form">' + felder + '</form>'
+      + '<div class="dialog__knoepfe">'
+      + '<button class="knopf knopf--still" data-nein>Abbrechen</button>'
+      + '<button class="knopf ' + (o.gefahr ? "knopf--gefahr" : "knopf--haupt") + '" data-ja>'
+      + esc(o.bestaetigen || "Speichern") + '</button></div></div>';
+
+    document.body.appendChild(huelle);
+
+    const schliessen = (wert) => { huelle.remove(); fertig(wert); };
+
+    const absenden = () => {
+      const ergebnis = {};
+      for (const f of (o.felder || [])) {
+        const el = document.getElementById("df-" + f.name);
+        const wert = (el.value || "").trim();
+        if (f.pflicht && !wert) {
+          el.focus();
+          el.classList.add("menge--fehler");
+          meldung(f.label + " wird benötigt.", "warn");
+          return;
+        }
+        ergebnis[f.name] = f.typ === "number" ? (wert === "" ? 0 : Number(wert)) : wert;
+      }
+      schliessen(ergebnis);
+    };
+
+    huelle.querySelector("[data-ja]").onclick = absenden;
+    huelle.querySelector("[data-nein]").onclick = () => schliessen(null);
+    huelle.onclick = (e) => { if (e.target === huelle) schliessen(null); };
+    document.getElementById("df-form").onsubmit = (e) => { e.preventDefault(); absenden(); };
+
+    const erstes = huelle.querySelector("input, textarea");
+    if (erstes) erstes.focus();
+  });
+}
+
+// Löschen mit zwei Rückfragen. Gibt true zurück, wenn gelöscht wurde.
+async function loeschen(o) {
+  const ok = await doppeltNachfragen(
+    { titel: o.titel, text: o.text, bestaetigen: "Weiter zum Löschen", gefahr: true },
+    { titel: "Wirklich endgültig löschen?",
+      text: o.zweiteFrage || "Letzte Rückfrage. Danach ist der Eintrag unwiderruflich weg.",
+      bestaetigen: "Endgültig löschen", gefahr: true });
+  if (!ok) return false;
+
+  const { error } = await db.from(o.tabelle).delete().eq("id", o.id);
+  if (error) { meldung(fehlertext(error), "fehler"); return false; }
+  meldung("Gelöscht.");
+  return true;
+}
+
+// Drei Rückfragen für Admins bei besonders kritischen Aktionen.
+async function dreiNachfragen(was, was2, warnung) {
+  const a = await nachfragen({ titel: was + " – Schritt 1 von 3",
+    text: 'Soll ' + was2 + ' wirklich gelöscht werden? Deaktivieren wäre der sichere Weg.',
+    bestaetigen: "Weiter", gefahr: true });
+  if (!a) return false;
+  const b = await nachfragen({ titel: was + " – Schritt 2 von 3",
+    text: (warnung ? warnung + " " : "") + "Alles daran (Stückzahlen, Aufträge) geht verloren.",
+    bestaetigen: "Ja, ich will löschen", gefahr: true });
+  if (!b) return false;
+  return await nachfragen({ titel: was + " – Letzte Bestätigung",
+    text: "Das ist unwiderruflich. Danach gibt es kein Zurück.",
+    bestaetigen: "Endgültig löschen", gefahr: true });
+}
+
+// Zwei Rückfragen hintereinander für wirklich kritische Aktionen.
+async function doppeltNachfragen(erste, zweite) {
+  const a = await nachfragen(erste);
+  if (!a) return false;
+  return await nachfragen(zweite);
+}
+
+// =================================================================
+//  PRODUKTION
+// =================================================================
+
+const prod = {
+  ansicht: "erfassen",
+  parkId: null,
+  tag: null,
+  modus: null,
+  vonDatum: null,
+  bisDatum: null,
+  parks: null,
+  maschinen: null,
+  auftraege: null,
+};
+
+// ---------- Datumshelfer ----------
+
+function isoDatum(d) {
+  const p = (n) => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+}
+
+function ausIso(text) {
+  const [j, m, t] = text.split("-").map(Number);
+  return new Date(j, m - 1, t);
+}
+
+function plusTage(text, n) {
+  const d = ausIso(text);
+  d.setDate(d.getDate() + n);
+  return isoDatum(d);
+}
+
+function wochenStart(text) {
+  const d = ausIso(text);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return isoDatum(d);
+}
+
+function kurzDatum(text) {
+  const d = ausIso(text);
+  return String(d.getDate()).padStart(2, "0") + "." + String(d.getMonth() + 1).padStart(2, "0") + ".";
+}
+
+const WOCHENTAGE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
+const WT_KURZ = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+
+function wochentagName(text) { return WOCHENTAGE[(ausIso(text).getDay() + 6) % 7]; }
+function zahlText(n) { return Number(n || 0).toLocaleString("de-CH"); }
+
+function leistungText(n) {
+  if (n === null || n === undefined) return "";
+  return (n > 0 ? "+" : "") + zahlText(n);
+}
+
+// ---------- Daten ----------
+
+async function ladeParks(auchInaktive) {
+  let a = db.from("machine_parks").select("*").order("sort_order").order("name");
+  if (!auchInaktive) a = a.eq("is_active", true);
+  const { data, error } = await zeitlimit(a, 10000, "Maschinenparks");
+  if (error) throw error;
+  return data || [];
+}
+
+async function ladeMaschinen(auchInaktive) {
+  let a = db.from("machines").select("*").order("sort_order").order("name");
+  if (!auchInaktive) a = a.eq("is_active", true);
+  const { data, error } = await zeitlimit(a, 10000, "Maschinen");
+  if (error) throw error;
+  return data || [];
+}
+
+async function ladeLaufendeAuftraege() {
+  const { data, error } = await zeitlimit(
+    db.from("jobs").select("*").is("ended_at", null), 10000, "Aufträge");
+  if (error) throw error;
+  const karte = {};
+  (data || []).forEach((j) => { karte[j.machine_id] = j; });
+  return karte;
+}
+
+// Holt Einträge im Zeitraum plus etwas Vorlauf, damit die
+// Tagesleistung als Differenz berechnet werden kann.
+async function ladeZaehlerstaende(von, bis, maschinenIds) {
+  if (!maschinenIds.length) return { proSchluessel: {}, proMaschine: {} };
+
+  const { data, error } = await zeitlimit(
+    db.from("production_records")
+      .select("machine_id, record_date, quantity, job_id, updated_at")
+      .gte("record_date", plusTage(von, -120)).lte("record_date", bis)
+      .in("machine_id", maschinenIds)
+      .order("record_date"),
+    12000, "Stückzahlen");
+  if (error) throw error;
+
+  const proMaschine = {};
+  (data || []).forEach((z) => {
+    (proMaschine[z.machine_id] = proMaschine[z.machine_id] || []).push(z);
+  });
+
+  // Tagesleistung = Differenz zum vorherigen Eintrag desselben Auftrags
+  const proSchluessel = {};
+  Object.keys(proMaschine).forEach((mid) => {
+    const liste = proMaschine[mid];
+    liste.forEach((z, i) => {
+      const vorher = i > 0 ? liste[i - 1] : null;
+      z.leistung = (vorher && vorher.job_id === z.job_id)
+        ? z.quantity - vorher.quantity
+        : z.quantity;
+      proSchluessel[mid + "|" + z.record_date] = z;
+    });
+  });
+
+  return { proSchluessel: proSchluessel, proMaschine: proMaschine };
+}
+
+async function speichereStand(maschineId, datum, stand, auftragId) {
+  const { error } = await zeitlimit(
+    db.from("production_records").upsert(
+      { machine_id: maschineId, record_date: datum, quantity: stand, job_id: auftragId },
+      { onConflict: "machine_id,record_date" }),
+    12000, "Speichern");
+  if (error) throw error;
+}
+
+// ---------- Einstieg ----------
+
+async function seiteProduktion(b) {
+  if (!prod.tag) prod.tag = isoDatum(new Date());
+  if (!prod.modus) prod.modus = einstellung("wochestart") ? "woche"
+    : (window.innerWidth < 780 ? "tag" : "woche");
+  if (!prod.vonDatum) {
+    const h = new Date();
+    prod.bisDatum = isoDatum(h);
+    prod.vonDatum = isoDatum(new Date(h.getFullYear(), h.getMonth(), 1));
+  }
+
+  b.innerHTML = '<h1 class="seitentitel">Produktion</h1>'
+    + '<div class="reiter">'
+    + [["erfassen", "Erfassen"], ["uebersicht", "Übersicht"], ["maschinen", "Maschinen"]]
+        .map(([w, t]) => '<button class="reiter__knopf' + (prod.ansicht === w ? " aktiv" : "")
+          + '" data-ansicht="' + w + '">' + t + '</button>').join("")
+    + '</div>'
+    + (darfSchreiben() ? "" : nurLesenHinweis("Du kannst hier alles ansehen, aber nichts ändern."))
+    + '<div id="prod-inhalt"><div class="laedt">Wird geladen …</div></div>';
+
+  b.querySelectorAll("[data-ansicht]").forEach((el) => {
+    el.onclick = () => { prod.ansicht = el.dataset.ansicht; seiteProduktion(b); };
+  });
+
+  const ziel = document.getElementById("prod-inhalt");
+  try {
+    prod.parks = await ladeParks(prod.ansicht === "maschinen");
+    prod.maschinen = await ladeMaschinen(prod.ansicht === "maschinen");
+    prod.auftraege = await ladeLaufendeAuftraege();
+  } catch (f) {
+    ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  if (prod.ansicht === "maschinen") return ansichtMaschinen(ziel, b);
+
+  if (!prod.parks.length) {
+    ziel.innerHTML = '<div class="karte karte--hinweis"><h2>Noch keine Maschinen</h2>'
+      + '<p>Lege zuerst einen Maschinenpark und Maschinen an.</p>'
+      + (darfSchreiben() ? '<button class="knopf knopf--haupt" id="zu-maschinen">Maschinen einrichten</button>' : "")
+      + '</div>';
+    const k = document.getElementById("zu-maschinen");
+    if (k) k.onclick = () => { prod.ansicht = "maschinen"; seiteProduktion(b); };
+    return;
+  }
+
+  if (!prod.parkId || !prod.parks.some((p) => p.id === prod.parkId)) prod.parkId = prod.parks[0].id;
+
+  if (prod.ansicht === "uebersicht") return ansichtUebersicht(ziel, b);
+  return ansichtErfassen(ziel, b);
+}
+
+function parkAuswahl() {
+  if (prod.parks.length < 2) return "";
+  return '<div class="parkwahl">'
+    + prod.parks.map((p) => '<button class="parkwahl__knopf' + (p.id === prod.parkId ? " aktiv" : "")
+        + '" data-park="' + esc(p.id) + '">' + esc(p.name) + '</button>').join("")
+    + '</div>';
+}
+
+function parkAuswahlBinden(b) {
+  document.querySelectorAll("[data-park]").forEach((el) => {
+    el.onclick = () => { prod.parkId = el.dataset.park; seiteProduktion(b); };
+  });
+}
+
+// =================================================================
+//  ERFASSEN
+// =================================================================
+
+async function ansichtErfassen(ziel, b) {
+  const maschinen = prod.maschinen.filter((m) => m.park_id === prod.parkId);
+
+  if (!maschinen.length) {
+    ziel.innerHTML = parkAuswahl()
+      + '<div class="karte karte--hinweis"><p>In diesem Maschinenpark ist noch keine Maschine angelegt.</p></div>';
+    parkAuswahlBinden(b);
+    return;
+  }
+
+  const istWoche = prod.modus === "woche";
+  const tageProWoche = einstellung("wochenende") ? 7 : 5;
+  const von = istWoche ? wochenStart(prod.tag) : prod.tag;
+  const bis = istWoche ? plusTage(von, tageProWoche - 1) : prod.tag;
+
+  ziel.innerHTML = parkAuswahl()
+    + '<div class="steuerung">'
+    + '<button class="knopf knopf--klein" id="zurueck">‹</button>'
+    + '<div class="steuerung__mitte"><div class="steuerung__titel" id="zeitraum"></div>'
+    + '<button class="linkknopf" id="heute">Heute</button></div>'
+    + '<button class="knopf knopf--klein" id="vor">›</button></div>'
+    + '<div class="moduswahl">'
+    + '<button class="moduswahl__knopf' + (!istWoche ? " aktiv" : "") + '" data-modus="tag">Tag</button>'
+    + '<button class="moduswahl__knopf' + (istWoche ? " aktiv" : "") + '" data-modus="woche">Woche</button>'
+    + '</div>'
+    + '<div id="raster"><div class="laedt">Zahlen werden geladen …</div></div>';
+
+  parkAuswahlBinden(b);
+
+  document.getElementById("zeitraum").textContent = istWoche
+    ? "Woche " + kurzDatum(von) + " – " + kurzDatum(bis)
+    : wochentagName(prod.tag) + ", " + kurzDatum(prod.tag) + ausIso(prod.tag).getFullYear();
+
+  document.getElementById("zurueck").onclick = () => {
+    prod.tag = plusTage(prod.tag, istWoche ? -7 : -1); seiteProduktion(b); };
+  document.getElementById("vor").onclick = () => {
+    prod.tag = plusTage(prod.tag, istWoche ? 7 : 1); seiteProduktion(b); };
+  document.getElementById("heute").onclick = () => {
+    prod.tag = isoDatum(new Date()); seiteProduktion(b); };
+  document.querySelectorAll("[data-modus]").forEach((el) => {
+    el.onclick = () => { prod.modus = el.dataset.modus; seiteProduktion(b); };
+  });
+
+  let staende;
+  try {
+    staende = await ladeZaehlerstaende(von, bis, maschinen.map((m) => m.id));
+  } catch (f) {
+    document.getElementById("raster").innerHTML =
+      '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  const raster = document.getElementById("raster");
+  raster.innerHTML = istWoche
+    ? wochenRaster(maschinen, von, tageProWoche, staende)
+    : tagesRaster(maschinen, prod.tag, staende);
+
+  eingabenBinden(raster, staende, b);
+  auftragsKnoepfeBinden(raster, b);
+}
+
+function auftragsZeile(maschine) {
+  const j = prod.auftraege[maschine.id];
+  if (!j) {
+    return '<div class="auftrag auftrag--leer">'
+      + '<span class="auftrag__nr">Kein Auftrag</span>'
+      + (darfSchreiben() ? '<button class="linkknopf" data-auftrag-start="' + esc(maschine.id)
+          + '">Auftrag starten</button>' : "")
+      + '</div>';
+  }
+  return '<div class="auftrag">'
+    + '<span class="auftrag__nr">' + esc(j.job_number) + '</span>'
+    + '<span class="auftrag__seit">seit ' + kurzDatum(isoDatum(new Date(j.started_at))) + '</span>'
+    + (darfSchreiben() ? '<button class="linkknopf" data-auftrag-ende="' + esc(j.id)
+        + '" data-maschine="' + esc(maschine.id) + '">Beenden</button>' : "")
+    + '</div>';
+}
+
+function standFeld(maschine, datum, eintrag) {
+  const j = prod.auftraege[maschine.id];
+  if (!j) return '<div class="kein-feld">–</div>';
+  return '<input class="menge" type="number" inputmode="numeric" min="0" step="1"'
+    + ' data-maschine="' + esc(maschine.id) + '" data-datum="' + datum + '"'
+    + ' data-auftrag="' + esc(j.id) + '"'
+    + (darfSchreiben() ? "" : " disabled")
+    + ' value="' + (eintrag ? eintrag.quantity : "") + '">';
+}
+
+function tagesRaster(maschinen, datum, staende) {
+  const zeilen = maschinen.map((m) => {
+    const e = staende.proSchluessel[m.id + "|" + datum];
+    return '<div class="mkarte">'
+      + '<div class="mkarte__kopf"><div class="mkarte__name">' + esc(m.name)
+      + (m.machine_number ? '<span class="mkarte__nr">' + esc(m.machine_number) + '</span>' : "")
+      + '</div></div>'
+      + auftragsZeile(m)
+      + '<div class="mkarte__eingabe">'
+      + '<div class="mkarte__label">Zählerstand<span>gesamt seit Auftragsbeginn</span></div>'
+      + standFeld(m, datum, e)
+      + '</div>'
+      + '</div>';
+  }).join("");
+
+  return '<div class="mkarten">' + zeilen + '</div>';
+}
+
+function wochenRaster(maschinen, von, anzahl, staende) {
+  const tage = [];
+  for (let i = 0; i < anzahl; i++) tage.push(plusTage(von, i));
+  const heute = isoDatum(new Date());
+
+  const kopf = '<tr><th class="fest">Maschine</th>'
+    + tage.map((t, i) => '<th class="' + (t === heute ? "heute" : "") + '">' + WT_KURZ[i]
+        + '<span class="th__datum">' + kurzDatum(t) + '</span></th>').join("")
+    + '</tr>';
+
+  const zeilen = maschinen.map((m) => {
+    const j = prod.auftraege[m.id];
+
+    const zellen = tage.map((t) => {
+      const e = staende.proSchluessel[m.id + "|" + t];
+      return '<td class="' + (t === heute ? "heute" : "") + '">'
+        + standFeld(m, t, e) + '</td>';
+    }).join("");
+
+    return '<tr><th class="fest">' + esc(m.name)
+      + '<span class="fest__auftrag">' + (j ? esc(j.job_number) : "kein Auftrag") + '</span>'
+      + (j ? '<span class="fest__stand">Stand ' + zahlText(aktuellerStand(m.id, staende))
+             + '</span>' : "")
+      + '</th>' + zellen + '</tr>';
+  }).join("");
+
+  return '<div class="karte karte--raster"><div class="rasterrolle"><table class="raster">'
+    + '<thead>' + kopf + '</thead><tbody>' + zeilen + '</tbody></table></div></div>'
+    + '<p class="hinweis">Die große Zahl ist der Zählerstand seit Auftragsbeginn. '
+    + 'Darunter steht die daraus errechnete Tagesleistung. '
+    + 'Links steht der aktuelle Stand des laufenden Auftrags.</p>';
+}
+
+// Letzter erfasster Zählerstand des laufenden Auftrags
+function aktuellerStand(maschineId, staende) {
+  const j = prod.auftraege[maschineId];
+  if (!j) return 0;
+  const liste = (staende.proMaschine && staende.proMaschine[maschineId]) || [];
+  for (let i = liste.length - 1; i >= 0; i--) {
+    if (liste[i].job_id === j.id) return liste[i].quantity;
+  }
+  return 0;
+}
+
+function eingabenBinden(raster, staende, b) {
+  raster.querySelectorAll(".menge").forEach((el) => {
+    el.addEventListener("focus", () => el.select());
+    el.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); el.blur(); } });
+
+    el.addEventListener("change", async () => {
+      const roh = el.value.trim();
+      if (roh === "") return;
+
+      const stand = Math.max(0, Math.round(Number(roh)));
+      if (!Number.isFinite(stand)) { meldung("Bitte eine Zahl eingeben.", "warn"); return; }
+
+      const schluessel = el.dataset.maschine + "|" + el.dataset.datum;
+      const alt = staende.proSchluessel[schluessel];
+      if (alt && alt.quantity === stand) return;
+
+      el.classList.add("menge--speichert");
+      try {
+        await speichereStand(el.dataset.maschine, el.dataset.datum, stand, el.dataset.auftrag);
+        el.classList.remove("menge--speichert");
+        el.classList.add("menge--gespeichert");
+        setTimeout(() => el.classList.remove("menge--gespeichert"), 900);
+        seiteProduktion(b);   // neu berechnen, damit die Leistungen stimmen
+      } catch (f) {
+        el.classList.remove("menge--speichert");
+        el.classList.add("menge--fehler");
+        el.value = alt ? alt.quantity : "";
+        meldung(fehlertext(f), "fehler");
+      }
+    });
+  });
+}
+
+function auftragsKnoepfeBinden(raster, b) {
+  raster.querySelectorAll("[data-auftrag-start]").forEach((el) => {
+    el.onclick = async () => {
+      const maschine = prod.maschinen.find((m) => m.id === el.dataset.auftragStart);
+      const werte = await dialogFelder({
+        titel: "Auftrag starten",
+        text: maschine ? "Maschine " + maschine.name : "",
+        felder: [
+          { name: "nummer", label: "HOCO Nr.", pflicht: true,
+            platzhalter: "HOCO Nr. eingeben" },
+          { name: "notiz", label: "Notiz", typ: "textarea", platzhalter: "kann leer bleiben" },
+        ],
+        bestaetigen: "Auftrag starten",
+      });
+      if (!werte) return;
+
+      const { error } = await db.from("jobs").insert({
+        machine_id: el.dataset.auftragStart,
+        job_number: werte.nummer,
+        note: werte.notiz || null,
+      });
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Auftrag " + werte.nummer + " gestartet."); seiteProduktion(b); }
+    };
+  });
+
+  raster.querySelectorAll("[data-auftrag-ende]").forEach((el) => {
+    el.onclick = async () => {
+      const j = prod.auftraege[el.dataset.maschine];
+      const ok = await nachfragen({
+        titel: "Auftrag beenden",
+        text: "Auftrag " + (j ? j.job_number : "") + " wird abgeschlossen. "
+            + "Der Zähler beginnt beim nächsten Auftrag wieder bei null. "
+            + "Die erfassten Zahlen bleiben erhalten.",
+        bestaetigen: "Auftrag beenden",
+      });
+      if (!ok) return;
+
+      const { error } = await db.from("jobs")
+        .update({ ended_at: new Date().toISOString(), ended_by: profil.id })
+        .eq("id", el.dataset.auftragEnde);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Auftrag beendet."); seiteProduktion(b); }
+    };
+  });
+}
+
+// =================================================================
+//  ÜBERSICHT
+//  Alle Maschinenparks untereinander, je Maschine die ganze Woche.
+// =================================================================
+
+async function ansichtUebersicht(ziel, b) {
+  const tageProWoche = einstellung("wochenende") ? 7 : 5;
+  const von = wochenStart(prod.tag);
+  const bis = plusTage(von, tageProWoche - 1);
+
+  ziel.innerHTML = '<div class="steuerung">'
+    + '<button class="knopf knopf--klein" id="u-zurueck">‹</button>'
+    + '<div class="steuerung__mitte"><div class="steuerung__titel">Woche '
+    + kurzDatum(von) + ' – ' + kurzDatum(bis) + '</div>'
+    + '<button class="linkknopf" id="u-heute">Heute</button></div>'
+    + '<button class="knopf knopf--klein" id="u-vor">›</button></div>'
+    + '<div id="u-inhalt"><div class="laedt">Zahlen werden geladen …</div></div>';
+
+  document.getElementById("u-zurueck").onclick = () => {
+    prod.tag = plusTage(prod.tag, -7); seiteProduktion(b); };
+  document.getElementById("u-vor").onclick = () => {
+    prod.tag = plusTage(prod.tag, 7); seiteProduktion(b); };
+  document.getElementById("u-heute").onclick = () => {
+    prod.tag = isoDatum(new Date()); seiteProduktion(b); };
+
+  let staende;
+  try {
+    staende = await ladeZaehlerstaende(von, bis, prod.maschinen.map((m) => m.id));
+  } catch (f) {
+    document.getElementById("u-inhalt").innerHTML =
+      '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  const tage = [];
+  for (let i = 0; i < tageProWoche; i++) tage.push(plusTage(von, i));
+  const heute = isoDatum(new Date());
+
+  document.getElementById("u-inhalt").innerHTML = prod.parks.map((park) => {
+    const maschinen = prod.maschinen.filter((m) => m.park_id === park.id);
+    if (!maschinen.length) return "";
+
+    const kopf = '<tr><th class="fest">Maschine</th>'
+      + tage.map((t, i) => '<th class="' + (t === heute ? "heute" : "") + '">' + WT_KURZ[i]
+          + '<span class="th__datum">' + kurzDatum(t) + '</span></th>').join("")
+      + '</tr>';
+
+    const zeilen = maschinen.map((m) => {
+      const j = prod.auftraege[m.id];
+      const zellen = tage.map((t) => {
+        const e = staende.proSchluessel[m.id + "|" + t];
+        return '<td class="' + (t === heute ? "heute" : "") + '">'
+          + '<span class="uzelle__stand">' + (e ? zahlText(e.quantity) : "–") + '</span></td>';
+      }).join("");
+
+      return '<tr><th class="fest">' + esc(m.name)
+        + '<span class="fest__auftrag">' + (j ? esc(j.job_number) : "kein Auftrag") + '</span>'
+        + (j ? '<span class="fest__stand">Stand ' + zahlText(aktuellerStand(m.id, staende))
+               + '</span>' : "")
+        + '</th>' + zellen + '</tr>';
+    }).join("");
+
+    return '<section class="karte karte--raster">'
+      + '<h2 class="raster__titel">' + esc(park.name) + '</h2>'
+      + '<div class="rasterrolle"><table class="raster">'
+      + '<thead>' + kopf + '</thead><tbody>' + zeilen + '</tbody></table></div></section>';
+  }).join("")
+  + '<p class="hinweis">Die Zahlen sind die Zählerstände seit Auftragsbeginn.</p>';
+}
+
+// =================================================================
+//  MASCHINEN VERWALTEN
+// =================================================================
+
+function ansichtMaschinen(ziel, b) {
+  const darf = darfSchreiben();
+
+  ziel.innerHTML = prod.parks.map((p) => {
+    const maschinen = prod.maschinen.filter((m) => m.park_id === p.id);
+    return '<section class="karte' + (p.is_active ? "" : " karte--inaktiv") + '">'
+      + '<div class="karte__kopf"><h2>' + esc(p.name)
+      + (p.is_active ? "" : ' <span class="marke">inaktiv</span>') + '</h2>'
+      + (darf ? '<div class="karte__aktionen">'
+          + '<button class="linkknopf" data-park-um="' + esc(p.id) + '">Umbenennen</button>'
+          + '<button class="linkknopf" data-park-aktiv="' + esc(p.id) + '" data-wert="'
+          + (p.is_active ? "0" : "1") + '">' + (p.is_active ? "Deaktivieren" : "Aktivieren") + '</button>'
+          + '<button class="linkknopf linkknopf--gefahr" data-park-weg="' + esc(p.id) + '">Löschen</button>'
+          + '</div>' : "") + '</div>'
+
+      + (maschinen.length
+        ? '<table class="tabelle"><tbody>' + maschinen.map((m, i) =>
+            '<tr class="' + (m.is_active ? "" : "zeile--inaktiv") + '">'
+            + (darf ? '<td class="sortspalte">'
+                + '<button class="sortknopf" data-hoch="' + esc(m.id) + '"'
+                + (i === 0 ? " disabled" : "") + ' title="nach oben">↑</button>'
+                + '<button class="sortknopf" data-runter="' + esc(m.id) + '"'
+                + (i === maschinen.length - 1 ? " disabled" : "") + ' title="nach unten">↓</button>'
+                + '</td>' : "")
+            + '<td>' + esc(m.name)
+            + (m.machine_number ? ' <span class="klein">' + esc(m.machine_number) + '</span>' : "")
+            + '</td>' + (darf ? '<td class="rechts nowrap">'
+              + '<button class="linkknopf" data-masch-um="' + esc(m.id) + '">Bearbeiten</button> '
+              + '<button class="linkknopf" data-masch-aktiv="' + esc(m.id) + '" data-wert="'
+              + (m.is_active ? "0" : "1") + '">' + (m.is_active ? "Aus" : "Ein") + '</button> '
+              + '<button class="linkknopf linkknopf--gefahr" data-masch-weg="' + esc(m.id) + '">Löschen</button>'
+              + '</td>' : '<td class="rechts klein">' + (m.is_active ? "aktiv" : "inaktiv") + '</td>')
+            + '</tr>').join("") + '</tbody></table>'
+        : '<p class="hinweis">Noch keine Maschine in diesem Park.</p>')
+
+      + (darf ? '<button class="knopf knopf--klein" data-masch-neu="' + esc(p.id) + '">+ Maschine</button>' : "")
+      + '</section>';
+  }).join("")
+  + (darf ? '<button class="knopf knopf--haupt knopf--breit" id="park-neu">+ Maschinenpark</button>' : "");
+
+  if (!darf) return;
+  const neuLaden = () => seiteProduktion(b);
+
+  document.getElementById("park-neu").onclick = async () => {
+    const w = await dialogFelder({ titel: "Neuer Maschinenpark",
+      felder: [{ name: "name", label: "Name", pflicht: true, platzhalter: "z. B. Langdreherpark" }],
+      bestaetigen: "Anlegen" });
+    if (!w) return;
+    const { error } = await db.from("machine_parks").insert({ name: w.name });
+    if (error) meldung(fehlertext(error), "fehler");
+    else { meldung("Maschinenpark angelegt."); neuLaden(); }
+  };
+
+  ziel.querySelectorAll("[data-masch-neu]").forEach((el) => {
+    el.onclick = async () => {
+      const w = await dialogFelder({ titel: "Neue Maschine",
+        felder: [
+          { name: "name", label: "Name", pflicht: true, platzhalter: "z. B. Maschine 01" },
+          { name: "nummer", label: "Maschinennummer", platzhalter: "kann leer bleiben" }],
+        bestaetigen: "Anlegen" });
+      if (!w) return;
+      const { error } = await db.from("machines").insert({
+        park_id: el.dataset.maschNeu, name: w.name, machine_number: w.nummer || null });
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Maschine angelegt."); neuLaden(); }
+    };
+  });
+
+  ziel.querySelectorAll("[data-park-um]").forEach((el) => {
+    el.onclick = async () => {
+      const p = prod.parks.find((x) => x.id === el.dataset.parkUm) || {};
+      const w = await dialogFelder({ titel: "Maschinenpark umbenennen",
+        felder: [{ name: "name", label: "Name", wert: p.name, pflicht: true }] });
+      if (!w || w.name === p.name) return;
+      const { error } = await db.from("machine_parks").update({ name: w.name }).eq("id", p.id);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Umbenannt."); neuLaden(); }
+    };
+  });
+
+  ziel.querySelectorAll("[data-masch-um]").forEach((el) => {
+    el.onclick = async () => {
+      const m = prod.maschinen.find((x) => x.id === el.dataset.maschUm) || {};
+      const w = await dialogFelder({ titel: "Maschine bearbeiten",
+        felder: [
+          { name: "name", label: "Name", wert: m.name, pflicht: true },
+          { name: "nummer", label: "Maschinennummer", wert: m.machine_number || "" }] });
+      if (!w) return;
+      const { error } = await db.from("machines")
+        .update({ name: w.name, machine_number: w.nummer || null }).eq("id", m.id);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Gespeichert."); neuLaden(); }
+    };
+  });
+
+  ziel.querySelectorAll("[data-park-aktiv]").forEach((el) => {
+    el.onclick = async () => {
+      const ein = el.dataset.wert === "1";
+      if (!ein) {
+        const ok = await nachfragen({ titel: "Maschinenpark deaktivieren",
+          text: "Der Park verschwindet aus der Erfassung. Alle Zahlen bleiben erhalten.",
+          bestaetigen: "Deaktivieren", gefahr: true });
+        if (!ok) return;
+      }
+      const { error } = await db.from("machine_parks").update({ is_active: ein }).eq("id", el.dataset.parkAktiv);
+      if (error) meldung(fehlertext(error), "fehler"); else neuLaden();
+    };
+  });
+
+  ziel.querySelectorAll("[data-masch-aktiv]").forEach((el) => {
+    el.onclick = async () => {
+      const ein = el.dataset.wert === "1";
+      if (!ein) {
+        const ok = await nachfragen({ titel: "Maschine deaktivieren",
+          text: "Die Maschine verschwindet aus der Erfassung. Alle Zahlen bleiben erhalten.",
+          bestaetigen: "Deaktivieren", gefahr: true });
+        if (!ok) return;
+      }
+      const { error } = await db.from("machines").update({ is_active: ein }).eq("id", el.dataset.maschAktiv);
+      if (error) meldung(fehlertext(error), "fehler"); else neuLaden();
+    };
+  });
+
+  // ----- Reihenfolge ändern -----
+
+  async function verschieben(maschineId, richtung) {
+    const m = prod.maschinen.find((x) => x.id === maschineId);
+    if (!m) return;
+    const liste = prod.maschinen.filter((x) => x.park_id === m.park_id);
+    const i = liste.findIndex((x) => x.id === maschineId);
+    const j = i + richtung;
+    if (j < 0 || j >= liste.length) return;
+
+    // Tauschen und die ganze Liste neu durchnummerieren
+    liste.splice(j, 0, liste.splice(i, 1)[0]);
+    for (let k = 0; k < liste.length; k++) {
+      const { error } = await db.from("machines").update({ sort_order: k }).eq("id", liste[k].id);
+      if (error) { meldung(fehlertext(error), "fehler"); return; }
+    }
+    neuLaden();
+  }
+
+  ziel.querySelectorAll("[data-hoch]").forEach((el) => {
+    el.onclick = () => verschieben(el.dataset.hoch, -1);
+  });
+  ziel.querySelectorAll("[data-runter]").forEach((el) => {
+    el.onclick = () => verschieben(el.dataset.runter, 1);
+  });
+
+  // ----- Löschen: zwei Rückfragen -----
+
+  ziel.querySelectorAll("[data-park-weg]").forEach((el) => {
+    el.onclick = async () => {
+      const p = prod.parks.find((x) => x.id === el.dataset.parkWeg) || {};
+      const anzahl = prod.maschinen.filter((m) => m.park_id === p.id).length;
+
+      const bestPark = istAdmin()
+        ? await dreiNachfragen(
+            "Maschinenpark löschen",
+            'Park "' + p.name + '"',
+            anzahl > 0 ? "Achtung: " + anzahl + " Maschinen sind noch zugeordnet." : "")
+        : await doppeltNachfragen(
+            { titel: "Maschinenpark löschen",
+              text: 'Soll "' + p.name + '" wirklich gelöscht werden? Deaktivieren wäre sicherer.',
+              bestaetigen: "Weiter zum Löschen", gefahr: true },
+            { titel: "Wirklich endgültig löschen?",
+              text: "Letzte Rückfrage. Danach ist der Park unwiderruflich weg.",
+              bestaetigen: "Endgültig löschen", gefahr: true });
+      const ok = bestPark;
+      if (!ok) return;
+
+      const { error } = await db.from("machine_parks").delete().eq("id", p.id);
+      if (!error) { meldung("Maschinenpark gelöscht."); neuLaden(); return; }
+
+      // Datenbank hat abgelehnt. Administratoren dürfen erzwingen.
+      if (!istAdmin()) { meldung(fehlertext(error), "fehler"); return; }
+
+      const hart = await nachfragen({
+        titel: "Löschen wurde abgelehnt",
+        text: fehlertext(error) + " Als Administrator kannst du trotzdem löschen. "
+            + "Dabei gehen ALLE Maschinen, Stückzahlen, Aufträge und Kontrollmeldungen "
+            + "dieses Parks unwiderruflich verloren.",
+        bestaetigen: "Trotzdem alles löschen", gefahr: true });
+      if (!hart) return;
+
+      const r = await db.rpc("park_hart_loeschen", { p_park_id: p.id });
+      if (r.error) meldung(fehlertext(r.error), "fehler");
+      else { meldung(r.data || "Gelöscht."); neuLaden(); }
+    };
+  });
+
+  ziel.querySelectorAll("[data-masch-weg]").forEach((el) => {
+    el.onclick = async () => {
+      const m = prod.maschinen.find((x) => x.id === el.dataset.maschWeg) || {};
+      const ok = istAdmin()
+        ? await dreiNachfragen("Maschine löschen", '"' + m.name + '"', "")
+        : await doppeltNachfragen(
+            { titel: "Maschine löschen",
+              text: 'Soll "' + m.name + '" wirklich gelöscht werden? Deaktivieren wäre sicherer.',
+              bestaetigen: "Weiter zum Löschen", gefahr: true },
+            { titel: "Wirklich endgültig löschen?",
+              text: "Letzte Rückfrage. Danach ist die Maschine unwiderruflich weg.",
+              bestaetigen: "Endgültig löschen", gefahr: true });
+      if (!ok) return;
+
+      const { error } = await db.from("machines").delete().eq("id", m.id);
+      if (!error) { meldung("Maschine gelöscht."); neuLaden(); return; }
+
+      if (!istAdmin()) { meldung(fehlertext(error), "fehler"); return; }
+
+      const hart = await nachfragen({
+        titel: "Löschen wurde abgelehnt",
+        text: fehlertext(error) + " Als Administrator kannst du trotzdem löschen. "
+            + "Dabei gehen alle Stückzahlen, Aufträge und Kontrollmeldungen dieser "
+            + "Maschine unwiderruflich verloren.",
+        bestaetigen: "Trotzdem alles löschen", gefahr: true });
+      if (!hart) return;
+
+      const r = await db.rpc("maschine_hart_loeschen", { p_machine_id: m.id });
+      if (r.error) meldung(fehlertext(r.error), "fehler");
+      else { meldung(r.data || "Gelöscht."); neuLaden(); }
+    };
+  });
+}
+
+// =================================================================
+//  KONTROLLE
+// =================================================================
+
+async function seiteKontrolle(b) {
+  b.innerHTML = '<h1 class="seitentitel">Kontrolle</h1>'
+    + (darfKontrolle() ? "" : nurLesenHinweis(
+        "Du kannst Meldungen ansehen und quittieren. Erfassen dürfen nur Benutzer mit der Rolle Kontrolle."))
+    + '<div id="k-inhalt"><div class="laedt">Wird geladen …</div></div>';
+
+  const ziel = document.getElementById("k-inhalt");
+  let auftraege = [], meldungen = [];
+
+  try {
+    const a = await zeitlimit(db.from("laufende_auftraege").select("*").order("maschine"),
+      10000, "Aufträge");
+    if (a.error) throw a.error;
+    auftraege = a.data || [];
+
+    const m = await zeitlimit(db.from("kontrolle_lesbar").select("*")
+      .is("acknowledged_at", null)
+      .order("created_at", { ascending: false }).limit(50), 10000, "Meldungen");
+    if (!m.error) meldungen = m.data || [];
+  } catch (f) {
+    ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  ziel.innerHTML = '<section class="karte"><h2>Laufende Aufträge</h2>'
+    + (auftraege.length
+      ? auftraege.map((j) => '<div class="kzeile">'
+          + '<div class="kzeile__oben"><span class="kzeile__nr">' + esc(j.job_number) + '</span>'
+          + '<span class="kzeile__maschine">' + esc(j.maschine)
+          + (j.maschine_nr ? ' · ' + esc(j.maschine_nr) : "") + '</span></div>'
+          + '<div class="kzeile__unten">'
+          + '<span>Stand ' + zahlText(j.stand) + '</span>'
+          + (j.ausschuss > 0
+              ? '<span class="kzeile__ausschuss">offen ' + zahlText(j.ausschuss) + '</span>' : "")
+          + (darfKontrolle() ? '<button class="knopf knopf--klein" data-melden="' + esc(j.id)
+              + '" data-nr="' + esc(j.job_number) + '">Ausschuss melden</button>' : "")
+          + '</div></div>').join("")
+      : '<p class="hinweis">Zurzeit läuft kein Auftrag.</p>')
+    + '</section>'
+
+    + '<section class="karte"><h2>Offene Meldungen'
+    + (meldungen.length ? ' <span class="marke">' + meldungen.length + '</span>' : "")
+    + '</h2>'
+    + (meldungen.length
+      ? '<table class="tabelle tabelle--meldungen"><thead><tr>'
+        + '<th>Wann</th><th>Auftrag</th><th class="mitte">Ausschuss</th><th>Wer</th>'
+        + (darfSchreiben() ? '<th></th>' : "")
+        + '</tr></thead><tbody>'
+        + meldungen.map((m) => '<tr>'
+            + '<td class="klein">' + esc(datumZeitKurz(m.created_at)) + '</td>'
+            + '<td>' + esc(m.job_number) + '<span class="klein"> ' + esc(m.maschine)
+            + (m.maschine_nr ? ' · ' + esc(m.maschine_nr) : "") + '</span>'
+            + (m.note ? '<div class="knotiz">' + esc(m.note) + '</div>' : "") + '</td>'
+            + '<td class="mitte stark">' + zahlText(m.scrap_count) + '</td>'
+            + '<td class="klein">' + esc(m.benutzer_name || m.benutzer_email || "") + '</td>'
+            + (darfSchreiben()
+                ? '<td class="rechts nowrap"><button class="linkknopf" data-quit="' + esc(m.id)
+                  + '">Quittieren</button>'
+                  + (istAdmin() ? ' <button class="linkknopf linkknopf--gefahr" data-kweg="'
+                      + esc(m.id) + '">Löschen</button>' : "")
+                  + '</td>' : "")
+            + '</tr>').join("")
+        + '</tbody></table>'
+        + '<p class="hinweis">Quittieren heisst: gesehen und erledigt. '
+        + 'Die Meldung verschwindet aus der Liste.</p>'
+      : '<p class="hinweis">Keine offenen Meldungen.</p>')
+    + '</section>';
+
+  ziel.querySelectorAll("[data-melden]").forEach((el) => {
+    el.onclick = async () => {
+      const w = await dialogFelder({
+        titel: "Ausschuss melden",
+        text: "Auftrag " + el.dataset.nr,
+        felder: [
+          { name: "anzahl", label: "Anzahl Ausschussteile", typ: "number", pflicht: true },
+          { name: "notiz", label: "Was war nicht in Ordnung?", typ: "textarea",
+            platzhalter: "z. B. Durchmesser zu gross, Grat an der Stirnseite" },
+        ],
+        bestaetigen: "Melden",
+      });
+      if (!w) return;
+
+      const { error } = await db.from("quality_reports").insert({
+        job_id: el.dataset.melden,
+        scrap_count: Math.max(0, Math.round(w.anzahl)),
+        note: w.notiz || null,
+      });
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Meldung erfasst."); seiteKontrolle(b); }
+    };
+  });
+
+  ziel.querySelectorAll("[data-kweg]").forEach((el) => {
+    el.onclick = async () => {
+      const w = await loeschen({ tabelle: "quality_reports", id: el.dataset.kweg,
+        titel: "Meldung löschen",
+        text: "Die Meldung wird endgültig entfernt. Quittieren wäre der übliche Weg, "
+            + "dann bleibt sie nachvollziehbar." });
+      if (w) seiteKontrolle(b);
+    };
+  });
+
+  ziel.querySelectorAll("[data-kweg]").forEach((el) => {
+    el.onclick = async () => {
+      const ok = await doppeltNachfragen(
+        { titel: "Meldung löschen",
+          text: "Soll diese Kontrollmeldung wirklich gelöscht werden? "
+              + "Quittieren reicht meistens aus.",
+          bestaetigen: "Weiter zum Löschen", gefahr: true },
+        { titel: "Wirklich endgültig löschen?",
+          text: "Letzte Rückfrage. Danach ist die Meldung weg.",
+          bestaetigen: "Endgültig löschen", gefahr: true });
+      if (!ok) return;
+      const { error } = await db.from("quality_reports").delete().eq("id", el.dataset.kweg);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Meldung gelöscht."); seiteKontrolle(b); }
+    };
+  });
+
+  ziel.querySelectorAll("[data-quit]").forEach((el) => {
+    el.onclick = async () => {
+      const ok = await nachfragen({
+        titel: "Meldung quittieren?",
+        text: "Auftrag " + (el.dataset.qnr || "") + " · " + (el.dataset.qanz || "0")
+            + " Ausschussteile. Die Meldung verschwindet danach aus der Liste.",
+        bestaetigen: "Ja, quittieren" });
+      if (!ok) return;
+
+      const { error } = await db.from("quality_reports").update({
+        acknowledged_at: new Date().toISOString(),
+        acknowledged_by: profil.id,
+      }).eq("id", el.dataset.quit);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Quittiert."); seiteKontrolle(b); }
+    };
+  });
+}
+
+function datumZeitKurz(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const p = (n) => String(n).padStart(2, "0");
+  return p(d.getDate()) + "." + p(d.getMonth() + 1) + ". " + p(d.getHours()) + ":" + p(d.getMinutes());
+}
+
+// =================================================================
+//  ERFASSEN MIT DER KAMERA
+//
+//  Zwei Wege:
+//   1. Barcode      – falls ein Code vorhanden ist
+//   2. Foto + Text  – Bild aufnehmen, Rahmen über die Nummer ziehen,
+//                     die App liest den Text aus
+//
+//  Gibt die erkannte Nummer als Text zurück, oder null bei Abbruch.
+// =================================================================
+
+let ocrArbeiter = null;   // wird nur einmal geladen und dann behalten
+
+async function scannen(startModus) {
+  const huelle = document.createElement("div");
+  huelle.className = "dialog-huelle";
+  huelle.innerHTML = '<div class="scanner">'
+    + '<div class="scanner__modus">'
+    + '<button class="scanner__tab" data-modus="foto">Foto</button>'
+    + '<button class="scanner__tab" data-modus="barcode">Barcode</button>'
+    + '</div>'
+    + '<div class="scanner__buehne">'
+    + '<video id="scan-video" playsinline muted></video>'
+    + '<canvas id="scan-bild" hidden></canvas>'
+    + '<div class="scanner__rahmen" id="scan-rahmen" hidden></div>'
+    + '<div class="scanner__auswahl" id="scan-auswahl" hidden></div>'
+    + '<button id="scan-gross" class="scan-gross" hidden>📷 Foto aufnehmen</button>'
+    + '</div>'
+    + '<div class="scanner__vorschlaege" id="scan-vorschlaege" hidden></div>'
+    + '<div class="scanner__leiste">'
+    + '<div id="scan-text">Kamera wird gestartet …</div>'
+    + '<div class="scanner__knoepfe">'
+    + '<button class="knopf knopf--still" id="scan-zu">Abbrechen</button>'
+    + '<button class="knopf knopf--haupt" id="scan-tun" hidden>Weiter</button>'
+    + '</div></div></div>';
+  document.body.appendChild(huelle);
+
+  const video   = document.getElementById("scan-video");
+  const leinwand = document.getElementById("scan-bild");
+  const rahmen  = document.getElementById("scan-rahmen");
+  const auswahl = document.getElementById("scan-auswahl");
+  const text    = document.getElementById("scan-text");
+  const tun     = document.getElementById("scan-tun");
+  const vorschlaege = document.getElementById("scan-vorschlaege");
+
+  let strom = null, laeuft = true, steuerung = null;
+  let modus = startModus || "foto";
+  let bildAufgenommen = false;
+  let zustand = "aufnehmen";
+
+  return new Promise(async (fertig) => {
+
+    const beenden = (ergebnis) => {
+      laeuft = false;
+      if (steuerung && steuerung.stop) { try { steuerung.stop(); } catch (e) {} }
+      if (strom) strom.getTracks().forEach((t) => t.stop());
+      huelle.remove();
+      fertig(ergebnis);
+    };
+
+    document.getElementById("scan-zu").onclick = () => beenden(null);
+    huelle.onclick = (e) => { if (e.target === huelle) beenden(null); };
+
+    // ---------- Kamera starten ----------
+    try {
+      strom = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment", width: { ideal: 1920 } }, audio: false });
+      video.srcObject = strom;
+      await video.play();
+    } catch (f) {
+      text.textContent = "Kamera nicht verfügbar: " + f.message;
+      setTimeout(() => beenden(null), 3000);
+      return;
+    }
+
+    // ---------- Umschalten ----------
+    const modusSetzen = (neu) => {
+      modus = neu;
+      bildAufgenommen = false;
+      leinwand.hidden = true;
+      video.hidden = false;
+      auswahl.hidden = true;
+      vorschlaege.hidden = true;
+      vorschlaege.innerHTML = "";
+
+      huelle.querySelectorAll("[data-modus]").forEach((t) => {
+        t.classList.toggle("aktiv", t.dataset.modus === neu);
+      });
+
+      if (neu === "foto") {
+        rahmen.hidden = true;
+        tun.hidden = true;
+        zustand = "aufnehmen";
+        gross.hidden = false;
+        text.textContent = "Nummer ins Bild bringen, dann Knopf drücken";
+      } else {
+        rahmen.hidden = false;
+        tun.hidden = true;
+        text.textContent = "Barcode vor die Kamera halten";
+        barcodeSuchen();
+      }
+    };
+
+    huelle.querySelectorAll("[data-modus]").forEach((t) => {
+      t.onclick = () => modusSetzen(t.dataset.modus);
+    });
+
+    // ---------- Weg 1: Barcode ----------
+    async function barcodeSuchen() {
+      if ("BarcodeDetector" in window) {
+        try {
+          const erkenner = new window.BarcodeDetector();
+          const schleife = async () => {
+            if (!laeuft || modus !== "barcode") return;
+            try {
+              const treffer = await erkenner.detect(video);
+              if (treffer && treffer.length) return beenden(treffer[0].rawValue);
+            } catch (e) { /* einzelne Bilder dürfen misslingen */ }
+            requestAnimationFrame(schleife);
+          };
+          schleife();
+          return;
+        } catch (e) { /* weiter unten */ }
+      }
+
+      try {
+        text.textContent = "Scanner wird geladen …";
+        const zx = await zeitlimit(
+          import("https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/+esm"), 10000, "Scanner");
+        const leser = new zx.BrowserMultiFormatReader();
+        text.textContent = "Barcode vor die Kamera halten";
+        steuerung = await leser.decodeFromVideoElement(video, (erg) => {
+          if (erg && laeuft && modus === "barcode") beenden(erg.getText());
+        });
+      } catch (f) {
+        text.textContent = "Barcode-Erkennung nicht möglich. Bitte den Foto-Weg nehmen.";
+      }
+    }
+
+    // ---------- Weg 2: Foto und Text ----------
+
+    let start = null, kasten = null;
+
+    const punkt = (e) => {
+      const r = leinwand.getBoundingClientRect();
+      const q = e.touches ? e.touches[0] : e;
+      return { x: q.clientX - r.left, y: q.clientY - r.top };
+    };
+
+    const zeichneAuswahl = () => {
+      if (!kasten) { auswahl.hidden = true; return; }
+      auswahl.hidden = false;
+      auswahl.style.left = kasten.x + "px";
+      auswahl.style.top = kasten.y + "px";
+      auswahl.style.width = kasten.w + "px";
+      auswahl.style.height = kasten.h + "px";
+    };
+
+    const beginnen = (e) => {
+      if (!bildAufgenommen) return;
+      e.preventDefault();
+      start = punkt(e);
+      kasten = { x: start.x, y: start.y, w: 0, h: 0 };
+      zeichneAuswahl();
+    };
+
+    const ziehen = (e) => {
+      if (!start) return;
+      e.preventDefault();
+      const p = punkt(e);
+      kasten = {
+        x: Math.min(start.x, p.x), y: Math.min(start.y, p.y),
+        w: Math.abs(p.x - start.x), h: Math.abs(p.y - start.y),
+      };
+      zeichneAuswahl();
+    };
+
+    const loslassen = () => {
+      if (!start) return;
+      start = null;
+      if (kasten && kasten.w > 20 && kasten.h > 12) {
+        tun.hidden = false;
+        gross.hidden = true;
+        zustand = "erkennen";
+        tun.textContent = "Text erkennen";
+        text.textContent = "Rahmen passt? Dann auf Text erkennen";
+      }
+    };
+
+    leinwand.addEventListener("mousedown", beginnen);
+    leinwand.addEventListener("touchstart", beginnen, { passive: false });
+    window.addEventListener("mousemove", ziehen);
+    window.addEventListener("touchmove", ziehen, { passive: false });
+    window.addEventListener("mouseup", loslassen);
+    window.addEventListener("touchend", loslassen);
+
+    const fotoAufnehmen = () => {
+      // Wenn das Videobild noch keine Grösse hat, entsteht ein leeres
+      // Foto. Dann kurz warten und erneut versuchen.
+      if (!video.videoWidth || !video.videoHeight) {
+        text.textContent = "Kamera ist noch nicht bereit, einen Moment …";
+        setTimeout(fotoAufnehmen, 400);
+        return;
+      }
+
+      leinwand.width = video.videoWidth;
+      leinwand.height = video.videoHeight;
+      leinwand.getContext("2d").drawImage(video, 0, 0, leinwand.width, leinwand.height);
+      leinwand.hidden = false;
+      video.hidden = true;
+      bildAufgenommen = true;
+      kasten = null;
+      auswahl.hidden = true;
+      gross.hidden = true;
+      tun.hidden = true;
+      text.textContent = "Rahmen über die Artikelnummer ziehen";
+    };
+
+    const textErkennen = async () => {
+      if (!kasten) return;
+
+      // Vom angezeigten Bild auf die echte Bildgrösse umrechnen
+      const faktor = leinwand.width / leinwand.clientWidth;
+      const ausschnitt = document.createElement("canvas");
+      const breite = Math.round(kasten.w * faktor);
+      const hoehe = Math.round(kasten.h * faktor);
+
+      // Auf das Dreifache vergrössern, das hilft der Erkennung deutlich
+      const massstab = 3;
+      ausschnitt.width = breite * massstab;
+      ausschnitt.height = hoehe * massstab;
+      const ctx = ausschnitt.getContext("2d");
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(leinwand, Math.round(kasten.x * faktor), Math.round(kasten.y * faktor),
+        breite, hoehe, 0, 0, ausschnitt.width, ausschnitt.height);
+
+      // In Graustufen umwandeln und den Kontrast anheben
+      const bild = ctx.getImageData(0, 0, ausschnitt.width, ausschnitt.height);
+      const d = bild.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const g = 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2];
+        const v = g < 110 ? 0 : g > 165 ? 255 : (g - 110) * 255 / 55;
+        d[i] = d[i + 1] = d[i + 2] = v;
+      }
+      ctx.putImageData(bild, 0, 0);
+
+      tun.hidden = true;
+      text.textContent = "Text wird gelesen … das kann beim ersten Mal etwas dauern";
+
+      try {
+        if (!ocrArbeiter) {
+          const T = await zeitlimit(
+            import("https://cdn.jsdelivr.net/npm/tesseract.js@5/+esm"), 20000, "Texterkennung");
+          ocrArbeiter = await T.createWorker("eng");
+          await ocrArbeiter.setParameters({
+            tessedit_char_whitelist:
+              "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-./ ",
+          });
+        }
+
+        const { data } = await ocrArbeiter.recognize(ausschnitt);
+        const kandidaten = kandidatenAus(data);
+
+        text.textContent = kandidaten.length
+          ? "Stimmt die Nummer? Sonst hier anpassen."
+          : "Nichts erkannt. Bitte von Hand eingeben.";
+
+        vorschlaege.hidden = false;
+        vorschlaege.innerHTML = ''
+          + '<div class="vorschlag__eingabe">'
+          + '<input type="text" id="scan-eingabe" value="' + esc(kandidaten[0] || "") + '"'
+          + ' placeholder="Artikelnummer" autocomplete="off" spellcheck="false">'
+          + '<button class="knopf knopf--haupt" id="scan-ok">Übernehmen</button>'
+          + '</div>'
+          + (kandidaten.length > 1
+            ? '<div class="vorschlag__liste">' + kandidaten.slice(1).map((k) =>
+                '<button class="vorschlag" data-wert="' + esc(k) + '">' + esc(k) + '</button>'
+              ).join("") + '</div>'
+            : "");
+
+        const eingabe = document.getElementById("scan-eingabe");
+        eingabe.focus();
+        eingabe.select();
+
+        const uebernehmen = () => {
+          const w = eingabe.value.trim();
+          if (w) beenden(w);
+        };
+        document.getElementById("scan-ok").onclick = uebernehmen;
+        eingabe.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); uebernehmen(); } };
+
+        // Ein Vorschlag füllt das Feld, damit er noch angepasst werden kann
+        vorschlaege.querySelectorAll("[data-wert]").forEach((el) => {
+          el.onclick = () => { eingabe.value = el.dataset.wert; eingabe.focus(); };
+        });
+
+        zeigeNeuKnopf();
+
+      } catch (f) {
+        text.textContent = "Texterkennung nicht möglich: " + f.message;
+        zeigeNeuKnopf();
+      }
+    };
+
+    const neuesFoto = () => {
+      vorschlaege.hidden = true;
+      vorschlaege.innerHTML = "";
+      video.hidden = false;
+      leinwand.hidden = true;
+      bildAufgenommen = false;
+      auswahl.hidden = true;
+      kasten = null;
+      zustand = "aufnehmen";
+      gross.hidden = false;
+      tun.hidden = true;
+      text.textContent = "Nummer ins Bild bringen, dann Knopf drücken";
+    };
+
+    const zeigeNeuKnopf = () => {
+      zustand = "neu";
+      tun.hidden = false;
+      tun.textContent = "Neues Foto";
+      gross.hidden = true;
+    };
+
+    // Ein einziger Knopf, der je nach Zustand etwas anderes tut.
+    const knopfDruck = () => {
+      if (zustand === "neu") return neuesFoto();
+      if (!bildAufgenommen) return fotoAufnehmen();
+      return textErkennen();
+    };
+
+    tun.onclick = knopfDruck;
+    tun.addEventListener("touchend", (e) => { e.preventDefault(); knopfDruck(); });
+
+    const gross = document.getElementById("scan-gross");
+    gross.onclick = fotoAufnehmen;
+    gross.addEventListener("touchend", (e) => { e.preventDefault(); fotoAufnehmen(); });
+
+    modusSetzen(modus);
+  });
+}
+
+// Aus dem erkannten Text mögliche Artikelnummern herausziehen.
+// Es ist alles erlaubt: nur Buchstaben, nur Zahlen, mit Punkt,
+// Bindestrich oder Leerzeichen. Bewertet wird nach dem Muster,
+// die wahrscheinlichste Nummer steht oben.
+function kandidatenAus(data) {
+  const roh = (data && data.text) || "";
+  const gefunden = [];
+
+  // Artikelnummern können alles sein: nur Buchstaben, nur Zahlen,
+  // mit Punkt, Bindestrich oder Leerzeichen. Deshalb wird hier
+  // nichts weggefiltert ausser offensichtlichem Unsinn.
+  const aufnehmen = (t, behalteLeerzeichen) => {
+    let x = (t || "").trim();
+    if (!behalteLeerzeichen) x = x.replace(/\s+/g, "");
+    else x = x.replace(/\s+/g, " ");
+    x = x.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, "");   // Ränder säubern
+    if (x.length < 2 || x.length > 40) return;
+    if (!/[A-Za-z0-9]/.test(x)) return;
+    const gross = x.toUpperCase();
+    if (!gefunden.includes(gross)) gefunden.push(gross);
+  };
+
+  // Ganze Zeilen zuerst (mit Leerzeichen), dann einzelne Wörter
+  roh.split("\n").forEach((z) => aufnehmen(z, true));
+  roh.split(/[\s,;|]+/).forEach((w) => aufnehmen(w, false));
+
+  return gefunden.slice(0, 8);
+}
+
+// =================================================================
+//  LAGER
+// =================================================================
+
+const lag = {
+  ansicht: "suche",
+  suchtext: "",
+  treffer: null,
+  artikel: null,
+};
+
+const BEWEGUNGSARTEN = {
+  eingang: "Eingang",
+  entnahme: "Entnahme",
+  umlagerung: "Umlagerung",
+  korrektur: "Korrektur",
+  inventur: "Inventur",
+};
+
+async function ladeLagerplaetze() {
+  const { data, error } = await zeitlimit(
+    db.from("storage_locations").select("*").eq("is_active", true).order("code"),
+    10000, "Lagerplätze");
+  if (error) throw error;
+  return data || [];
+}
+
+async function ladeLieferanten() {
+  const { data, error } = await zeitlimit(
+    db.from("suppliers").select("*").eq("is_active", true).order("name"),
+    10000, "Lieferanten");
+  if (error) throw error;
+  return data || [];
+}
+
+async function sucheArtikel(text) {
+  const t = (text || "").trim();
+  let abfrage = db.from("artikel_uebersicht").select("*").eq("is_active", true);
+  if (t) {
+    abfrage = abfrage.or("article_number.ilike.%" + t + "%,name.ilike.%" + t
+      + "%,supplier_name.ilike.%" + t + "%");
+  }
+  const { data, error } = await zeitlimit(abfrage.order("article_number").limit(50),
+    12000, "Artikelsuche");
+  if (error) throw error;
+  return data || [];
+}
+
+async function ladeBestandJeArtikel(artikelId) {
+  const { data, error } = await zeitlimit(
+    db.from("bestand_je_platz").select("*").eq("article_id", artikelId).order("lagerplatz"),
+    10000, "Bestand");
+  if (error) throw error;
+  return data || [];
+}
+
+async function ladeBewegungen(filter) {
+  let a = db.from("bewegungen_lesbar").select("*")
+    .order("created_at", { ascending: false }).limit(30);
+  if (filter && filter.artikel) a = a.eq("article_id", filter.artikel);
+  if (filter && filter.platz) a = a.eq("location_id", filter.platz);
+  const { data, error } = await zeitlimit(a, 10000, "Bewegungen");
+  if (error) throw error;
+  return data || [];
+}
+
+async function bucheBewegung(eintrag) {
+  const { error } = await zeitlimit(db.from("stock_movements").insert(eintrag),
+    12000, "Buchung");
+  if (error) throw error;
+}
+
+// ---------- Seite ----------
+
+async function seiteLager(b) {
+  b.innerHTML = '<h1 class="seitentitel">Lager</h1>'
+    + '<div class="reiter">'
+    + [["suche", "Suche"], ["bewegungen", "Bewegungen"],
+       ["artikel", "Artikel"], ["plaetze", "Lagerplätze"]]
+      .map(([w, t]) => '<button class="reiter__knopf' + (lag.ansicht === w ? " aktiv" : "")
+        + '" data-lager="' + w + '">' + t + '</button>').join("")
+    + '</div>'
+    + (darfSchreiben() ? "" : nurLesenHinweis("Du kannst hier alles ansehen, aber nichts buchen."))
+    + '<div id="lag-inhalt"></div>';
+
+  b.querySelectorAll("[data-lager]").forEach((el) => {
+    el.onclick = () => { lag.ansicht = el.dataset.lager; seiteLager(b); };
+  });
+
+  const ziel = document.getElementById("lag-inhalt");
+  if (lag.ansicht === "bewegungen") return lagerBewegungen(ziel, b);
+  if (lag.ansicht === "artikel") return lagerArtikel(ziel, b);
+  if (lag.ansicht === "plaetze") return lagerPlaetze(ziel, b);
+  return lagerSuche(ziel, b);
+}
+
+// ---------- Suche ----------
+
+async function lagerSuche(ziel, b) {
+  ziel.innerHTML = '<div class="suchleiste">'
+    + '<input type="text" id="l-such" placeholder="Artikelnummer, Name oder Lieferant"'
+    + ' value="' + esc(lag.suchtext) + '" autocomplete="off">'
+    + '<button class="knopf knopf--scan" id="l-scan" title="Mit der Kamera erfassen">Kamera</button>'
+    + '</div>'
+    + '<div id="l-treffer"><div class="laedt">Wird gesucht …</div></div>';
+
+  const feld = document.getElementById("l-such");
+  let taste = null;
+  feld.oninput = () => {
+    lag.suchtext = feld.value;
+    clearTimeout(taste);
+    taste = setTimeout(() => trefferZeichnen(b), 300);
+  };
+  feld.onkeydown = (e) => { if (e.key === "Enter") { clearTimeout(taste); trefferZeichnen(b); } };
+  feld.focus();
+
+  document.getElementById("l-scan").onclick = async () => {
+    const code = await scannen();
+    if (!code) return;
+    lag.suchtext = code;
+    feld.value = code;
+    trefferZeichnen(b);
+  };
+
+  trefferZeichnen(b);
+}
+
+async function trefferZeichnen(b) {
+  const kasten = document.getElementById("l-treffer");
+  if (!kasten) return;
+  kasten.innerHTML = '<div class="laedt">Wird gesucht …</div>';
+
+  let liste;
+  try { liste = await sucheArtikel(lag.suchtext); }
+  catch (f) {
+    kasten.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  if (!liste.length) {
+    kasten.innerHTML = '<div class="karte karte--hinweis">'
+      + '<p>Kein Artikel gefunden' + (lag.suchtext ? ' für "' + esc(lag.suchtext) + '"' : "") + '.</p>'
+      + (darfSchreiben() ? '<button class="knopf" id="l-neu-hier">Artikel anlegen</button>' : "")
+      + '</div>';
+    const k = document.getElementById("l-neu-hier");
+    if (k) k.onclick = () => artikelDialog(null, b, lag.suchtext);
+    return;
+  }
+
+  // Ein einziger Treffer: gleich die Details zeigen
+  if (liste.length === 1) return artikelDetail(kasten, liste[0], b);
+
+  kasten.innerHTML = '<div class="trefferliste">' + liste.map((a) =>
+    '<button class="treffer" data-artikel="' + esc(a.id) + '">'
+    + '<div class="treffer__kopf"><span class="treffer__nr">' + esc(a.article_number) + '</span>'
+    + '<span class="treffer__bestand">'
+    + zahlText(a.gesamtbestand) + ' ' + esc(a.unit) + '</span></div>'
+    + '<div class="treffer__name">' + esc(a.name) + '</div>'
+    + (a.supplier_name ? '<div class="treffer__lief">' + esc(a.supplier_name) + '</div>' : "")
+    + '</button>').join("") + '</div>';
+
+  kasten.querySelectorAll("[data-artikel]").forEach((el) => {
+    el.onclick = () => {
+      const a = liste.find((x) => x.id === el.dataset.artikel);
+      artikelDetail(kasten, a, b);
+    };
+  });
+}
+
+async function artikelDetail(kasten, artikel, b) {
+  kasten.innerHTML = '<div class="laedt">Bestand wird geladen …</div>';
+
+  let plaetze = [], bewegungen = [];
+  try {
+    plaetze = await ladeBestandJeArtikel(artikel.id);
+    bewegungen = await ladeBewegungen({ artikel: artikel.id });
+  } catch (f) {
+    kasten.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  const darf = darfSchreiben();
+
+  kasten.innerHTML = '<section class="karte artikelkarte">'
+    + '<div class="artikel__kopf">'
+    + '<div><div class="artikel__nr">' + esc(artikel.article_number) + '</div>'
+    + '<div class="artikel__name">' + esc(artikel.name) + '</div>'
+    + (artikel.supplier_name
+        ? '<div class="artikel__lief">Lieferant: ' + esc(artikel.supplier_name) + '</div>' : "")
+    + '</div>'
+    + '<div class="artikel__gesamt">'
+    + zahlText(artikel.gesamtbestand) + '<span>' + esc(artikel.unit) + '</span></div>'
+    + '</div>'
+
+    + '<h3 class="untertitel">Lagerplätze</h3>'
+    + (plaetze.length
+      ? '<table class="tabelle"><tbody>' + plaetze.map((p) =>
+          '<tr><td class="platzcode">' + esc(p.lagerplatz) + '</td>'
+          + '<td class="rechts stark">' + zahlText(p.quantity) + '</td></tr>').join("")
+        + '</tbody></table>'
+      : '<p class="hinweis">Dieser Artikel liegt noch auf keinem Lagerplatz.</p>')
+
+    + (darf ? '<div class="aktionen">'
+        + '<button class="knopf knopf--haupt" data-tun="entnahme">Entnahme</button>'
+        + '<button class="knopf" data-tun="eingang">Wareneingang</button>'
+        + '</div>' : "")
+
+    + '<h3 class="untertitel">Letzte Bewegungen</h3>'
+    + (bewegungen.length
+      ? '<table class="tabelle"><tbody>' + bewegungen.slice(0, 10).map((m) =>
+          '<tr><td class="klein">' + esc(datumZeitKurz(m.created_at)) + '</td>'
+          + '<td>' + esc(BEWEGUNGSARTEN[m.movement_type] || m.movement_type)
+          + '<span class="klein"> ' + esc(m.lagerplatz) + '</span></td>'
+          + '<td class="rechts stark ' + (m.quantity < 0 ? "minus" : "plus") + '">'
+          + leistungText(m.quantity) + '</td>'
+          + '<td class="klein">' + esc(m.benutzer_name || "") + '</td></tr>').join("")
+        + '</tbody></table>'
+      : '<p class="hinweis">Noch keine Bewegungen.</p>')
+
+    + '<div class="karte__fuss">'
+    + '<button class="linkknopf" id="l-zurueck">Zurück zur Suche</button>'
+    + (darf ? ' <button class="linkknopf" id="l-bearbeiten">Artikel bearbeiten</button>' : "")
+    + '</div></section>';
+
+  document.getElementById("l-zurueck").onclick = () => trefferZeichnen(b);
+  const bear = document.getElementById("l-bearbeiten");
+  if (bear) bear.onclick = () => artikelDialog(artikel, b);
+
+  kasten.querySelectorAll("[data-tun]").forEach((el) => {
+    el.onclick = () => buchungsDialog(el.dataset.tun, artikel, plaetze, b);
+  });
+}
+
+// ---------- Buchungen ----------
+
+async function buchungsDialog(art, artikel, plaetze, b) {
+  let alle;
+  try { alle = await ladeLagerplaetze(); }
+  catch (f) { meldung(fehlertext(f), "fehler"); return; }
+
+  if (!alle.length) {
+    meldung("Lege zuerst einen Lagerplatz an.", "warn");
+    return;
+  }
+
+  const belegte = plaetze.map((p) => ({ id: p.location_id, code: p.lagerplatz, menge: p.quantity }));
+
+  const auswahl = (name, label, liste, hinweis) =>
+    '<label class="feld"><span>' + label + '</span>'
+    + '<select id="df-' + name + '">'
+    + liste.map((p) => '<option value="' + esc(p.id) + '">' + esc(p.code)
+        + (p.menge !== undefined ? " (" + zahlText(p.menge) + ")" : "") + '</option>').join("")
+    + '</select>'
+    + (hinweis ? '<span class="feldhinweis">' + esc(hinweis) + '</span>' : "")
+    + '</label>';
+
+  const titel = { entnahme: "Entnahme", eingang: "Wareneingang",
+                  umlagerung: "Umlagern", korrektur: "Bestand korrigieren" }[art];
+
+  const huelle = document.createElement("div");
+  huelle.className = "dialog-huelle";
+  huelle.innerHTML = '<div class="dialog">'
+    + '<h2>' + titel + '</h2>'
+    + '<p>' + esc(artikel.article_number) + ' · ' + esc(artikel.name) + '</p>'
+    + '<form id="bd-form">'
+    + (art === "entnahme"
+        ? auswahl("von", "Von welchem Lagerplatz", belegte.length ? belegte : alle)
+      : art === "eingang"
+        ? auswahl("nach", "Auf welchen Lagerplatz", alle)
+      : art === "umlagerung"
+        ? auswahl("von", "Von", belegte.length ? belegte : alle) + auswahl("nach", "Nach", alle)
+        : auswahl("von", "Welcher Lagerplatz", belegte.length ? belegte : alle))
+    + '<label class="feld"><span>'
+    + (art === "korrektur" ? "Tatsächlicher Bestand" : "Menge") + '</span>'
+    + '<input id="df-menge" type="number" inputmode="numeric" min="0" step="1">'
+    + (art === "korrektur"
+        ? '<span class="feldhinweis">Der gezählte Bestand. Die Differenz wird gebucht.</span>' : "")
+    + '</label>'
+    + '<label class="feld"><span>Notiz</span>'
+    + '<textarea id="df-notiz" rows="2" placeholder="kann leer bleiben"></textarea></label>'
+    + '</form>'
+    + '<div class="dialog__knoepfe">'
+    + '<button class="knopf knopf--still" id="bd-nein">Abbrechen</button>'
+    + '<button class="knopf knopf--haupt" id="bd-ja">' + titel + '</button>'
+    + '</div></div>';
+  document.body.appendChild(huelle);
+
+  const zu = () => huelle.remove();
+  document.getElementById("bd-nein").onclick = zu;
+  huelle.onclick = (e) => { if (e.target === huelle) zu(); };
+  document.getElementById("df-menge").focus();
+
+  const ausfuehren = async () => {
+    const menge = Math.round(Number(document.getElementById("df-menge").value));
+    const notiz = (document.getElementById("df-notiz").value || "").trim() || null;
+
+    if (!Number.isFinite(menge) || menge < 0) { meldung("Bitte eine Menge eingeben.", "warn"); return; }
+    if (art !== "korrektur" && menge === 0) { meldung("Menge muss grösser als null sein.", "warn"); return; }
+
+    const vonEl = document.getElementById("df-von");
+    const nachEl = document.getElementById("df-nach");
+    const vonId = vonEl ? vonEl.value : null;
+    const nachId = nachEl ? nachEl.value : null;
+
+    const code = (id) => (alle.find((p) => p.id === id) || {}).code || "";
+
+    try {
+      if (art === "eingang") {
+        const ok = await nachfragen({ titel: "Wareneingang buchen",
+          text: zahlText(menge) + " Stück " + artikel.article_number + " auf " + code(nachId) + " einlagern?",
+          bestaetigen: "Buchen" });
+        if (!ok) return;
+        await bucheBewegung({ article_id: artikel.id, location_id: nachId,
+          movement_type: "eingang", quantity: menge, note: notiz });
+
+      } else if (art === "entnahme") {
+        const b1 = belegte.find((p) => p.id === vonId);
+        const rest = (b1 ? b1.menge : 0) - menge;
+        const ok = await nachfragen({ titel: "Entnahme buchen",
+          text: zahlText(menge) + " Stück " + artikel.article_number + " von " + code(vonId)
+              + " entnehmen? Danach dort: " + zahlText(rest) + ".",
+          bestaetigen: "Entnehmen", gefahr: rest < 0 });
+        if (!ok) return;
+        await bucheBewegung({ article_id: artikel.id, location_id: vonId,
+          movement_type: "entnahme", quantity: -menge, note: notiz });
+
+      } else if (art === "umlagerung") {
+        if (vonId === nachId) { meldung("Von und Nach sind gleich.", "warn"); return; }
+        const ok = await nachfragen({ titel: "Umlagern",
+          text: zahlText(menge) + " Stück von " + code(vonId) + " nach " + code(nachId) + " umlagern?",
+          bestaetigen: "Umlagern" });
+        if (!ok) return;
+        const gruppe = crypto.randomUUID();
+        await bucheBewegung({ article_id: artikel.id, location_id: vonId,
+          movement_type: "umlagerung", quantity: -menge, note: notiz, transfer_group_id: gruppe });
+        await bucheBewegung({ article_id: artikel.id, location_id: nachId,
+          movement_type: "umlagerung", quantity: menge, note: notiz, transfer_group_id: gruppe });
+
+      } else {
+        const b1 = belegte.find((p) => p.id === vonId);
+        const ist = b1 ? b1.menge : 0;
+        const diff = menge - ist;
+        if (diff === 0) { meldung("Bestand stimmt bereits.", "warn"); return; }
+        const ok = await nachfragen({ titel: "Bestand korrigieren",
+          text: "Auf " + code(vonId) + " sind " + zahlText(ist) + " gebucht, gezählt wurden "
+              + zahlText(menge) + ". Es wird " + leistungText(diff) + " gebucht.",
+          bestaetigen: "Korrigieren", gefahr: true });
+        if (!ok) return;
+        await bucheBewegung({ article_id: artikel.id, location_id: vonId,
+          movement_type: "inventur", quantity: diff, note: notiz });
+      }
+
+      zu();
+      meldung("Gebucht.");
+      lag.suchtext = artikel.article_number;
+      seiteLager(b);
+    } catch (f) {
+      meldung(fehlertext(f), "fehler");
+    }
+  };
+
+  document.getElementById("bd-ja").onclick = ausfuehren;
+  document.getElementById("bd-form").onsubmit = (e) => { e.preventDefault(); ausfuehren(); };
+}
+
+// ---------- Bewegungen ----------
+
+async function lagerBewegungen(ziel, b) {
+  ziel.innerHTML = '<div class="laedt">Bewegungen werden geladen …</div>';
+  let liste;
+  try { liste = await ladeBewegungen(null); }
+  catch (f) {
+    ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  ziel.innerHTML = '<section class="karte"><h2>Letzte Bewegungen</h2>'
+    + (liste.length
+      ? '<table class="tabelle"><thead><tr><th>Wann</th><th>Artikel</th>'
+        + '<th>Platz</th><th class="mitte">Menge</th><th>Wer</th></tr></thead><tbody>'
+        + liste.map((m) => '<tr><td class="klein">' + esc(datumZeitKurz(m.created_at)) + '</td>'
+            + '<td>' + esc(m.article_number)
+            + '<div class="klein">' + esc(BEWEGUNGSARTEN[m.movement_type] || "") + '</div></td>'
+            + '<td class="platzcode">' + esc(m.lagerplatz) + '</td>'
+            + '<td class="mitte stark ' + (m.quantity < 0 ? "minus" : "plus") + '">'
+            + leistungText(m.quantity) + '</td>'
+            + '<td class="klein">' + esc(m.benutzer_name || "") + '</td></tr>').join("")
+        + '</tbody></table>'
+      : '<p class="hinweis">Noch keine Bewegungen erfasst.</p>')
+    + '</section>';
+}
+
+// ---------- Artikel ----------
+
+async function lagerArtikel(ziel, b) {
+  ziel.innerHTML = '<div class="laedt">Artikel werden geladen …</div>';
+  let liste, plaetzeJeArtikel = {};
+  try {
+    liste = await sucheArtikel("");
+    const r = await zeitlimit(db.from("bestand_je_platz").select("article_id, lagerplatz, quantity"),
+      10000, "Lagerplätze");
+    if (!r.error) {
+      (r.data || []).forEach((z) => {
+        (plaetzeJeArtikel[z.article_id] = plaetzeJeArtikel[z.article_id] || []).push(z);
+      });
+    }
+  } catch (f) {
+    ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  ziel.innerHTML = (darfSchreiben()
+      ? '<button class="knopf knopf--haupt knopf--breit" id="a-neu">+ Neuer Artikel</button>' : "")
+    + '<section class="karte"><h2>Artikel <span class="marke">' + liste.length + '</span></h2>'
+    + (liste.length
+      ? '<table class="tabelle"><thead><tr><th>Nummer</th><th>Bezeichnung</th>'
+        + '<th class="mitte">Bestand</th>' + (darfSchreiben() ? '<th></th>' : "")
+        + '</tr></thead><tbody>'
+        + liste.map((a) => '<tr><td class="stark">' + esc(a.article_number) + '</td>'
+            + '<td>' + esc(a.name)
+            + (a.supplier_name ? '<div class="klein">' + esc(a.supplier_name) + '</div>' : "") + '</td>'
+            + '<td class="mitte">'
+            + zahlText(a.gesamtbestand) + '</td>'
+            + (darfSchreiben() ? '<td class="rechts"><button class="linkknopf" data-bearb="'
+                + esc(a.id) + '">Bearbeiten</button></td>' : "")
+            + '</tr>').join("")
+        + '</tbody></table>'
+      : '<p class="hinweis">Noch keine Artikel angelegt.</p>')
+    + '</section>';
+
+  const neu = document.getElementById("a-neu");
+  if (neu) neu.onclick = () => artikelDialog(null, b);
+
+  ziel.querySelectorAll("[data-bearb]").forEach((el) => {
+    el.onclick = () => artikelDialog(liste.find((x) => x.id === el.dataset.bearb), b);
+  });
+}
+
+async function artikelDialog(artikel, b, vorgabeNummer) {
+  let lieferanten = [], plaetze = [];
+  try { lieferanten = await ladeLieferanten(); } catch (f) { /* geht auch ohne */ }
+  try { plaetze = await ladeLagerplaetze(); } catch (f) { /* geht auch ohne */ }
+
+  const neuerArtikel = !artikel;
+
+  const huelle = document.createElement("div");
+  huelle.className = "dialog-huelle";
+  huelle.innerHTML = '<div class="dialog">'
+    + '<h2>' + (artikel ? "Artikel bearbeiten" : "Neuer Artikel") + '</h2>'
+    + '<form id="ad-form">'
+    + '<label class="feld"><span>Artikelnummer</span>'
+    + '<input id="ad-nr" type="text" autocapitalize="characters" value="'
+    + esc(artikel ? artikel.article_number : (vorgabeNummer || "")) + '">'
+    + '<span class="feldhinweis">Buchstaben, Zahlen, Punkt, Bindestrich und Leerzeichen '
+    + 'sind alle erlaubt.</span></label>'
+    + '<label class="feld"><span>Bezeichnung</span>'
+    + '<input id="ad-name" type="text" value="' + esc(artikel ? artikel.name : "") + '"></label>'
+    + '<div class="zeitraumwahl">'
+    + '<label class="feld"><span>Einheit</span>'
+    + '<input id="ad-einheit" type="text" value="' + esc(artikel ? artikel.unit : "Stück") + '"></label>'
+    + '</div>'
+    + '<label class="feld"><span>Lieferant</span><select id="ad-lief">'
+    + '<option value="">– kein Lieferant –</option>'
+    + lieferanten.map((l) => '<option value="' + esc(l.id) + '"'
+        + (artikel && artikel.supplier_id === l.id ? " selected" : "") + '>'
+        + esc(l.name) + '</option>').join("")
+    + '<option value="__neu">+ Neuer Lieferant …</option>'
+    + '</select></label>'
+
+    + (neuerArtikel
+      ? '<div class="dialog__block"><div class="dialog__blocktitel">Wohin kommt der Artikel?</div>'
+        + '<div class="zeitraumwahl">'
+        + '<label class="feld"><span>Lagerplatz</span><select id="ad-platz">'
+        + plaetze.map((p) => '<option value="' + esc(p.id) + '">' + esc(p.code) + '</option>').join("")
+        + '<option value="__neu">+ Neuer Lagerplatz …</option>'
+        + '</select></label>'
+        + '<label class="feld"><span>Anfangsbestand</span>'
+        + '<input id="ad-bestand" type="number" min="0" step="1" value="0"></label>'
+        + '</div></div>'
+      : "")
+    + '</form>'
+    + '<div class="dialog__knoepfe">'
+    + (artikel ? '<button class="knopf knopf--gefahr" id="ad-weg">Löschen</button>' : "")
+    + '<button class="knopf knopf--still" id="ad-nein">Abbrechen</button>'
+    + '<button class="knopf knopf--haupt" id="ad-ja">Speichern</button>'
+    + '</div></div>';
+  document.body.appendChild(huelle);
+
+  const zu = () => huelle.remove();
+  document.getElementById("ad-nein").onclick = zu;
+  huelle.onclick = (e) => { if (e.target === huelle) zu(); };
+  document.getElementById("ad-nr").focus();
+
+  // Artikelnummer mit der Kamera erfassen
+  document.getElementById("ad-kamera").onclick = async () => {
+    const code = await scannen();
+    if (code) document.getElementById("ad-nr").value = code;
+  };
+
+  // Neuen Lieferanten direkt hier anlegen
+  const liefWahl = document.getElementById("ad-lief");
+  liefWahl.onchange = async () => {
+    if (liefWahl.value !== "__neu") return;
+    liefWahl.value = "";
+    const w = await dialogFelder({ titel: "Neuer Lieferant",
+      felder: [{ name: "name", label: "Name", pflicht: true }], bestaetigen: "Anlegen" });
+    if (!w) return;
+    const { data, error } = await db.from("suppliers").insert({ name: w.name }).select().single();
+    if (error) { meldung(fehlertext(error), "fehler"); return; }
+    const opt = document.createElement("option");
+    opt.value = data.id; opt.textContent = data.name; opt.selected = true;
+    liefWahl.insertBefore(opt, liefWahl.lastElementChild);
+    meldung("Lieferant angelegt.");
+  };
+
+  // Neuen Lagerplatz direkt hier anlegen
+  const platzWahl = document.getElementById("ad-platz");
+  if (platzWahl) platzWahl.onchange = async () => {
+    if (platzWahl.value !== "__neu") return;
+    platzWahl.value = "";
+    const neuerPlatz = await lagerplatzAnlegen();
+    if (!neuerPlatz) return;
+    const opt = document.createElement("option");
+    opt.value = neuerPlatz.id; opt.textContent = neuerPlatz.code; opt.selected = true;
+    platzWahl.insertBefore(opt, platzWahl.lastElementChild);
+  };
+
+  const speichern = async () => {
+    const daten = {
+      article_number: document.getElementById("ad-nr").value.trim(),
+      name: document.getElementById("ad-name").value.trim(),
+      unit: document.getElementById("ad-einheit").value.trim() || "Stück",
+      supplier_id: liefWahl.value && liefWahl.value !== "__neu" ? liefWahl.value : null,
+    };
+    if (!daten.article_number || !daten.name) {
+      meldung("Artikelnummer und Bezeichnung werden benötigt.", "warn");
+      return;
+    }
+
+    if (artikel) {
+      const { error } = await db.from("articles").update(daten).eq("id", artikel.id);
+      if (error) { meldung(fehlertext(error), "fehler"); return; }
+      zu(); meldung("Gespeichert."); seiteLager(b);
+      return;
+    }
+
+    const { data, error } = await db.from("articles").insert(daten).select().single();
+    if (error) { meldung(fehlertext(error), "fehler"); return; }
+
+    // Anfangsbestand gleich einbuchen
+    const platzId = platzWahl && platzWahl.value && platzWahl.value !== "__neu"
+      ? platzWahl.value : null;
+    const menge = Math.max(0, Math.round(
+      Number(document.getElementById("ad-bestand").value) || 0));
+
+    if (platzId && menge > 0) {
+      try {
+        await bucheBewegung({ article_id: data.id, location_id: platzId,
+          movement_type: "eingang", quantity: menge, note: "Anfangsbestand" });
+      } catch (f) { meldung("Artikel angelegt, aber Bestand nicht gebucht: "
+        + fehlertext(f), "warn"); }
+    }
+
+    zu();
+    meldung("Artikel angelegt.");
+    lag.suchtext = daten.article_number;
+    seiteLager(b);
+  };
+
+  const adJa = document.getElementById("ad-ja");
+  adJa.type = "button";
+  adJa.onclick = (e) => { e.preventDefault(); speichern(); };
+  document.getElementById("ad-form").onsubmit = (e) => { e.preventDefault(); speichern(); };
+  // Sicherstellung: Enter in jedem Feld des Formulars löst auch speichern aus.
+  document.getElementById("ad-form").querySelectorAll("input").forEach((el) => {
+    el.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); speichern(); } });
+  });
+
+  const weg = document.getElementById("ad-weg");
+  if (weg) weg.onclick = async () => {
+    const ok = await doppeltNachfragen(
+      { titel: "Artikel löschen",
+        text: 'Soll "' + artikel.article_number + '" wirklich gelöscht werden? '
+            + "Wenn Bestand oder Bewegungen daran hängen, lehnt die Datenbank das ab. "
+            + "Deaktivieren wäre der sichere Weg.",
+        bestaetigen: "Weiter zum Löschen", gefahr: true },
+      { titel: "Wirklich endgültig löschen?",
+        text: "Letzte Rückfrage. Danach ist der Artikel unwiderruflich weg.",
+        bestaetigen: "Endgültig löschen", gefahr: true });
+    if (!ok) return;
+
+    const { error } = await db.from("articles").delete().eq("id", artikel.id);
+    if (error) {
+      const nochmal = await nachfragen({ titel: "Löschen nicht möglich",
+        text: fehlertext(error) + " Soll der Artikel stattdessen deaktiviert werden?",
+        bestaetigen: "Deaktivieren" });
+      if (!nochmal) return;
+      const r = await db.from("articles").update({ is_active: false }).eq("id", artikel.id);
+      if (r.error) { meldung(fehlertext(r.error), "fehler"); return; }
+      zu(); meldung("Deaktiviert."); seiteLager(b);
+      return;
+    }
+    zu(); meldung("Artikel gelöscht."); lag.suchtext = ""; seiteLager(b);
+  };
+}
+
+// ---------- Lagerplätze ----------
+
+async function lagerPlaetze(ziel, b) {
+  ziel.innerHTML = '<div class="laedt">Lagerplätze werden geladen …</div>';
+  let liste;
+  try { liste = await ladeLagerplaetze(); }
+  catch (f) {
+    ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  // Nach Schrank gruppieren
+  const gruppen = {};
+  liste.forEach((p) => { (gruppen[p.cabinet || "Ohne Schrank"] =
+    gruppen[p.cabinet || "Ohne Schrank"] || []).push(p); });
+
+  ziel.innerHTML = (darfSchreiben()
+      ? '<button class="knopf knopf--haupt knopf--breit" id="p-neu">+ Lagerplatz anlegen</button>' : "")
+    + (liste.length
+      ? Object.keys(gruppen).sort().map((schrank) =>
+          '<section class="karte"><h2>Schrank ' + esc(schrank) + '</h2>'
+          + '<div class="platzgitter">' + gruppen[schrank].map((p) =>
+              (darfSchreiben()
+                ? '<button class="platzchip platzchip--klick" data-platz="' + esc(p.id) + '"'
+                  + ' title="' + esc(p.description || "") + '">' + esc(p.code) + '</button>'
+                : '<span class="platzchip">' + esc(p.code) + '</span>')).join("")
+          + '</div></section>').join("")
+      : '<div class="karte karte--hinweis"><p>Noch keine Lagerplätze angelegt. '
+        + 'Ein Lagerplatz besteht aus Schrank, Ebene und Koordinate, zum Beispiel A, 1, B4 '
+        + 'ergibt den Code A1B4.</p></div>');
+
+  ziel.querySelectorAll("[data-platz]").forEach((el) => {
+    el.onclick = async () => {
+      const platz = liste.find((x) => x.id === el.dataset.platz);
+      if (!platz) return;
+
+      const huelle = document.createElement("div");
+      huelle.className = "dialog-huelle";
+      huelle.innerHTML = '<div class="dialog"><h2>Lagerplatz ' + esc(platz.code) + '</h2>'
+        + '<p>' + esc(platz.description || "Keine Beschreibung hinterlegt.") + '</p>'
+        + '<div class="statuswahl">'
+        + '<button class="knopf" data-tun="deaktiv">Deaktivieren</button>'
+        + (istAdmin() ? '<button class="knopf knopf--gefahr" data-tun="weg">Löschen</button>' : "")
+        + '</div><div class="dialog__knoepfe">'
+        + '<button class="knopf knopf--still" data-nein>Schliessen</button></div></div>';
+      document.body.appendChild(huelle);
+
+      const zu = () => huelle.remove();
+      huelle.querySelector("[data-nein]").onclick = zu;
+      huelle.onclick = (e) => { if (e.target === huelle) zu(); };
+
+      huelle.querySelectorAll("[data-tun]").forEach((k) => {
+        k.onclick = async () => {
+          if (k.dataset.tun === "deaktiv") {
+            const ok = await nachfragen({ titel: "Lagerplatz deaktivieren",
+              text: "Der Platz verschwindet aus den Listen. Gebuchte Bestände bleiben erhalten.",
+              bestaetigen: "Deaktivieren", gefahr: true });
+            if (!ok) return;
+            const { error } = await db.from("storage_locations")
+              .update({ is_active: false }).eq("id", platz.id);
+            zu();
+            if (error) meldung(fehlertext(error), "fehler");
+            else { meldung("Deaktiviert."); seiteLager(b); }
+          } else {
+            const w = await loeschen({ tabelle: "storage_locations", id: platz.id,
+              titel: "Lagerplatz löschen",
+              text: 'Soll "' + platz.code + '" endgültig gelöscht werden? '
+                  + 'Wenn dort noch Bestand oder Bewegungen liegen, wird das abgelehnt.' });
+            zu();
+            if (w) seiteLager(b);
+          }
+        };
+      });
+    };
+  });
+
+  const neu = document.getElementById("p-neu");
+  if (neu) neu.onclick = async () => {
+    const p = await lagerplatzAnlegen();
+    if (p) seiteLager(b);
+  };
+
+  ziel.querySelectorAll("[data-platz-bearb]").forEach((el) => {
+    el.onclick = async () => {
+      const w = await dialogFelder({ titel: "Lagerplatz umbenennen",
+        felder: [{ name: "code", label: "Code", wert: el.dataset.code, pflicht: true }],
+        bestaetigen: "Speichern" });
+      if (!w) return;
+      const code = w.code.toUpperCase().replace(/\s+/g, "");
+      const { error } = await db.from("storage_locations")
+        .update({ code: code }).eq("id", el.dataset.platzBearb);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Gespeichert."); seiteLager(b); }
+    };
+  });
+
+  ziel.querySelectorAll("[data-platz-weg]").forEach((el) => {
+    el.onclick = async () => {
+      const code = el.dataset.code;
+      const ok = await doppeltNachfragen(
+        { titel: "Lagerplatz löschen",
+          text: 'Soll "' + code + '" wirklich gelöscht werden? Wenn dort noch Bestand '
+              + "gebucht ist, lehnt die Datenbank das ab.",
+          bestaetigen: "Weiter zum Löschen", gefahr: true },
+        { titel: "Wirklich endgültig löschen?",
+          text: "Letzte Rückfrage. Danach ist der Lagerplatz weg.",
+          bestaetigen: "Endgültig löschen", gefahr: true });
+      if (!ok) return;
+
+      const { error } = await db.from("storage_locations").delete().eq("id", el.dataset.platzWeg);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Lagerplatz gelöscht."); seiteLager(b); }
+    };
+  });
+}
+
+// Legt einen Lagerplatz an und gibt ihn zurück. Wird auch aus dem
+// Artikeldialog heraus aufgerufen.
+async function lagerplatzAnlegen() {
+  const w = await dialogFelder({ titel: "Lagerplatz anlegen",
+    text: "Aus Schrank, Ebene und Koordinate wird der Code gebildet, zum Beispiel A1B4.",
+    felder: [
+      { name: "schrank", label: "Schrank", pflicht: true, platzhalter: "A" },
+      { name: "ebene", label: "Ebene", pflicht: true, platzhalter: "1" },
+      { name: "koordinate", label: "Koordinate", pflicht: true, platzhalter: "B4" },
+      { name: "notiz", label: "Beschreibung", platzhalter: "kann leer bleiben" },
+    ],
+    bestaetigen: "Anlegen" });
+  if (!w) return null;
+
+  const code = (w.schrank + w.ebene + w.koordinate).toUpperCase().replace(/\s+/g, "");
+  const { data, error } = await db.from("storage_locations").insert({
+    code: code, cabinet: w.schrank.toUpperCase(), level: w.ebene,
+    coordinate: w.koordinate.toUpperCase(), description: w.notiz || null
+  }).select().single();
+
+  if (error) { meldung(fehlertext(error), "fehler"); return null; }
+  meldung("Lagerplatz " + code + " angelegt.");
+  return data;
+}
+
+// =================================================================
+//  BESTELLUNGEN
+// =================================================================
+
+const best = {
+  ansicht: "offen",
+  lieferantId: null,
+};
+
+const BESTELLSTATUS = {
+  offen: "Offen",
+  bestellt: "Bestellt",
+  teilweise_geliefert: "Teilweise geliefert",
+  geliefert: "Geliefert",
+  erledigt: "Erledigt",
+  storniert: "Storniert",
+};
+
+async function ladeBestellungen(offen) {
+  let a = db.from("order_items")
+    .select("*, articles(article_number, name, unit), suppliers(name)")
+    .order("needed_by", { ascending: true, nullsFirst: false })
+    .order("created_at");
+  if (offen) a = a.in("status", ["offen", "bestellt", "teilweise_geliefert"]);
+  else a = a.limit(100).order("created_at", { ascending: false });
+
+  const { data, error } = await zeitlimit(a, 12000, "Bestellungen");
+  if (error) throw error;
+  return data || [];
+}
+
+async function seiteBestellungen(b) {
+  b.innerHTML = '<h1 class="seitentitel">Bestellungen</h1>'
+    + '<div class="reiter">'
+    + [["offen", "Offen"], ["historie", "Historie"], ["lieferanten", "Lieferanten"]]
+      .map(([w, t]) => '<button class="reiter__knopf' + (best.ansicht === w ? " aktiv" : "")
+        + '" data-best="' + w + '">' + t + '</button>').join("")
+    + '</div>'
+    + (darfSchreiben() ? "" : nurLesenHinweis("Du kannst hier alles ansehen, aber nichts ändern."))
+    + '<div id="best-inhalt"><div class="laedt">Wird geladen …</div></div>';
+
+  b.querySelectorAll("[data-best]").forEach((el) => {
+    el.onclick = () => { best.ansicht = el.dataset.best; seiteBestellungen(b); };
+  });
+
+  const ziel = document.getElementById("best-inhalt");
+  if (best.ansicht === "lieferanten") return bestLieferanten(ziel, b);
+  if (best.ansicht === "historie") return bestHistorie(ziel, b);
+  return bestOffen(ziel, b);
+}
+
+// ---------- Offene Positionen, nach Lieferant gruppiert ----------
+
+async function bestOffen(ziel, b) {
+  let liste;
+  try { liste = await ladeBestellungen(true); }
+  catch (f) {
+    ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  const heute = isoDatum(new Date());
+  const gruppen = {};
+  liste.forEach((z) => {
+    const name = (z.suppliers && z.suppliers.name) || "Ohne Lieferant";
+    (gruppen[name] = gruppen[name] || []).push(z);
+  });
+
+  ziel.innerHTML = (darfSchreiben()
+      ? '<button class="knopf knopf--haupt knopf--breit" id="b-neu">+ Neue Position</button>' : "")
+    + (liste.length
+      ? Object.keys(gruppen).sort().map((name) => {
+          const zeilen = gruppen[name];
+          return '<section class="karte"><div class="karte__kopf">'
+            + '<h2>' + esc(name) + '</h2>'
+            + '<span class="klein">' + zeilen.length + ' Position'
+            + (zeilen.length === 1 ? "" : "en") + '</span></div>'
+            + '<table class="tabelle"><tbody>'
+            + zeilen.map((z) => {
+                const a = z.articles || {};
+                const spaet = z.needed_by && z.needed_by < heute;
+                return '<tr><td>'
+                  + '<strong>' + esc(a.article_number || "?") + '</strong> '
+                  + esc(a.name || "")
+                  + '<div class="klein">'
+                  + '<span class="statuschip statuschip--' + esc(z.status) + '">'
+                  + esc(BESTELLSTATUS[z.status] || z.status) + '</span>'
+                  + (z.needed_by ? ' <span class="' + (spaet ? "minus stark" : "") + '">bis '
+                      + kurzDatum(z.needed_by) + '</span>' : "")
+                  + (z.note ? ' · ' + esc(z.note) : "")
+                  + '</div></td>'
+                  + '<td class="mitte stark">' + zahlText(z.quantity) + '</td>'
+                  + (darfSchreiben()
+                      ? '<td class="rechts nowrap">'
+                        + '<button class="linkknopf" data-bstatus="' + esc(z.id) + '">Status</button> '
+                        + '<button class="linkknopf" data-berledigt="' + esc(z.id) + '">Erledigt</button>'
+                        + (istAdmin() ? ' <button class="linkknopf linkknopf--gefahr" data-bweg="'
+                            + esc(z.id) + '">Löschen</button>' : "")
+                        + '</td>' : "")
+                  + '</tr>';
+              }).join("")
+            + '</tbody></table></section>';
+        }).join("")
+      : '<div class="karte karte--hinweis"><p>Keine offenen Bestellpositionen.</p></div>');
+
+  const neu = document.getElementById("b-neu");
+  if (neu) neu.onclick = () => positionDialog(b);
+
+  ziel.querySelectorAll("[data-berledigt]").forEach((el) => {
+    el.onclick = async () => {
+      const ok = await nachfragen({ titel: "Position erledigt?",
+        text: "Ist diese Bestellung wirklich abgeschlossen? Sie verschwindet danach aus der Liste.",
+        bestaetigen: "Ja, erledigt" });
+      if (!ok) return;
+      const { error } = await db.from("order_items").update({
+        status: "erledigt", completed_at: new Date().toISOString() }).eq("id", el.dataset.berledigt);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Als erledigt markiert."); seiteBestellungen(b); }
+    };
+  });
+
+  ziel.querySelectorAll("[data-bearb-best]").forEach((el) => {
+    el.onclick = async () => {
+      const z = liste.find((x) => x.id === el.dataset.bearbBest);
+      if (!z) return;
+      const w = await dialogFelder({ titel: "Bestellung bearbeiten",
+        felder: [
+          { name: "menge", label: "Menge", typ: "number", wert: z.quantity, pflicht: true },
+          { name: "frist", label: "Bis wann", typ: "date", wert: z.needed_by || "" },
+          { name: "notiz", label: "Notiz", wert: z.note || "" },
+        ], bestaetigen: "Speichern" });
+      if (!w) return;
+      const { error } = await db.from("order_items").update({
+        quantity: Math.max(1, Math.round(w.menge)),
+        needed_by: w.frist || null,
+        note: w.notiz || null,
+      }).eq("id", z.id);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Gespeichert."); seiteBestellungen(b); }
+    };
+  });
+
+  ziel.querySelectorAll("[data-bweg]").forEach((el) => {
+    el.onclick = async () => {
+      const z = liste.find((x) => x.id === el.dataset.bweg) || {};
+      const a = z.articles || {};
+      const w = await loeschen({ tabelle: "order_items", id: z.id,
+        titel: "Bestellposition löschen",
+        text: (a.article_number || "Die Position") + " wird endgültig aus der Liste entfernt. "
+            + "Zum Nachvollziehen wäre \"Storniert\" der bessere Weg." });
+      if (w) seiteBestellungen(b);
+    };
+  });
+
+  ziel.querySelectorAll("[data-bearb-best]").forEach((el) => {
+    el.onclick = async () => {
+      const z = liste.find((x) => x.id === el.dataset.bearbBest);
+      if (!z) return;
+      const w = await dialogFelder({ titel: "Bestellung bearbeiten",
+        felder: [
+          { name: "menge", label: "Menge", typ: "number", wert: z.quantity, pflicht: true },
+          { name: "frist", label: "Bis wann", typ: "date", wert: z.needed_by || "" },
+          { name: "notiz", label: "Notiz", wert: z.note || "" },
+        ], bestaetigen: "Speichern" });
+      if (!w) return;
+      const { error } = await db.from("order_items").update({
+        quantity: Math.max(1, Math.round(w.menge)),
+        needed_by: w.frist || null,
+        note: w.notiz || null,
+      }).eq("id", z.id);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Gespeichert."); seiteBestellungen(b); }
+    };
+  });
+
+  ziel.querySelectorAll("[data-bweg]").forEach((el) => {
+    el.onclick = async () => {
+      const ok = await doppeltNachfragen(
+        { titel: "Position löschen",
+          text: "Soll die Position " + el.dataset.nr + " wirklich gelöscht werden?",
+          bestaetigen: "Weiter zum Löschen", gefahr: true },
+        { titel: "Wirklich endgültig löschen?",
+          text: "Letzte Rückfrage. Danach ist die Position weg.",
+          bestaetigen: "Endgültig löschen", gefahr: true });
+      if (!ok) return;
+      const { error } = await db.from("order_items").delete().eq("id", el.dataset.bweg);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Position gelöscht."); seiteBestellungen(b); }
+    };
+  });
+
+  ziel.querySelectorAll("[data-bstatus]").forEach((el) => {
+    el.onclick = async () => {
+      const z = liste.find((x) => x.id === el.dataset.bstatus);
+      const huelle = document.createElement("div");
+      huelle.className = "dialog-huelle";
+      huelle.innerHTML = '<div class="dialog"><h2>Status ändern</h2>'
+        + '<div class="statuswahl">'
+        + Object.keys(BESTELLSTATUS).map((s) => '<button class="knopf'
+            + (z.status === s ? " knopf--haupt" : "") + '" data-neu="' + s + '">'
+            + BESTELLSTATUS[s] + '</button>').join("")
+        + '</div><div class="dialog__knoepfe">'
+        + '<button class="knopf knopf--still" data-nein>Abbrechen</button></div></div>';
+      document.body.appendChild(huelle);
+
+      huelle.querySelector("[data-nein]").onclick = () => huelle.remove();
+      huelle.onclick = (e) => { if (e.target === huelle) huelle.remove(); };
+
+      huelle.querySelectorAll("[data-neu]").forEach((k) => {
+        k.onclick = async () => {
+          const neuStatus = k.dataset.neu;
+          if (neuStatus === "geliefert" || neuStatus === "erledigt" || neuStatus === "storniert") {
+            const ok = await nachfragen({ titel: "Status ändern",
+              text: 'Wirklich auf "' + BESTELLSTATUS[neuStatus] + '" setzen?',
+              bestaetigen: "Ja, ändern", gefahr: neuStatus === "storniert" });
+            if (!ok) return;
+          }
+          const daten = { status: neuStatus };
+          if (neuStatus === "bestellt") daten.ordered_at = new Date().toISOString();
+          if (neuStatus === "erledigt") daten.completed_at = new Date().toISOString();
+
+          const { error } = await db.from("order_items").update(daten).eq("id", z.id);
+          huelle.remove();
+          if (error) meldung(fehlertext(error), "fehler");
+          else { meldung("Status geändert."); seiteBestellungen(b); }
+        };
+      });
+    };
+  });
+}
+
+// ---------- Neue Position ----------
+
+async function positionDialog(b) {
+  const huelle = document.createElement("div");
+  huelle.className = "dialog-huelle";
+  huelle.innerHTML = '<div class="dialog"><h2>Neue Bestellposition</h2>'
+    + '<div class="suchleiste">'
+    + '<input type="text" id="pd-such" placeholder="Artikelnummer oder Name" autocomplete="off">'
+    + '<button class="knopf knopf--scan" id="pd-scan">Kamera</button></div>'
+    + '<div id="pd-treffer" class="pd-treffer"></div>'
+    + '<div id="pd-rest" hidden>'
+    + '<div class="pd-gewaehlt" id="pd-gewaehlt"></div>'
+    + '<div class="zeitraumwahl">'
+    + '<label class="feld"><span>Menge</span>'
+    + '<input id="pd-menge" type="number" min="1" step="1" value="1"></label>'
+    + '<label class="feld"><span>Bis wann</span><input id="pd-frist" type="date"></label>'
+    + '</div>'
+    + '<label class="feld"><span>Notiz</span>'
+    + '<textarea id="pd-notiz" rows="2" placeholder="kann leer bleiben"></textarea></label>'
+    + '</div>'
+    + '<div class="dialog__knoepfe">'
+    + '<button class="knopf knopf--still" id="pd-nein">Abbrechen</button>'
+    + '<button class="knopf knopf--haupt" id="pd-ja" disabled>Hinzufügen</button>'
+    + '</div></div>';
+  document.body.appendChild(huelle);
+
+  let gewaehlt = null;
+  const zu = () => huelle.remove();
+  document.getElementById("pd-nein").onclick = zu;
+  huelle.onclick = (e) => { if (e.target === huelle) zu(); };
+
+  const feld = document.getElementById("pd-such");
+  const trefferBox = document.getElementById("pd-treffer");
+  feld.focus();
+
+  const suchen = async () => {
+    const t = feld.value.trim();
+    if (t.length < 1) { trefferBox.innerHTML = ""; return; }
+    trefferBox.innerHTML = '<div class="laedt">Wird gesucht …</div>';
+    try {
+      const liste = await sucheArtikel(t);
+      trefferBox.innerHTML = liste.length
+        ? liste.slice(0, 8).map((a) => '<button class="pd-zeile" data-w="' + esc(a.id) + '">'
+            + '<strong>' + esc(a.article_number) + '</strong> ' + esc(a.name)
+            + '<span class="klein"> ' + esc(a.supplier_name || "ohne Lieferant") + '</span>'
+            + '</button>').join("")
+        : '<p class="hinweis">Kein Artikel gefunden.</p>';
+
+      trefferBox.querySelectorAll("[data-w]").forEach((el) => {
+        el.onclick = () => {
+          gewaehlt = liste.find((x) => x.id === el.dataset.w);
+          trefferBox.innerHTML = "";
+          feld.value = "";
+          document.getElementById("pd-rest").hidden = false;
+          document.getElementById("pd-gewaehlt").innerHTML =
+            '<strong>' + esc(gewaehlt.article_number) + '</strong> ' + esc(gewaehlt.name)
+            + '<div class="klein">Lieferant: ' + esc(gewaehlt.supplier_name || "keiner hinterlegt")
+            + ' · Bestand ' + zahlText(gewaehlt.gesamtbestand) + '</div>';
+          document.getElementById("pd-ja").disabled = false;
+          document.getElementById("pd-menge").focus();
+        };
+      });
+    } catch (f) { trefferBox.innerHTML = '<p class="hinweis">' + esc(fehlertext(f)) + '</p>'; }
+  };
+
+  let taste = null;
+  feld.oninput = () => { clearTimeout(taste); taste = setTimeout(suchen, 300); };
+  feld.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); clearTimeout(taste); suchen(); } };
+
+  document.getElementById("pd-scan").onclick = async () => {
+    const code = await scannen();
+    if (!code) return;
+    feld.value = code;
+    suchen();
+  };
+
+  document.getElementById("pd-ja").onclick = async () => {
+    if (!gewaehlt) return;
+    const menge = Math.round(Number(document.getElementById("pd-menge").value));
+    if (!Number.isFinite(menge) || menge < 1) { meldung("Menge muss mindestens 1 sein.", "warn"); return; }
+
+    const { error } = await db.from("order_items").insert({
+      article_id: gewaehlt.id,
+      supplier_id: gewaehlt.supplier_id || null,
+      quantity: menge,
+      needed_by: document.getElementById("pd-frist").value || null,
+      note: (document.getElementById("pd-notiz").value || "").trim() || null,
+    });
+
+    if (error) meldung(fehlertext(error), "fehler");
+    else { zu(); meldung("Position hinzugefügt."); seiteBestellungen(b); }
+  };
+}
+
+// ---------- Historie ----------
+
+async function bestHistorie(ziel, b) {
+  let liste;
+  try { liste = await ladeBestellungen(false); }
+  catch (f) {
+    ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  ziel.innerHTML = '<section class="karte"><h2>Letzte 100 Positionen</h2>'
+    + (liste.length
+      ? '<table class="tabelle"><thead><tr><th>Datum</th><th>Artikel</th>'
+        + '<th class="mitte">Menge</th><th>Status</th></tr></thead><tbody>'
+        + liste.map((z) => {
+            const a = z.articles || {};
+            return '<tr><td class="klein">' + esc(kurzDatum(z.created_at.slice(0, 10))) + '</td>'
+              + '<td><strong>' + esc(a.article_number || "?") + '</strong> ' + esc(a.name || "")
+              + '<div class="klein">' + esc((z.suppliers && z.suppliers.name) || "") + '</div></td>'
+              + '<td class="mitte stark">' + zahlText(z.quantity) + '</td>'
+              + '<td><span class="statuschip statuschip--' + esc(z.status) + '">'
+              + esc(BESTELLSTATUS[z.status] || z.status) + '</span></td></tr>';
+          }).join("")
+        + '</tbody></table>'
+      : '<p class="hinweis">Noch keine Bestellungen erfasst.</p>')
+    + '</section>';
+}
+
+// ---------- Lieferanten ----------
+
+async function bestLieferanten(ziel, b) {
+  let liste;
+  try { liste = await ladeLieferanten(); }
+  catch (f) {
+    ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  ziel.innerHTML = (darfSchreiben()
+      ? '<button class="knopf knopf--haupt knopf--breit" id="lf-neu">+ Neuer Lieferant</button>' : "")
+    + '<section class="karte"><h2>Lieferanten <span class="marke">' + liste.length + '</span></h2>'
+    + (liste.length
+      ? '<table class="tabelle"><tbody>' + liste.map((l) =>
+          '<tr><td class="stark">' + esc(l.name) + '</td>'
+          + (darfSchreiben() ? '<td class="rechts nowrap">'
+              + '<button class="linkknopf" data-lf="' + esc(l.id) + '">Umbenennen</button> '
+              + '<button class="linkknopf linkknopf--gefahr" data-lfweg="' + esc(l.id)
+              + '" data-name="' + esc(l.name) + '">Löschen</button></td>' : "")
+          + '</tr>').join("") + '</tbody></table>'
+      : '<p class="hinweis">Noch keine Lieferanten angelegt.</p>')
+    + '</section>';
+
+  const neu = document.getElementById("lf-neu");
+  if (neu) neu.onclick = () => lieferantDialog(null, b);
+
+  ziel.querySelectorAll("[data-lf]").forEach((el) => {
+    el.onclick = () => lieferantDialog(liste.find((x) => x.id === el.dataset.lf), b);
+  });
+
+  ziel.querySelectorAll("[data-lfweg]").forEach((el) => {
+    el.onclick = async () => {
+      const ok = await doppeltNachfragen(
+        { titel: "Lieferant löschen",
+          text: 'Soll "' + el.dataset.name + '" wirklich gelöscht werden? '
+              + "Wenn Artikel oder Bestellungen darauf verweisen, lehnt die Datenbank das ab.",
+          bestaetigen: "Weiter zum Löschen", gefahr: true },
+        { titel: "Wirklich endgültig löschen?",
+          text: "Letzte Rückfrage. Danach ist der Lieferant weg.",
+          bestaetigen: "Endgültig löschen", gefahr: true });
+      if (!ok) return;
+
+      const { error } = await db.from("suppliers").delete().eq("id", el.dataset.lfweg);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Lieferant gelöscht."); seiteBestellungen(b); }
+    };
+  });
+}
+
+async function lieferantDialog(lieferant, b) {
+  const w = await dialogFelder({
+    titel: lieferant ? "Lieferant umbenennen" : "Neuer Lieferant",
+    felder: [{ name: "name", label: "Name", pflicht: true,
+               wert: lieferant ? lieferant.name : "" }],
+    bestaetigen: "Speichern",
+  });
+  if (!w) return;
+
+  const { error } = lieferant
+    ? await db.from("suppliers").update({ name: w.name }).eq("id", lieferant.id)
+    : await db.from("suppliers").insert({ name: w.name });
+
+  if (error) meldung(fehlertext(error), "fehler");
+  else { meldung("Gespeichert."); seiteBestellungen(b); }
+}
+
+async function seiteEinstellungen(b) {
+  b.innerHTML = '<h1 class="seitentitel">Einstellungen</h1><div class="laedt">Benutzer werden geladen …</div>';
+
+  let benutzer = [];
+  try {
+    const { data, error } = await zeitlimit(
+      db.from("profiles").select("id, email, full_name, role, is_active")
+        .order("full_name"), 10000, "Benutzerliste");
+    if (error) throw error;
+    benutzer = data || [];
+  } catch (f) {
+    b.innerHTML = '<h1 class="seitentitel">Einstellungen</h1>'
+      + '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  const besitzer = istAdmin();
+
+  b.innerHTML = '<h1 class="seitentitel">Einstellungen</h1>'
+    + '<section class="karte"><h2>Benutzer</h2><table class="tabelle">'
+    + '<thead><tr><th>Name</th><th>E-Mail</th><th>Rolle</th><th>Status</th></tr></thead><tbody>'
+    + benutzer.map((u) => '<tr class="' + (u.is_active ? "" : "zeile--inaktiv") + '">'
+        + '<td>' + esc(u.full_name || "–")
+        + (profil && u.id === profil.id ? ' <span class="marke">du</span>' : "") + '</td>'
+        + '<td class="klein">' + esc(u.email) + '</td>'
+        + '<td>' + (besitzer && profil.id !== u.id
+            ? '<select class="auswahl" data-rolle="' + esc(u.id) + '">'
+              + Object.keys(ROLLEN).map((w) => '<option value="' + w + '"'
+                  + (u.role === w ? " selected" : "") + '>' + ROLLEN[w] + '</option>').join("")
+              + '</select>'
+            : esc(ROLLEN[u.role] || u.role)) + '</td>'
+        + '<td>' + (besitzer && profil.id !== u.id
+            ? '<button class="linkknopf" data-aktiv="' + esc(u.id) + '" data-wert="'
+              + (u.is_active ? "0" : "1") + '">' + (u.is_active ? "Deaktivieren" : "Aktivieren") + '</button>'
+            : (u.is_active ? "aktiv" : "inaktiv")) + '</td></tr>').join("")
+    + '</tbody></table>'
+    + '<div class="rollenhilfe">'
+    + '<div><strong>Administrator</strong> darf alles, auch Benutzer verwalten.</div>'
+    + '<div><strong>Produktion</strong> darf alles ausser Kontrolle-Einträge und Benutzer.</div>'
+    + '<div><strong>Kontrolle</strong> darf nur Ausschuss und Notizen erfassen.</div>'
+    + '<div>Ansehen darf jeder alles.</div></div>'
+    + '<p class="hinweis">Neue Benutzer legst du im Supabase-Dashboard unter '
+    + 'Authentication → Users an, als E-Mail den Namen mit @hoferco.ch.</p></section>'
+
+    + '<section class="karte"><h2>Mein Konto</h2>'
+    + '<label class="feld"><span>Anzeigename</span>'
+    + '<input type="text" id="mn" value="' + esc((profil && profil.full_name) || "") + '"></label>'
+    + '<button class="knopf" id="ns">Name speichern</button>'
+    + '<label class="feld feld--abstand"><span>Neues Passwort</span>'
+    + '<input type="password" id="np" autocomplete="new-password" placeholder="mindestens 8 Zeichen"></label>'
+    + '<button class="knopf" id="ps">Passwort ändern</button></section>'
+
+    + '<section class="karte"><h2>Darstellung</h2>'
+    + '<label class="schalter"><input type="checkbox" id="e-wochenende"'
+    + (einstellung("wochenende") ? " checked" : "") + '>'
+    + '<span>Samstag und Sonntag in der Wochenansicht zeigen</span></label>'
+    + '<label class="schalter"><input type="checkbox" id="e-wochestart"'
+    + (einstellung("wochestart") ? " checked" : "") + '>'
+    + '<span>Erfassung immer mit der Wochenansicht öffnen</span></label>'
+    + '<p class="hinweis">Diese Einstellungen gelten nur auf diesem Gerät.</p>'
+    + '</section>'
+
+    + '<section class="karte"><h2>Datensicherung</h2>'
+    + '<p class="klein">Der kostenlose Tarif macht keine automatischen Sicherungen. '
+    + 'Lade die Daten regelmässig herunter, am besten einmal pro Woche, und lege die '
+    + 'Dateien an einem sicheren Ort ab.</p>'
+    + '<button class="knopf knopf--haupt" id="e-sichern">Daten sichern</button>'
+    + '<p class="hinweis">Du erhältst eine vollständige Datei mit allem sowie einzelne '
+    + 'CSV-Dateien für Excel.</p>'
+    + '</section>'
+
+    + '<section class="karte"><h2>Über die App</h2><p class="klein">Version ' + esc(APP_VERSION)
+    + ' · angemeldet als ' + esc((profil && profil.email) || "") + '</p></section>';
+
+  b.querySelectorAll("[data-rolle]").forEach((el) => {
+    const vorher = el.value;
+    el.addEventListener("change", async () => {
+      const person = benutzer.find((u) => u.id === el.dataset.rolle);
+      const ok = await nachfragen({
+        titel: "Rolle ändern?",
+        text: (person ? (person.full_name || person.email) : "Dieser Benutzer")
+            + " bekommt die Rolle " + (ROLLEN[el.value] || el.value) + ".",
+        bestaetigen: "Ja, ändern" });
+
+      if (!ok) { el.value = vorher; return; }
+
+      const { error } = await db.from("profiles").update({ role: el.value }).eq("id", el.dataset.rolle);
+      if (error) { meldung(fehlertext(error), "fehler"); seiteEinstellungen(b); }
+      else { meldung("Rolle geändert."); seiteEinstellungen(b); }
+    });
+  });
+
+  b.querySelectorAll("[data-aktiv]").forEach((el) => {
+    el.addEventListener("click", async () => {
+      const ein = el.dataset.wert === "1";
+      if (ein) {
+        const ok = await nachfragen({ titel: "Benutzer aktivieren",
+          text: "Die Person kann sich danach wieder anmelden.",
+          bestaetigen: "Ja, aktivieren" });
+        if (!ok) return;
+      }
+      if (!ein) {
+        const ok = await nachfragen({
+          titel: "Benutzer deaktivieren",
+          text: "Die Person kann sich danach nicht mehr anmelden. Bisherige Einträge bleiben erhalten.",
+          bestaetigen: "Deaktivieren", gefahr: true });
+        if (!ok) return;
+      }
+      const { error } = await db.from("profiles").update({ is_active: ein }).eq("id", el.dataset.aktiv);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung(ein ? "Benutzer aktiviert." : "Benutzer deaktiviert."); seiteEinstellungen(b); }
+    });
+  });
+
+  document.getElementById("ns").addEventListener("click", async () => {
+    const name = document.getElementById("mn").value.trim();
+    const { error } = await db.from("profiles").update({ full_name: name }).eq("id", profil.id);
+    if (error) meldung(fehlertext(error), "fehler");
+    else {
+      profil.full_name = name;
+      const anz = document.querySelector("[data-benutzername]");
+      if (anz) anz.textContent = name || profil.email;
+      meldung("Name gespeichert.");
+    }
+  });
+
+
+  document.getElementById("e-sichern").addEventListener("click", (e) => {
+    datenSichern(e.currentTarget);
+  });
+
+  document.getElementById("e-wochenende").addEventListener("change", (e) => {
+    einstellungSetzen("wochenende", e.target.checked);
+    meldung("Gespeichert.");
+  });
+  document.getElementById("e-wochestart").addEventListener("change", (e) => {
+    einstellungSetzen("wochestart", e.target.checked);
+    prod.modus = e.target.checked ? "woche" : "tag";
+    meldung("Gespeichert.");
+  });
+
+  document.getElementById("ps").addEventListener("click", async () => {
+    const pw = document.getElementById("np").value;
+    if (pw.length < 8) { meldung("Das Passwort braucht mindestens 8 Zeichen.", "warn"); return; }
+    const { error } = await db.auth.updateUser({ password: pw });
+    if (error) meldung(fehlertext(error), "fehler");
+    else { document.getElementById("np").value = ""; meldung("Passwort geändert."); }
+  });
+}
+
+// -----------------------------------------------------------------
+//  Navigation
+// -----------------------------------------------------------------
+
+const SEITEN = [
+  { pfad: "dashboard",    titel: "Start",        zeichen: "◧", zeige: seiteDashboard },
+  { pfad: "produktion",   titel: "Produktion",   zeichen: "▶", zeige: seiteProduktion },
+  { pfad: "kontrolle",    titel: "Kontrolle",    zeichen: "✓", zeige: seiteKontrolle },
+  { pfad: "lager",        titel: "Lager",        zeichen: "▤", zeige: seiteLager },
+  { pfad: "bestellungen", titel: "Bestellungen", zeichen: "≡", zeige: seiteBestellungen },
+  { pfad: "einstellungen", titel: "Einstellungen", zeichen: "⚙", zeige: seiteEinstellungen },
+];
+
+function zeichneSeite() {
+  const roh = location.hash.replace(/^#\/?/, "").split("/")[0];
+  const pfad = SEITEN.some((s) => s.pfad === roh) ? roh : "dashboard";
+  const seite = SEITEN.find((s) => s.pfad === pfad);
+  document.querySelectorAll("[data-nav]").forEach((el) => {
+    el.classList.toggle("aktiv", el.dataset.nav === pfad);
+  });
+  window.scrollTo(0, 0);
+  seite.zeige(document.getElementById("inhalt"));
+}
+
+function zeichneGeruest() {
+  const anzeige = (profil && (profil.full_name || profil.email)) || "";
+  WURZEL.innerHTML = ''
+    + '<header class="kopf">'
+    + '<img class="kopf__logo" src="./logo.png" alt="Hofer + Co.">'
+    + '<span class="kopf__benutzer" data-benutzername>' + esc(anzeige) + '</span>'
+    + '<button class="kopf__abmelden" id="ab">Abmelden</button></header>'
+    + '<div class="rahmen"><nav class="nav" aria-label="Hauptnavigation">'
+    + SEITEN.map((s) => '<a class="nav__punkt" data-nav="' + s.pfad + '" href="#/' + s.pfad + '">'
+        + '<span class="nav__zeichen" aria-hidden="true">' + s.zeichen + '</span>'
+        + '<span class="nav__text">' + esc(s.titel) + '</span></a>').join("")
+    + '</nav><main class="inhalt" id="inhalt"></main></div>';
+
+  document.getElementById("ab").addEventListener("click", async () => {
+    const ok = await nachfragen({ titel: "Abmelden",
+      text: "Du musst dich danach neu anmelden.", bestaetigen: "Abmelden" });
+    if (!ok) return;
+    await db.auth.signOut();
+    profil = null;
+    location.hash = "";
+    zeigeLogin();
+  });
+
+  if (!location.hash) location.hash = "#/dashboard";
+  zeichneSeite();
+}
+
+window.addEventListener("hashchange", () => {
+  if (document.getElementById("inhalt")) zeichneSeite();
+});
+
+// -----------------------------------------------------------------
+//  Start
+// -----------------------------------------------------------------
+
+try {
+  stand("Verbindung wird aufgebaut …");
+  db = await verbinden();
+
+  stand("Anmeldung wird geprüft …");
+  const p = await profilLaden();
+
+  BOOT.hidden = true;
+  WURZEL.hidden = false;
+
+  if (!p) {
+    zeigeLogin();
+  } else if (p.is_active === false) {
+    await db.auth.signOut();
+    profil = null;
+    zeigeLogin();
+    meldung("Dieses Konto ist deaktiviert. Bitte an den Besitzer wenden.", "fehler");
+  } else {
+    zeichneGeruest();
+  }
+} catch (fehler) {
+  console.error(fehler);
+  startFehler(esc(fehler.message || String(fehler)));
+}
+</script>
+</body>
+</html>
