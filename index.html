@@ -966,8 +966,8 @@ a:focus-visible {
            letter-spacing: .06em; position: sticky; left: 0; }
 
 .pw-zeile--kopf > div:not(.pw-name) { display: grid;
-  grid-template-columns: repeat(var(--pw-tage, 21), 1fr); }
-.pw-zeile--kopf { grid-template-columns: 130px repeat(var(--pw-tage, 21), 1fr); }
+  grid-template-columns: repeat(var(--pw-tage, 15), 1fr); }
+.pw-zeile--kopf { grid-template-columns: 130px repeat(var(--pw-tage, 15), 1fr); }
 .pw-tag { padding: 6px 2px; text-align: center; font-size: .7rem;
           border-left: 1px solid var(--linie); }
 .pw-tag--we { background: #f7f8fa; color: var(--gedaempft); }
@@ -976,19 +976,19 @@ a:focus-visible {
 .pw-tag__datum { display: block; color: var(--gedaempft); }
 
 .pw-spuren { position: relative; display: grid;
-             grid-template-columns: repeat(var(--pw-tage, 21), 1fr); min-height: 46px; }
+             grid-template-columns: repeat(var(--pw-tage, 15), 1fr); min-height: 46px; }
 .pw-zelle { border-left: 1px solid var(--linie); }
 .pw-zelle--heute { background: rgba(0,56,132,.05); }
 .pw-zelle--ziel { background: var(--signalgelb); opacity: .4; }
 .pw-balken-schicht { position: absolute; inset: 3px 0; display: grid;
-                     grid-template-columns: repeat(var(--pw-tage, 21), 1fr);
+                     grid-template-columns: repeat(var(--pw-tage, 15), 1fr);
                      pointer-events: none; }
 .pw-balken { grid-column: calc(var(--von) + 1) / span var(--dauer);
              background: var(--marke); color: #fff; border-radius: 3px;
              padding: 5px 7px; font-size: .76rem; font-weight: 650;
              display: flex; align-items: center; gap: 5px; overflow: hidden;
              pointer-events: auto; cursor: grab; user-select: none;
-             -webkit-user-select: none; touch-action: pan-y; }
+             -webkit-user-select: none; touch-action: none; }
 .pw-balken--laeuft { background: var(--gut); }
 .pw-balken--offen { border-left: 4px dashed rgba(255,255,255,.6); }
 .pw-balken--zieht { opacity: .35; }
@@ -1011,6 +1011,9 @@ a:focus-visible {
 .pw-balken--fertig .pw-balken__nr { text-decoration: line-through; opacity: .85; }
 .pw-legende { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px;
               font-size: .8rem; color: var(--gedaempft); }
+
+.pdfabstand { height: 10px; }
+.feld--abstand { margin-top: 22px; }
 </style>
 </head>
 <body>
@@ -1054,7 +1057,7 @@ const APP_UNTERTITEL = "HUDSON TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "9.1.0";
+const APP_VERSION = "9.2.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -1957,6 +1960,7 @@ async function seiteProduktion(b) {
     prod.parks = await ladeParks(prod.ansicht === "maschinen");
     prod.maschinen = await ladeMaschinen(prod.ansicht === "maschinen");
     prod.auftraege = await ladeLaufendeAuftraege();
+    try { plan.auftraege = await ladePlanAuftraege(); } catch (f) { plan.auftraege = []; }
   } catch (f) {
     ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
     return;
@@ -2189,15 +2193,54 @@ function eingabenBinden(raster, staende, b) {
 function auftragsKnoepfeBinden(raster, b) {
   raster.querySelectorAll("[data-auftrag-start]").forEach((el) => {
     el.onclick = async () => {
-      const maschine = prod.maschinen.find((m) => m.id === el.dataset.auftragStart);
+      const maschineId = el.dataset.auftragStart;
+      const maschine = prod.maschinen.find((m) => m.id === maschineId);
+
+      // Was ist auf dieser Maschine eingeplant, aber noch nicht gestartet?
+      let geplant = [];
+      try {
+        const { data, error } = await zeitlimit(
+          db.from("jobs").select("*").eq("machine_id", maschineId)
+            .is("ended_at", null).not("planned_from", "is", null)
+            .order("planned_from"), 10000, "Planung");
+        if (!error) geplant = (data || []).filter((j) => j.plan_status !== "fertig");
+      } catch (f) { /* dann eben ohne Vorschläge */ }
+
+      let auftrag = null;
+
+      if (geplant.length) {
+        const wahl = await auswahlDialog(
+          "Auftrag auf " + (maschine ? maschine.name : "dieser Maschine"),
+          geplant.map((j) => ({
+            wert: j.id,
+            text: j.job_number + (j.planned_from ? "  ab " + kurzDatum(j.planned_from) : "")
+              + (j.target_quantity ? "  ·  " + zahlText(j.target_quantity) + " Stück" : ""),
+          })).concat([{ wert: "__neu", text: "+ Neuer Auftrag, nicht geplant" }]));
+
+        if (wahl === null) return;
+        if (wahl !== "__neu") auftrag = geplant.find((j) => j.id === wahl);
+      }
+
+      if (auftrag) {
+        // Vorhandenen Auftrag starten: er läuft ab jetzt auf dieser Maschine
+        const { error } = await db.from("jobs").update({
+          started_at: new Date().toISOString(),
+          plan_status: "laeuft",
+        }).eq("id", auftrag.id);
+        if (error) meldung(fehlertext(error), "fehler");
+        else { meldung("Auftrag " + auftrag.job_number + " gestartet."); seiteProduktion(b); }
+        return;
+      }
+
       const werte = await dialogFelder({
-        titel: "Auftrag starten",
+        titel: "Neuer Auftrag",
         text: maschine ? "Maschine " + maschine.name : "",
         felder: [
           { name: "nummer", label: "HOCO Nr.", pflicht: true,
             platzhalter: "HOCO Nr. eingeben" },
           { name: "menge", label: "Fertigungsmenge", typ: "number",
             platzhalter: "wie viele Stück, kann leer bleiben" },
+          { name: "tage", label: "Dauer in Tagen", typ: "number", wert: 1 },
           { name: "notiz", label: "Notiz", typ: "textarea", platzhalter: "kann leer bleiben" },
         ],
         bestaetigen: "Auftrag starten",
@@ -2205,9 +2248,12 @@ function auftragsKnoepfeBinden(raster, b) {
       if (!werte) return;
 
       const { error } = await db.from("jobs").insert({
-        machine_id: el.dataset.auftragStart,
+        machine_id: maschineId,
         job_number: werte.nummer,
         target_quantity: werte.menge ? Math.max(0, Math.round(werte.menge)) : null,
+        planned_days: Math.max(1, Math.round(werte.tage || 1)),
+        planned_from: naechsterArbeitstag(isoDatum(new Date())),
+        plan_status: "laeuft",
         note: werte.notiz || null,
       });
       if (error) meldung(fehlertext(error), "fehler");
@@ -2264,7 +2310,7 @@ function auftragsKnoepfeBinden(raster, b) {
 
 const plan = {
   start: null,      // erster sichtbarer Tag
-  tage: 21,
+  tage: 15,   // drei Wochen zu je fünf Arbeitstagen
   auftraege: null,
 };
 
@@ -2288,6 +2334,48 @@ const PLANSTATUS = {
   laeuft:  { name: "Läuft",    zeichen: "▶" },
   fertig:  { name: "Fertig",   zeichen: "✔" },
 };
+
+// Samstag und Sonntag werden auf der Planwand übersprungen.
+function istWochenende(datum) {
+  const t = ausIso(datum).getDay();
+  return t === 0 || t === 6;
+}
+
+function naechsterArbeitstag(datum) {
+  let d = datum;
+  while (istWochenende(d)) d = plusTage(d, 1);
+  return d;
+}
+
+// Zählt n Arbeitstage weiter, Wochenenden übersprungen.
+function arbeitstagePlus(datum, n) {
+  let d = naechsterArbeitstag(datum);
+  for (let i = 0; i < n; i++) { d = naechsterArbeitstag(plusTage(d, 1)); }
+  return d;
+}
+
+// Liste von n Arbeitstagen ab einem Datum
+function arbeitstage(ab, anzahl) {
+  const liste = [];
+  let d = naechsterArbeitstag(ab);
+  for (let i = 0; i < anzahl; i++) { liste.push(d); d = naechsterArbeitstag(plusTage(d, 1)); }
+  return liste;
+}
+
+// Erster freier Tag auf einer Maschine: hinter dem letzten geplanten Auftrag.
+function naechsterFreierTag(maschineId) {
+  const heute = naechsterArbeitstag(isoDatum(new Date()));
+  const eigene = (plan.auftraege || []).filter(
+    (j) => j.machine_id === maschineId && j.planned_from && j.plan_status !== "fertig");
+  if (!eigene.length) return heute;
+
+  let spaetestes = heute;
+  eigene.forEach((j) => {
+    const ende = arbeitstagePlus(j.planned_from, j.planned_days || 1);
+    if (ende > spaetestes) spaetestes = ende;
+  });
+  return naechsterArbeitstag(spaetestes);
+}
 
 function farbeVon(wert) {
   return PLANFARBEN.find((f) => f.wert === wert) || PLANFARBEN[0];
@@ -2322,7 +2410,7 @@ async function seitePlanwand(b) {
 }
 
 async function ansichtPlanwand(ziel, b) {
-  if (!plan.start) plan.start = wochenStart(isoDatum(new Date()));
+  if (!plan.start) plan.start = naechsterArbeitstag(wochenStart(isoDatum(new Date())));
 
   ziel.innerHTML = '<div class="steuerung">'
     + '<button class="knopf knopf--klein" id="pw-zurueck">‹</button>'
@@ -2335,11 +2423,11 @@ async function ansichtPlanwand(ziel, b) {
     + '<div id="pw-inhalt"><div class="laedt">Planung wird geladen …</div></div>';
 
   document.getElementById("pw-zurueck").onclick = () => {
-    plan.start = plusTage(plan.start, -7); seitePlanwand(b); };
+    plan.start = naechsterArbeitstag(plusTage(plan.start, -7)); seitePlanwand(b); };
   document.getElementById("pw-vor").onclick = () => {
-    plan.start = plusTage(plan.start, 7); seitePlanwand(b); };
+    plan.start = naechsterArbeitstag(plusTage(plan.start, 7)); seitePlanwand(b); };
   document.getElementById("pw-heute").onclick = () => {
-    plan.start = wochenStart(isoDatum(new Date())); seitePlanwand(b); };
+    plan.start = naechsterArbeitstag(wochenStart(isoDatum(new Date()))); seitePlanwand(b); };
 
   const neu = document.getElementById("pw-neu");
   if (neu) neu.onclick = () => planAuftragDialog(null, b);
@@ -2356,8 +2444,7 @@ async function ansichtPlanwand(ziel, b) {
 }
 
 function zeichnePlanwand(b) {
-  const tage = [];
-  for (let i = 0; i < plan.tage; i++) tage.push(plusTage(plan.start, i));
+  const tage = arbeitstage(plan.start, plan.tage);
   const heute = isoDatum(new Date());
 
   document.getElementById("pw-titel").textContent =
@@ -2389,19 +2476,15 @@ function zeichnePlanwand(b) {
           const balken = plan.auftraege
             .filter((j) => j.machine_id === m.id && j.planned_from && !j.ended_at)
             .map((j) => {
-              const von = tage.indexOf(j.planned_from);
-              if (von === -1) {
-                // beginnt vor dem sichtbaren Bereich, ragt aber hinein?
-                const ende = plusTage(j.planned_from, (j.planned_days || 1) - 1);
-                if (j.planned_from < tage[0] && ende >= tage[0]) {
-                  const dauer = Math.min(plan.tage,
-                    Math.round((ausIso(ende) - ausIso(tage[0])) / 86400000) + 1);
-                  return planBalken(j, 0, dauer, true);
-                }
-                return "";
-              }
-              const dauer = Math.min(j.planned_days || 1, plan.tage - von);
-              return planBalken(j, von, dauer, false);
+              // Alle Arbeitstage, die dieser Auftrag belegt
+              const belegt = arbeitstage(j.planned_from, j.planned_days || 1);
+              const sichtbar = belegt.filter((t) => tage.indexOf(t) !== -1);
+              if (!sichtbar.length) return "";
+
+              const von = tage.indexOf(sichtbar[0]);
+              const dauer = sichtbar.length;
+              const angeschnitten = belegt[0] !== sichtbar[0];
+              return planBalken(j, von, dauer, angeschnitten);
             }).join("");
 
           return '<div class="pw-zeile" data-maschine="' + esc(m.id) + '">'
@@ -2614,6 +2697,7 @@ async function planAuftragDialog(auftrag, b) {
     + (auftrag && auftrag.drawing_url
         ? '<a class="pdflink" href="' + esc(auftrag.drawing_url)
           + '" target="_blank" rel="noopener">Zeichnung öffnen</a>' : "")
+    + '<div class="pdfabstand"></div>' 
     + (darf
         ? '<label class="knopf bildknopf">PDF auswählen'
           + '<input type="file" id="pl-pdf" accept="application/pdf" hidden></label>'
@@ -2691,6 +2775,8 @@ async function planAuftragDialog(auftrag, b) {
       if (!nr) { meldung("HOCO Nr. wird benötigt.", "warn"); return; }
       daten.job_number = nr;
       daten.machine_id = $("pl-maschine").value;
+      // Kein Datum angegeben: hinter den letzten Auftrag dieser Maschine
+      if (!daten.planned_from) daten.planned_from = naechsterFreierTag(daten.machine_id);
       ({ error: fehler } = await db.from("jobs").insert(daten));
     }
 
@@ -4028,7 +4114,7 @@ async function seiteEinkauf(b) {
   let liste = [];
   try {
     const { data, error } = await zeitlimit(
-      db.from("shopping_items").select("*")
+      db.from("shopping_items").select("*, profiles!shopping_items_created_by_fkey(full_name, email)")
         .eq("is_done", einkauf.zeigeErledigte)
         .order("prio").order("created_at"), 10000, "Einkaufsliste");
     if (error) throw error;
@@ -4055,7 +4141,10 @@ async function seiteEinkauf(b) {
                     : '<input type="checkbox" data-ekfertig="' + esc(z.id) + '">')
                 + '<span class="notiz__text">' + esc(z.text)
                 + (z.menge ? ' <span class="klein">' + esc(z.menge) + '</span>' : "")
-                + (z.laden ? '<div class="klein">bei ' + esc(z.laden) + '</div>' : "")
+                + '<div class="klein">'
+                + (z.laden ? "bei " + esc(z.laden) + " · " : "")
+                + "von " + esc((z.profiles && (z.profiles.full_name || z.profiles.email))
+                    || "unbekannt") + '</div>' 
                 + '</span>'
                 + '<button class="chipweg chipweg--bearb" data-ekbearb="' + esc(z.id)
                 + '" title="bearbeiten">✎</button>'
