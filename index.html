@@ -128,16 +128,22 @@ html, body {
   right: 0;
   z-index: 20;
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: none;
   background: var(--flaeche);
   border-top: 1px solid var(--linie-stark);
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+.nav::-webkit-scrollbar { display: none; }
+
 .nav__punkt {
   display: grid;
   place-items: center;
   gap: 2px;
+  flex: 1 0 auto;
+  min-width: 72px;
   height: var(--navhoehe);
   text-decoration: none;
   color: var(--gedaempft);
@@ -888,6 +894,52 @@ a:focus-visible {
 }
 .pd-zeile--neu { border-style: dashed; border-color: var(--marke); color: var(--marke);
                  font-weight: 600; text-align: center; margin-top: 6px; }
+
+/* ---------- Einkaufsliste ---------- */
+.priopunkt { display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+             margin-right: 8px; vertical-align: middle; }
+.prio1 { background: #b3261e; }
+.prio2 { background: #c08415; }
+.prio3 { background: var(--marke); }
+.prio4 { background: var(--linie-stark); }
+.hakenfertig { color: var(--gut); font-weight: 700; width: 20px; flex: none; }
+
+/* ---------- Rechner ---------- */
+.wahlgitter { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.wahlknopf { background: var(--flaeche); border: 1px solid var(--linie-stark);
+             border-radius: var(--radius); padding: 12px 10px; font: inherit;
+             font-size: .9rem; cursor: pointer; }
+.wahlknopf.aktiv { background: var(--marke); border-color: var(--marke); color: #fff;
+                   font-weight: 650; }
+.karte--ergebnis { background: var(--marke); color: #fff; border-color: var(--marke); }
+.karte--ergebnis .hinweis { color: rgba(255,255,255,.75); }
+.ergebnis { margin-bottom: 10px; }
+.ergebnis__titel { font-size: .78rem; opacity: .8; }
+.ergebnis__wert { font-size: 2.2rem; font-weight: 650; line-height: 1.1;
+                  font-variant-numeric: tabular-nums; }
+.ergebnis__wert span { font-size: .9rem; font-weight: 400; opacity: .8; margin-left: 6px; }
+.ergebnis__wert--klein { font-size: 1.5rem; }
+.ergebnisreihe { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.feldlabel { display: block; margin-bottom: 5px; font-size: .85rem;
+             font-weight: 600; color: var(--gedaempft); }
+
+/* ---------- Fotos bei Kontrollmeldungen ---------- */
+.bildwahl { display: flex; gap: 8px; flex-wrap: wrap; }
+.bildknopf { cursor: pointer; text-align: center; flex: 1; min-width: 130px; }
+.bildliste { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.bildchen { position: relative; }
+.bildchen img { width: 74px; height: 74px; object-fit: cover; border-radius: var(--radius);
+                border: 1px solid var(--linie-stark); display: block; }
+.bildchen__weg { position: absolute; top: -6px; right: -6px; width: 22px; height: 22px;
+                 border-radius: 50%; border: none; background: var(--gefahr); color: #fff;
+                 font-size: .85rem; line-height: 1; cursor: pointer; }
+.bildliste--klein img { width: 52px; height: 52px; object-fit: cover;
+                        border-radius: 3px; border: 1px solid var(--linie); }
+
+@media (min-width: 780px) {
+  .wahlgitter { grid-template-columns: repeat(3, 1fr); }
+  .ergebnisreihe { grid-template-columns: repeat(4, 1fr); }
+}
 </style>
 </head>
 <body>
@@ -931,7 +983,7 @@ const APP_UNTERTITEL = "HUDSON TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "7.1.0";
+const APP_VERSION = "8.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -2477,22 +2529,14 @@ async function seiteKontrolle(b) {
 
   ziel.querySelectorAll("[data-melden]").forEach((el) => {
     el.onclick = async () => {
-      const w = await dialogFelder({
-        titel: "Ausschuss melden",
-        text: "Auftrag " + el.dataset.nr,
-        felder: [
-          { name: "anzahl", label: "Anzahl Ausschussteile", typ: "number", pflicht: true },
-          { name: "notiz", label: "Was war nicht in Ordnung?", typ: "textarea",
-            platzhalter: "z. B. Durchmesser zu gross, Grat an der Stirnseite" },
-        ],
-        bestaetigen: "Melden",
-      });
+      const w = await meldungDialog(el.dataset.nr);
       if (!w) return;
 
       const { error } = await db.from("quality_reports").insert({
         job_id: el.dataset.melden,
         scrap_count: Math.max(0, Math.round(w.anzahl)),
         note: w.notiz || null,
+        images: w.bilder,
       });
       if (error) meldung(fehlertext(error), "fehler");
       else { meldung("Meldung erfasst."); seiteKontrolle(b); }
@@ -2545,383 +2589,117 @@ async function seiteKontrolle(b) {
   });
 }
 
+// Meldedialog mit Fotos. Bilder werden vor dem Hochladen verkleinert,
+// damit der Speicherplatz reicht und es auch mit schwachem WLAN geht.
+function meldungDialog(auftragNr) {
+  return new Promise((fertig) => {
+    const huelle = document.createElement("div");
+    huelle.className = "dialog-huelle";
+    huelle.innerHTML = '<div class="dialog"><h2>Ausschuss melden</h2>'
+      + '<p>Auftrag ' + esc(auftragNr) + '</p>'
+      + '<label class="feld"><span>Anzahl Ausschussteile</span>'
+      + '<input id="md-anzahl" type="number" inputmode="numeric" min="0" step="1"></label>'
+      + '<label class="feld"><span>Was war nicht in Ordnung?</span>'
+      + '<textarea id="md-notiz" rows="3" placeholder="z. B. Durchmesser zu gross, Grat an der Stirnseite"></textarea></label>'
+      + '<div class="feld"><span class="feldlabel">Fotos</span>'
+      + '<div class="bildwahl">'
+      + '<label class="knopf bildknopf">Foto aufnehmen'
+      + '<input type="file" id="md-kamera" accept="image/*" capture="environment" multiple hidden></label>'
+      + '<label class="knopf bildknopf">Aus der Galerie'
+      + '<input type="file" id="md-datei" accept="image/*" multiple hidden></label>'
+      + '</div>'
+      + '<div class="bildliste" id="md-bilder"></div>'
+      + '<span class="feldhinweis" id="md-stand"></span></div>'
+      + '<div class="dialog__knoepfe">'
+      + '<button class="knopf knopf--still" id="md-nein">Abbrechen</button>'
+      + '<button class="knopf knopf--haupt" id="md-ja">Melden</button>'
+      + '</div></div>';
+    document.body.appendChild(huelle);
+
+    const $ = (k) => huelle.querySelector("#" + k);
+    const bilder = [];      // fertige Adressen
+    const wartend = [];     // Dateien, die noch hochgeladen werden
+
+    const zu = (wert) => { huelle.remove(); fertig(wert); };
+    $("md-nein").onclick = () => zu(null);
+    huelle.onclick = (e) => { if (e.target === huelle) zu(null); };
+    $("md-anzahl").focus();
+
+    const zeichnen = () => {
+      $("md-bilder").innerHTML = bilder.map((b2, i) =>
+        '<div class="bildchen"><img src="' + esc(b2) + '" alt="">'
+        + '<button class="bildchen__weg" data-weg="' + i + '">×</button></div>').join("");
+      $("md-bilder").querySelectorAll("[data-weg]").forEach((el) => {
+        el.onclick = () => { bilder.splice(Number(el.dataset.weg), 1); zeichnen(); };
+      });
+    };
+
+    const verarbeiten = async (dateien) => {
+      for (const datei of dateien) {
+        if (!datei.type.startsWith("image/")) continue;
+        $("md-stand").textContent = "Bild wird hochgeladen …";
+        try {
+          const klein = await bildVerkleinern(datei);
+          const name = "meldung/" + Date.now() + "-" + Math.random().toString(36).slice(2, 8) + ".jpg";
+          const { error } = await db.storage.from("kontrolle").upload(name, klein,
+            { contentType: "image/jpeg" });
+          if (error) throw error;
+          const { data } = db.storage.from("kontrolle").getPublicUrl(name);
+          bilder.push(data.publicUrl);
+          zeichnen();
+          $("md-stand").textContent = bilder.length + " Foto" + (bilder.length === 1 ? "" : "s");
+        } catch (f) {
+          $("md-stand").textContent = "Bild konnte nicht hochgeladen werden: " + (f.message || f);
+        }
+      }
+    };
+
+    $("md-kamera").onchange = (e) => verarbeiten(Array.from(e.target.files || []));
+    $("md-datei").onchange = (e) => verarbeiten(Array.from(e.target.files || []));
+
+    $("md-ja").onclick = () => {
+      const anzahl = Number($("md-anzahl").value);
+      if (!Number.isFinite(anzahl) || anzahl < 0) {
+        meldung("Bitte eine Anzahl eintragen.", "warn");
+        return;
+      }
+      zu({ anzahl: anzahl, notiz: ($("md-notiz").value || "").trim(), bilder: bilder });
+    };
+  });
+}
+
+// Verkleinert ein Foto auf höchstens 1600 Pixel Kantenlänge.
+function bildVerkleinern(datei) {
+  return new Promise((fertig, ablehnen) => {
+    const leser = new FileReader();
+    leser.onload = () => {
+      const bild = new Image();
+      bild.onload = () => {
+        const max = 1600;
+        let { width: bw, height: bh } = bild;
+        if (bw > max || bh > max) {
+          const f = Math.min(max / bw, max / bh);
+          bw = Math.round(bw * f); bh = Math.round(bh * f);
+        }
+        const c = document.createElement("canvas");
+        c.width = bw; c.height = bh;
+        c.getContext("2d").drawImage(bild, 0, 0, bw, bh);
+        c.toBlob((blob) => blob ? fertig(blob) : ablehnen(new Error("Bild nicht lesbar")),
+          "image/jpeg", 0.82);
+      };
+      bild.onerror = () => ablehnen(new Error("Bild nicht lesbar"));
+      bild.src = leser.result;
+    };
+    leser.onerror = () => ablehnen(new Error("Datei nicht lesbar"));
+    leser.readAsDataURL(datei);
+  });
+}
+
 function datumZeitKurz(iso) {
   if (!iso) return "";
   const d = new Date(iso);
   const p = (n) => String(n).padStart(2, "0");
   return p(d.getDate()) + "." + p(d.getMonth() + 1) + ". " + p(d.getHours()) + ":" + p(d.getMinutes());
-}
-
-// =================================================================
-//  ERFASSEN MIT DER KAMERA
-//
-//  Zwei Wege:
-//   1. Barcode      – falls ein Code vorhanden ist
-//   2. Foto + Text  – Bild aufnehmen, Rahmen über die Nummer ziehen,
-//                     die App liest den Text aus
-//
-//  Gibt die erkannte Nummer als Text zurück, oder null bei Abbruch.
-// =================================================================
-
-let ocrArbeiter = null;   // wird nur einmal geladen und dann behalten
-
-async function scannen(startModus) {
-  const huelle = document.createElement("div");
-  huelle.className = "dialog-huelle";
-  huelle.innerHTML = '<div class="scanner">'
-    + '<div class="scanner__modus">'
-    + '<button class="scanner__tab" data-modus="foto">Foto</button>'
-    + '<button class="scanner__tab" data-modus="barcode">Barcode</button>'
-    + '</div>'
-    + '<div class="scanner__buehne">'
-    + '<video id="scan-video" playsinline muted></video>'
-    + '<canvas id="scan-bild" hidden></canvas>'
-    + '<div class="scanner__rahmen" id="scan-rahmen" hidden></div>'
-    + '<div class="scanner__auswahl" id="scan-auswahl" hidden></div>'
-    + '<button id="scan-gross" class="scan-gross" hidden>📷 Foto aufnehmen</button>'
-    + '</div>'
-    + '<div class="scanner__vorschlaege" id="scan-vorschlaege" hidden></div>'
-    + '<div class="scanner__leiste">'
-    + '<div id="scan-text">Kamera wird gestartet …</div>'
-    + '<div class="scanner__knoepfe">'
-    + '<button class="knopf knopf--still" id="scan-zu">Abbrechen</button>'
-    + '<button class="knopf knopf--haupt" id="scan-tun" hidden>Weiter</button>'
-    + '</div></div></div>';
-  document.body.appendChild(huelle);
-
-  const video   = document.getElementById("scan-video");
-  const leinwand = document.getElementById("scan-bild");
-  const rahmen  = document.getElementById("scan-rahmen");
-  const auswahl = document.getElementById("scan-auswahl");
-  const text    = document.getElementById("scan-text");
-  const tun     = document.getElementById("scan-tun");
-  const vorschlaege = document.getElementById("scan-vorschlaege");
-
-  let strom = null, laeuft = true, steuerung = null;
-  let modus = startModus || "foto";
-  let bildAufgenommen = false;
-  let zustand = "aufnehmen";
-
-  return new Promise(async (fertig) => {
-
-    const beenden = (ergebnis) => {
-      laeuft = false;
-      if (steuerung && steuerung.stop) { try { steuerung.stop(); } catch (e) {} }
-      if (strom) strom.getTracks().forEach((t) => t.stop());
-      huelle.remove();
-      fertig(ergebnis);
-    };
-
-    document.getElementById("scan-zu").onclick = () => beenden(null);
-    huelle.onclick = (e) => { if (e.target === huelle) beenden(null); };
-
-    // ---------- Kamera starten ----------
-    try {
-      strom = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 1920 } }, audio: false });
-      video.srcObject = strom;
-      await video.play();
-    } catch (f) {
-      text.textContent = "Kamera nicht verfügbar: " + f.message;
-      setTimeout(() => beenden(null), 3000);
-      return;
-    }
-
-    // ---------- Umschalten ----------
-    const modusSetzen = (neu) => {
-      modus = neu;
-      bildAufgenommen = false;
-      leinwand.hidden = true;
-      video.hidden = false;
-      auswahl.hidden = true;
-      vorschlaege.hidden = true;
-      vorschlaege.innerHTML = "";
-
-      huelle.querySelectorAll("[data-modus]").forEach((t) => {
-        t.classList.toggle("aktiv", t.dataset.modus === neu);
-      });
-
-      if (neu === "foto") {
-        rahmen.hidden = true;
-        tun.hidden = true;
-        zustand = "aufnehmen";
-        gross.hidden = false;
-        text.textContent = "Nummer ins Bild bringen, dann Knopf drücken";
-      } else {
-        rahmen.hidden = false;
-        tun.hidden = true;
-        text.textContent = "Barcode vor die Kamera halten";
-        barcodeSuchen();
-      }
-    };
-
-    huelle.querySelectorAll("[data-modus]").forEach((t) => {
-      t.onclick = () => modusSetzen(t.dataset.modus);
-    });
-
-    // ---------- Weg 1: Barcode ----------
-    async function barcodeSuchen() {
-      if ("BarcodeDetector" in window) {
-        try {
-          const erkenner = new window.BarcodeDetector();
-          const schleife = async () => {
-            if (!laeuft || modus !== "barcode") return;
-            try {
-              const treffer = await erkenner.detect(video);
-              if (treffer && treffer.length) return beenden(treffer[0].rawValue);
-            } catch (e) { /* einzelne Bilder dürfen misslingen */ }
-            requestAnimationFrame(schleife);
-          };
-          schleife();
-          return;
-        } catch (e) { /* weiter unten */ }
-      }
-
-      try {
-        text.textContent = "Scanner wird geladen …";
-        const zx = await zeitlimit(
-          import("https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/+esm"), 10000, "Scanner");
-        const leser = new zx.BrowserMultiFormatReader();
-        text.textContent = "Barcode vor die Kamera halten";
-        steuerung = await leser.decodeFromVideoElement(video, (erg) => {
-          if (erg && laeuft && modus === "barcode") beenden(erg.getText());
-        });
-      } catch (f) {
-        text.textContent = "Barcode-Erkennung nicht möglich. Bitte den Foto-Weg nehmen.";
-      }
-    }
-
-    // ---------- Weg 2: Foto und Text ----------
-
-    let start = null, kasten = null;
-
-    const punkt = (e) => {
-      const r = leinwand.getBoundingClientRect();
-      const q = e.touches ? e.touches[0] : e;
-      return { x: q.clientX - r.left, y: q.clientY - r.top };
-    };
-
-    const zeichneAuswahl = () => {
-      if (!kasten) { auswahl.hidden = true; return; }
-      auswahl.hidden = false;
-      auswahl.style.left = kasten.x + "px";
-      auswahl.style.top = kasten.y + "px";
-      auswahl.style.width = kasten.w + "px";
-      auswahl.style.height = kasten.h + "px";
-    };
-
-    const beginnen = (e) => {
-      if (!bildAufgenommen) return;
-      e.preventDefault();
-      start = punkt(e);
-      kasten = { x: start.x, y: start.y, w: 0, h: 0 };
-      zeichneAuswahl();
-    };
-
-    const ziehen = (e) => {
-      if (!start) return;
-      e.preventDefault();
-      const p = punkt(e);
-      kasten = {
-        x: Math.min(start.x, p.x), y: Math.min(start.y, p.y),
-        w: Math.abs(p.x - start.x), h: Math.abs(p.y - start.y),
-      };
-      zeichneAuswahl();
-    };
-
-    const loslassen = () => {
-      if (!start) return;
-      start = null;
-      if (kasten && kasten.w > 20 && kasten.h > 12) {
-        tun.hidden = false;
-        gross.hidden = true;
-        zustand = "erkennen";
-        tun.textContent = "Text erkennen";
-        text.textContent = "Rahmen passt? Dann auf Text erkennen";
-      }
-    };
-
-    leinwand.addEventListener("mousedown", beginnen);
-    leinwand.addEventListener("touchstart", beginnen, { passive: false });
-    window.addEventListener("mousemove", ziehen);
-    window.addEventListener("touchmove", ziehen, { passive: false });
-    window.addEventListener("mouseup", loslassen);
-    window.addEventListener("touchend", loslassen);
-
-    const fotoAufnehmen = () => {
-      // Wenn das Videobild noch keine Grösse hat, entsteht ein leeres
-      // Foto. Dann kurz warten und erneut versuchen.
-      if (!video.videoWidth || !video.videoHeight) {
-        text.textContent = "Kamera ist noch nicht bereit, einen Moment …";
-        setTimeout(fotoAufnehmen, 400);
-        return;
-      }
-
-      leinwand.width = video.videoWidth;
-      leinwand.height = video.videoHeight;
-      leinwand.getContext("2d").drawImage(video, 0, 0, leinwand.width, leinwand.height);
-      leinwand.hidden = false;
-      video.hidden = true;
-      bildAufgenommen = true;
-      kasten = null;
-      auswahl.hidden = true;
-      gross.hidden = true;
-      tun.hidden = true;
-      text.textContent = "Rahmen über die Artikelnummer ziehen";
-    };
-
-    const textErkennen = async () => {
-      if (!kasten) return;
-
-      // Vom angezeigten Bild auf die echte Bildgrösse umrechnen
-      const faktor = leinwand.width / leinwand.clientWidth;
-      const ausschnitt = document.createElement("canvas");
-      const breite = Math.round(kasten.w * faktor);
-      const hoehe = Math.round(kasten.h * faktor);
-
-      // Auf das Dreifache vergrössern, das hilft der Erkennung deutlich
-      const massstab = 3;
-      ausschnitt.width = breite * massstab;
-      ausschnitt.height = hoehe * massstab;
-      const ctx = ausschnitt.getContext("2d");
-      ctx.imageSmoothingQuality = "high";
-      ctx.drawImage(leinwand, Math.round(kasten.x * faktor), Math.round(kasten.y * faktor),
-        breite, hoehe, 0, 0, ausschnitt.width, ausschnitt.height);
-
-      // In Graustufen umwandeln und den Kontrast anheben
-      const bild = ctx.getImageData(0, 0, ausschnitt.width, ausschnitt.height);
-      const d = bild.data;
-      for (let i = 0; i < d.length; i += 4) {
-        const g = 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2];
-        const v = g < 110 ? 0 : g > 165 ? 255 : (g - 110) * 255 / 55;
-        d[i] = d[i + 1] = d[i + 2] = v;
-      }
-      ctx.putImageData(bild, 0, 0);
-
-      tun.hidden = true;
-      text.textContent = "Text wird gelesen … das kann beim ersten Mal etwas dauern";
-
-      try {
-        if (!ocrArbeiter) {
-          const T = await zeitlimit(
-            import("https://cdn.jsdelivr.net/npm/tesseract.js@5/+esm"), 20000, "Texterkennung");
-          ocrArbeiter = await T.createWorker("eng");
-          await ocrArbeiter.setParameters({
-            tessedit_char_whitelist:
-              "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-./ ",
-          });
-        }
-
-        const { data } = await ocrArbeiter.recognize(ausschnitt);
-        const kandidaten = kandidatenAus(data);
-
-        text.textContent = kandidaten.length
-          ? "Stimmt die Nummer? Sonst hier anpassen."
-          : "Nichts erkannt. Bitte von Hand eingeben.";
-
-        vorschlaege.hidden = false;
-        vorschlaege.innerHTML = ''
-          + '<div class="vorschlag__eingabe">'
-          + '<input type="text" id="scan-eingabe" value="' + esc(kandidaten[0] || "") + '"'
-          + ' placeholder="Artikelnummer" autocomplete="off" spellcheck="false">'
-          + '<button class="knopf knopf--haupt" id="scan-ok">Übernehmen</button>'
-          + '</div>'
-          + (kandidaten.length > 1
-            ? '<div class="vorschlag__liste">' + kandidaten.slice(1).map((k) =>
-                '<button class="vorschlag" data-wert="' + esc(k) + '">' + esc(k) + '</button>'
-              ).join("") + '</div>'
-            : "");
-
-        const eingabe = document.getElementById("scan-eingabe");
-        eingabe.focus();
-        eingabe.select();
-
-        const uebernehmen = () => {
-          const w = eingabe.value.trim();
-          if (w) beenden(w);
-        };
-        document.getElementById("scan-ok").onclick = uebernehmen;
-        eingabe.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); uebernehmen(); } };
-
-        // Ein Vorschlag füllt das Feld, damit er noch angepasst werden kann
-        vorschlaege.querySelectorAll("[data-wert]").forEach((el) => {
-          el.onclick = () => { eingabe.value = el.dataset.wert; eingabe.focus(); };
-        });
-
-        zeigeNeuKnopf();
-
-      } catch (f) {
-        text.textContent = "Texterkennung nicht möglich: " + f.message;
-        zeigeNeuKnopf();
-      }
-    };
-
-    const neuesFoto = () => {
-      vorschlaege.hidden = true;
-      vorschlaege.innerHTML = "";
-      video.hidden = false;
-      leinwand.hidden = true;
-      bildAufgenommen = false;
-      auswahl.hidden = true;
-      kasten = null;
-      zustand = "aufnehmen";
-      gross.hidden = false;
-      tun.hidden = true;
-      text.textContent = "Nummer ins Bild bringen, dann Knopf drücken";
-    };
-
-    const zeigeNeuKnopf = () => {
-      zustand = "neu";
-      tun.hidden = false;
-      tun.textContent = "Neues Foto";
-      gross.hidden = true;
-    };
-
-    // Ein einziger Knopf, der je nach Zustand etwas anderes tut.
-    const knopfDruck = () => {
-      if (zustand === "neu") return neuesFoto();
-      if (!bildAufgenommen) return fotoAufnehmen();
-      return textErkennen();
-    };
-
-    tun.onclick = knopfDruck;
-    tun.addEventListener("touchend", (e) => { e.preventDefault(); knopfDruck(); });
-
-    const gross = document.getElementById("scan-gross");
-    gross.onclick = fotoAufnehmen;
-    gross.addEventListener("touchend", (e) => { e.preventDefault(); fotoAufnehmen(); });
-
-    modusSetzen(modus);
-  });
-}
-
-// Aus dem erkannten Text mögliche Artikelnummern herausziehen.
-// Es ist alles erlaubt: nur Buchstaben, nur Zahlen, mit Punkt,
-// Bindestrich oder Leerzeichen. Bewertet wird nach dem Muster,
-// die wahrscheinlichste Nummer steht oben.
-function kandidatenAus(data) {
-  const roh = (data && data.text) || "";
-  const gefunden = [];
-
-  // Artikelnummern können alles sein: nur Buchstaben, nur Zahlen,
-  // mit Punkt, Bindestrich oder Leerzeichen. Deshalb wird hier
-  // nichts weggefiltert ausser offensichtlichem Unsinn.
-  const aufnehmen = (t, behalteLeerzeichen) => {
-    let x = (t || "").trim();
-    if (!behalteLeerzeichen) x = x.replace(/\s+/g, "");
-    else x = x.replace(/\s+/g, " ");
-    x = x.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, "");   // Ränder säubern
-    if (x.length < 2 || x.length > 40) return;
-    if (!/[A-Za-z0-9]/.test(x)) return;
-    const gross = x.toUpperCase();
-    if (!gefunden.includes(gross)) gefunden.push(gross);
-  };
-
-  // Ganze Zeilen zuerst (mit Leerzeichen), dann einzelne Wörter
-  roh.split("\n").forEach((z) => aufnehmen(z, true));
-  roh.split(/[\s,;|]+/).forEach((w) => aufnehmen(w, false));
-
-  return gefunden.slice(0, 8);
 }
 
 // =================================================================
@@ -3671,6 +3449,361 @@ async function lagerplatzAnlegen() {
 // =================================================================
 //  BESTELLUNGEN
 // =================================================================
+//  EINKAUFSLISTE
+//  Für alles, was man beim nächsten Ladenbesuch mitnehmen soll.
+// =================================================================
+
+const PRIO = {
+  1: { text: "Sofort", kurz: "!", farbe: "prio1", hilfe: "Brauche ich jetzt gerade" },
+  2: { text: "Heute", kurz: "H", farbe: "prio2", hilfe: "Sollte heute noch kommen" },
+  3: { text: "Diese Woche", kurz: "W", farbe: "prio3", hilfe: "Hat ein paar Tage Zeit" },
+  4: { text: "Irgendwann", kurz: "~", farbe: "prio4", hilfe: "Wäre schön, eilt aber nicht" },
+};
+
+const einkauf = { zeigeErledigte: false };
+
+async function seiteEinkauf(b) {
+  b.innerHTML = '<h1 class="seitentitel">Einkaufsliste</h1>'
+    + '<button class="knopf knopf--haupt knopf--breit" id="ek-neu">+ Auf die Liste setzen</button>'
+    + '<div id="ek-inhalt"><div class="laedt">Wird geladen …</div></div>';
+
+  document.getElementById("ek-neu").onclick = () => einkaufDialog(null, b);
+
+  const ziel = document.getElementById("ek-inhalt");
+  let liste = [];
+  try {
+    const { data, error } = await zeitlimit(
+      db.from("shopping_items").select("*")
+        .eq("is_done", einkauf.zeigeErledigte)
+        .order("prio").order("created_at"), 10000, "Einkaufsliste");
+    if (error) throw error;
+    liste = data || [];
+  } catch (f) {
+    ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  // Nach Dringlichkeit gruppieren
+  const gruppen = {};
+  liste.forEach((z) => { (gruppen[z.prio] = gruppen[z.prio] || []).push(z); });
+
+  ziel.innerHTML = (liste.length
+      ? Object.keys(gruppen).sort().map((prio) => {
+          const p = PRIO[prio] || PRIO[3];
+          return '<section class="karte"><div class="karte__kopf">'
+            + '<h2><span class="priopunkt ' + p.farbe + '"></span>' + esc(p.text) + '</h2>'
+            + '<span class="klein">' + gruppen[prio].length + '</span></div>'
+            + '<div class="notizen">'
+            + gruppen[prio].map((z) => '<label class="notiz">'
+                + (einkauf.zeigeErledigte
+                    ? '<span class="hakenfertig">✓</span>'
+                    : '<input type="checkbox" data-ekfertig="' + esc(z.id) + '">')
+                + '<span class="notiz__text">' + esc(z.text)
+                + (z.menge ? ' <span class="klein">' + esc(z.menge) + '</span>' : "")
+                + (z.laden ? '<div class="klein">bei ' + esc(z.laden) + '</div>' : "")
+                + '</span>'
+                + '<button class="chipweg chipweg--bearb" data-ekbearb="' + esc(z.id)
+                + '" title="bearbeiten">✎</button>'
+                + '<button class="chipweg" data-ekweg="' + esc(z.id) + '" title="löschen">×</button>'
+                + '</label>').join("")
+            + '</div></section>';
+        }).join("")
+      : '<div class="karte karte--hinweis"><p>'
+        + (einkauf.zeigeErledigte ? "Noch nichts abgehakt." : "Die Liste ist leer. Sehr gut.")
+        + '</p></div>')
+
+    + '<button class="linkknopf" id="ek-wechsel">'
+    + (einkauf.zeigeErledigte ? "Offene Punkte anzeigen" : "Bereits Erledigtes anzeigen")
+    + '</button>';
+
+  document.getElementById("ek-wechsel").onclick = () => {
+    einkauf.zeigeErledigte = !einkauf.zeigeErledigte;
+    seiteEinkauf(b);
+  };
+
+  ziel.querySelectorAll("[data-ekfertig]").forEach((el) => {
+    el.onchange = async () => {
+      el.checked = false;
+      const ok = await nachfragen({ titel: "Eingekauft?",
+        text: "Hast du das wirklich schon geholt?", bestaetigen: "Ja, habe ich" });
+      if (!ok) return;
+      const { error } = await db.from("shopping_items").update({
+        is_done: true, done_at: new Date().toISOString(), done_by: profil.id
+      }).eq("id", el.dataset.ekfertig);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Abgehakt."); seiteEinkauf(b); }
+    };
+  });
+
+  ziel.querySelectorAll("[data-ekbearb]").forEach((el) => {
+    el.onclick = (e) => {
+      e.preventDefault();
+      einkaufDialog(liste.find((x) => x.id === el.dataset.ekbearb), b);
+    };
+  });
+
+  ziel.querySelectorAll("[data-ekweg]").forEach((el) => {
+    el.onclick = async (e) => {
+      e.preventDefault();
+      const ok = await nachfragen({ titel: "Von der Liste nehmen",
+        text: "Soll dieser Punkt gelöscht werden?",
+        bestaetigen: "Löschen", gefahr: true });
+      if (!ok) return;
+      const { error } = await db.from("shopping_items").delete().eq("id", el.dataset.ekweg);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Gelöscht."); seiteEinkauf(b); }
+    };
+  });
+}
+
+async function einkaufDialog(eintrag, b) {
+  const w = await dialogFelder({
+    titel: eintrag ? "Eintrag bearbeiten" : "Was brauchst du?",
+    felder: [
+      { name: "text", label: "Was", pflicht: true, wert: eintrag ? eintrag.text : "",
+        platzhalter: "Kaffee, Handschuhe, Bohrer 6 mm …" },
+      { name: "menge", label: "Wie viel", wert: eintrag ? (eintrag.menge || "") : "",
+        platzhalter: "2 Packungen, 1 Kiste …" },
+      { name: "laden", label: "Wo", wert: eintrag ? (eintrag.laden || "") : "",
+        platzhalter: "Migros, Bauhaus … kann leer bleiben" },
+    ],
+    bestaetigen: "Weiter",
+  });
+  if (!w) return;
+
+  const prio = await auswahlDialog("Wie dringend?",
+    Object.keys(PRIO).map((k) => ({ wert: k, text: PRIO[k].text + " – " + PRIO[k].hilfe })));
+  if (prio === null) return;
+
+  const daten = { text: w.text, menge: w.menge || null, laden: w.laden || null,
+                  prio: Number(prio) };
+
+  const { error } = eintrag
+    ? await db.from("shopping_items").update(daten).eq("id", eintrag.id)
+    : await db.from("shopping_items").insert(daten);
+
+  if (error) meldung(fehlertext(error), "fehler");
+  else { meldung(eintrag ? "Gespeichert." : "Steht auf der Liste."); seiteEinkauf(b); }
+}
+
+// =================================================================
+//  RECHNER FÜR DIE WERKSTATT
+// =================================================================
+
+// Richtwerte für die Schnittgeschwindigkeit Vc in m/min.
+// Das sind Startwerte, keine Vorschrift. Die Angaben des
+// Werkzeugherstellers gehen immer vor.
+const WERKSTOFFE = [
+  { name: "Stahl",            hss: 30,  hm: 200 },
+  { name: "Rostfreier Stahl", hss: 15,  hm: 120 },
+  { name: "Aluminium",        hss: 250, hm: 700 },
+  { name: "Messing",          hss: 80,  hm: 300 },
+  { name: "Neusilber",        hss: 50,  hm: 200 },
+  { name: "Ecobrass",         hss: 70,  hm: 250 },
+  { name: "Bronze",           hss: 45,  hm: 220 },
+  { name: "Titan",            hss: 12,  hm: 60  },
+  { name: "Kunststoff",       hss: 300, hm: 600 },
+];
+
+const rech = {
+  ansicht: "drehzahl",
+  werkstoff: 0,
+  schneidstoff: "hm",
+  eigenerVc: "",
+  durchmesser: "",
+  zaehne: "",
+  fz: "",
+};
+
+function seiteRechner(b) {
+  b.innerHTML = '<h1 class="seitentitel">Rechner</h1>'
+    + '<div class="reiter">'
+    + [["drehzahl", "Drehzahl"], ["winkel", "Winkel und Fase"]]
+        .map(([w, t]) => '<button class="reiter__knopf' + (rech.ansicht === w ? " aktiv" : "")
+          + '" data-rech="' + w + '">' + t + '</button>').join("")
+    + '</div><div id="rech-inhalt"></div>';
+
+  b.querySelectorAll("[data-rech]").forEach((el) => {
+    el.onclick = () => { rech.ansicht = el.dataset.rech; seiteRechner(b); };
+  });
+
+  const ziel = document.getElementById("rech-inhalt");
+  if (rech.ansicht === "winkel") return rechnerWinkel(ziel);
+  return rechnerDrehzahl(ziel, b);
+}
+
+// ---------- Drehzahl ----------
+
+function rechnerDrehzahl(ziel, b) {
+  const w = WERKSTOFFE[rech.werkstoff];
+  const vcVorschlag = rech.schneidstoff === "hss" ? w.hss : w.hm;
+  const vc = rech.eigenerVc !== "" ? Number(rech.eigenerVc) : vcVorschlag;
+  const d = Number(rech.durchmesser);
+
+  const n = (d > 0 && vc > 0) ? (vc * 1000) / (Math.PI * d) : null;
+
+  const z = Number(rech.zaehne);
+  const fz = Number(rech.fz);
+  const vf = (n && z > 0 && fz > 0) ? n * z * fz : null;
+
+  ziel.innerHTML = ''
+    + '<section class="karte"><h2>Werkstoff</h2>'
+    + '<div class="wahlgitter">'
+    + WERKSTOFFE.map((m, i) => '<button class="wahlknopf' + (i === rech.werkstoff ? " aktiv" : "")
+        + '" data-werkstoff="' + i + '">' + esc(m.name) + '</button>').join("")
+    + '</div>'
+
+    + '<h2 class="untertitel">Schneidstoff</h2>'
+    + '<div class="moduswahl">'
+    + '<button class="moduswahl__knopf' + (rech.schneidstoff === "hss" ? " aktiv" : "")
+    + '" data-schneid="hss">HSS</button>'
+    + '<button class="moduswahl__knopf' + (rech.schneidstoff === "hm" ? " aktiv" : "")
+    + '" data-schneid="hm">Hartmetall</button>'
+    + '</div>'
+
+    + '<label class="feld feld--abstand"><span>Schnittgeschwindigkeit Vc in m/min</span>'
+    + '<input type="number" id="r-vc" inputmode="decimal" step="1" value="'
+    + esc(rech.eigenerVc) + '" placeholder="' + vcVorschlag + ' (Richtwert)">'
+    + '<span class="feldhinweis">Leer lassen, um den Richtwert zu verwenden. '
+    + 'Eigenen Wert eintragen, wenn du bessere Daten hast.</span></label>'
+    + '</section>'
+
+    + '<section class="karte"><h2>Werkzeug</h2>'
+    + '<label class="feld"><span>Durchmesser in mm</span>'
+    + '<input type="number" id="r-d" inputmode="decimal" step="0.1" value="'
+    + esc(rech.durchmesser) + '" placeholder="z. B. 8"></label>'
+    + '<div class="zeitraumwahl">'
+    + '<label class="feld"><span>Zähne</span>'
+    + '<input type="number" id="r-z" inputmode="numeric" step="1" value="'
+    + esc(rech.zaehne) + '" placeholder="optional"></label>'
+    + '<label class="feld"><span>fz in mm</span>'
+    + '<input type="number" id="r-fz" inputmode="decimal" step="0.01" value="'
+    + esc(rech.fz) + '" placeholder="optional"></label>'
+    + '</div></section>'
+
+    + '<section class="karte karte--ergebnis">'
+    + '<div class="ergebnis"><div class="ergebnis__titel">Drehzahl</div>'
+    + '<div class="ergebnis__wert">' + (n ? Math.round(n).toLocaleString("de-CH") : "–")
+    + '<span>1/min</span></div></div>'
+    + (vf
+      ? '<div class="ergebnis"><div class="ergebnis__titel">Vorschub</div>'
+        + '<div class="ergebnis__wert">' + Math.round(vf).toLocaleString("de-CH")
+        + '<span>mm/min</span></div></div>'
+      : "")
+    + '<p class="hinweis">Gerechnet mit Vc = ' + zahlText(Math.round(vc)) + ' m/min. '
+    + 'n = Vc · 1000 / (π · d)'
+    + (vf ? ', Vf = n · z · fz' : "") + '</p>'
+    + '</section>'
+
+    + '<p class="hinweis">Die Vc-Werte sind grobe Startwerte aus der Praxis. '
+    + 'Was der Werkzeughersteller angibt, hat immer Vorrang. '
+    + 'Bei dünnen Werkzeugen, langen Auskragungen oder schlechter Kühlung eher weniger nehmen.</p>';
+
+  ziel.querySelectorAll("[data-werkstoff]").forEach((el) => {
+    el.onclick = () => { rech.werkstoff = Number(el.dataset.werkstoff); seiteRechner(b); };
+  });
+  ziel.querySelectorAll("[data-schneid]").forEach((el) => {
+    el.onclick = () => { rech.schneidstoff = el.dataset.schneid; seiteRechner(b); };
+  });
+
+  const binde = (id, feld) => {
+    const el = document.getElementById(id);
+    el.oninput = () => { rech[feld] = el.value; };
+    el.onchange = () => { rech[feld] = el.value; seiteRechner(b); };
+  };
+  binde("r-vc", "eigenerVc");
+  binde("r-d", "durchmesser");
+  binde("r-z", "zaehne");
+  binde("r-fz", "fz");
+}
+
+// ---------- Winkel und Fase ----------
+
+const wink = { a: "", g: "", h: "", winkel: "" };
+
+function rechnerWinkel(ziel) {
+  // Rechtwinkliges Dreieck:
+  //   a = Ankathete, g = Gegenkathete, h = Hypotenuse, w = Winkel
+  const a = parseFloat(wink.a);
+  const g = parseFloat(wink.g);
+  const h = parseFloat(wink.h);
+  const w = parseFloat(wink.winkel);
+
+  let ra = a, rg = g, rh = h, rw = w;
+  const da = !isNaN(a), dg = !isNaN(g), dh = !isNaN(h), dw = !isNaN(w);
+  const bogen = (grad) => grad * Math.PI / 180;
+  const grad = (b) => b * 180 / Math.PI;
+
+  if (da && dg) { rh = Math.sqrt(a * a + g * g); rw = grad(Math.atan(g / a)); }
+  else if (da && dh && h > a) { rg = Math.sqrt(h * h - a * a); rw = grad(Math.acos(a / h)); }
+  else if (dg && dh && h > g) { ra = Math.sqrt(h * h - g * g); rw = grad(Math.asin(g / h)); }
+  else if (dw && da) { rg = a * Math.tan(bogen(w)); rh = a / Math.cos(bogen(w)); }
+  else if (dw && dg) { ra = g / Math.tan(bogen(w)); rh = g / Math.sin(bogen(w)); }
+  else if (dw && dh) { ra = h * Math.cos(bogen(w)); rg = h * Math.sin(bogen(w)); }
+  else { ra = rg = rh = rw = NaN; }
+
+  const z = (x) => (x === undefined || x === null || isNaN(x)) ? "–"
+    : (Math.round(x * 1000) / 1000).toLocaleString("de-CH");
+
+  ziel.innerHTML = ''
+    + '<section class="karte"><h2>Rechtwinkliges Dreieck</h2>'
+    + '<p class="hinweis">Zwei Werte eingeben, die anderen werden berechnet. '
+    + 'Für eine Fase sind Ankathete und Gegenkathete die beiden Fasenmasse, '
+    + 'der Winkel ist der Fasenwinkel.</p>'
+    + '<div class="zeitraumwahl">'
+    + '<label class="feld"><span>Ankathete a in mm</span>'
+    + '<input type="number" id="w-a" inputmode="decimal" step="0.01" value="' + esc(wink.a) + '"></label>'
+    + '<label class="feld"><span>Gegenkathete b in mm</span>'
+    + '<input type="number" id="w-g" inputmode="decimal" step="0.01" value="' + esc(wink.g) + '"></label>'
+    + '</div>'
+    + '<div class="zeitraumwahl">'
+    + '<label class="feld"><span>Hypotenuse c in mm</span>'
+    + '<input type="number" id="w-h" inputmode="decimal" step="0.01" value="' + esc(wink.h) + '"></label>'
+    + '<label class="feld"><span>Winkel in Grad</span>'
+    + '<input type="number" id="w-w" inputmode="decimal" step="0.1" value="' + esc(wink.winkel) + '"></label>'
+    + '</div>'
+    + '<button class="linkknopf" id="w-leer">Alles zurücksetzen</button>'
+    + '</section>'
+
+    + '<section class="karte karte--ergebnis">'
+    + '<div class="ergebnisreihe">'
+    + '<div class="ergebnis"><div class="ergebnis__titel">a</div>'
+    + '<div class="ergebnis__wert ergebnis__wert--klein">' + z(ra) + '<span>mm</span></div></div>'
+    + '<div class="ergebnis"><div class="ergebnis__titel">b</div>'
+    + '<div class="ergebnis__wert ergebnis__wert--klein">' + z(rg) + '<span>mm</span></div></div>'
+    + '<div class="ergebnis"><div class="ergebnis__titel">c</div>'
+    + '<div class="ergebnis__wert ergebnis__wert--klein">' + z(rh) + '<span>mm</span></div></div>'
+    + '<div class="ergebnis"><div class="ergebnis__titel">Winkel</div>'
+    + '<div class="ergebnis__wert ergebnis__wert--klein">' + z(rw) + '<span>Grad</span></div></div>'
+    + '</div></section>'
+
+    + '<section class="karte"><h2>Häufige Fasen</h2><table class="tabelle">'
+    + '<thead><tr><th>Fase</th><th class="mitte">Winkel</th>'
+    + '<th class="mitte">a</th><th class="mitte">b</th></tr></thead><tbody>'
+    + [[0.2, 45], [0.3, 45], [0.5, 45], [1, 45], [1.5, 45], [2, 45], [0.5, 30], [1, 30], [1, 60]]
+        .map(([m, gr]) => {
+          const bb = gr === 45 ? m : m * Math.tan(bogen(gr));
+          return '<tr><td>' + m + ' × ' + gr + '°</td>'
+            + '<td class="mitte">' + gr + '°</td>'
+            + '<td class="mitte">' + m + '</td>'
+            + '<td class="mitte">' + (Math.round(bb * 1000) / 1000) + '</td></tr>';
+        }).join("")
+    + '</tbody></table></section>';
+
+  const binde = (id, feld) => {
+    const el = document.getElementById(id);
+    el.onchange = () => { wink[feld] = el.value; rechnerWinkel(ziel); };
+  };
+  binde("w-a", "a"); binde("w-g", "g"); binde("w-h", "h"); binde("w-w", "winkel");
+
+  document.getElementById("w-leer").onclick = () => {
+    wink.a = wink.g = wink.h = wink.winkel = "";
+    rechnerWinkel(ziel);
+  };
+}
+
+
+// =================================================================
 
 const best = {
   ansicht: "offen",
@@ -3901,10 +4034,20 @@ async function artikelSchnellAnlegen(vorgabe) {
   if (!w) return null;
 
   let lieferantId = null;
-  if (lieferanten.length) {
-    const wahl = await auswahlDialog("Lieferant wählen",
-      lieferanten.map((l) => ({ wert: l.id, text: l.name }))
-        .concat([{ wert: "", text: "– kein Lieferant –" }]));
+  const wahl = await auswahlDialog("Lieferant wählen",
+    lieferanten.map((l) => ({ wert: l.id, text: l.name }))
+      .concat([{ wert: "__neu", text: "+ Neuen Lieferanten anlegen" },
+               { wert: "", text: "– kein Lieferant –" }]));
+
+  if (wahl === "__neu") {
+    const nw = await dialogFelder({ titel: "Neuer Lieferant",
+      felder: [{ name: "name", label: "Name", pflicht: true }], bestaetigen: "Anlegen" });
+    if (nw) {
+      const r = await db.from("suppliers").insert({ name: nw.name }).select().single();
+      if (r.error) meldung(fehlertext(r.error), "fehler");
+      else { lieferantId = r.data.id; lieferanten.push(r.data); meldung("Lieferant angelegt."); }
+    }
+  } else {
     lieferantId = wahl || null;
   }
 
@@ -4301,6 +4444,8 @@ const SEITEN = [
   { pfad: "kontrolle",    titel: "Kontrolle",    zeichen: "✓", zeige: seiteKontrolle },
   { pfad: "lager",        titel: "Lager",        zeichen: "▤", zeige: seiteLager },
   { pfad: "bestellungen", titel: "Bestellungen", zeichen: "≡", zeige: seiteBestellungen },
+  { pfad: "einkauf",      titel: "Einkauf",      zeichen: "🛒", zeige: seiteEinkauf },
+  { pfad: "rechner",      titel: "Rechner",      zeichen: "∡", zeige: seiteRechner },
   { pfad: "einstellungen", titel: "Einstellungen", zeichen: "⚙", zeige: seiteEinstellungen },
 ];
 
