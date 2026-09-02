@@ -1057,7 +1057,7 @@ const APP_UNTERTITEL = "HUDSON TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "9.2.0";
+const APP_VERSION = "9.3.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -1131,7 +1131,10 @@ function fehlertext(e) {
   if (m.includes("foreign key") || m.includes("violates foreign key"))
     return "Das lässt sich nicht löschen, weil noch Buchungen oder Bestellungen daran hängen. "
          + "Deaktivieren geht aber immer.";
-  if (m.includes("duplicate key")) return "Diese Nummer gibt es bereits.";
+  if (m.includes("idx_jobs_laeuft") || m.includes("idx_jobs_laufend"))
+    return "Auf dieser Maschine läuft bereits ein Auftrag. "
+         + "Beende ihn zuerst oder setze ihn auf einen anderen Zustand.";
+  if (m.includes("duplicate key")) return "Dieser Eintrag existiert bereits.";
   if (m.includes("duplicate key") || m.includes("bereits vorhanden"))
     return "Dieser Eintrag existiert bereits.";
   if (m.includes("foreign key"))
@@ -2069,7 +2072,7 @@ function auftragsZeile(maschine) {
     return '<div class="auftrag auftrag--leer">'
       + '<span class="auftrag__nr">Kein Auftrag</span>'
       + (darfSchreiben() ? '<button class="linkknopf" data-auftrag-start="' + esc(maschine.id)
-          + '">Auftrag starten</button>' : "")
+          + '">Auftrag wählen</button>' : "")
       + '</div>';
   }
   return '<div class="auftrag">'
@@ -2196,68 +2199,47 @@ function auftragsKnoepfeBinden(raster, b) {
       const maschineId = el.dataset.auftragStart;
       const maschine = prod.maschinen.find((m) => m.id === maschineId);
 
-      // Was ist auf dieser Maschine eingeplant, aber noch nicht gestartet?
+      // Nur was auf der Planwand für diese Maschine eingeplant ist,
+      // in der geplanten Reihenfolge.
       let geplant = [];
       try {
         const { data, error } = await zeitlimit(
           db.from("jobs").select("*").eq("machine_id", maschineId)
             .is("ended_at", null).not("planned_from", "is", null)
             .order("planned_from"), 10000, "Planung");
-        if (!error) geplant = (data || []).filter((j) => j.plan_status !== "fertig");
-      } catch (f) { /* dann eben ohne Vorschläge */ }
-
-      let auftrag = null;
-
-      if (geplant.length) {
-        const wahl = await auswahlDialog(
-          "Auftrag auf " + (maschine ? maschine.name : "dieser Maschine"),
-          geplant.map((j) => ({
-            wert: j.id,
-            text: j.job_number + (j.planned_from ? "  ab " + kurzDatum(j.planned_from) : "")
-              + (j.target_quantity ? "  ·  " + zahlText(j.target_quantity) + " Stück" : ""),
-          })).concat([{ wert: "__neu", text: "+ Neuer Auftrag, nicht geplant" }]));
-
-        if (wahl === null) return;
-        if (wahl !== "__neu") auftrag = geplant.find((j) => j.id === wahl);
-      }
-
-      if (auftrag) {
-        // Vorhandenen Auftrag starten: er läuft ab jetzt auf dieser Maschine
-        const { error } = await db.from("jobs").update({
-          started_at: new Date().toISOString(),
-          plan_status: "laeuft",
-        }).eq("id", auftrag.id);
-        if (error) meldung(fehlertext(error), "fehler");
-        else { meldung("Auftrag " + auftrag.job_number + " gestartet."); seiteProduktion(b); }
+        if (error) throw error;
+        geplant = (data || []).filter((j) => j.plan_status !== "fertig");
+      } catch (f) {
+        meldung(fehlertext(f), "fehler");
         return;
       }
 
-      const werte = await dialogFelder({
-        titel: "Neuer Auftrag",
-        text: maschine ? "Maschine " + maschine.name : "",
-        felder: [
-          { name: "nummer", label: "HOCO Nr.", pflicht: true,
-            platzhalter: "HOCO Nr. eingeben" },
-          { name: "menge", label: "Fertigungsmenge", typ: "number",
-            platzhalter: "wie viele Stück, kann leer bleiben" },
-          { name: "tage", label: "Dauer in Tagen", typ: "number", wert: 1 },
-          { name: "notiz", label: "Notiz", typ: "textarea", platzhalter: "kann leer bleiben" },
-        ],
-        bestaetigen: "Auftrag starten",
-      });
-      if (!werte) return;
+      if (!geplant.length) {
+        await nachfragen({
+          titel: "Nichts eingeplant",
+          text: "Für " + (maschine ? maschine.name : "diese Maschine") + " steht auf der "
+              + "Planwand kein Auftrag. Aufträge werden dort angelegt und eingeplant.",
+          bestaetigen: "Verstanden" });
+        return;
+      }
 
-      const { error } = await db.from("jobs").insert({
-        machine_id: maschineId,
-        job_number: werte.nummer,
-        target_quantity: werte.menge ? Math.max(0, Math.round(werte.menge)) : null,
-        planned_days: Math.max(1, Math.round(werte.tage || 1)),
-        planned_from: naechsterArbeitstag(isoDatum(new Date())),
+      const wahl = await auswahlDialog(
+        "Auftrag auf " + (maschine ? maschine.name : "dieser Maschine"),
+        geplant.map((j) => ({
+          wert: j.id,
+          text: j.job_number + "   ab " + kurzDatum(j.planned_from)
+            + (j.target_quantity ? "  ·  " + zahlText(j.target_quantity) + " Stück" : ""),
+        })));
+      if (!wahl) return;
+
+      const auftrag = geplant.find((j) => j.id === wahl);
+      const { error } = await db.from("jobs").update({
+        started_at: new Date().toISOString(),
         plan_status: "laeuft",
-        note: werte.notiz || null,
-      });
+      }).eq("id", auftrag.id);
+
       if (error) meldung(fehlertext(error), "fehler");
-      else { meldung("Auftrag " + werte.nummer + " gestartet."); seiteProduktion(b); }
+      else { meldung("Auftrag " + auftrag.job_number + " gestartet."); seiteProduktion(b); }
     };
   });
 
@@ -2294,7 +2276,8 @@ function auftragsKnoepfeBinden(raster, b) {
       if (!ok) return;
 
       const { error } = await db.from("jobs")
-        .update({ ended_at: new Date().toISOString(), ended_by: profil.id })
+        .update({ ended_at: new Date().toISOString(), ended_by: profil.id,
+                  plan_status: "fertig" })
         .eq("id", el.dataset.auftragEnde);
       if (error) meldung(fehlertext(error), "fehler");
       else { meldung("Auftrag beendet."); seiteProduktion(b); }
@@ -2536,82 +2519,83 @@ function planBalken(j, spalte, dauer, angeschnitten) {
 
 function balkenVerhalten(b) {
   const tafel = document.querySelector(".pw-tafel");
-  if (!tafel) return;
-
-  let halten = null, zieht = false, aktiv = null, schatten = null;
-
-  const zielZelle = (x, y) => {
-    const el = document.elementFromPoint(x, y);
-    if (!el) return null;
-    const zelle = el.closest("[data-zelle]");
-    return zelle ? zelle.dataset.zelle : null;
-  };
+  if (!tafel || !darfPlanen()) return;
 
   tafel.querySelectorAll("[data-auftrag]").forEach((el) => {
+    let halten = null, zieht = false, schatten = null, gestartet = false;
 
-    const start = (e) => {
-      const p = e.touches ? e.touches[0] : e;
-      aktiv = el;
+    const aufraeumen = () => {
+      clearTimeout(halten);
+      if (schatten) { schatten.remove(); schatten = null; }
+      el.classList.remove("pw-balken--zieht");
+      el.style.pointerEvents = "";
+      tafel.querySelectorAll(".pw-zelle--ziel").forEach((z) => z.classList.remove("pw-zelle--ziel"));
       zieht = false;
+      gestartet = false;
+    };
 
-      if (!darfPlanen()) return;
+    const zelleUnter = (x, y) => {
+      const treffer = document.elementFromPoint(x, y);
+      if (!treffer) return null;
+      const zelle = treffer.closest("[data-zelle]");
+      return zelle ? zelle.dataset.zelle : null;
+    };
 
-      // Erst nach langem Drücken wird verschoben, damit ein
-      // kurzer Tipp weiterhin die Notiz öffnet.
+    el.addEventListener("pointerdown", (e) => {
+      if (e.button !== undefined && e.button !== 0) return;
+      gestartet = true;
+      const startX = e.clientX, startY = e.clientY;
+
       halten = setTimeout(() => {
         zieht = true;
         el.classList.add("pw-balken--zieht");
+        // Der Balken darf sich nicht selbst im Weg stehen, sonst
+        // findet die Suche nach der Zielzelle nur ihn selbst.
+        el.style.pointerEvents = "none";
         if (navigator.vibrate) navigator.vibrate(30);
+
         schatten = document.createElement("div");
         schatten.className = "pw-schatten";
         schatten.textContent = el.querySelector(".pw-balken__nr").textContent;
         document.body.appendChild(schatten);
-        schatten.style.left = p.clientX + "px";
-        schatten.style.top = p.clientY + "px";
-      }, 450);
-    };
+        schatten.style.left = startX + "px";
+        schatten.style.top = startY + "px";
+      }, 400);
 
-    const bewegen = (e) => {
-      if (!aktiv) return;
-      const p = e.touches ? e.touches[0] : e;
-      if (!zieht) { clearTimeout(halten); return; }
+      try { el.setPointerCapture(e.pointerId); } catch (f) { /* egal */ }
+    });
+
+    el.addEventListener("pointermove", (e) => {
+      if (!gestartet) return;
+      if (!zieht) return;
       e.preventDefault();
+
       if (schatten) {
-        schatten.style.left = p.clientX + "px";
-        schatten.style.top = p.clientY + "px";
+        schatten.style.left = e.clientX + "px";
+        schatten.style.top = e.clientY + "px";
       }
       tafel.querySelectorAll(".pw-zelle--ziel").forEach((z) => z.classList.remove("pw-zelle--ziel"));
-      const ziel = zielZelle(p.clientX, p.clientY);
+      const ziel = zelleUnter(e.clientX, e.clientY);
       if (ziel) {
         const z = tafel.querySelector('[data-zelle="' + CSS.escape(ziel) + '"]');
         if (z) z.classList.add("pw-zelle--ziel");
       }
-    };
+    });
 
-    const ende = async (e) => {
-      clearTimeout(halten);
-      if (!aktiv) return;
-      const war = zieht;
-      const knopf = aktiv;
-      aktiv = null;
-      zieht = false;
-      knopf.classList.remove("pw-balken--zieht");
+    el.addEventListener("pointerup", async (e) => {
+      if (!gestartet) return;
+      const warZiehen = zieht;
+      const ziel = warZiehen ? zelleUnter(e.clientX, e.clientY) : null;
+      aufraeumen();
 
-      const p = (e.changedTouches && e.changedTouches[0]) || e;
-      if (schatten) { schatten.remove(); schatten = null; }
-      tafel.querySelectorAll(".pw-zelle--ziel").forEach((z) => z.classList.remove("pw-zelle--ziel"));
-
-      const auftrag = plan.auftraege.find((j) => j.id === knopf.dataset.auftrag);
+      const auftrag = (plan.auftraege || []).find((j) => j.id === el.dataset.auftrag);
       if (!auftrag) return;
 
-      if (!war) {
-        planAuftragDialog(auftrag, b);
-        return;
-      }
+      if (!warZiehen) { planAuftragDialog(auftrag, b); return; }
+      if (!ziel) { meldung("Kein Ziel getroffen. Nichts geändert.", "warn"); return; }
 
-      const ziel = zielZelle(p.clientX, p.clientY);
-      if (!ziel) return;
-      const [maschineId, datum] = ziel.split("|");
+      const teile = ziel.split("|");
+      const maschineId = teile[0], datum = teile[1];
       if (maschineId === auftrag.machine_id && datum === auftrag.planned_from) return;
 
       const { error } = await db.from("jobs")
@@ -2620,15 +2604,10 @@ function balkenVerhalten(b) {
 
       if (error) meldung(fehlertext(error), "fehler");
       else { meldung("Verschoben."); seitePlanwand(b); }
-    };
+    });
 
-    el.addEventListener("mousedown", start);
-    el.addEventListener("touchstart", start, { passive: true });
-    window.addEventListener("mousemove", bewegen);
-    window.addEventListener("touchmove", bewegen, { passive: false });
-    el.addEventListener("mouseup", ende);
-    el.addEventListener("touchend", ende);
-    window.addEventListener("mouseup", () => { clearTimeout(halten); });
+    el.addEventListener("pointercancel", aufraeumen);
+    el.addEventListener("lostpointercapture", () => { if (!zieht) aufraeumen(); });
   });
 }
 
@@ -2654,11 +2633,14 @@ async function planAuftragDialog(auftrag, b) {
 
     + (auftrag ? "" :
         '<label class="feld"><span>HOCO Nr.</span>'
-        + '<input id="pl-nr" type="text" autocapitalize="characters"></label>'
-        + '<label class="feld"><span>Maschine</span><select id="pl-maschine">'
-        + maschinen.map((m) => '<option value="' + esc(m.id) + '">' + esc(m.name)
-            + (m.machine_number ? " (" + esc(m.machine_number) + ")" : "") + '</option>').join("")
-        + '</select></label>')
+        + '<input id="pl-nr" type="text" autocapitalize="characters"></label>')
+    + '<label class="feld"><span>Maschine</span><select id="pl-maschine"'
+    + (darf ? "" : " disabled") + '>'
+    + maschinen.map((m) => '<option value="' + esc(m.id) + '"'
+        + (auftrag && auftrag.machine_id === m.id ? " selected" : "") + '>' + esc(m.name)
+        + (m.machine_number ? " (" + esc(m.machine_number) + ")" : "") + '</option>').join("")
+    + '</select><span class="feldhinweis">Hier lässt sich der Auftrag auch ohne Ziehen '
+    + 'auf eine andere Maschine setzen.</span></label>' 
 
     + '<div class="zeitraumwahl">'
     + '<label class="feld"><span>Geplant ab</span>'
@@ -2765,6 +2747,7 @@ async function planAuftragDialog(auftrag, b) {
       drawing_url: pdfAdresse,
       plan_status: planZustand,
       color: planFarbe,
+      machine_id: $("pl-maschine").value,
     };
 
     let fehler;
@@ -2774,7 +2757,6 @@ async function planAuftragDialog(auftrag, b) {
       const nr = ($("pl-nr").value || "").trim();
       if (!nr) { meldung("HOCO Nr. wird benötigt.", "warn"); return; }
       daten.job_number = nr;
-      daten.machine_id = $("pl-maschine").value;
       // Kein Datum angegeben: hinter den letzten Auftrag dieser Maschine
       if (!daten.planned_from) daten.planned_from = naechsterFreierTag(daten.machine_id);
       ({ error: fehler } = await db.from("jobs").insert(daten));
