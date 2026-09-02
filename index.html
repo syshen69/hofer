@@ -871,6 +871,23 @@ a:focus-visible {
 .scan-gross:active { background: var(--marke); }
 
 .chipweg--bearb { color: var(--marke); }
+
+.blocktitel { margin: 22px 0 10px; font-size: 1.05rem; font-weight: 650; }
+.blocktitel:first-child { margin-top: 4px; }
+
+.pd-zeile--neu { border-style: dashed; border-color: var(--marke); color: var(--marke);
+                 font-weight: 600; margin-top: 6px; }
+
+/* ---------- Dialoge auf dem Handy fast bildschirmfüllend ---------- */
+@media (max-width: 620px) {
+  .dialog-huelle { padding: 0; align-items: flex-end; }
+  .dialog { max-width: 100%; max-height: 92vh; border-radius: 8px 8px 0 0;
+            padding: 20px 16px calc(16px + env(safe-area-inset-bottom)); }
+  .dialog__knoepfe { flex-direction: column-reverse; }
+  .dialog__knoepfe .knopf { width: 100%; min-height: 50px; }
+}
+.pd-zeile--neu { border-style: dashed; border-color: var(--marke); color: var(--marke);
+                 font-weight: 600; text-align: center; margin-top: 6px; }
 </style>
 </head>
 <body>
@@ -914,7 +931,7 @@ const APP_UNTERTITEL = "HUDSON TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "6.7.0";
+const APP_VERSION = "7.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -1555,13 +1572,18 @@ function nurLesenHinweis(text) {
 
 //  felder: [{ name, label, typ, wert, platzhalter, pflicht, hinweis }]
 //  Gibt ein Objekt mit den Werten zurück, oder null bei Abbruch.
+let dialogZaehler = 0;
+
 function dialogFelder(o) {
   return new Promise((fertig) => {
+    // Eigene Nummer je Dialog, damit sich zwei offene Fenster
+    // niemals dieselben Kennungen teilen.
+    const nr = "d" + (++dialogZaehler) + "-";
     const huelle = document.createElement("div");
     huelle.className = "dialog-huelle";
 
     const felder = (o.felder || []).map((f) => {
-      const id = "df-" + f.name;
+      const id = nr + f.name;
       if (f.typ === "textarea") {
         return '<label class="feld"><span>' + esc(f.label) + '</span>'
           + '<textarea id="' + id + '" rows="3" placeholder="' + esc(f.platzhalter || "") + '">'
@@ -1581,7 +1603,7 @@ function dialogFelder(o) {
     huelle.innerHTML = '<div class="dialog" role="dialog" aria-modal="true">'
       + '<h2>' + esc(o.titel) + '</h2>'
       + (o.text ? '<p>' + esc(o.text) + '</p>' : "")
-      + '<form id="df-form">' + felder + '</form>'
+      + '<form>' + felder + '</form>'
       + '<div class="dialog__knoepfe">'
       + '<button class="knopf knopf--still" data-nein>Abbrechen</button>'
       + '<button class="knopf ' + (o.gefahr ? "knopf--gefahr" : "knopf--haupt") + '" data-ja>'
@@ -1594,7 +1616,7 @@ function dialogFelder(o) {
     const absenden = () => {
       const ergebnis = {};
       for (const f of (o.felder || [])) {
-        const el = document.getElementById("df-" + f.name);
+        const el = huelle.querySelector("#" + nr + f.name);
         const wert = (el.value || "").trim();
         if (f.pflicht && !wert) {
           el.focus();
@@ -1610,7 +1632,7 @@ function dialogFelder(o) {
     huelle.querySelector("[data-ja]").onclick = absenden;
     huelle.querySelector("[data-nein]").onclick = () => schliessen(null);
     huelle.onclick = (e) => { if (e.target === huelle) schliessen(null); };
-    document.getElementById("df-form").onsubmit = (e) => { e.preventDefault(); absenden(); };
+    huelle.querySelector("form").onsubmit = (e) => { e.preventDefault(); absenden(); };
 
     const erstes = huelle.querySelector("input, textarea");
     if (erstes) erstes.focus();
@@ -3004,7 +3026,6 @@ async function lagerSuche(ziel, b) {
   ziel.innerHTML = '<div class="suchleiste">'
     + '<input type="text" id="l-such" placeholder="Artikelnummer, Name oder Lieferant"'
     + ' value="' + esc(lag.suchtext) + '" autocomplete="off">'
-    + '<button class="knopf knopf--scan" id="l-scan" title="Mit der Kamera erfassen">Kamera</button>'
     + '</div>'
     + '<div id="l-treffer"><div class="laedt">Wird gesucht …</div></div>';
 
@@ -3017,14 +3038,6 @@ async function lagerSuche(ziel, b) {
   };
   feld.onkeydown = (e) => { if (e.key === "Enter") { clearTimeout(taste); trefferZeichnen(b); } };
   feld.focus();
-
-  document.getElementById("l-scan").onclick = async () => {
-    const code = await scannen();
-    if (!code) return;
-    lag.suchtext = code;
-    feld.value = code;
-    trefferZeichnen(b);
-  };
 
   trefferZeichnen(b);
 }
@@ -3189,20 +3202,22 @@ async function buchungsDialog(art, artikel, plaetze, b) {
     + '</div></div>';
   document.body.appendChild(huelle);
 
+  const $ = (kennung) => huelle.querySelector("#" + kennung);
+
   const zu = () => huelle.remove();
-  document.getElementById("bd-nein").onclick = zu;
+  $("bd-nein").onclick = zu;
   huelle.onclick = (e) => { if (e.target === huelle) zu(); };
-  document.getElementById("df-menge").focus();
+  $("df-menge").focus();
 
   const ausfuehren = async () => {
-    const menge = Math.round(Number(document.getElementById("df-menge").value));
-    const notiz = (document.getElementById("df-notiz").value || "").trim() || null;
+    const menge = Math.round(Number($("df-menge").value));
+    const notiz = ($("df-notiz").value || "").trim() || null;
 
     if (!Number.isFinite(menge) || menge < 0) { meldung("Bitte eine Menge eingeben.", "warn"); return; }
     if (art !== "korrektur" && menge === 0) { meldung("Menge muss grösser als null sein.", "warn"); return; }
 
-    const vonEl = document.getElementById("df-von");
-    const nachEl = document.getElementById("df-nach");
+    const vonEl = $("df-von");
+    const nachEl = $("df-nach");
     const vonId = vonEl ? vonEl.value : null;
     const nachId = nachEl ? nachEl.value : null;
 
@@ -3263,8 +3278,8 @@ async function buchungsDialog(art, artikel, plaetze, b) {
     }
   };
 
-  document.getElementById("bd-ja").onclick = ausfuehren;
-  document.getElementById("bd-form").onsubmit = (e) => { e.preventDefault(); ausfuehren(); };
+  $("bd-ja").onclick = ausfuehren;
+  $("bd-form").onsubmit = (e) => { e.preventDefault(); ausfuehren(); };
 }
 
 // ---------- Bewegungen ----------
@@ -3353,8 +3368,11 @@ async function artikelDialog(artikel, b, vorgabeNummer) {
     + '<h2>' + (artikel ? "Artikel bearbeiten" : "Neuer Artikel") + '</h2>'
     + '<form id="ad-form">'
     + '<label class="feld"><span>Artikelnummer</span>'
+    + '<div class="suchleiste">'
     + '<input id="ad-nr" type="text" autocapitalize="characters" value="'
     + esc(artikel ? artikel.article_number : (vorgabeNummer || "")) + '">'
+    + '<button type="button" class="knopf knopf--scan" id="ad-kamera">Kamera</button>'
+    + '</div>'
     + '<span class="feldhinweis">Buchstaben, Zahlen, Punkt, Bindestrich und Leerzeichen '
     + 'sind alle erlaubt.</span></label>'
     + '<label class="feld"><span>Bezeichnung</span>'
@@ -3390,20 +3408,18 @@ async function artikelDialog(artikel, b, vorgabeNummer) {
     + '</div></div>';
   document.body.appendChild(huelle);
 
-  const zu = () => huelle.remove();
-  document.getElementById("ad-nein").onclick = zu;
-  huelle.onclick = (e) => { if (e.target === huelle) zu(); };
-  document.getElementById("ad-nr").focus();
+  // Nur im eigenen Fenster suchen. Sonst greift der Klick
+  // versehentlich auf einen gleichnamigen Knopf eines anderen Dialogs.
+  const $ = (kennung) => huelle.querySelector("#" + kennung);
 
-  // Artikelnummer mit der Kamera erfassen
-  document.getElementById("ad-kamera").onclick = async () => {
-    const code = await scannen();
-    if (code) document.getElementById("ad-nr").value = code;
-  };
+  const zu = () => huelle.remove();
+  $("ad-nein").onclick = zu;
+  huelle.onclick = (e) => { if (e.target === huelle) zu(); };
+  $("ad-nr").focus();
 
   // Neuen Lieferanten direkt hier anlegen
-  const liefWahl = document.getElementById("ad-lief");
-  liefWahl.onchange = async () => {
+  const liefWahl = $("ad-lief");
+  if (liefWahl) liefWahl.onchange = async () => {
     if (liefWahl.value !== "__neu") return;
     liefWahl.value = "";
     const w = await dialogFelder({ titel: "Neuer Lieferant",
@@ -3418,7 +3434,7 @@ async function artikelDialog(artikel, b, vorgabeNummer) {
   };
 
   // Neuen Lagerplatz direkt hier anlegen
-  const platzWahl = document.getElementById("ad-platz");
+  const platzWahl = $("ad-platz");
   if (platzWahl) platzWahl.onchange = async () => {
     if (platzWahl.value !== "__neu") return;
     platzWahl.value = "";
@@ -3431,10 +3447,11 @@ async function artikelDialog(artikel, b, vorgabeNummer) {
 
   const speichern = async () => {
     const daten = {
-      article_number: document.getElementById("ad-nr").value.trim(),
-      name: document.getElementById("ad-name").value.trim(),
-      unit: document.getElementById("ad-einheit").value.trim() || "Stück",
-      supplier_id: liefWahl.value && liefWahl.value !== "__neu" ? liefWahl.value : null,
+      article_number: $("ad-nr").value.trim(),
+      name: $("ad-name").value.trim(),
+      unit: $("ad-einheit").value.trim() || "Stück",
+      supplier_id: liefWahl && liefWahl.value && liefWahl.value !== "__neu"
+        ? liefWahl.value : null,
     };
     if (!daten.article_number || !daten.name) {
       meldung("Artikelnummer und Bezeichnung werden benötigt.", "warn");
@@ -3454,8 +3471,8 @@ async function artikelDialog(artikel, b, vorgabeNummer) {
     // Anfangsbestand gleich einbuchen
     const platzId = platzWahl && platzWahl.value && platzWahl.value !== "__neu"
       ? platzWahl.value : null;
-    const menge = Math.max(0, Math.round(
-      Number(document.getElementById("ad-bestand").value) || 0));
+    const bestandFeld = $("ad-bestand");
+    const menge = Math.max(0, Math.round(Number(bestandFeld ? bestandFeld.value : 0) || 0));
 
     if (platzId && menge > 0) {
       try {
@@ -3471,16 +3488,18 @@ async function artikelDialog(artikel, b, vorgabeNummer) {
     seiteLager(b);
   };
 
-  const adJa = document.getElementById("ad-ja");
-  adJa.type = "button";
-  adJa.onclick = (e) => { e.preventDefault(); speichern(); };
-  document.getElementById("ad-form").onsubmit = (e) => { e.preventDefault(); speichern(); };
+  const adJa = $("ad-ja");
+  if (adJa) {
+    adJa.type = "button";
+    adJa.onclick = (e) => { e.preventDefault(); speichern(); };
+  }
+  $("ad-form").onsubmit = (e) => { e.preventDefault(); speichern(); };
   // Sicherstellung: Enter in jedem Feld des Formulars löst auch speichern aus.
-  document.getElementById("ad-form").querySelectorAll("input").forEach((el) => {
+  $("ad-form").querySelectorAll("input").forEach((el) => {
     el.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); speichern(); } });
   });
 
-  const weg = document.getElementById("ad-weg");
+  const weg = $("ad-weg");
   if (weg) weg.onclick = async () => {
     const ok = await doppeltNachfragen(
       { titel: "Artikel löschen",
@@ -3662,17 +3681,18 @@ const BESTELLSTATUS = {
   offen: "Offen",
   bestellt: "Bestellt",
   teilweise_geliefert: "Teilweise geliefert",
-  geliefert: "Geliefert",
   erledigt: "Erledigt",
-  storniert: "Storniert",
 };
+
+// Reihenfolge der Abschnitte in der Übersicht
+const OFFENE_STATUS = ["offen", "bestellt", "teilweise_geliefert"];
 
 async function ladeBestellungen(offen) {
   let a = db.from("order_items")
     .select("*, articles(article_number, name, unit), suppliers(name)")
     .order("needed_by", { ascending: true, nullsFirst: false })
     .order("created_at");
-  if (offen) a = a.in("status", ["offen", "bestellt", "teilweise_geliefert"]);
+  if (offen) a = a.in("status", OFFENE_STATUS);
   else a = a.limit(100).order("created_at", { ascending: false });
 
   const { data, error } = await zeitlimit(a, 12000, "Bestellungen");
@@ -3711,97 +3731,67 @@ async function bestOffen(ziel, b) {
   }
 
   const heute = isoDatum(new Date());
-  const gruppen = {};
-  liste.forEach((z) => {
-    const name = (z.suppliers && z.suppliers.name) || "Ohne Lieferant";
-    (gruppen[name] = gruppen[name] || []).push(z);
-  });
+
+  // Drei getrennte Blöcke, innerhalb davon nach Lieferant gruppiert
+  const bloecke = [
+    { status: "offen", titel: "Offen" },
+    { status: "bestellt", titel: "Bestellt" },
+    { status: "teilweise_geliefert", titel: "Teilweise geliefert" },
+  ];
+
+  const zeileHtml = (z) => {
+    const a2 = z.articles || {};
+    const spaet = z.needed_by && z.needed_by < heute;
+    return '<tr><td>'
+      + '<strong>' + esc(a2.article_number || "?") + '</strong> ' + esc(a2.name || "")
+      + '<div class="klein">'
+      + (z.needed_by ? '<span class="' + (spaet ? "minus stark" : "") + '">bis '
+          + kurzDatum(z.needed_by) + '</span>' : "")
+      + (z.note ? ' · ' + esc(z.note) : "")
+      + '</div></td>'
+      + '<td class="mitte stark">' + zahlText(z.quantity) + '</td>'
+      + (darfSchreiben()
+          ? '<td class="rechts">'
+            + '<button class="linkknopf" data-bearb-best="' + esc(z.id) + '">Bearbeiten</button>'
+            + '<button class="linkknopf" data-bstatus="' + esc(z.id) + '">Status</button>'
+            + '<button class="linkknopf" data-berledigt="' + esc(z.id) + '">Erledigt</button>'
+            + '<button class="linkknopf linkknopf--gefahr" data-bweg="' + esc(z.id)
+            + '" data-nr="' + esc(a2.article_number || "") + '">Löschen</button>'
+            + '</td>' : "")
+      + '</tr>';
+  };
 
   ziel.innerHTML = (darfSchreiben()
       ? '<button class="knopf knopf--haupt knopf--breit" id="b-neu">+ Neue Position</button>' : "")
-    + (liste.length
-      ? Object.keys(gruppen).sort().map((name) => {
-          const zeilen = gruppen[name];
-          return '<section class="karte"><div class="karte__kopf">'
-            + '<h2>' + esc(name) + '</h2>'
-            + '<span class="klein">' + zeilen.length + ' Position'
-            + (zeilen.length === 1 ? "" : "en") + '</span></div>'
-            + '<table class="tabelle"><tbody>'
-            + zeilen.map((z) => {
-                const a = z.articles || {};
-                const spaet = z.needed_by && z.needed_by < heute;
-                return '<tr><td>'
-                  + '<strong>' + esc(a.article_number || "?") + '</strong> '
-                  + esc(a.name || "")
-                  + '<div class="klein">'
-                  + '<span class="statuschip statuschip--' + esc(z.status) + '">'
-                  + esc(BESTELLSTATUS[z.status] || z.status) + '</span>'
-                  + (z.needed_by ? ' <span class="' + (spaet ? "minus stark" : "") + '">bis '
-                      + kurzDatum(z.needed_by) + '</span>' : "")
-                  + (z.note ? ' · ' + esc(z.note) : "")
-                  + '</div></td>'
-                  + '<td class="mitte stark">' + zahlText(z.quantity) + '</td>'
-                  + (darfSchreiben()
-                      ? '<td class="rechts nowrap">'
-                        + '<button class="linkknopf" data-bstatus="' + esc(z.id) + '">Status</button> '
-                        + '<button class="linkknopf" data-berledigt="' + esc(z.id) + '">Erledigt</button>'
-                        + (istAdmin() ? ' <button class="linkknopf linkknopf--gefahr" data-bweg="'
-                            + esc(z.id) + '">Löschen</button>' : "")
-                        + '</td>' : "")
-                  + '</tr>';
-              }).join("")
-            + '</tbody></table></section>';
-        }).join("")
-      : '<div class="karte karte--hinweis"><p>Keine offenen Bestellpositionen.</p></div>');
+
+    + bloecke.map((bl) => {
+        const eigene = liste.filter((z) => z.status === bl.status);
+        if (!eigene.length) return "";
+
+        // innerhalb des Blocks nach Lieferant gruppieren
+        const gruppen = {};
+        eigene.forEach((z) => {
+          const name = (z.suppliers && z.suppliers.name) || "Ohne Lieferant";
+          (gruppen[name] = gruppen[name] || []).push(z);
+        });
+
+        return '<h2 class="blocktitel">' + esc(bl.titel)
+          + ' <span class="marke">' + eigene.length + '</span></h2>'
+          + Object.keys(gruppen).sort().map((name) =>
+              '<section class="karte"><div class="karte__kopf">'
+              + '<h2>' + esc(name) + '</h2>'
+              + '<span class="klein">' + gruppen[name].length + ' Position'
+              + (gruppen[name].length === 1 ? "" : "en") + '</span></div>'
+              + '<table class="tabelle"><tbody>'
+              + gruppen[name].map(zeileHtml).join("")
+              + '</tbody></table></section>').join("");
+      }).join("")
+
+    + (liste.length ? "" :
+        '<div class="karte karte--hinweis"><p>Keine offenen Bestellpositionen.</p></div>');
 
   const neu = document.getElementById("b-neu");
   if (neu) neu.onclick = () => positionDialog(b);
-
-  ziel.querySelectorAll("[data-berledigt]").forEach((el) => {
-    el.onclick = async () => {
-      const ok = await nachfragen({ titel: "Position erledigt?",
-        text: "Ist diese Bestellung wirklich abgeschlossen? Sie verschwindet danach aus der Liste.",
-        bestaetigen: "Ja, erledigt" });
-      if (!ok) return;
-      const { error } = await db.from("order_items").update({
-        status: "erledigt", completed_at: new Date().toISOString() }).eq("id", el.dataset.berledigt);
-      if (error) meldung(fehlertext(error), "fehler");
-      else { meldung("Als erledigt markiert."); seiteBestellungen(b); }
-    };
-  });
-
-  ziel.querySelectorAll("[data-bearb-best]").forEach((el) => {
-    el.onclick = async () => {
-      const z = liste.find((x) => x.id === el.dataset.bearbBest);
-      if (!z) return;
-      const w = await dialogFelder({ titel: "Bestellung bearbeiten",
-        felder: [
-          { name: "menge", label: "Menge", typ: "number", wert: z.quantity, pflicht: true },
-          { name: "frist", label: "Bis wann", typ: "date", wert: z.needed_by || "" },
-          { name: "notiz", label: "Notiz", wert: z.note || "" },
-        ], bestaetigen: "Speichern" });
-      if (!w) return;
-      const { error } = await db.from("order_items").update({
-        quantity: Math.max(1, Math.round(w.menge)),
-        needed_by: w.frist || null,
-        note: w.notiz || null,
-      }).eq("id", z.id);
-      if (error) meldung(fehlertext(error), "fehler");
-      else { meldung("Gespeichert."); seiteBestellungen(b); }
-    };
-  });
-
-  ziel.querySelectorAll("[data-bweg]").forEach((el) => {
-    el.onclick = async () => {
-      const z = liste.find((x) => x.id === el.dataset.bweg) || {};
-      const a = z.articles || {};
-      const w = await loeschen({ tabelle: "order_items", id: z.id,
-        titel: "Bestellposition löschen",
-        text: (a.article_number || "Die Position") + " wird endgültig aus der Liste entfernt. "
-            + "Zum Nachvollziehen wäre \"Storniert\" der bessere Weg." });
-      if (w) seiteBestellungen(b);
-    };
-  });
 
   ziel.querySelectorAll("[data-bearb-best]").forEach((el) => {
     el.onclick = async () => {
@@ -3840,6 +3830,19 @@ async function bestOffen(ziel, b) {
     };
   });
 
+  ziel.querySelectorAll("[data-berledigt]").forEach((el) => {
+    el.onclick = async () => {
+      const ok = await nachfragen({ titel: "Position erledigt?",
+        text: "Ist diese Bestellung wirklich abgeschlossen? Sie verschwindet danach aus der Liste.",
+        bestaetigen: "Ja, erledigt" });
+      if (!ok) return;
+      const { error } = await db.from("order_items").update({
+        status: "erledigt", completed_at: new Date().toISOString() }).eq("id", el.dataset.berledigt);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Als erledigt markiert."); seiteBestellungen(b); }
+    };
+  });
+
   ziel.querySelectorAll("[data-bstatus]").forEach((el) => {
     el.onclick = async () => {
       const z = liste.find((x) => x.id === el.dataset.bstatus);
@@ -3847,9 +3850,9 @@ async function bestOffen(ziel, b) {
       huelle.className = "dialog-huelle";
       huelle.innerHTML = '<div class="dialog"><h2>Status ändern</h2>'
         + '<div class="statuswahl">'
-        + Object.keys(BESTELLSTATUS).map((s) => '<button class="knopf'
-            + (z.status === s ? " knopf--haupt" : "") + '" data-neu="' + s + '">'
-            + BESTELLSTATUS[s] + '</button>').join("")
+        + Object.keys(BESTELLSTATUS).map((st) => '<button class="knopf'
+            + (z.status === st ? " knopf--haupt" : "") + '" data-neu="' + st + '">'
+            + BESTELLSTATUS[st] + '</button>').join("")
         + '</div><div class="dialog__knoepfe">'
         + '<button class="knopf knopf--still" data-nein>Abbrechen</button></div></div>';
       document.body.appendChild(huelle);
@@ -3860,12 +3863,11 @@ async function bestOffen(ziel, b) {
       huelle.querySelectorAll("[data-neu]").forEach((k) => {
         k.onclick = async () => {
           const neuStatus = k.dataset.neu;
-          if (neuStatus === "geliefert" || neuStatus === "erledigt" || neuStatus === "storniert") {
-            const ok = await nachfragen({ titel: "Status ändern",
-              text: 'Wirklich auf "' + BESTELLSTATUS[neuStatus] + '" setzen?',
-              bestaetigen: "Ja, ändern", gefahr: neuStatus === "storniert" });
-            if (!ok) return;
-          }
+          const ok = await nachfragen({ titel: "Status ändern",
+            text: 'Wirklich auf "' + BESTELLSTATUS[neuStatus] + '" setzen?',
+            bestaetigen: "Ja, ändern" });
+          if (!ok) return;
+
           const daten = { status: neuStatus };
           if (neuStatus === "bestellt") daten.ordered_at = new Date().toISOString();
           if (neuStatus === "erledigt") daten.completed_at = new Date().toISOString();
@@ -3881,6 +3883,63 @@ async function bestOffen(ziel, b) {
 }
 
 // ---------- Neue Position ----------
+
+// Legt einen Artikel mit den nötigsten Angaben an und gibt ihn zurück.
+async function artikelSchnellAnlegen(vorgabe) {
+  let lieferanten = [];
+  try { lieferanten = await ladeLieferanten(); } catch (f) { /* geht auch ohne */ }
+
+  const w = await dialogFelder({
+    titel: "Neuen Artikel anlegen",
+    felder: [
+      { name: "nummer", label: "Artikelnummer", pflicht: true, wert: vorgabe || "" },
+      { name: "name", label: "Bezeichnung", pflicht: true },
+      { name: "einheit", label: "Einheit", wert: "Stück" },
+    ],
+    bestaetigen: "Weiter",
+  });
+  if (!w) return null;
+
+  let lieferantId = null;
+  if (lieferanten.length) {
+    const wahl = await auswahlDialog("Lieferant wählen",
+      lieferanten.map((l) => ({ wert: l.id, text: l.name }))
+        .concat([{ wert: "", text: "– kein Lieferant –" }]));
+    lieferantId = wahl || null;
+  }
+
+  const { data, error } = await db.from("articles").insert({
+    article_number: w.nummer, name: w.name,
+    unit: w.einheit || "Stück", supplier_id: lieferantId,
+  }).select().single();
+
+  if (error) { meldung(fehlertext(error), "fehler"); return null; }
+  meldung("Artikel angelegt.");
+
+  const lief = lieferanten.find((l) => l.id === lieferantId);
+  return { id: data.id, article_number: data.article_number, name: data.name,
+           supplier_id: data.supplier_id, supplier_name: lief ? lief.name : null,
+           unit: data.unit, gesamtbestand: 0 };
+}
+
+// Einfache Auswahl aus einer Liste. Gibt den gewählten Wert zurück.
+function auswahlDialog(titel, optionen) {
+  return new Promise((fertig) => {
+    const h = document.createElement("div");
+    h.className = "dialog-huelle";
+    h.innerHTML = '<div class="dialog"><h2>' + esc(titel) + '</h2>'
+      + '<div class="statuswahl">'
+      + optionen.map((o) => '<button class="knopf" data-w="' + esc(o.wert) + '">'
+          + esc(o.text) + '</button>').join("")
+      + '</div><div class="dialog__knoepfe">'
+      + '<button class="knopf knopf--still" data-nein>Abbrechen</button></div></div>';
+    document.body.appendChild(h);
+    const zu = (v) => { h.remove(); fertig(v); };
+    h.querySelector("[data-nein]").onclick = () => zu(null);
+    h.onclick = (e) => { if (e.target === h) zu(null); };
+    h.querySelectorAll("[data-w]").forEach((el) => { el.onclick = () => zu(el.dataset.w); });
+  });
+}
 
 async function positionDialog(b) {
   const huelle = document.createElement("div");
@@ -3906,13 +3965,15 @@ async function positionDialog(b) {
     + '</div></div>';
   document.body.appendChild(huelle);
 
+  const $ = (kennung) => huelle.querySelector("#" + kennung);
+
   let gewaehlt = null;
   const zu = () => huelle.remove();
-  document.getElementById("pd-nein").onclick = zu;
+  $("pd-nein").onclick = zu;
   huelle.onclick = (e) => { if (e.target === huelle) zu(); };
 
-  const feld = document.getElementById("pd-such");
-  const trefferBox = document.getElementById("pd-treffer");
+  const feld = $("pd-such");
+  const trefferBox = $("pd-treffer");
   feld.focus();
 
   const suchen = async () => {
@@ -3921,25 +3982,43 @@ async function positionDialog(b) {
     trefferBox.innerHTML = '<div class="laedt">Wird gesucht …</div>';
     try {
       const liste = await sucheArtikel(t);
-      trefferBox.innerHTML = liste.length
+      trefferBox.innerHTML = (liste.length
         ? liste.slice(0, 8).map((a) => '<button class="pd-zeile" data-w="' + esc(a.id) + '">'
             + '<strong>' + esc(a.article_number) + '</strong> ' + esc(a.name)
             + '<span class="klein"> ' + esc(a.supplier_name || "ohne Lieferant") + '</span>'
             + '</button>').join("")
-        : '<p class="hinweis">Kein Artikel gefunden.</p>';
+        : '<p class="hinweis">Kein Artikel gefunden.</p>')
+        + (darfSchreiben()
+            ? '<button class="pd-zeile pd-zeile--neu" data-neuartikel>'
+              + '+ Artikel "' + esc(t) + '" neu anlegen</button>' : "");
+
+      const neuArt = trefferBox.querySelector("[data-neuartikel]");
+      if (neuArt) neuArt.onclick = async () => {
+        const a = await artikelSchnellAnlegen(feld.value.trim());
+        if (!a) return;
+        gewaehlt = a;
+        trefferBox.innerHTML = "";
+        feld.value = "";
+        $("pd-rest").hidden = false;
+        $("pd-gewaehlt").innerHTML =
+          '<strong>' + esc(a.article_number) + '</strong> ' + esc(a.name)
+          + '<div class="klein">Lieferant: ' + esc(a.supplier_name || "keiner hinterlegt") + '</div>';
+        $("pd-ja").disabled = false;
+        $("pd-menge").focus();
+      };
 
       trefferBox.querySelectorAll("[data-w]").forEach((el) => {
         el.onclick = () => {
           gewaehlt = liste.find((x) => x.id === el.dataset.w);
           trefferBox.innerHTML = "";
           feld.value = "";
-          document.getElementById("pd-rest").hidden = false;
-          document.getElementById("pd-gewaehlt").innerHTML =
+          $("pd-rest").hidden = false;
+          $("pd-gewaehlt").innerHTML =
             '<strong>' + esc(gewaehlt.article_number) + '</strong> ' + esc(gewaehlt.name)
             + '<div class="klein">Lieferant: ' + esc(gewaehlt.supplier_name || "keiner hinterlegt")
             + ' · Bestand ' + zahlText(gewaehlt.gesamtbestand) + '</div>';
-          document.getElementById("pd-ja").disabled = false;
-          document.getElementById("pd-menge").focus();
+          $("pd-ja").disabled = false;
+          $("pd-menge").focus();
         };
       });
     } catch (f) { trefferBox.innerHTML = '<p class="hinweis">' + esc(fehlertext(f)) + '</p>'; }
@@ -3949,24 +4028,17 @@ async function positionDialog(b) {
   feld.oninput = () => { clearTimeout(taste); taste = setTimeout(suchen, 300); };
   feld.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); clearTimeout(taste); suchen(); } };
 
-  document.getElementById("pd-scan").onclick = async () => {
-    const code = await scannen();
-    if (!code) return;
-    feld.value = code;
-    suchen();
-  };
-
-  document.getElementById("pd-ja").onclick = async () => {
+  $("pd-ja").onclick = async () => {
     if (!gewaehlt) return;
-    const menge = Math.round(Number(document.getElementById("pd-menge").value));
+    const menge = Math.round(Number($("pd-menge").value));
     if (!Number.isFinite(menge) || menge < 1) { meldung("Menge muss mindestens 1 sein.", "warn"); return; }
 
     const { error } = await db.from("order_items").insert({
       article_id: gewaehlt.id,
       supplier_id: gewaehlt.supplier_id || null,
       quantity: menge,
-      needed_by: document.getElementById("pd-frist").value || null,
-      note: (document.getElementById("pd-notiz").value || "").trim() || null,
+      needed_by: $("pd-frist").value || null,
+      note: ($("pd-notiz").value || "").trim() || null,
     });
 
     if (error) meldung(fehlertext(error), "fehler");
