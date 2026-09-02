@@ -1057,7 +1057,7 @@ const APP_UNTERTITEL = "HUDSON TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "9.4.0";
+const APP_VERSION = "9.5.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -4715,13 +4715,9 @@ async function bestOffen(ziel, b) {
       huelle.className = "dialog-huelle";
       huelle.innerHTML = '<div class="dialog"><h2>Status ändern</h2>'
         + '<div class="statuswahl">'
-        + Object.keys(BESTELLSTATUS)
-            .filter((st) => st !== "geliefert")
-            .map((st) => '<button class="knopf'
+        + Object.keys(BESTELLSTATUS).map((st) => '<button class="knopf'
               + (z.status === st ? " knopf--haupt" : "") + '" data-neu="' + st + '">'
-              + BESTELLSTATUS[st] + '</button>').join("")
-        + '<p class="hinweis">Geliefert wird über den eigenen Knopf gesetzt, '
-        + 'weil dabei gleich eingelagert wird.</p>' 
+              + BESTELLSTATUS[st] + '</button>').join("") 
         + '</div><div class="dialog__knoepfe">'
         + '<button class="knopf knopf--still" data-nein>Abbrechen</button></div></div>';
       document.body.appendChild(huelle);
@@ -4732,6 +4728,15 @@ async function bestOffen(ziel, b) {
       huelle.querySelectorAll("[data-neu]").forEach((k) => {
         k.onclick = async () => {
           const neuStatus = k.dataset.neu;
+
+          // Geliefert läuft immer über den Einlagerdialog, damit der
+          // Bestand gleich mitgebucht wird.
+          if (neuStatus === "geliefert") {
+            huelle.remove();
+            await lieferungEinlagern(z, b);
+            return;
+          }
+
           const ok = await nachfragen({ titel: "Status ändern",
             text: 'Wirklich auf "' + BESTELLSTATUS[neuStatus] + '" setzen?',
             bestaetigen: "Ja, ändern" });
@@ -4739,7 +4744,6 @@ async function bestOffen(ziel, b) {
 
           const daten = { status: neuStatus };
           if (neuStatus === "bestellt") daten.ordered_at = new Date().toISOString();
-          if (neuStatus === "erledigt") daten.completed_at = new Date().toISOString();
 
           const { error } = await db.from("order_items").update(daten).eq("id", z.id);
           huelle.remove();
