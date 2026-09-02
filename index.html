@@ -1014,6 +1014,14 @@ a:focus-visible {
 
 .pdfabstand { height: 10px; }
 .feld--abstand { margin-top: 22px; }
+
+/* ---------- Symbole in der Navigation ---------- */
+.navsym { width: 22px; height: 22px; display: block; }
+.nav__zeichen { display: flex; align-items: center; justify-content: center;
+                line-height: 1; }
+@media (min-width: 780px) {
+  .navsym { width: 19px; height: 19px; }
+}
 </style>
 </head>
 <body>
@@ -1057,7 +1065,7 @@ const APP_UNTERTITEL = "HUDSON TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "9.5.0";
+const APP_VERSION = "9.6.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -5257,16 +5265,68 @@ async function seiteEinstellungen(b) {
 //  Navigation
 // -----------------------------------------------------------------
 
+// Symbole für die Navigation, als Zeichnung statt Textzeichen.
+const SYM = {};
+const svg = (inhalt) => '<svg viewBox="0 0 24 24" class="navsym" fill="none"'
+  + ' stroke="currentColor" stroke-width="1.9" stroke-linecap="round"'
+  + ' stroke-linejoin="round" aria-hidden="true">' + inhalt + '</svg>';
+
+// Start: Werkstatt-Kacheln, eine davon hervorgehoben
+SYM.start = svg('<rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/>'
+  + '<rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5" fill="currentColor" stroke="none"/>'
+  + '<rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/>'
+  + '<rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/>');
+
+// Planwand: Tafel mit Balken
+SYM.planwand = svg('<rect x="2.5" y="4" width="19" height="16" rx="2"/>'
+  + '<line x1="2.5" y1="8.5" x2="21.5" y2="8.5"/>'
+  + '<rect x="5" y="10.5" width="8" height="2.6" rx="1.3" fill="currentColor" stroke="none"/>'
+  + '<rect x="9" y="15" width="9" height="2.6" rx="1.3" fill="currentColor" stroke="none"/>');
+
+// Produktion: Zahnrad
+SYM.produktion = svg('<circle cx="12" cy="12" r="3.2"/>'
+  + '<path d="M12 2.6v2.6M12 18.8v2.6M4.4 12H1.8M22.2 12h-2.6'
+  + 'M6.3 6.3 4.5 4.5M19.5 19.5l-1.8-1.8M17.7 6.3l1.8-1.8M4.5 19.5l1.8-1.8"/>');
+
+// Kontrolle: Haken im Kreis
+SYM.kontrolle = svg('<circle cx="12" cy="12" r="9"/><path d="M8 12.3l2.7 2.7L16 9.6"/>');
+
+// Lager: gestapelte Kisten
+SYM.lager = svg('<rect x="3" y="3.5" width="18" height="6" rx="1.5"/>'
+  + '<rect x="3" y="9.5" width="18" height="5.5" rx="1.5"/>'
+  + '<rect x="3" y="15" width="18" height="5.5" rx="1.5"/>'
+  + '<line x1="9.5" y1="12.2" x2="14.5" y2="12.2"/>');
+
+// Bestellungen: Lieferschein mit Haken
+SYM.bestellungen = svg('<path d="M6 2.8h9l4 4v14.4H6z"/><path d="M15 2.8v4h4"/>'
+  + '<path d="M9 13l1.8 1.8L14.5 11"/><line x1="9" y1="17.6" x2="15" y2="17.6"/>');
+
+// Einkauf: Einkaufswagen
+SYM.einkauf = svg('<circle cx="9.5" cy="19.5" r="1.5"/><circle cx="17.5" cy="19.5" r="1.5"/>'
+  + '<path d="M2.5 3h2.3l2.6 11.4h11.1L21 7H6.2"/>');
+
+// Rechner: Winkelmesser mit Gradbogen
+SYM.rechner = svg('<path d="M3 19.5h18"/><path d="M3 19.5L17 5"/>'
+  + '<path d="M11 19.5a8 8 0 0 0-2.4-5.7"/><circle cx="3" cy="19.5" r="1.1"'
+  + ' fill="currentColor" stroke="none"/>');
+
+// Einstellungen: Schieberegler
+SYM.einstellungen = svg('<line x1="4" y1="7" x2="20" y2="7"/>'
+  + '<line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/>'
+  + '<circle cx="9" cy="7" r="2.2" fill="var(--flaeche)"/>'
+  + '<circle cx="15" cy="12" r="2.2" fill="var(--flaeche)"/>'
+  + '<circle cx="8" cy="17" r="2.2" fill="var(--flaeche)"/>');
+
 const SEITEN = [
-  { pfad: "dashboard",    titel: "Start",        zeichen: "◧", zeige: seiteDashboard },
-  { pfad: "planwand",     titel: "Planwand",     zeichen: "▦", zeige: seitePlanwand },
-  { pfad: "produktion",   titel: "Produktion",   zeichen: "▶", zeige: seiteProduktion },
-  { pfad: "kontrolle",    titel: "Kontrolle",    zeichen: "✓", zeige: seiteKontrolle },
-  { pfad: "lager",        titel: "Lager",        zeichen: "▤", zeige: seiteLager },
-  { pfad: "bestellungen", titel: "Bestellungen", zeichen: "≡", zeige: seiteBestellungen },
-  { pfad: "einkauf",      titel: "Einkauf",      zeichen: "🛒", zeige: seiteEinkauf },
-  { pfad: "rechner",      titel: "Rechner",      zeichen: "∡", zeige: seiteRechner },
-  { pfad: "einstellungen", titel: "Einstellungen", zeichen: "⚙", zeige: seiteEinstellungen },
+  { pfad: "dashboard",    titel: "Start",        zeichen: SYM.start, zeige: seiteDashboard },
+  { pfad: "planwand",     titel: "Planwand",     zeichen: SYM.planwand, zeige: seitePlanwand },
+  { pfad: "produktion",   titel: "Produktion",   zeichen: SYM.produktion, zeige: seiteProduktion },
+  { pfad: "kontrolle",    titel: "Kontrolle",    zeichen: SYM.kontrolle, zeige: seiteKontrolle },
+  { pfad: "lager",        titel: "Lager",        zeichen: SYM.lager, zeige: seiteLager },
+  { pfad: "bestellungen", titel: "Bestellungen", zeichen: SYM.bestellungen, zeige: seiteBestellungen },
+  { pfad: "einkauf",      titel: "Einkauf",      zeichen: SYM.einkauf, zeige: seiteEinkauf },
+  { pfad: "rechner",      titel: "Rechner",      zeichen: SYM.rechner, zeige: seiteRechner },
+  { pfad: "einstellungen", titel: "Einstellungen", zeichen: SYM.einstellungen, zeige: seiteEinstellungen },
 ];
 
 function zeichneSeite() {
