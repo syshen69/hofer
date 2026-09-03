@@ -1022,6 +1022,50 @@ a:focus-visible {
 @media (min-width: 780px) {
   .navsym { width: 19px; height: 19px; }
 }
+
+/* ---------- Fortschritt im Planwand-Balken ---------- */
+.pw-balken { position: relative; }
+.pw-fortschritt { position: absolute; left: 0; top: 0; bottom: 0;
+                  background: rgba(255,255,255,.28); pointer-events: none;
+                  border-right: 2px solid rgba(255,255,255,.55); }
+.pw-balken__inhalt { position: relative; display: flex; align-items: center;
+                     gap: 5px; width: 100%; overflow: hidden; }
+.pw-balken__prozent { font-size: .68rem; opacity: .9; flex: none;
+                      font-variant-numeric: tabular-nums; }
+
+/* ---------- Maschinennummer in den Rastern ---------- */
+.fest__nr { display: block; font-size: .7rem; font-weight: 400; color: var(--gedaempft); }
+
+/* ---------- Betrachter für PDF und Fotos ---------- */
+.betrachter-huelle { padding: 0; align-items: stretch; }
+.betrachter { display: flex; flex-direction: column; width: 100%; height: 100%;
+              background: #12161b; }
+.betrachter__kopf { display: flex; align-items: center; justify-content: space-between;
+                    gap: 12px; padding: 10px 14px; background: #1d2430; color: #fff; }
+.betrachter__titel { font-size: .9rem; font-weight: 600; overflow: hidden;
+                     text-overflow: ellipsis; white-space: nowrap; }
+.betrachter__knoepfe { display: flex; gap: 8px; flex: none; }
+.betrachter__knoepfe .knopf { background: transparent; border-color: #47505c; color: #fff;
+                              text-decoration: none; display: inline-flex;
+                              align-items: center; }
+.betrachter__buehne { flex: 1; display: flex; flex-direction: column;
+                      align-items: center; justify-content: center; padding: 10px;
+                      overflow: auto; }
+.betrachter__buehne iframe { width: 100%; height: 100%; border: none;
+                             background: #fff; border-radius: 4px; }
+.betrachter__buehne img { max-width: 100%; max-height: 100%; object-fit: contain;
+                          border-radius: 4px; }
+.betrachter__hinweis { color: #9aa5b1; font-size: .8rem; margin: 8px 0 0;
+                       text-align: center; }
+
+/* ---------- Meldungsansicht ---------- */
+.zeile--klickbar { cursor: pointer; }
+.zeile--klickbar:hover { background: var(--marke-hell); }
+.meldungszahl { padding: 12px 16px; border-radius: var(--radius); margin-bottom: 16px; }
+.meldungsnotiz { padding: 10px 12px; background: var(--grund);
+                 border-radius: var(--radius); white-space: pre-wrap; }
+.bildliste--klein img { cursor: pointer; }
+.pdflink { display: block; width: 100%; margin-bottom: 4px; }
 </style>
 </head>
 <body>
@@ -1065,7 +1109,7 @@ const APP_UNTERTITEL = "HUDSON TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "9.7.0";
+const APP_VERSION = "9.8.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -2511,16 +2555,29 @@ function planBalken(j, spalte, dauer, angeschnitten) {
   const vg = fertig ? "#ffffff" : f.schrift;
   const rand = (!fertig && j.color === "weiss") ? "border:1px solid var(--linie-stark);" : "";
 
+  // Fortschritt in Schritten von fünf Prozent
+  let anteil = null;
+  if (j.target_quantity && j.target_quantity > 0) {
+    const roh = (j.stand || 0) / j.target_quantity * 100;
+    anteil = Math.max(0, Math.min(100, Math.round(roh / 5) * 5));
+  } else if (fertig) {
+    anteil = 100;
+  }
+
   return '<div class="pw-balken' + (fertig ? " pw-balken--fertig" : "")
     + (angeschnitten ? " pw-balken--offen" : "") + '"'
     + ' data-auftrag="' + esc(j.id) + '"'
     + ' style="--von:' + spalte + ';--dauer:' + Math.max(1, dauer)
     + ';background:' + hg + ';color:' + vg + ';' + rand + '">'
+    + (anteil !== null
+        ? '<div class="pw-fortschritt" style="width:' + anteil + '%"></div>' : "")
+    + '<div class="pw-balken__inhalt">'
     + '<span class="pw-balken__status">' + (PLANSTATUS[st] || PLANSTATUS.geplant).zeichen + '</span>'
     + '<span class="pw-balken__nr">' + esc(j.job_number) + '</span>'
+    + (anteil !== null ? '<span class="pw-balken__prozent">' + anteil + '%</span>' : "")
     + (j.plan_note ? '<span class="pw-balken__zeichen">✎</span>' : "")
     + (j.drawing_url ? '<span class="pw-balken__zeichen">PDF</span>' : "")
-    + '</div>';
+    + '</div></div>';
 }
 
 // ---------- Antippen und Verschieben ----------
@@ -2685,8 +2742,8 @@ async function planAuftragDialog(auftrag, b) {
 
     + '<div class="feld"><span class="feldlabel">Zeichnung als PDF</span>'
     + (auftrag && auftrag.drawing_url
-        ? '<a class="pdflink" href="' + esc(auftrag.drawing_url)
-          + '" target="_blank" rel="noopener">Zeichnung öffnen</a>' : "")
+        ? '<button type="button" class="knopf pdflink" data-pdfzeigen="'
+          + esc(auftrag.drawing_url) + '">Zeichnung ansehen</button>' : "")
     + '<div class="pdfabstand"></div>' 
     + (darf
         ? '<label class="knopf bildknopf">PDF auswählen'
@@ -2709,6 +2766,11 @@ async function planAuftragDialog(auftrag, b) {
   huelle.onclick = (e) => { if (e.target === huelle) zu(); };
 
   let pdfAdresse = auftrag ? auftrag.drawing_url : null;
+
+  const pdfKnopf = huelle.querySelector("[data-pdfzeigen]");
+  if (pdfKnopf) pdfKnopf.onclick = () =>
+    betrachter(pdfKnopf.dataset.pdfzeigen,
+      "Zeichnung " + (auftrag ? auftrag.job_number : ""), true);
 
   huelle.querySelectorAll("[data-plstatus]").forEach((el) => {
     el.onclick = () => {
@@ -3174,6 +3236,15 @@ async function seiteKontrolle(b) {
     };
   });
 
+  ziel.querySelectorAll("[data-meldung]").forEach((zeile) => {
+    zeile.onclick = (e) => {
+      // Klicks auf die Knöpfe in der Zeile nicht abfangen
+      if (e.target.closest("button")) return;
+      const m = meldungen.find((x) => x.id === zeile.dataset.meldung);
+      if (m) meldungAnsehen(m, b);
+    };
+  });
+
   ziel.querySelectorAll("[data-kweg]").forEach((el) => {
     el.onclick = async () => {
       const w = await loeschen({ tabelle: "quality_reports", id: el.dataset.kweg,
@@ -3181,6 +3252,15 @@ async function seiteKontrolle(b) {
         text: "Die Meldung wird endgültig entfernt. Quittieren wäre der übliche Weg, "
             + "dann bleibt sie nachvollziehbar." });
       if (w) seiteKontrolle(b);
+    };
+  });
+
+  ziel.querySelectorAll("[data-meldung]").forEach((zeile) => {
+    zeile.onclick = (e) => {
+      // Klicks auf die Knöpfe in der Zeile nicht abfangen
+      if (e.target.closest("button")) return;
+      const m = meldungen.find((x) => x.id === zeile.dataset.meldung);
+      if (m) meldungAnsehen(m, b);
     };
   });
 
@@ -3324,6 +3404,88 @@ function bildVerkleinern(datei) {
     leser.onerror = () => ablehnen(new Error("Datei nicht lesbar"));
     leser.readAsDataURL(datei);
   });
+}
+
+// Alle Angaben einer Kontrollmeldung, mit Fotos zum Vergrössern.
+function meldungAnsehen(m, b) {
+  const huelle = document.createElement("div");
+  huelle.className = "dialog-huelle";
+  huelle.innerHTML = '<div class="dialog">'
+    + '<h2>' + esc(m.job_number) + '</h2>'
+    + '<p class="klein">' + esc(m.maschine)
+    + (m.maschine_nr ? " · " + esc(m.maschine_nr) : "") + ' · '
+    + esc(datumZeitKurz(m.created_at)) + ' · '
+    + esc(m.benutzer_name || m.benutzer_email || "") + '</p>'
+
+    + '<div class="karte--ergebnis meldungszahl">'
+    + '<div class="ergebnis__titel">Ausschuss</div>'
+    + '<div class="ergebnis__wert">' + zahlText(m.scrap_count) + '<span>Stück</span></div></div>'
+
+    + (m.note ? '<div class="feld"><span class="feldlabel">Was war nicht in Ordnung</span>'
+        + '<div class="meldungsnotiz">' + esc(m.note) + '</div></div>' : "")
+
+    + ((m.images && m.images.length)
+        ? '<div class="feld"><span class="feldlabel">Fotos</span>'
+          + '<div class="bildliste">'
+          + m.images.map((u) => '<div class="bildchen"><img src="' + esc(u)
+              + '" alt="Foto" data-gross="' + esc(u) + '"></div>').join("")
+          + '</div><span class="feldhinweis">Foto antippen zeigt es gross.</span></div>'
+        : '<p class="hinweis">Zu dieser Meldung gibt es keine Fotos.</p>')
+
+    + '<div class="dialog__knoepfe">'
+    + '<button class="knopf knopf--still" data-zu>Schliessen</button>'
+    + (darfSchreiben() ? '<button class="knopf knopf--haupt" data-quittieren>Quittieren</button>' : "")
+    + '</div></div>';
+  document.body.appendChild(huelle);
+
+  const zu = () => huelle.remove();
+  huelle.querySelector("[data-zu]").onclick = zu;
+  huelle.onclick = (e) => { if (e.target === huelle) zu(); };
+
+  huelle.querySelectorAll("[data-gross]").forEach((bild) => {
+    bild.onclick = () => betrachter(bild.dataset.gross, "Foto zu " + m.job_number, false);
+  });
+
+  const q = huelle.querySelector("[data-quittieren]");
+  if (q) q.onclick = async () => {
+    const ok = await nachfragen({ titel: "Meldung quittieren?",
+      text: "Auftrag " + m.job_number + " · " + m.scrap_count
+          + " Ausschussteile. Die Meldung verschwindet danach aus der Liste.",
+      bestaetigen: "Ja, quittieren" });
+    if (!ok) return;
+    const { error } = await db.from("quality_reports").update({
+      acknowledged_at: new Date().toISOString(), acknowledged_by: profil.id
+    }).eq("id", m.id);
+    zu();
+    if (error) meldung(fehlertext(error), "fehler");
+    else { meldung("Quittiert."); seiteKontrolle(b); }
+  };
+}
+
+// Zeigt ein PDF oder ein Bild in der App an, ohne Herunterladen.
+function betrachter(adresse, titel, istPdf) {
+  const huelle = document.createElement("div");
+  huelle.className = "dialog-huelle betrachter-huelle";
+  huelle.innerHTML = '<div class="betrachter">'
+    + '<div class="betrachter__kopf">'
+    + '<span class="betrachter__titel">' + esc(titel || "") + '</span>'
+    + '<div class="betrachter__knoepfe">'
+    + '<a class="knopf knopf--klein" href="' + esc(adresse) + '" target="_blank"'
+    + ' rel="noopener">Neuer Tab</a>'
+    + '<button class="knopf knopf--klein" data-zu>Schliessen</button>'
+    + '</div></div>'
+    + '<div class="betrachter__buehne">'
+    + (istPdf
+        ? '<iframe src="' + esc(adresse) + '" title="Zeichnung"></iframe>'
+          + '<p class="betrachter__hinweis">Wird nichts angezeigt, öffne die Datei über '
+          + '"Neuer Tab". Manche Handys zeigen PDFs nicht direkt in der App an.</p>'
+        : '<img src="' + esc(adresse) + '" alt="Foto">')
+    + '</div></div>';
+  document.body.appendChild(huelle);
+
+  const zu = () => huelle.remove();
+  huelle.querySelector("[data-zu]").onclick = zu;
+  huelle.onclick = (e) => { if (e.target === huelle) zu(); };
 }
 
 function datumZeitKurz(iso) {
