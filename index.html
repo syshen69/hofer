@@ -659,7 +659,7 @@ a:focus-visible {
 .fest__auftrag { display: block; font-size: .72rem; font-weight: 400; color: var(--marke); }
 .zelle__leistung { display: block; font-size: .7rem; color: var(--gedaempft); margin-top: 2px; }
 
-/* ---------- Kontrolle ---------- */
+/* ---------- Ferienbalken ---------- */
 .kzeile { padding: 12px 0; border-bottom: 1px solid var(--linie); }
 .kzeile:last-child { border-bottom: none; }
 .kzeile__oben { display: flex; gap: 10px; align-items: baseline; }
@@ -1084,6 +1084,23 @@ a:focus-visible {
 
 .lieferantlink { color: var(--marke); text-decoration: none; }
 .lieferantlink:hover { text-decoration: underline; }
+
+/* ---------- Ferienzeilen auf der Planwand ---------- */
+.pw-park--ferien { background: #f2f4f7; color: var(--gedaempft); }
+.pw-zeile--fein { border-bottom: 1px solid var(--linie); }
+.pw-spuren--fein { min-height: 26px; }
+.pw-name--fein { font-size: .7rem; font-weight: 400; color: var(--gedaempft);
+                 padding: 4px 10px; }
+.pw-zelle--fein { cursor: pointer; }
+.pw-zelle--fein:hover { background: var(--marke-hell); }
+.pw-ferien { grid-column: calc(var(--von) + 1) / span var(--dauer);
+             background: repeating-linear-gradient(45deg, #f0b429, #f0b429 6px,
+               #e0a518 6px, #e0a518 12px);
+             color: #3a2c05; border-radius: 3px; margin: 2px 0;
+             padding: 2px 7px; font-size: .7rem; font-weight: 650;
+             display: flex; align-items: center; overflow: hidden;
+             pointer-events: auto; cursor: pointer; }
+.pw-ferien__name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>
 </head>
 <body>
@@ -1127,7 +1144,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "10.0.0";
+const APP_VERSION = "10.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -1517,7 +1534,6 @@ async function seiteDashboard(b) {
               + '<td class="klein">' + esc(j.maschine)
               + (j.maschine_nr ? '<div>' + esc(j.maschine_nr) + '</div>' : "") + '</td>'
               + '<td class="rechts stark">' + zahlText(j.stand)
-              + (j.ausschuss > 0 ? '<span class="klein"> −' + zahlText(j.ausschuss) + '</span>' : "")
               + '</td></tr>').join("")
           + '</tbody></table>'
           + '<p class="hinweis">Ein Punkt neben der Auftragsnummer heisst: heute noch keine Zahl erfasst.</p>'
@@ -1751,12 +1767,10 @@ function ladeHerunter(inhalt, dateiname, art) {
 function meineRolle() { return (profil && profil.role) || "produktion"; }
 function istAdmin() { return meineRolle() === "admin"; }
 function darfSchreiben() { return meineRolle() === "admin" || meineRolle() === "produktion"; }
-function darfKontrolle() { return meineRolle() === "admin" || meineRolle() === "kontrolle"; }
 
 const ROLLEN = {
   admin: "Administrator",
   produktion: "Produktion",
-  kontrolle: "Kontrolle",
   planer: "Planer",
 };
 
@@ -2365,6 +2379,7 @@ const plan = {
   start: null,      // erster sichtbarer Tag
   tage: 15,   // drei Wochen zu je fünf Arbeitstagen
   auftraege: null,
+  ferien: [],
 };
 
 // Farben für die Balken
@@ -2439,6 +2454,15 @@ function darfPlanen() {
   return r === "admin" || r === "planer";
 }
 
+const FERIEN_ZEILEN = 5;
+
+async function ladeFerien() {
+  const { data, error } = await zeitlimit(
+    db.from("vacations").select("*").order("von"), 10000, "Ferien");
+  if (error) throw error;
+  return data || [];
+}
+
 async function ladePlanAuftraege() {
   const { data, error } = await zeitlimit(
     db.from("planwand").select("*").order("planned_from", { nullsFirst: false }),
@@ -2499,6 +2523,9 @@ async function ansichtPlanwand(ziel, b) {
       '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
     return;
   }
+
+  try { plan.ferien = await ladeFerien(); }
+  catch (f) { plan.ferien = []; console.warn("Ferien:", f.message); }
 
   zeichnePlanwand(b);
 }
@@ -2565,9 +2592,13 @@ function zeichnePlanwand(b) {
     + '</div>'
     + '<p class="hinweis">Balken antippen öffnet Notiz, Menge und Zeichnung. '
     + (darfPlanen() ? 'Lange gedrückt halten und ziehen verschiebt ihn. ' : "")
-    + 'Fertige Aufträge werden dunkelgrau.</p>';
+    + 'Fertige Aufträge werden dunkelgrau. '
+    + (darfPlanen() ? 'In den Ferienzeilen unten auf einen freien Tag tippen, '
+        + 'um jemanden einzutragen.' : "")
+    + '</p>';
 
   balkenVerhalten(b);
+  ferienVerhalten(b);
 }
 
 function planBalken(j, spalte, dauer, angeschnitten) {
@@ -2606,6 +2637,74 @@ function planBalken(j, spalte, dauer, angeschnitten) {
 }
 
 // ---------- Antippen und Verschieben ----------
+
+function ferienVerhalten(b) {
+  const tafel = document.querySelector(".pw-tafel");
+  if (!tafel || !darfPlanen()) return;
+
+  // Leere Stelle antippen: neuen Eintrag anlegen
+  tafel.querySelectorAll("[data-fzelle]").forEach((zelle) => {
+    zelle.onclick = async () => {
+      const teile = zelle.dataset.fzelle.split("|");
+      await ferienDialog(null, Number(teile[0]), teile[1], b);
+    };
+  });
+
+  // Vorhandenen Balken antippen: bearbeiten oder löschen
+  tafel.querySelectorAll("[data-ferien]").forEach((el) => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      const f2 = (plan.ferien || []).find((x) => x.id === el.dataset.ferien);
+      if (f2) ferienDialog(f2, f2.zeile, f2.von, b);
+    };
+  });
+}
+
+async function ferienDialog(eintrag, zeile, datum, b) {
+  const w = await dialogFelder({
+    titel: eintrag ? "Ferien bearbeiten" : "Ferien eintragen",
+    text: eintrag ? "" : "Ab " + kurzDatum(datum),
+    felder: [
+      { name: "person", label: "Wer", pflicht: true,
+        wert: eintrag ? eintrag.person : "", platzhalter: "Name" },
+      { name: "tage", label: "Wie viele Arbeitstage", typ: "number",
+        wert: eintrag ? eintrag.tage : 5 },
+      { name: "von", label: "Erster Tag", typ: "date",
+        wert: eintrag ? eintrag.von : datum },
+      { name: "notiz", label: "Notiz", wert: eintrag ? (eintrag.note || "") : "",
+        platzhalter: "kann leer bleiben" },
+    ],
+    bestaetigen: eintrag ? "Speichern" : "Eintragen",
+  });
+
+  if (!w) {
+    // Abbrechen bei einem vorhandenen Eintrag: Löschen anbieten
+    if (!eintrag) return;
+    const weg = await nachfragen({ titel: "Ferien löschen",
+      text: "Soll der Eintrag für " + eintrag.person + " gelöscht werden?",
+      bestaetigen: "Löschen", gefahr: true });
+    if (!weg) return;
+    const { error } = await db.from("vacations").delete().eq("id", eintrag.id);
+    if (error) meldung(fehlertext(error), "fehler");
+    else { meldung("Gelöscht."); seitePlanwand(b); }
+    return;
+  }
+
+  const daten = {
+    person: w.person,
+    zeile: zeile,
+    von: w.von || datum,
+    tage: Math.max(1, Math.round(w.tage || 1)),
+    note: w.notiz || null,
+  };
+
+  const { error } = eintrag
+    ? await db.from("vacations").update(daten).eq("id", eintrag.id)
+    : await db.from("vacations").insert(daten);
+
+  if (error) meldung(fehlertext(error), "fehler");
+  else { meldung("Gespeichert."); seitePlanwand(b); }
+}
 
 function balkenVerhalten(b) {
   const tafel = document.querySelector(".pw-tafel");
@@ -3173,318 +3272,11 @@ function ansichtMaschinen(ziel, b) {
   });
 }
 
-// =================================================================
-//  KONTROLLE
-// =================================================================
-
-async function seiteKontrolle(b) {
-  b.innerHTML = '<h1 class="seitentitel">Kontrolle</h1>'
-    + (darfKontrolle() ? "" : nurLesenHinweis(
-        "Du kannst Meldungen ansehen und quittieren. Erfassen dürfen nur Benutzer mit der Rolle Kontrolle."))
-    + '<div id="k-inhalt"><div class="laedt">Wird geladen …</div></div>';
-
-  const ziel = document.getElementById("k-inhalt");
-  let auftraege = [], meldungen = [];
-
-  try {
-    const a = await zeitlimit(db.from("laufende_auftraege").select("*").order("maschine"),
-      10000, "Aufträge");
-    if (a.error) throw a.error;
-    auftraege = a.data || [];
-
-    const m = await zeitlimit(db.from("kontrolle_lesbar").select("*")
-      .is("acknowledged_at", null)
-      .order("created_at", { ascending: false }).limit(50), 10000, "Meldungen");
-    if (!m.error) meldungen = m.data || [];
-  } catch (f) {
-    ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
-    return;
-  }
-
-  ziel.innerHTML = '<section class="karte"><h2>Laufende Aufträge</h2>'
-    + (auftraege.length
-      ? auftraege.map((j) => '<div class="kzeile">'
-          + '<div class="kzeile__oben"><span class="kzeile__nr">' + esc(j.job_number) + '</span>'
-          + '<span class="kzeile__maschine">' + esc(j.maschine)
-          + (j.maschine_nr ? ' · ' + esc(j.maschine_nr) : "") + '</span></div>'
-          + '<div class="kzeile__unten">'
-          + '<span>Stand ' + zahlText(j.stand) + '</span>'
-          + (j.ausschuss > 0
-              ? '<span class="kzeile__ausschuss">offen ' + zahlText(j.ausschuss) + '</span>' : "")
-          + (darfKontrolle() ? '<button class="knopf knopf--klein" data-melden="' + esc(j.id)
-              + '" data-nr="' + esc(j.job_number) + '">Ausschuss melden</button>' : "")
-          + '</div></div>').join("")
-      : '<p class="hinweis">Zurzeit läuft kein Auftrag.</p>')
-    + '</section>'
-
-    + '<section class="karte"><h2>Offene Meldungen'
-    + (meldungen.length ? ' <span class="marke">' + meldungen.length + '</span>' : "")
-    + '</h2>'
-    + (meldungen.length
-      ? '<table class="tabelle tabelle--meldungen"><thead><tr>'
-        + '<th>Wann</th><th>Auftrag</th><th class="mitte">Ausschuss</th><th>Wer</th>'
-        + (darfSchreiben() ? '<th></th>' : "")
-        + '</tr></thead><tbody>'
-        + meldungen.map((m) => '<tr>'
-            + '<td class="klein">' + esc(datumZeitKurz(m.created_at)) + '</td>'
-            + '<td>' + esc(m.job_number) + '<span class="klein"> ' + esc(m.maschine)
-            + (m.maschine_nr ? ' · ' + esc(m.maschine_nr) : "") + '</span>'
-            + (m.note ? '<div class="knotiz">' + esc(m.note) + '</div>' : "") + '</td>'
-            + '<td class="mitte stark">' + zahlText(m.scrap_count) + '</td>'
-            + '<td class="klein">' + esc(m.benutzer_name || m.benutzer_email || "") + '</td>'
-            + (darfSchreiben()
-                ? '<td class="rechts nowrap"><button class="linkknopf" data-quit="' + esc(m.id)
-                  + '">Quittieren</button>'
-                  + (istAdmin() ? ' <button class="linkknopf linkknopf--gefahr" data-kweg="'
-                      + esc(m.id) + '">Löschen</button>' : "")
-                  + '</td>' : "")
-            + '</tr>').join("")
-        + '</tbody></table>'
-        + '<p class="hinweis">Quittieren heisst: gesehen und erledigt. '
-        + 'Die Meldung verschwindet aus der Liste.</p>'
-      : '<p class="hinweis">Keine offenen Meldungen.</p>')
-    + '</section>';
-
-  ziel.querySelectorAll("[data-melden]").forEach((el) => {
-    el.onclick = async () => {
-      const w = await meldungDialog(el.dataset.nr);
-      if (!w) return;
-
-      const { error } = await db.from("quality_reports").insert({
-        job_id: el.dataset.melden,
-        scrap_count: Math.max(0, Math.round(w.anzahl)),
-        note: w.notiz || null,
-        images: w.bilder,
-      });
-      if (error) meldung(fehlertext(error), "fehler");
-      else { meldung("Meldung erfasst."); seiteKontrolle(b); }
-    };
-  });
-
-  ziel.querySelectorAll("[data-meldung]").forEach((zeile) => {
-    zeile.onclick = (e) => {
-      // Klicks auf die Knöpfe in der Zeile nicht abfangen
-      if (e.target.closest("button")) return;
-      const m = meldungen.find((x) => x.id === zeile.dataset.meldung);
-      if (m) meldungAnsehen(m, b);
-    };
-  });
-
-  ziel.querySelectorAll("[data-kweg]").forEach((el) => {
-    el.onclick = async () => {
-      const w = await loeschen({ tabelle: "quality_reports", id: el.dataset.kweg,
-        titel: "Meldung löschen",
-        text: "Die Meldung wird endgültig entfernt. Quittieren wäre der übliche Weg, "
-            + "dann bleibt sie nachvollziehbar." });
-      if (w) seiteKontrolle(b);
-    };
-  });
-
-  ziel.querySelectorAll("[data-meldung]").forEach((zeile) => {
-    zeile.onclick = (e) => {
-      // Klicks auf die Knöpfe in der Zeile nicht abfangen
-      if (e.target.closest("button")) return;
-      const m = meldungen.find((x) => x.id === zeile.dataset.meldung);
-      if (m) meldungAnsehen(m, b);
-    };
-  });
-
-  ziel.querySelectorAll("[data-kweg]").forEach((el) => {
-    el.onclick = async () => {
-      const ok = await doppeltNachfragen(
-        { titel: "Meldung löschen",
-          text: "Soll diese Kontrollmeldung wirklich gelöscht werden? "
-              + "Quittieren reicht meistens aus.",
-          bestaetigen: "Weiter zum Löschen", gefahr: true },
-        { titel: "Wirklich endgültig löschen?",
-          text: "Letzte Rückfrage. Danach ist die Meldung weg.",
-          bestaetigen: "Endgültig löschen", gefahr: true });
-      if (!ok) return;
-      const { error } = await db.from("quality_reports").delete().eq("id", el.dataset.kweg);
-      if (error) meldung(fehlertext(error), "fehler");
-      else { meldung("Meldung gelöscht."); seiteKontrolle(b); }
-    };
-  });
-
-  ziel.querySelectorAll("[data-quit]").forEach((el) => {
-    el.onclick = async () => {
-      const ok = await nachfragen({
-        titel: "Meldung quittieren?",
-        text: "Auftrag " + (el.dataset.qnr || "") + " · " + (el.dataset.qanz || "0")
-            + " Ausschussteile. Die Meldung verschwindet danach aus der Liste.",
-        bestaetigen: "Ja, quittieren" });
-      if (!ok) return;
-
-      const { error } = await db.from("quality_reports").update({
-        acknowledged_at: new Date().toISOString(),
-        acknowledged_by: profil.id,
-      }).eq("id", el.dataset.quit);
-      if (error) meldung(fehlertext(error), "fehler");
-      else { meldung("Quittiert."); seiteKontrolle(b); }
-    };
-  });
-}
-
-// Meldedialog mit Fotos. Bilder werden vor dem Hochladen verkleinert,
-// damit der Speicherplatz reicht und es auch mit schwachem WLAN geht.
-function meldungDialog(auftragNr) {
-  return new Promise((fertig) => {
-    const huelle = document.createElement("div");
-    huelle.className = "dialog-huelle";
-    huelle.innerHTML = '<div class="dialog"><h2>Ausschuss melden</h2>'
-      + '<p>Auftrag ' + esc(auftragNr) + '</p>'
-      + '<label class="feld"><span>Anzahl Ausschussteile</span>'
-      + '<input id="md-anzahl" type="number" inputmode="numeric" min="0" step="1"></label>'
-      + '<label class="feld"><span>Was war nicht in Ordnung?</span>'
-      + '<textarea id="md-notiz" rows="3" placeholder="z. B. Durchmesser zu gross, Grat an der Stirnseite"></textarea></label>'
-      + '<div class="feld"><span class="feldlabel">Fotos</span>'
-      + '<div class="bildwahl">'
-      + '<label class="knopf bildknopf">Foto aufnehmen'
-      + '<input type="file" id="md-kamera" accept="image/*" capture="environment" multiple hidden></label>'
-      + '<label class="knopf bildknopf">Aus der Galerie'
-      + '<input type="file" id="md-datei" accept="image/*" multiple hidden></label>'
-      + '</div>'
-      + '<div class="bildliste" id="md-bilder"></div>'
-      + '<span class="feldhinweis" id="md-stand"></span></div>'
-      + '<div class="dialog__knoepfe">'
-      + '<button class="knopf knopf--still" id="md-nein">Abbrechen</button>'
-      + '<button class="knopf knopf--haupt" id="md-ja">Melden</button>'
-      + '</div></div>';
-    document.body.appendChild(huelle);
-
-    const $ = (k) => huelle.querySelector("#" + k);
-    const bilder = [];      // fertige Adressen
-    const wartend = [];     // Dateien, die noch hochgeladen werden
-
-    const zu = (wert) => { huelle.remove(); fertig(wert); };
-    $("md-nein").onclick = () => zu(null);
-    huelle.onclick = (e) => { if (e.target === huelle) zu(null); };
-    $("md-anzahl").focus();
-
-    const zeichnen = () => {
-      $("md-bilder").innerHTML = bilder.map((b2, i) =>
-        '<div class="bildchen"><img src="' + esc(b2) + '" alt="">'
-        + '<button class="bildchen__weg" data-weg="' + i + '">×</button></div>').join("");
-      $("md-bilder").querySelectorAll("[data-weg]").forEach((el) => {
-        el.onclick = () => { bilder.splice(Number(el.dataset.weg), 1); zeichnen(); };
-      });
-    };
-
-    const verarbeiten = async (dateien) => {
-      for (const datei of dateien) {
-        if (!datei.type.startsWith("image/")) continue;
-        $("md-stand").textContent = "Bild wird hochgeladen …";
-        try {
-          const klein = await bildVerkleinern(datei);
-          const name = "meldung/" + Date.now() + "-" + Math.random().toString(36).slice(2, 8) + ".jpg";
-          const { error } = await db.storage.from("kontrolle").upload(name, klein,
-            { contentType: "image/jpeg" });
-          if (error) throw error;
-          const { data } = db.storage.from("kontrolle").getPublicUrl(name);
-          bilder.push(data.publicUrl);
-          zeichnen();
-          $("md-stand").textContent = bilder.length + " Foto" + (bilder.length === 1 ? "" : "s");
-        } catch (f) {
-          $("md-stand").textContent = "Bild konnte nicht hochgeladen werden: " + (f.message || f);
-        }
-      }
-    };
-
-    $("md-kamera").onchange = (e) => verarbeiten(Array.from(e.target.files || []));
-    $("md-datei").onchange = (e) => verarbeiten(Array.from(e.target.files || []));
-
-    $("md-ja").onclick = () => {
-      const anzahl = Number($("md-anzahl").value);
-      if (!Number.isFinite(anzahl) || anzahl < 0) {
-        meldung("Bitte eine Anzahl eintragen.", "warn");
-        return;
-      }
-      zu({ anzahl: anzahl, notiz: ($("md-notiz").value || "").trim(), bilder: bilder });
-    };
-  });
-}
-
-// Verkleinert ein Foto auf höchstens 1600 Pixel Kantenlänge.
-function bildVerkleinern(datei) {
-  return new Promise((fertig, ablehnen) => {
-    const leser = new FileReader();
-    leser.onload = () => {
-      const bild = new Image();
-      bild.onload = () => {
-        const max = 1600;
-        let { width: bw, height: bh } = bild;
-        if (bw > max || bh > max) {
-          const f = Math.min(max / bw, max / bh);
-          bw = Math.round(bw * f); bh = Math.round(bh * f);
-        }
-        const c = document.createElement("canvas");
-        c.width = bw; c.height = bh;
-        c.getContext("2d").drawImage(bild, 0, 0, bw, bh);
-        c.toBlob((blob) => blob ? fertig(blob) : ablehnen(new Error("Bild nicht lesbar")),
-          "image/jpeg", 0.82);
-      };
-      bild.onerror = () => ablehnen(new Error("Bild nicht lesbar"));
-      bild.src = leser.result;
-    };
-    leser.onerror = () => ablehnen(new Error("Datei nicht lesbar"));
-    leser.readAsDataURL(datei);
-  });
-}
-
-// Alle Angaben einer Kontrollmeldung, mit Fotos zum Vergrössern.
-function meldungAnsehen(m, b) {
-  const huelle = document.createElement("div");
-  huelle.className = "dialog-huelle";
-  huelle.innerHTML = '<div class="dialog">'
-    + '<h2>' + esc(m.job_number) + '</h2>'
-    + '<p class="klein">' + esc(m.maschine)
-    + (m.maschine_nr ? " · " + esc(m.maschine_nr) : "") + ' · '
-    + esc(datumZeitKurz(m.created_at)) + ' · '
-    + esc(m.benutzer_name || m.benutzer_email || "") + '</p>'
-
-    + '<div class="karte--ergebnis meldungszahl">'
-    + '<div class="ergebnis__titel">Ausschuss</div>'
-    + '<div class="ergebnis__wert">' + zahlText(m.scrap_count) + '<span>Stück</span></div></div>'
-
-    + (m.note ? '<div class="feld"><span class="feldlabel">Was war nicht in Ordnung</span>'
-        + '<div class="meldungsnotiz">' + esc(m.note) + '</div></div>' : "")
-
-    + ((m.images && m.images.length)
-        ? '<div class="feld"><span class="feldlabel">Fotos</span>'
-          + '<div class="bildliste">'
-          + m.images.map((u) => '<div class="bildchen"><img src="' + esc(u)
-              + '" alt="Foto" data-gross="' + esc(u) + '"></div>').join("")
-          + '</div><span class="feldhinweis">Foto antippen zeigt es gross.</span></div>'
-        : '<p class="hinweis">Zu dieser Meldung gibt es keine Fotos.</p>')
-
-    + '<div class="dialog__knoepfe">'
-    + '<button class="knopf knopf--still" data-zu>Schliessen</button>'
-    + (darfSchreiben() ? '<button class="knopf knopf--haupt" data-quittieren>Quittieren</button>' : "")
-    + '</div></div>';
-  document.body.appendChild(huelle);
-
-  const zu = () => huelle.remove();
-  huelle.querySelector("[data-zu]").onclick = zu;
-  huelle.onclick = (e) => { if (e.target === huelle) zu(); };
-
-  huelle.querySelectorAll("[data-gross]").forEach((bild) => {
-    bild.onclick = () => betrachter(bild.dataset.gross, "Foto zu " + m.job_number, false);
-  });
-
-  const q = huelle.querySelector("[data-quittieren]");
-  if (q) q.onclick = async () => {
-    const ok = await nachfragen({ titel: "Meldung quittieren?",
-      text: "Auftrag " + m.job_number + " · " + m.scrap_count
-          + " Ausschussteile. Die Meldung verschwindet danach aus der Liste.",
-      bestaetigen: "Ja, quittieren" });
-    if (!ok) return;
-    const { error } = await db.from("quality_reports").update({
-      acknowledged_at: new Date().toISOString(), acknowledged_by: profil.id
-    }).eq("id", m.id);
-    zu();
-    if (error) meldung(fehlertext(error), "fehler");
-    else { meldung("Quittiert."); seiteKontrolle(b); }
-  };
+function datumZeitKurz(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const p = (n) => String(n).padStart(2, "0");
+  return p(d.getDate()) + "." + p(d.getMonth() + 1) + ". " + p(d.getHours()) + ":" + p(d.getMinutes());
 }
 
 // Zeigt ein PDF oder ein Bild in der App an, ohne Herunterladen.
@@ -3511,13 +3303,6 @@ function betrachter(adresse, titel, istPdf) {
   const zu = () => huelle.remove();
   huelle.querySelector("[data-zu]").onclick = zu;
   huelle.onclick = (e) => { if (e.target === huelle) zu(); };
-}
-
-function datumZeitKurz(iso) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const p = (n) => String(n).padStart(2, "0");
-  return p(d.getDate()) + "." + p(d.getMonth() + 1) + ". " + p(d.getHours()) + ":" + p(d.getMinutes());
 }
 
 // =================================================================
@@ -5341,8 +5126,7 @@ async function seiteEinstellungen(b) {
     + '</tbody></table>'
     + '<div class="rollenhilfe">'
     + '<div><strong>Administrator</strong> darf alles, auch Benutzer verwalten.</div>'
-    + '<div><strong>Produktion</strong> darf alles ausser Kontrolle-Einträge und Benutzer.</div>'
-    + '<div><strong>Kontrolle</strong> darf nur Ausschuss und Notizen erfassen.</div>'
+    + '<div><strong>Produktion</strong> darf alles ausser der Benutzerverwaltung.</div>'
     + '<div><strong>Planer</strong> darf die Planwand bearbeiten.</div>'
     + '<div>Ansehen darf jeder alles.</div></div>'
     + '<p class="hinweis">Neue Benutzer legst du im Supabase-Dashboard unter '
@@ -5481,9 +5265,6 @@ SYM.produktion = svg('<circle cx="12" cy="12" r="3.2"/>'
   + '<path d="M12 2.6v2.6M12 18.8v2.6M4.4 12H1.8M22.2 12h-2.6'
   + 'M6.3 6.3 4.5 4.5M19.5 19.5l-1.8-1.8M17.7 6.3l1.8-1.8M4.5 19.5l1.8-1.8"/>');
 
-// Kontrolle: Haken im Kreis
-SYM.kontrolle = svg('<circle cx="12" cy="12" r="9"/><path d="M8 12.3l2.7 2.7L16 9.6"/>');
-
 // Lager: gestapelte Kisten
 SYM.lager = svg('<rect x="3" y="3.5" width="18" height="6" rx="1.5"/>'
   + '<rect x="3" y="9.5" width="18" height="5.5" rx="1.5"/>'
@@ -5514,7 +5295,6 @@ const SEITEN = [
   { pfad: "dashboard",    titel: "Start",        zeichen: SYM.start, zeige: seiteDashboard },
   { pfad: "planwand",     titel: "Planwand",     zeichen: SYM.planwand, zeige: seitePlanwand },
   { pfad: "produktion",   titel: "Produktion",   zeichen: SYM.produktion, zeige: seiteProduktion },
-  { pfad: "kontrolle",    titel: "Kontrolle",    zeichen: SYM.kontrolle, zeige: seiteKontrolle },
   { pfad: "lager",        titel: "Lager",        zeichen: SYM.lager, zeige: seiteLager },
   { pfad: "bestellungen", titel: "Bestellungen", zeichen: SYM.bestellungen, zeige: seiteBestellungen },
   { pfad: "einkauf",      titel: "Einkauf",      zeichen: SYM.einkauf, zeige: seiteEinkauf },
