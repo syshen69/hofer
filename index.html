@@ -717,7 +717,6 @@ a:focus-visible {
 /* ---------- Suchleiste ---------- */
 .suchleiste { display: flex; gap: 8px; margin-bottom: 14px; }
 .suchleiste input { flex: 1; }
-.knopf--scan { white-space: nowrap; }
 
 /* ---------- Trefferliste ---------- */
 .trefferliste { display: grid; gap: 8px; }
@@ -853,8 +852,7 @@ a:focus-visible {
 .platzchip--klein { padding: 2px 7px; font-size: .76rem; font-weight: 500;
                     display: inline-block; margin: 1px 0; }
 .platzchip--klein b { font-weight: 700; }
-.suchleiste .knopf--scan { flex: none; }
-
+.suchleiste 
 /* ---------- Großer Foto-Knopf als Overlay ---------- */
 .scan-gross {
   position: absolute;
@@ -1144,7 +1142,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "10.1.0";
+const APP_VERSION = "10.2.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -2380,6 +2378,7 @@ const plan = {
   tage: 15,   // drei Wochen zu je fünf Arbeitstagen
   auftraege: null,
   ferien: [],
+  suche: "",
 };
 
 // Farben für die Balken
@@ -2454,7 +2453,16 @@ function darfPlanen() {
   return r === "admin" || r === "planer";
 }
 
-const FERIEN_ZEILEN = 5;
+const FERIEN_ZEILEN = 7;
+
+// Sucht in Auftragsnummer, Notiz und Maschine
+function passtZurSuche(j) {
+  const t = (plan.suche || "").trim().toLowerCase();
+  if (!t) return true;
+  return (j.job_number || "").toLowerCase().includes(t)
+    || (j.plan_note || "").toLowerCase().includes(t)
+    || (j.maschine || "").toLowerCase().includes(t);
+}
 
 async function ladeFerien() {
   const { data, error } = await zeitlimit(
@@ -2501,8 +2509,16 @@ async function ansichtPlanwand(ziel, b) {
     + '<div class="steuerung__mitte"><div class="steuerung__titel" id="pw-titel"></div>'
     + '<button class="linkknopf" id="pw-heute">Heute</button></div>'
     + '<button class="knopf knopf--klein" id="pw-vor">›</button></div>'
+    + '<div class="suchleiste">'
+    + '<input type="search" id="pw-suche" placeholder="Auftrag suchen"'
+    + ' value="' + esc(plan.suche) + '" autocomplete="off">'
+    + (plan.suche ? '<button class="knopf" id="pw-suche-weg">Zurücksetzen</button>' : "")
+    + '</div>'
     + (darfPlanen()
-        ? '<button class="knopf knopf--haupt knopf--breit" id="pw-neu">+ Auftrag einplanen</button>'
+        ? '<div class="aktionen">'
+          + '<button class="knopf knopf--haupt" id="pw-neu">+ Auftrag einplanen</button>'
+          + '<button class="knopf" id="pw-ferien">+ Ferien eintragen</button>'
+          + '</div>'
         : nurLesenHinweis("Du kannst die Planung ansehen. Ändern dürfen Planer und Administratoren."))
     + '<div id="pw-inhalt"><div class="laedt">Planung wird geladen …</div></div>';
 
@@ -2515,6 +2531,18 @@ async function ansichtPlanwand(ziel, b) {
 
   const neu = document.getElementById("pw-neu");
   if (neu) neu.onclick = () => planAuftragDialog(null, b);
+
+  const fer = document.getElementById("pw-ferien");
+  if (fer) fer.onclick = () => ferienDialog(null, null, null, b);
+
+  const suchfeld = document.getElementById("pw-suche");
+  let taste = null;
+  suchfeld.oninput = () => {
+    clearTimeout(taste);
+    taste = setTimeout(() => { plan.suche = suchfeld.value; zeichnePlanwand(b); }, 300);
+  };
+  const suchWeg = document.getElementById("pw-suche-weg");
+  if (suchWeg) suchWeg.onclick = () => { plan.suche = ""; seitePlanwand(b); };
 
   try {
     plan.auftraege = await ladePlanAuftraege();
@@ -2561,7 +2589,8 @@ function zeichnePlanwand(b) {
 
           // Balken für diese Maschine im sichtbaren Zeitraum
           const balken = plan.auftraege
-            .filter((j) => j.machine_id === m.id && j.planned_from && !j.ended_at)
+            .filter((j) => j.machine_id === m.id && j.planned_from
+                            && (!plan.suche || passtZurSuche(j)))
             .map((j) => {
               // Alle Arbeitstage, die dieser Auftrag belegt
               const belegt = arbeitstage(j.planned_from, j.planned_days || 1);
@@ -2650,27 +2679,106 @@ function ferienVerhalten(b) {
     };
   });
 
-  // Vorhandenen Balken antippen: bearbeiten oder löschen
+  // Ferienbalken: kurzer Tipp bearbeitet, langes Drücken verschiebt
   tafel.querySelectorAll("[data-ferien]").forEach((el) => {
-    el.onclick = (e) => {
-      e.stopPropagation();
-      const f2 = (plan.ferien || []).find((x) => x.id === el.dataset.ferien);
-      if (f2) ferienDialog(f2, f2.zeile, f2.von, b);
+    let halten = null, zieht = false, schatten = null, gestartet = false;
+
+    const aufraeumen = () => {
+      clearTimeout(halten);
+      if (schatten) { schatten.remove(); schatten = null; }
+      el.classList.remove("pw-balken--zieht");
+      el.style.pointerEvents = "";
+      tafel.querySelectorAll(".pw-zelle--ziel").forEach((z) => z.classList.remove("pw-zelle--ziel"));
+      zieht = false; gestartet = false;
     };
+
+    // Ferien dürfen nur in Ferienzeilen landen, nicht auf Maschinen
+    const zielFerien = (x, y) => {
+      const treffer = document.elementFromPoint(x, y);
+      if (!treffer) return null;
+      const zelle = treffer.closest("[data-fzelle]");
+      return zelle ? zelle.dataset.fzelle : null;
+    };
+
+    el.addEventListener("pointerdown", (e) => {
+      gestartet = true;
+      const sx = e.clientX, sy = e.clientY;
+      halten = setTimeout(() => {
+        zieht = true;
+        el.classList.add("pw-balken--zieht");
+        el.style.pointerEvents = "none";
+        if (navigator.vibrate) navigator.vibrate(30);
+        schatten = document.createElement("div");
+        schatten.className = "pw-schatten";
+        schatten.textContent = el.textContent;
+        document.body.appendChild(schatten);
+        schatten.style.left = sx + "px";
+        schatten.style.top = sy + "px";
+      }, 400);
+      try { el.setPointerCapture(e.pointerId); } catch (f2) { /* egal */ }
+    });
+
+    el.addEventListener("pointermove", (e) => {
+      if (!gestartet || !zieht) return;
+      e.preventDefault();
+      if (schatten) { schatten.style.left = e.clientX + "px"; schatten.style.top = e.clientY + "px"; }
+      tafel.querySelectorAll(".pw-zelle--ziel").forEach((z) => z.classList.remove("pw-zelle--ziel"));
+      const ziel = zielFerien(e.clientX, e.clientY);
+      if (ziel) {
+        const z = tafel.querySelector('[data-fzelle="' + CSS.escape(ziel) + '"]');
+        if (z) z.classList.add("pw-zelle--ziel");
+      }
+    });
+
+    el.addEventListener("pointerup", async (e) => {
+      if (!gestartet) return;
+      const warZiehen = zieht;
+      const ziel = warZiehen ? zielFerien(e.clientX, e.clientY) : null;
+      aufraeumen();
+
+      const f2 = (plan.ferien || []).find((x) => x.id === el.dataset.ferien);
+      if (!f2) return;
+
+      if (!warZiehen) { ferienDialog(f2, f2.zeile, f2.von, b); return; }
+      if (!ziel) { meldung("Ferien lassen sich nur in die Ferienzeilen schieben.", "warn"); return; }
+
+      const teile = ziel.split("|");
+      const { error } = await db.from("vacations")
+        .update({ zeile: Number(teile[0]), von: teile[1] }).eq("id", f2.id);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Verschoben."); seitePlanwand(b); }
+    });
+
+    el.addEventListener("pointercancel", aufraeumen);
   });
+}
+
+// Erste Ferienzeile, in der ab diesem Tag noch Platz ist
+function freieFerienZeile(von, tage, ausser) {
+  for (let z = 1; z <= FERIEN_ZEILEN; z++) {
+    const belegt = arbeitstage(von, tage);
+    const kollision = (plan.ferien || []).some((f2) => {
+      if (f2.zeile !== z) return false;
+      if (ausser && f2.id === ausser) return false;
+      const seine = arbeitstage(f2.von, f2.tage || 1);
+      return seine.some((t) => belegt.indexOf(t) !== -1);
+    });
+    if (!kollision) return z;
+  }
+  return FERIEN_ZEILEN;
 }
 
 async function ferienDialog(eintrag, zeile, datum, b) {
   const w = await dialogFelder({
     titel: eintrag ? "Ferien bearbeiten" : "Ferien eintragen",
-    text: eintrag ? "" : "Ab " + kurzDatum(datum),
+    text: eintrag ? "" : (datum ? "Ab " + kurzDatum(datum) : ""),
     felder: [
       { name: "person", label: "Wer", pflicht: true,
         wert: eintrag ? eintrag.person : "", platzhalter: "Name" },
       { name: "tage", label: "Wie viele Arbeitstage", typ: "number",
         wert: eintrag ? eintrag.tage : 5 },
       { name: "von", label: "Erster Tag", typ: "date",
-        wert: eintrag ? eintrag.von : datum },
+        wert: eintrag ? eintrag.von : (datum || naechsterArbeitstag(isoDatum(new Date()))) },
       { name: "notiz", label: "Notiz", wert: eintrag ? (eintrag.note || "") : "",
         platzhalter: "kann leer bleiben" },
     ],
@@ -2690,11 +2798,14 @@ async function ferienDialog(eintrag, zeile, datum, b) {
     return;
   }
 
+  const von = w.von || datum || naechsterArbeitstag(isoDatum(new Date()));
+  const tage = Math.max(1, Math.round(w.tage || 1));
+
   const daten = {
     person: w.person,
-    zeile: zeile,
-    von: w.von || datum,
-    tage: Math.max(1, Math.round(w.tage || 1)),
+    zeile: zeile || freieFerienZeile(von, tage, eintrag ? eintrag.id : null),
+    von: von,
+    tage: tage,
     note: w.notiz || null,
   };
 
@@ -3484,7 +3595,10 @@ async function artikelDetail(kasten, artikel, b) {
     + '<div><div class="artikel__nr">' + esc(artikel.article_number) + '</div>'
     + '<div class="artikel__name">' + esc(artikel.name) + '</div>'
     + (artikel.supplier_name
-        ? '<div class="artikel__lief">Lieferant: ' + esc(artikel.supplier_name) + '</div>' : "")
+        ? '<div class="artikel__lief">Lieferant: ' + (artikel.supplier_website
+            ? '<a class="lieferantlink" href="' + esc(artikel.supplier_website)
+              + '" target="_blank" rel="noopener">' + esc(artikel.supplier_name) + ' ↗</a>'
+            : esc(artikel.supplier_name)) + '</div>' : "")
     + '</div>'
     + '<div class="artikel__gesamt">'
     + zahlText(artikel.gesamtbestand) + '<span>' + esc(artikel.unit) + '</span></div>'
@@ -3749,11 +3863,8 @@ async function artikelDialog(artikel, b, vorgabeNummer) {
     + '<h2>' + (artikel ? "Artikel bearbeiten" : "Neuer Artikel") + '</h2>'
     + '<form id="ad-form">'
     + '<label class="feld"><span>Artikelnummer</span>'
-    + '<div class="suchleiste">'
     + '<input id="ad-nr" type="text" autocapitalize="characters" value="'
     + esc(artikel ? artikel.article_number : (vorgabeNummer || "")) + '">'
-    + '<button type="button" class="knopf knopf--scan" id="ad-kamera">Kamera</button>'
-    + '</div>'
     + '<span class="feldhinweis">Buchstaben, Zahlen, Punkt, Bindestrich und Leerzeichen '
     + 'sind alle erlaubt.</span></label>'
     + '<label class="feld"><span>Bezeichnung</span>'
@@ -3804,9 +3915,15 @@ async function artikelDialog(artikel, b, vorgabeNummer) {
     if (liefWahl.value !== "__neu") return;
     liefWahl.value = "";
     const w = await dialogFelder({ titel: "Neuer Lieferant",
-      felder: [{ name: "name", label: "Name", pflicht: true }], bestaetigen: "Anlegen" });
+      felder: [
+        { name: "name", label: "Name", pflicht: true },
+        { name: "website", label: "Website", platzhalter: "www.beispiel.ch" },
+      ], bestaetigen: "Anlegen" });
     if (!w) return;
-    const { data, error } = await db.from("suppliers").insert({ name: w.name }).select().single();
+    let seite = (w.website || "").trim();
+    if (seite && !/^https?:\/\//i.test(seite)) seite = "https://" + seite;
+    const { data, error } = await db.from("suppliers")
+      .insert({ name: w.name, website: seite || null }).select().single();
     if (error) { meldung(fehlertext(error), "fehler"); return; }
     const opt = document.createElement("option");
     opt.value = data.id; opt.textContent = data.name; opt.selected = true;
@@ -4542,7 +4659,7 @@ const OFFENE_STATUS = ["offen", "bestellt", "teilweise_geliefert"];
 
 async function ladeBestellungen(offen) {
   let a = db.from("order_items")
-    .select("*, articles(article_number, name, unit), suppliers(name, website)")
+    .select("*, articles(article_number, name, unit), suppliers(name, website), profiles!order_items_created_by_fkey(full_name, email)")
     .order("needed_by", { ascending: true, nullsFirst: false })
     .order("created_at");
   if (offen) a = a.in("status", OFFENE_STATUS);
@@ -4835,9 +4952,16 @@ async function artikelSchnellAnlegen(vorgabe) {
 
   if (wahl === "__neu") {
     const nw = await dialogFelder({ titel: "Neuer Lieferant",
-      felder: [{ name: "name", label: "Name", pflicht: true }], bestaetigen: "Anlegen" });
+      felder: [
+        { name: "name", label: "Name", pflicht: true },
+        { name: "website", label: "Website", platzhalter: "www.beispiel.ch",
+          hinweis: "Der Name wird dann überall in der App anklickbar." },
+      ], bestaetigen: "Anlegen" });
     if (nw) {
-      const r = await db.from("suppliers").insert({ name: nw.name }).select().single();
+      let seite = (nw.website || "").trim();
+      if (seite && !/^https?:\/\//i.test(seite)) seite = "https://" + seite;
+      const r = await db.from("suppliers")
+        .insert({ name: nw.name, website: seite || null }).select().single();
       if (r.error) meldung(fehlertext(r.error), "fehler");
       else { lieferantId = r.data.id; lieferanten.push(r.data); meldung("Lieferant angelegt."); }
     }
@@ -4884,7 +5008,7 @@ async function positionDialog(b) {
   huelle.innerHTML = '<div class="dialog"><h2>Neue Bestellposition</h2>'
     + '<div class="suchleiste">'
     + '<input type="text" id="pd-such" placeholder="Artikelnummer oder Name" autocomplete="off">'
-    + '<button class="knopf knopf--scan" id="pd-scan">Kamera</button></div>'
+    + '</div>'
     + '<div id="pd-treffer" class="pd-treffer"></div>'
     + '<div id="pd-rest" hidden>'
     + '<div class="pd-gewaehlt" id="pd-gewaehlt"></div>'
@@ -5295,10 +5419,10 @@ const SEITEN = [
   { pfad: "dashboard",    titel: "Start",        zeichen: SYM.start, zeige: seiteDashboard },
   { pfad: "planwand",     titel: "Planwand",     zeichen: SYM.planwand, zeige: seitePlanwand },
   { pfad: "produktion",   titel: "Produktion",   zeichen: SYM.produktion, zeige: seiteProduktion },
-  { pfad: "lager",        titel: "Lager",        zeichen: SYM.lager, zeige: seiteLager },
   { pfad: "bestellungen", titel: "Bestellungen", zeichen: SYM.bestellungen, zeige: seiteBestellungen },
   { pfad: "einkauf",      titel: "Einkauf",      zeichen: SYM.einkauf, zeige: seiteEinkauf },
   { pfad: "rechner",      titel: "Rechner",      zeichen: SYM.rechner, zeige: seiteRechner },
+  { pfad: "lager",        titel: "Lager",        zeichen: SYM.lager, zeige: seiteLager },
   { pfad: "einstellungen", titel: "Einstellungen", zeichen: SYM.einstellungen, zeige: seiteEinstellungen },
 ];
 
