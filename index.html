@@ -1099,6 +1099,14 @@ a:focus-visible {
              display: flex; align-items: center; overflow: hidden;
              pointer-events: auto; cursor: pointer; }
 .pw-ferien__name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- Knöpfe auf der Planwand mit Luft ---------- */
+.pw-aktionen { display: flex; flex-wrap: wrap; gap: 10px;
+               margin: 14px 0 18px; }
+.pw-aktionen .knopf { flex: 1 1 200px; }
+.pw-rolle + .pw-legende { margin-top: 12px; }
+.pw-zeile--fein .pw-spuren--fein { min-height: 30px; }
+.pw-park--ferien { margin-top: 4px; border-top: 2px solid var(--linie-stark); }
 </style>
 </head>
 <body>
@@ -1142,7 +1150,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "10.2.0";
+const APP_VERSION = "10.3.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -2612,9 +2620,36 @@ function zeichnePlanwand(b) {
         }).join("");
   }).join("");
 
+  // Sieben schmale Zeilen für die Ferien der Mitarbeiter.
+  // Sie stehen immer da, auch wenn niemand eingetragen ist.
+  const ferienZeilen = '<div class="pw-park pw-park--ferien">Ferien</div>'
+    + Array.from({ length: FERIEN_ZEILEN }, (unused, i2) => {
+        const zeile = i2 + 1;
+        const zellen = tage.map((t) => '<div class="pw-zelle pw-zelle--fein'
+          + (t === heute ? " pw-zelle--heute" : "") + '" data-fzelle="' + zeile + '|' + t
+          + '"></div>').join("");
+
+        const balken = (plan.ferien || [])
+          .filter((f2) => f2.zeile === zeile)
+          .map((f2) => {
+            const belegt = arbeitstage(f2.von, f2.tage || 1);
+            const sichtbar = belegt.filter((t) => tage.indexOf(t) !== -1);
+            if (!sichtbar.length) return "";
+            const von = tage.indexOf(sichtbar[0]);
+            return '<div class="pw-ferien" data-ferien="' + esc(f2.id) + '"'
+              + ' style="--von:' + von + ';--dauer:' + sichtbar.length + '">'
+              + '<span class="pw-ferien__name">' + esc(f2.person) + '</span></div>';
+          }).join("");
+
+        return '<div class="pw-zeile pw-zeile--fein">'
+          + '<div class="pw-name pw-name--fein">' + (i2 === 0 ? "Wer ist weg" : "") + '</div>'
+          + '<div class="pw-spuren pw-spuren--fein">' + zellen
+          + '<div class="pw-balken-schicht">' + balken + '</div></div></div>';
+      }).join("");
+
   document.getElementById("pw-inhalt").innerHTML =
     '<div class="pw-rolle"><div class="pw-tafel" style="--pw-tage:' + plan.tage + '">'
-    + kopf + zeilen + '</div></div>'
+    + kopf + zeilen + ferienZeilen + '</div></div>'
     + '<div class="pw-legende">'
     + Object.keys(PLANSTATUS).map((k) => '<span>' + PLANSTATUS[k].zeichen + ' '
         + PLANSTATUS[k].name + '</span>').join("")
