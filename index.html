@@ -815,7 +815,6 @@ a:focus-visible {
 .platzchip--klein { padding: 2px 7px; font-size: .76rem; font-weight: 500;
                     display: inline-block; margin: 1px 0; }
 .platzchip--klein b { font-weight: 700; }
-.suchleiste 
 /* ---------- Großer Foto-Knopf als Overlay ---------- */
 .scan-gross {
   position: absolute;
@@ -1054,7 +1053,7 @@ a:focus-visible {
                  padding: 4px 10px; }
 .pw-zelle--fein { cursor: pointer; }
 .pw-zelle--fein:hover { background: var(--marke-hell); }
-.pw-ferien { grid-column: calc(var(--von) + 1) / span var(--dauer);
+.pw-ferien { position: relative; grid-column: calc(var(--von) + 1) / span var(--dauer);
              background: repeating-linear-gradient(45deg, #f0b429, #f0b429 6px,
                #e0a518 6px, #e0a518 12px);
              color: #3a2c05; border-radius: 3px; margin: 2px 0;
@@ -1111,6 +1110,54 @@ a:focus-visible {
                background: var(--flaeche); border: 1px solid var(--linie);
                border-radius: var(--radius); }
 .pw-aktionen .knopf { flex: 1 1 210px; }
+
+/* ---------- Planwand: schmalere Balken, KW-Zeile ---------- */
+.pw-spuren { min-height: 38px !important; }
+.pw-balken { padding: 3px 6px; font-size: .72rem; }
+.pw-balken-schicht { inset: 2px 0; }
+.pw-balken__prozent { font-size: .66rem; }
+.pw-balken__fehlt { flex: none; font-size: .6rem; font-weight: 700;
+                    background: rgba(255,255,255,.3); border-radius: 2px;
+                    padding: 0 3px; }
+.pw-loeschen { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px;
+               border-radius: 50%; border: none; background: var(--gefahr); color: #fff;
+               font-size: .65rem; line-height: 1; cursor: pointer; z-index: 3;
+               padding: 0; display: none; }
+.pw-balken:hover .pw-loeschen { display: block; }
+.pw-zeile--kw { grid-template-columns: 130px 1fr; border-bottom: 1px solid var(--linie);
+                position: sticky; top: 0; z-index: 4; background: var(--flaeche); }
+.pw-kw-spuren { display: grid;
+                grid-template-columns: repeat(var(--pw-tage, 15), 1fr); }
+.pw-kw { grid-column: span var(--spann); text-align: center; font-size: .68rem;
+         font-weight: 650; color: var(--marke); background: var(--marke-hell);
+         padding: 3px 0; border-left: 2px solid var(--flaeche); }
+.pw-zeile--kopf { top: 24px !important; }
+
+.karte--klickbar { cursor: pointer; }
+.karte--klickbar:hover { border-color: var(--marke); }
+.fehltchip { display: inline-block; padding: 1px 7px; border-radius: 999px;
+             background: #fdf4e3; color: #8a5c10; font-size: .7rem; font-weight: 650; }
+
+/* ---------- Spassecke ---------- */
+.spass-anzeige { margin-top: 16px; }
+.spass-werte { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+               margin-bottom: 16px; }
+.spass-werte > div { background: var(--grund); border-radius: var(--radius);
+                     padding: 10px 12px; }
+.spass-label { display: block; font-size: .72rem; color: var(--gedaempft); }
+.spass-zahl { font-size: 1.5rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+.spass-bahn { position: relative; height: 54px; background: var(--stahl);
+              border-radius: var(--radius); overflow: hidden; margin-bottom: 12px;
+              transition: box-shadow .15s; }
+.spass-bahn--gut { box-shadow: inset 0 0 0 3px var(--gut); }
+.spass-bahn--schlecht { box-shadow: inset 0 0 0 3px var(--gefahr); }
+.spass-ziel { position: absolute; top: 0; bottom: 0; background: rgba(31,122,77,.55);
+              border-left: 2px solid #2ea36a; border-right: 2px solid #2ea36a; }
+.spass-support { position: absolute; top: 6px; bottom: 6px; width: 6px;
+                 margin-left: -3px; background: var(--signalgelb); border-radius: 3px; }
+.spass-text { text-align: center; margin-bottom: 12px; font-weight: 600;
+              min-height: 1.4em; }
+.spass-weisheit { font-size: 1.05rem; font-style: italic; margin: 0 0 10px; }
 </style>
 </head>
 <body>
@@ -1154,7 +1201,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "11.5.0";
+const APP_VERSION = "12.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -1485,7 +1532,8 @@ async function seiteDashboard(b) {
     + '<p class="gruss">' + esc(begruessung()) + (name ? ", " + esc(name) : "") + '</p>'
 
     + '<div id="db-probleme"></div>'
-    + '<div id="db-auftraege"><div class="laedt">Aufträge werden geladen …</div></div>'
+    + '<div id="db-vorbereitung"></div>'
+    + '<div id="db-einkauf"></div>'
     + '<div id="db-notizen"></div>'
     + '<div id="db-status"></div>';
 
@@ -1525,37 +1573,18 @@ async function seiteDashboard(b) {
       + (feiText ? '<div class="wetter__feiertag">' + esc(feiText) + '</div>' : "");
   });
 
-  // Laufende Aufträge
-  try {
-    const { data, error } = await zeitlimit(
-      db.from("laufende_auftraege").select("*").order("park").order("maschine"), 10000, "Aufträge");
-    if (error) throw error;
-    const auftraege = data || [];
-    const heute = isoDatum(new Date());
-
-    document.getElementById("db-auftraege").innerHTML =
-      '<section class="karte"><h2>Laufende Aufträge</h2>'
-      + (auftraege.length
-        ? '<table class="tabelle"><thead><tr><th>Auftrag</th><th>Maschine</th>'
-          + '<th class="rechts">Stand</th></tr></thead><tbody>'
-          + auftraege.map((j) => '<tr><td><strong>' + esc(j.job_number) + '</strong>'
-              + (j.letzter_eintrag === heute
-                  ? '' : '<span class="warnpunkt" title="Heute noch nichts erfasst"></span>')
-              + '</td>'
-              + '<td class="klein">' + esc(j.maschine)
-              + (j.maschine_nr ? '<div>' + esc(j.maschine_nr) + '</div>' : "") + '</td>'
-              + '<td class="rechts stark">' + zahlText(j.stand)
-              + '</td></tr>').join("")
-          + '</tbody></table>'
-          + '<p class="hinweis">Ein Punkt neben der Auftragsnummer heisst: heute noch keine Zahl erfasst.</p>'
-        : '<p class="hinweis">Zurzeit läuft kein Auftrag.</p>')
-      + '</section>';
-  } catch (f) {
-    document.getElementById("db-auftraege").innerHTML =
-      '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
-  }
-
   await zeichneProbleme(b);
+  await zeichneVorbereitung(b);
+  await zeichneEinkaufKurz(b);
+
+  // Karten auf der Startseite führen direkt in ihren Bereich
+  b.querySelectorAll("[data-zu]").forEach((karte) => {
+    karte.classList.add("karte--klickbar");
+    karte.addEventListener("click", (e) => {
+      if (e.target.closest("button, a, input, label")) return;
+      location.hash = "#/" + karte.dataset.zu;
+    });
+  });
   await zeichneNotizen();
 
   // Offene Bestellungen
@@ -1572,7 +1601,7 @@ async function seiteDashboard(b) {
 
   const statusEl = document.getElementById("db-status");
   if (statusEl) {
-    statusEl.innerHTML = '<section class="karte"><h2>Bestellungen</h2>'
+    statusEl.innerHTML = '<section class="karte" data-zu="bestellungen"><h2>Bestellungen</h2>'
       + '<div class="statusliste">'
       + statuszeile(ueberfaellig, "überfällig", ueberfaellig ? "gefahr" : "gut")
       + statuszeile(offene, "offen", "neutral")
@@ -1610,9 +1639,7 @@ async function zeichneProbleme(b) {
     + liste.map((j) => '<div class="problemzeile">'
         + '<span class="problemzeile__zeichen">⚠</span>'
         + '<div class="problemzeile__inhalt">'
-        + '<div class="problemzeile__nr">' + esc(j.job_number)
-        + '<span class="klein"> ' + esc(j.maschine)
-        + (j.maschine_nr ? " · " + esc(j.maschine_nr) : "") + '</span></div>'
+        + '<div class="problemzeile__nr">' + esc(j.job_number) + '</div>'
         + '<div>' + esc(j.problem) + '</div>'
         + '<div class="klein">' + esc(j.problem_von || "")
         + (j.problem_at ? " · " + esc(datumZeitKurz(j.problem_at)) : "") + '</div>'
@@ -1629,6 +1656,77 @@ async function zeichneProbleme(b) {
       if (j) await problemQuittieren(j, b, () => seiteDashboard(b));
     };
   });
+}
+
+// Was vor dem Start noch fehlt: FA und Material
+async function zeichneVorbereitung(b) {
+  const ziel = document.getElementById("db-vorbereitung");
+  if (!ziel) return;
+
+  let liste = [];
+  try {
+    const { data, error } = await zeitlimit(
+      db.from("planwand").select("*").is("ended_at", null)
+        .not("planned_from", "is", null).order("planned_from"), 10000, "Vorbereitung");
+    if (error) throw error;
+    liste = (data || []).filter((j) => j.plan_status !== "fertig");
+  } catch (f) { console.warn("Vorbereitung:", f.message); return; }
+
+  const ohneFa = liste.filter((j) => !j.fa_erstellt);
+  const ohneMaterial = liste.filter((j) => !j.material_ok);
+
+  const grenze = arbeitstagePlus(isoDatum(new Date()), 7);
+  const bald = liste.filter((j) => (!j.fa_erstellt || !j.material_ok)
+    && j.planned_from <= grenze);
+
+  ziel.innerHTML = '<section class="karte" data-zu="planwand">'
+    + '<h2>Vorbereitung</h2>'
+    + '<div class="statusliste">'
+    + statuszeile(ohneFa.length, "Aufträge ohne FA", ohneFa.length ? "warn" : "gut")
+    + statuszeile(ohneMaterial.length, "Aufträge ohne Material",
+        ohneMaterial.length ? "warn" : "gut")
+    + '</div>'
+    + (bald.length
+      ? '<h3 class="untertitel">Startet in den nächsten sieben Tagen</h3>'
+        + bald.map((j) => '<div class="problemzeile">'
+            + '<span class="problemzeile__zeichen">⏱</span>'
+            + '<div class="problemzeile__inhalt">'
+            + '<div class="problemzeile__nr">' + esc(j.job_number)
+            + '<span class="klein"> ' + esc(j.maschine) + ' · ab '
+            + esc(kurzDatum(j.planned_from)) + '</span></div>'
+            + '<div class="klein">'
+            + (!j.fa_erstellt ? '<span class="fehltchip">FA fehlt</span> ' : "")
+            + (!j.material_ok ? '<span class="fehltchip">Material fehlt</span>' : "")
+            + '</div></div></div>').join("")
+      : '<p class="hinweis">Für die nächsten sieben Tage ist alles vorbereitet.</p>')
+    + '</section>';
+}
+
+// Kurzfassung der Einkaufsliste
+async function zeichneEinkaufKurz(b) {
+  const ziel = document.getElementById("db-einkauf");
+  if (!ziel) return;
+
+  let liste = [];
+  try {
+    const { data, error } = await zeitlimit(
+      db.from("shopping_items").select("*").eq("is_done", false)
+        .order("prio").order("created_at").limit(12), 8000, "Einkauf");
+    if (error) throw error;
+    liste = data || [];
+  } catch (f) { console.warn("Einkauf:", f.message); return; }
+
+  ziel.innerHTML = '<section class="karte" data-zu="einkauf">'
+    + '<h2>Einkaufsliste'
+    + (liste.length ? ' <span class="marke">' + liste.length + '</span>' : "") + '</h2>'
+    + (liste.length
+      ? '<div class="notizen">' + liste.map((z) => '<div class="notiz">'
+          + '<span class="priopunkt ' + (PRIO[z.prio] || PRIO[3]).farbe + '"></span>'
+          + '<span class="notiz__text">' + esc(z.text)
+          + (z.menge ? ' <span class="klein">' + esc(z.menge) + '</span>' : "") + '</span>'
+          + '</div>').join("") + '</div>'
+      : '<p class="hinweis">Nichts einzukaufen.</p>')
+    + '</section>';
 }
 
 async function zeichneNotizen() {
@@ -1953,6 +2051,7 @@ async function doppeltNachfragen(erste, zweite) {
 
 const prod = {
   ansicht: "erfassen",
+  suche: "",
   parkId: null,
   tag: null,
   modus: null,
@@ -1985,6 +2084,16 @@ function wochenStart(text) {
   const d = ausIso(text);
   d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
   return isoDatum(d);
+}
+
+// Kalenderwoche nach ISO
+function kalenderwoche(text) {
+  const d = ausIso(text);
+  const ziel = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  ziel.setDate(ziel.getDate() + 3 - ((ziel.getDay() + 6) % 7));
+  const ersterDo = new Date(ziel.getFullYear(), 0, 4);
+  ersterDo.setDate(ersterDo.getDate() + 3 - ((ersterDo.getDay() + 6) % 7));
+  return 1 + Math.round((ziel - ersterDo) / (7 * 86400000));
 }
 
 function kurzDatum(text) {
@@ -2147,12 +2256,28 @@ function parkAuswahlBinden(b) {
 // =================================================================
 
 async function ansichtErfassen(ziel, b) {
-  const maschinen = prod.maschinen.filter((m) => m.park_id === prod.parkId);
+  const suchtext = (prod.suche || "").trim().toLowerCase();
+  const maschinen = prod.maschinen.filter((m) => {
+    if (m.park_id !== prod.parkId) return false;
+    if (!suchtext) return true;
+    return (m.name || "").toLowerCase().includes(suchtext)
+      || (m.machine_number || "").toLowerCase().includes(suchtext);
+  });
 
   if (!maschinen.length) {
     ziel.innerHTML = parkAuswahl()
       + '<div class="karte karte--hinweis"><p>In diesem Maschinenpark ist noch keine Maschine angelegt.</p></div>';
     parkAuswahlBinden(b);
+
+  const suchfeld = document.getElementById("p-suche");
+  if (suchfeld) {
+    let taste = null;
+    suchfeld.oninput = () => {
+      clearTimeout(taste);
+      taste = setTimeout(() => { prod.suche = suchfeld.value; seiteProduktion(b); }, 350);
+    };
+  }
+
     return;
   }
 
@@ -2171,6 +2296,9 @@ async function ansichtErfassen(ziel, b) {
     + '<button class="moduswahl__knopf' + (!istWoche ? " aktiv" : "") + '" data-modus="tag">Tag</button>'
     + '<button class="moduswahl__knopf' + (istWoche ? " aktiv" : "") + '" data-modus="woche">Woche</button>'
     + '</div>'
+    + '<div class="suchleiste"><input type="search" id="p-suche"'
+    + ' placeholder="Maschine oder Nummer suchen" value="' + esc(prod.suche || "") + '"'
+    + ' autocomplete="off"></div>'
     + '<div id="raster"><div class="laedt">Zahlen werden geladen …</div></div>';
 
   parkAuswahlBinden(b);
@@ -2630,6 +2758,22 @@ function zeichnePlanwand(b) {
   document.getElementById("pw-titel").textContent =
     kurzDatum(tage[0]) + " – " + kurzDatum(tage[tage.length - 1]);
 
+  // Zeile mit den Kalenderwochen, jede Woche über ihre Tage gespannt
+  const wochen = [];
+  tage.forEach((t) => {
+    const w = kalenderwoche(t);
+    const letzte = wochen[wochen.length - 1];
+    if (letzte && letzte.kw === w) letzte.anzahl++;
+    else wochen.push({ kw: w, anzahl: 1 });
+  });
+
+  const kwZeile = '<div class="pw-zeile pw-zeile--kw">'
+    + '<div class="pw-name pw-name--kopf">Woche</div>'
+    + '<div class="pw-kw-spuren">'
+    + wochen.map((w) => '<div class="pw-kw" style="--spann:' + w.anzahl + '">KW '
+        + w.kw + '</div>').join("")
+    + '</div></div>';
+
   const kopf = '<div class="pw-zeile pw-zeile--kopf">'
     + '<div class="pw-name pw-name--kopf">Maschine</div>'
     + tage.map((t) => {
@@ -2693,9 +2837,16 @@ function zeichnePlanwand(b) {
             const sichtbar = belegt.filter((t) => tage.indexOf(t) !== -1);
             if (!sichtbar.length) return "";
             const von = tage.indexOf(sichtbar[0]);
+            const feAngeschnitten = belegt[0] !== sichtbar[0];
             return '<div class="pw-ferien" data-ferien="' + esc(f2.id) + '"'
+              + ' data-von="' + von + '" data-dauer="' + sichtbar.length + '"'
               + ' style="--von:' + von + ';--dauer:' + sichtbar.length + '">'
-              + '<span class="pw-ferien__name">' + esc(f2.person) + '</span></div>';
+              + '<span class="pw-ferien__name">' + esc(f2.person) + '</span>'
+              + (darfPlanen() && !feAngeschnitten
+                  ? '<span class="pw-griff pw-griff--links" data-fgriff="links"></span>' : "")
+              + (darfPlanen()
+                  ? '<span class="pw-griff pw-griff--rechts" data-fgriff="rechts"></span>' : "")
+              + '</div>';
           }).join("");
 
         return '<div class="pw-zeile pw-zeile--fein">'
@@ -2706,7 +2857,7 @@ function zeichnePlanwand(b) {
 
   document.getElementById("pw-inhalt").innerHTML =
     '<div class="pw-rolle"><div class="pw-tafel" style="--pw-tage:' + plan.tage + '">'
-    + kopf + zeilen + ferienZeilen + '</div></div>'
+    + kwZeile + kopf + zeilen + ferienZeilen + '</div></div>'
     + '<div class="pw-legende">'
     + Object.keys(PLANSTATUS).map((k) => '<span>' + PLANSTATUS[k].zeichen + ' '
         + PLANSTATUS[k].name + '</span>').join("")
@@ -2720,6 +2871,9 @@ function zeichnePlanwand(b) {
 
   balkenVerhalten(b);
   griffVerhalten(b);
+  loeschKnoepfe(b);
+  zellenVerhalten(b);
+  ferienGriffe(b);
   ferienVerhalten(b);
 }
 
@@ -2742,6 +2896,14 @@ function planBalken(j, spalte, dauer, angeschnitten) {
     anteil = 100;
   }
 
+  // Stückzahl im Balken. Läuft er noch nicht, steht nur die Zielmenge da.
+  let mengeText = "";
+  if (j.target_quantity) {
+    mengeText = (st === "laeuft" || (j.stand || 0) > 0)
+      ? zahlText(j.stand || 0) + "/" + zahlText(j.target_quantity)
+      : zahlText(j.target_quantity);
+  }
+
   return '<div class="pw-balken' + (fertig ? " pw-balken--fertig" : "")
     + (angeschnitten ? " pw-balken--offen" : "") + '"'
     + ' data-auftrag="' + esc(j.id) + '"'
@@ -2753,9 +2915,11 @@ function planBalken(j, spalte, dauer, angeschnitten) {
         ? '<div class="pw-fortschritt" style="width:' + anteil + '%"></div>' : "")
     + '<div class="pw-balken__inhalt">'
     + (j.problem ? '<span class="pw-balken__warnung" title="' + esc(j.problem) + '">⚠</span>' : "")
+    + (!j.fa_erstellt ? '<span class="pw-balken__fehlt" title="FA fehlt">FA</span>' : "")
+    + (!j.material_ok ? '<span class="pw-balken__fehlt" title="Material fehlt">M</span>' : "")
     + '<span class="pw-balken__status">' + (PLANSTATUS[st] || PLANSTATUS.geplant).zeichen + '</span>'
     + '<span class="pw-balken__nr">' + esc(j.job_number) + '</span>'
-    + (anteil !== null ? '<span class="pw-balken__prozent">' + anteil + '%</span>' : "")
+    + (mengeText ? '<span class="pw-balken__prozent">' + mengeText + '</span>' : "")
     + (j.plan_note ? '<span class="pw-balken__zeichen">✎</span>' : "")
     + (j.drawing_url ? '<span class="pw-balken__zeichen">PDF</span>' : "")
     + '</div>'
@@ -2763,6 +2927,8 @@ function planBalken(j, spalte, dauer, angeschnitten) {
         ? '<span class="pw-griff pw-griff--links" data-griff="links"></span>' : "")
     + (darfPlanen()
         ? '<span class="pw-griff pw-griff--rechts" data-griff="rechts"></span>' : "")
+    + (istAdmin() ? '<button class="pw-loeschen" data-auftragweg="' + esc(j.id)
+        + '" data-nr="' + esc(j.job_number) + '" title="Auftrag löschen">✕</button>' : "")
     + '</div>';
 }
 
@@ -2855,6 +3021,24 @@ function ferienVerhalten(b) {
 }
 
 // Erste Ferienzeile, in der ab diesem Tag noch Platz ist
+// Zählt die Arbeitstage von einem Tag bis zu einem anderen, beide inklusive
+function arbeitstageZwischen(von, bis) {
+  if (!von || !bis || bis < von) return 1;
+  let anzahl = 0;
+  let d = naechsterArbeitstag(von);
+  while (d <= bis && anzahl < 400) {
+    anzahl++;
+    d = naechsterArbeitstag(plusTage(d, 1));
+  }
+  return Math.max(1, anzahl);
+}
+
+// Letzter Arbeitstag eines Zeitraums
+function letzterArbeitstag(von, tage) {
+  const liste = arbeitstage(von, Math.max(1, tage));
+  return liste[liste.length - 1];
+}
+
 function freieFerienZeile(von, tage, ausser) {
   for (let z = 1; z <= FERIEN_ZEILEN; z++) {
     const belegt = arbeitstage(von, tage);
@@ -2882,12 +3066,14 @@ async function ferienDialog(eintrag, zeile, datum, b) {
     + '<input id="fd-person" type="text" placeholder="Name" value="'
     + esc(eintrag ? eintrag.person : "") + '"></label>'
     + '<div class="zeitraumwahl">'
-    + '<label class="feld"><span>Erster Tag</span>'
+    + '<label class="feld"><span>Von</span>'
     + '<input id="fd-von" type="date" value="' + esc(start) + '"></label>'
-    + '<label class="feld"><span>Arbeitstage</span>'
-    + '<input id="fd-tage" type="number" min="1" step="1" value="'
-    + (eintrag ? eintrag.tage : 5) + '"></label>'
+    + '<label class="feld"><span>Bis</span>'
+    + '<input id="fd-bis" type="date" value="'
+    + esc(eintrag ? letzterArbeitstag(eintrag.von, eintrag.tage) : letzterArbeitstag(start, 5))
+    + '"></label>'
     + '</div>'
+    + '<span class="feldhinweis" id="fd-dauer"></span>'
     + '<label class="feld"><span>Notiz</span>'
     + '<input id="fd-notiz" type="text" placeholder="kann leer bleiben" value="'
     + esc(eintrag ? (eintrag.note || "") : "") + '"></label>'
@@ -2904,12 +3090,24 @@ async function ferienDialog(eintrag, zeile, datum, b) {
   huelle.onclick = (e) => { if (e.target === huelle) zu(); };
   $("fd-person").focus();
 
+  const dauerZeigen = () => {
+    const v = $("fd-von").value, bi = $("fd-bis").value;
+    if (!v || !bi) { $("fd-dauer").textContent = ""; return; }
+    if (bi < v) { $("fd-dauer").textContent = "Das Ende liegt vor dem Anfang."; return; }
+    const n = arbeitstageZwischen(v, bi);
+    $("fd-dauer").textContent = n + (n === 1 ? " Arbeitstag" : " Arbeitstage");
+  };
+  dauerZeigen();
+  $("fd-von").onchange = dauerZeigen;
+  $("fd-bis").onchange = dauerZeigen;
+
   $("fd-ja").onclick = async () => {
     const person = ($("fd-person").value || "").trim();
     if (!person) { meldung("Bitte einen Namen eintragen.", "warn"); return; }
 
     const von = $("fd-von").value || start;
-    const tage = Math.max(1, Math.round(Number($("fd-tage").value) || 1));
+    const bis = $("fd-bis").value || von;
+    const tage = arbeitstageZwischen(von, bis);
 
     const daten = {
       person: person,
@@ -3027,6 +3225,116 @@ function griffVerhalten(b) {
       aktiv = false;
       balken.classList.remove("pw-balken--groesse");
     });
+  });
+}
+
+// Leeren Tag bei einer Maschine antippen: dort gleich einen Auftrag anlegen
+function zellenVerhalten(b) {
+  const tafel = document.querySelector(".pw-tafel");
+  if (!tafel || !darfPlanen()) return;
+
+  tafel.querySelectorAll("[data-zelle]").forEach((zelle) => {
+    zelle.onclick = () => {
+      const teile = zelle.dataset.zelle.split("|");
+      planAuftragDialog(null, b, teile[0], teile[1]);
+    };
+  });
+}
+
+// Ferienbalken an den Rändern ziehen
+function ferienGriffe(b) {
+  const tafel = document.querySelector(".pw-tafel");
+  if (!tafel || !darfPlanen()) return;
+
+  tafel.querySelectorAll("[data-fgriff]").forEach((griff) => {
+    const balken = griff.closest("[data-ferien]");
+    if (!balken) return;
+
+    let aktiv = false, startX = 0, breite = 0;
+    let vonStart = 0, dauerStart = 0, vonJetzt = 0, dauerJetzt = 0;
+
+    griff.addEventListener("pointerdown", (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      aktiv = true;
+      startX = e.clientX;
+      const spuren = balken.closest(".pw-spuren");
+      breite = spuren ? spuren.clientWidth / plan.tage : 40;
+      vonStart = Number(balken.dataset.von) || 0;
+      dauerStart = Number(balken.dataset.dauer) || 1;
+      vonJetzt = vonStart; dauerJetzt = dauerStart;
+      balken.classList.add("pw-balken--groesse");
+      try { griff.setPointerCapture(e.pointerId); } catch (f) { /* egal */ }
+    });
+
+    griff.addEventListener("pointermove", (e) => {
+      if (!aktiv) return;
+      e.preventDefault();
+      const schritte = Math.round((e.clientX - startX) / breite);
+
+      if (griff.dataset.fgriff === "rechts") {
+        dauerJetzt = Math.max(1, Math.min(plan.tage - vonStart, dauerStart + schritte));
+        vonJetzt = vonStart;
+      } else {
+        const neuVon = Math.max(0, Math.min(vonStart + dauerStart - 1, vonStart + schritte));
+        vonJetzt = neuVon;
+        dauerJetzt = Math.max(1, dauerStart - (neuVon - vonStart));
+      }
+      balken.style.setProperty("--von", vonJetzt);
+      balken.style.setProperty("--dauer", dauerJetzt);
+    });
+
+    griff.addEventListener("pointerup", async (e) => {
+      if (!aktiv) return;
+      aktiv = false;
+      e.stopPropagation();
+      balken.classList.remove("pw-balken--groesse");
+      if (vonJetzt === vonStart && dauerJetzt === dauerStart) { seitePlanwand(b); return; }
+
+      const f2 = (plan.ferien || []).find((x) => x.id === balken.dataset.ferien);
+      if (!f2) return;
+
+      const daten = { tage: dauerJetzt };
+      if (griff.dataset.fgriff === "links") {
+        const tage = plan.sichtbareTage || [];
+        if (tage[vonJetzt]) daten.von = tage[vonJetzt];
+      }
+
+      const { error } = await db.from("vacations").update(daten).eq("id", f2.id);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Angepasst."); seitePlanwand(b); }
+    });
+
+    griff.addEventListener("pointercancel", () => {
+      aktiv = false;
+      balken.classList.remove("pw-balken--groesse");
+    });
+  });
+}
+
+function loeschKnoepfe(b) {
+  const tafel = document.querySelector(".pw-tafel");
+  if (!tafel) return;
+
+  tafel.querySelectorAll("[data-auftragweg]").forEach((el) => {
+    el.addEventListener("pointerdown", (e) => e.stopPropagation());
+    el.onclick = async (e) => {
+      e.stopPropagation();
+      const ok = await doppeltNachfragen(
+        { titel: "Auftrag löschen",
+          text: "Soll " + el.dataset.nr + " wirklich gelöscht werden? "
+              + "Erfasste Stückzahlen gehen dabei verloren.",
+          bestaetigen: "Weiter zum Löschen", gefahr: true },
+        { titel: "Wirklich endgültig löschen?",
+          text: "Letzte Rückfrage. Danach ist der Auftrag weg.",
+          bestaetigen: "Endgültig löschen", gefahr: true });
+      if (!ok) return;
+
+      await db.from("production_records").delete().eq("job_id", el.dataset.auftragweg);
+      const { error } = await db.from("jobs").delete().eq("id", el.dataset.auftragweg);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Auftrag gelöscht."); seitePlanwand(b); }
+    };
   });
 }
 
@@ -3149,7 +3457,7 @@ async function problemMelden(b) {
   const wahl = await auswahlDialog("Bei welchem Auftrag?",
     offen.map((j) => ({
       wert: j.id,
-      text: j.job_number + "   " + j.maschine + (j.problem ? "   (hat schon eine Meldung)" : ""),
+      text: j.job_number + (j.problem ? "   ⚠ hat schon eine Meldung" : ""),
     })));
   if (!wahl) return;
 
@@ -3203,7 +3511,7 @@ async function problemQuittieren(auftrag, b, danach) {
 
 // ---------- Auftrag planen und bearbeiten ----------
 
-async function planAuftragDialog(auftrag, b) {
+async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum) {
   const darf = darfPlanen();
   const maschinen = prod.maschinen;
 
@@ -3227,7 +3535,8 @@ async function planAuftragDialog(auftrag, b) {
     + '<label class="feld"><span>Maschine</span><select id="pl-maschine"'
     + (darf ? "" : " disabled") + '>'
     + maschinen.map((m) => '<option value="' + esc(m.id) + '"'
-        + (auftrag && auftrag.machine_id === m.id ? " selected" : "") + '>' + esc(m.name)
+        + ((auftrag && auftrag.machine_id === m.id)
+            || (!auftrag && vorgabeMaschine === m.id) ? " selected" : "") + '>' + esc(m.name)
         + (m.machine_number ? " (" + esc(m.machine_number) + ")" : "") + '</option>').join("")
     + '</select><span class="feldhinweis">Hier lässt sich der Auftrag auch ohne Ziehen '
     + 'auf eine andere Maschine setzen.</span></label>' 
@@ -3239,6 +3548,15 @@ async function planAuftragDialog(auftrag, b) {
     + '<label class="feld"><span>Dauer in Tagen</span>'
     + '<input id="pl-tage" type="number" min="1" step="1" value="'
     + (auftrag ? (auftrag.planned_days || 1) : 1) + '"></label>'
+    + '</div>'
+
+    + '<div class="feld"><span class="feldlabel">Vorbereitung</span>'
+    + '<label class="schalter"><input type="checkbox" id="pl-fa"'
+    + (auftrag && auftrag.fa_erstellt ? " checked" : "") + (darf ? "" : " disabled") + '>'
+    + '<span>FA ist erstellt</span></label>'
+    + '<label class="schalter"><input type="checkbox" id="pl-material"'
+    + (auftrag && auftrag.material_ok ? " checked" : "") + (darf ? "" : " disabled") + '>'
+    + '<span>Material vorhanden oder bestellt</span></label>'
     + '</div>'
 
     + '<label class="feld"><span>Fertigungsmenge</span>'
@@ -3359,6 +3677,8 @@ async function planAuftragDialog(auftrag, b) {
       drawing_url: pdfAdresse,
       plan_status: planZustand,
       color: planFarbe,
+      fa_erstellt: $("pl-fa").checked,
+      material_ok: $("pl-material").checked,
       machine_id: $("pl-maschine").value,
     };
 
@@ -4816,7 +5136,11 @@ async function bestLieferanten(ziel, b) {
     + '<section class="karte"><h2>Lieferanten <span class="marke">' + liste.length + '</span></h2>'
     + (liste.length
       ? '<table class="tabelle"><tbody>' + liste.map((l) =>
-          '<tr><td class="stark">' + esc(l.name) + '</td>'
+          '<tr><td class="stark">'
+          + (l.website
+              ? '<a class="lieferantlink" href="' + esc(l.website) + '"'
+                + ' target="_blank" rel="noopener">' + esc(l.name) + ' ↗</a>'
+              : esc(l.name)) + '</td>'
           + (darfSchreiben() ? '<td class="rechts nowrap">'
               + '<button class="linkknopf" data-lf="' + esc(l.id) + '">Umbenennen</button> '
               + '<button class="linkknopf linkknopf--gefahr" data-lfweg="' + esc(l.id)
@@ -5075,6 +5399,185 @@ SYM.einstellungen = svg('<line x1="4" y1="7" x2="20" y2="7"/>'
   + '<circle cx="15" cy="12" r="2.2" fill="var(--flaeche)"/>'
   + '<circle cx="8" cy="17" r="2.2" fill="var(--flaeche)"/>');
 
+// =================================================================
+//  TRISTANS SPASSECKE
+//  Ein kleines Spiel für die Pause. Läuft nur im Browser,
+//  speichert nichts in der Datenbank.
+// =================================================================
+
+const spass = {
+  laeuft: false,
+  punkte: 0,
+  bestwert: 0,
+  toleranz: 0,
+  ziel: 0,
+  ist: 0,
+  richtung: 1,
+  takt: null,
+  runde: 0,
+};
+
+const SPRUECHE = [
+  "Läuft wie geschmiert.",
+  "Der Späne-Gott ist zufrieden.",
+  "Das war Schweizer Präzision.",
+  "Sogar die Star hätte genickt.",
+  "Messschieber sagt: passt.",
+  "Hundertstel? Peanuts.",
+];
+
+const FLUECHE = [
+  "Ausschuss. Kübel links.",
+  "Das war ausserhalb der Toleranz.",
+  "Der Kunde ruft gleich an.",
+  "Nachmessen bringt jetzt auch nichts mehr.",
+  "Das wird eine Reklamation.",
+];
+
+function seiteSpass(b) {
+  b.innerHTML = '<h1 class="seitentitel">Tristans Spassecke</h1>'
+    + '<section class="karte">'
+    + '<h2>Auf Mass drehen</h2>'
+    + '<p class="hinweis">Der Support fährt hin und her. Drück auf Anhalten, wenn er '
+    + 'genau im grünen Feld steht. Je länger du überlebst, desto enger wird die Toleranz. '
+    + 'Drei Ausschussteile und Feierabend.</p>'
+
+    + '<div class="spass-anzeige">'
+    + '<div class="spass-werte">'
+    + '<div><span class="spass-label">Teile gut</span>'
+    + '<span class="spass-zahl" id="sp-punkte">0</span></div>'
+    + '<div><span class="spass-label">Ausschuss</span>'
+    + '<span class="spass-zahl" id="sp-fehler">0</span></div>'
+    + '<div><span class="spass-label">Rekord</span>'
+    + '<span class="spass-zahl" id="sp-best">0</span></div>'
+    + '</div>'
+
+    + '<div class="spass-bahn" id="sp-bahn">'
+    + '<div class="spass-ziel" id="sp-ziel"></div>'
+    + '<div class="spass-support" id="sp-support"></div>'
+    + '</div>'
+
+    + '<div class="spass-text" id="sp-text">Bereit wenn du es bist.</div>'
+    + '<button class="knopf knopf--haupt knopf--breit" id="sp-knopf">Maschine starten</button>'
+    + '</div></section>'
+
+    + '<section class="karte">'
+    + '<h2>Werkstattweisheit des Tages</h2>'
+    + '<p class="spass-weisheit" id="sp-weisheit"></p>'
+    + '<button class="linkknopf" id="sp-neu">Noch eine</button>'
+    + '</section>';
+
+  const WEISHEITEN = [
+    "Ein Hundertstel ist kein Fehler, sondern eine Meinungsverschiedenheit.",
+    "Wer misst, misst Mist. Wer nicht misst, macht Ausschuss.",
+    "Die Maschine läuft immer. Ausser wenn jemand zuschaut.",
+    "Kühlschmiermittel ist kein Getränk. Auch nicht am Freitag.",
+    "Das Teil ist fertig, wenn der Chef nicht mehr fragt.",
+    "Ein Werkzeugbruch kommt nie allein.",
+    "Toleranzen sind Vorschläge. Sagt niemand, der bleiben durfte.",
+    "Wenn es beim ersten Mal passt, hast du etwas übersehen.",
+    "Späne im Ärmel sind das Abzeichen der Zunft.",
+    "Der beste Vorschub ist der, bei dem es nicht pfeift.",
+  ];
+
+  const weisheitZeigen = () => {
+    document.getElementById("sp-weisheit").textContent =
+      WEISHEITEN[Math.floor(Math.random() * WEISHEITEN.length)];
+  };
+  weisheitZeigen();
+  document.getElementById("sp-neu").onclick = weisheitZeigen;
+
+  // ---------- Das Spiel ----------
+
+  const bahn = document.getElementById("sp-bahn");
+  const support = document.getElementById("sp-support");
+  const zielFeld = document.getElementById("sp-ziel");
+  const knopf = document.getElementById("sp-knopf");
+  const text = document.getElementById("sp-text");
+  let fehler = 0;
+
+  const neueRunde = () => {
+    spass.runde++;
+    // Toleranz wird mit jeder Runde enger, hört aber bei 4 Prozent auf
+    spass.toleranz = Math.max(4, 20 - spass.runde * 1.5);
+    spass.ziel = 15 + Math.random() * 70;
+    spass.ist = 0;
+    spass.richtung = 1;
+
+    zielFeld.style.left = (spass.ziel - spass.toleranz / 2) + "%";
+    zielFeld.style.width = spass.toleranz + "%";
+
+    const tempo = Math.min(2.4, 0.7 + spass.runde * 0.08);
+    clearInterval(spass.takt);
+    spass.takt = setInterval(() => {
+      spass.ist += spass.richtung * tempo;
+      if (spass.ist >= 100) { spass.ist = 100; spass.richtung = -1; }
+      if (spass.ist <= 0) { spass.ist = 0; spass.richtung = 1; }
+      support.style.left = spass.ist + "%";
+    }, 16);
+  };
+
+  const beenden = () => {
+    clearInterval(spass.takt);
+    spass.laeuft = false;
+    knopf.textContent = "Nochmal";
+    text.textContent = "Feierabend. " + spass.punkte
+      + (spass.punkte === 1 ? " gutes Teil" : " gute Teile") + " geschafft.";
+    if (spass.punkte > spass.bestwert) {
+      spass.bestwert = spass.punkte;
+      document.getElementById("sp-best").textContent = spass.bestwert;
+      text.textContent += " Neuer Rekord!";
+    }
+  };
+
+  const anhalten = () => {
+    const abstand = Math.abs(spass.ist - spass.ziel);
+    if (abstand <= spass.toleranz / 2) {
+      spass.punkte++;
+      document.getElementById("sp-punkte").textContent = spass.punkte;
+      text.textContent = SPRUECHE[Math.floor(Math.random() * SPRUECHE.length)];
+      bahn.classList.add("spass-bahn--gut");
+      setTimeout(() => bahn.classList.remove("spass-bahn--gut"), 250);
+      neueRunde();
+    } else {
+      fehler++;
+      document.getElementById("sp-fehler").textContent = fehler;
+      text.textContent = FLUECHE[Math.floor(Math.random() * FLUECHE.length)];
+      bahn.classList.add("spass-bahn--schlecht");
+      setTimeout(() => bahn.classList.remove("spass-bahn--schlecht"), 250);
+      if (fehler >= 3) { beenden(); return; }
+      neueRunde();
+    }
+  };
+
+  knopf.onclick = () => {
+    if (!spass.laeuft) {
+      spass.laeuft = true;
+      spass.punkte = 0;
+      spass.runde = 0;
+      fehler = 0;
+      document.getElementById("sp-punkte").textContent = "0";
+      document.getElementById("sp-fehler").textContent = "0";
+      knopf.textContent = "Anhalten";
+      text.textContent = "Konzentration.";
+      neueRunde();
+    } else {
+      anhalten();
+    }
+  };
+
+  // Leertaste geht auch
+  b.tabIndex = -1;
+  b.onkeydown = (e) => {
+    if (e.code === "Space") { e.preventDefault(); knopf.click(); }
+  };
+}
+
+// Spassecke: Späne-Symbol
+SYM.spass = svg('<circle cx="12" cy="12" r="3"/>'
+  + '<path d="M12 3.2a8.8 8.8 0 0 1 8.8 8.8M12 20.8A8.8 8.8 0 0 1 3.2 12"/>'
+  + '<path d="M17.5 6.5l2.6-2.6M6.5 17.5l-2.6 2.6"/>');
+
 const SEITEN = [
   { pfad: "dashboard",    titel: "Start",        zeichen: SYM.start, zeige: seiteDashboard },
   { pfad: "planwand",     titel: "Planwand",     zeichen: SYM.planwand, zeige: seitePlanwand },
@@ -5083,6 +5586,7 @@ const SEITEN = [
   { pfad: "einkauf",      titel: "Einkauf",      zeichen: SYM.einkauf, zeige: seiteEinkauf },
   { pfad: "rechner",      titel: "Rechner",      zeichen: SYM.rechner, zeige: seiteRechner },
   { pfad: "einstellungen", titel: "Einstellungen", zeichen: SYM.einstellungen, zeige: seiteEinstellungen },
+  { pfad: "spass",        titel: "Spassecke",    zeichen: SYM.spass, zeige: seiteSpass },
 ];
 
 function zeichneSeite() {
