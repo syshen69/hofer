@@ -1123,12 +1123,7 @@ a:focus-visible {
 .pw-balken__fehlt { flex: none; font-size: .6rem; font-weight: 700;
                     background: rgba(255,255,255,.3); border-radius: 2px;
                     padding: 0 3px; }
-.pw-loeschen { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px;
-               border-radius: 50%; border: none; background: var(--gefahr); color: #fff;
-               font-size: .65rem; line-height: 1; cursor: pointer; z-index: 3;
-               padding: 0; display: none; }
-.pw-balken:hover .pw-loeschen { display: block; }
-.pw-zeile--kw { grid-template-columns: 108px 1fr; border-bottom: 1px solid var(--linie);
+.pw-balken:hover .pw-zeile--kw { grid-template-columns: 108px 1fr; border-bottom: 1px solid var(--linie);
                 position: sticky; top: 0; z-index: 4; background: var(--flaeche); }
 .pw-kw-spuren { display: grid;
                 grid-template-columns: repeat(var(--pw-tage, 15), 1fr); }
@@ -1315,6 +1310,61 @@ a:focus-visible {
 .spass-stapel__turm { position: absolute; inset: 0; }
 .spass-stapel__ei { position: absolute; font-size: 1.5rem; }
 .spass-salat { font-size: 1.6rem; font-weight: 700; letter-spacing: .2em; }
+
+/* ---------- Seitenleiste einklappen, nur am PC ---------- */
+.kopf__klapp { display: none; background: none; border: 1px solid var(--linie-stark);
+               color: var(--marke); border-radius: var(--radius); width: 38px; height: 38px;
+               font-size: 1.1rem; cursor: pointer; flex: none; margin-right: 4px; }
+@media (min-width: 780px) {
+  .kopf__klapp { display: block; }
+  body.nav--schmal .rahmen { grid-template-columns: 62px 1fr; }
+  body.nav--schmal .nav__text { display: none; }
+  body.nav--schmal .nav__punkt { justify-content: center; padding: 0; }
+  body.nav--schmal .nav__zeichen { font-size: 1.25rem; }
+}
+
+/* ---------- Dunkler Modus ---------- */
+body.dunkel {
+  --grund: #14181d;
+  --flaeche: #1c2229;
+  --tinte: #e6eaef;
+  --gedaempft: #97a3b0;
+  --linie: #2b333c;
+  --linie-stark: #3a444f;
+  --marke-hell: #1e2b3d;
+}
+body.dunkel .kopf { background: #1c2229; border-bottom-color: var(--marke); }
+body.dunkel .kopf__logo { filter: brightness(0) invert(1); }
+body.dunkel .karte, body.dunkel .nav { background: var(--flaeche); }
+body.dunkel .pw-rolle, body.dunkel .pw-tafel { background: var(--flaeche); }
+body.dunkel .pw-name, body.dunkel .pw-zeile--kopf,
+body.dunkel .pw-zeile--kw { background: var(--flaeche); }
+body.dunkel .knopf { background: var(--flaeche); color: var(--tinte); }
+body.dunkel .knopf--haupt { background: var(--marke); color: #fff; }
+body.dunkel input, body.dunkel select, body.dunkel textarea {
+  background: #232a32; color: var(--tinte); border-color: var(--linie-stark); }
+body.dunkel .statuszeile { background: #232a32; }
+body.dunkel .zeile--inaktiv { background: #232a32; }
+body.dunkel .treffer, body.dunkel .pd-zeile { background: var(--flaeche); }
+
+/* ---------- Planwand: nichts läuft mehr seitlich hinaus ---------- */
+.pw-rolle { overflow-x: hidden; }
+.pw-tafel { min-width: 0; width: 100%; }
+.pw-zeile, .pw-zeile--kw { grid-template-columns: var(--pw-name, 108px) 1fr; }
+.pw-zeile--kopf { grid-template-columns: var(--pw-name, 108px)
+                  repeat(var(--pw-tage, 15), 1fr); }
+.pw-spuren, .pw-kw-spuren, .pw-balken-schicht {
+  grid-template-columns: repeat(var(--pw-tage, 15), 1fr); }
+
+/* Kopfzeilen decken beim Scrollen sauber ab, keine Lücke dazwischen */
+.pw-kopfblock { position: sticky; top: 0; z-index: 6; background: var(--flaeche); }
+.pw-zeile--kw, .pw-zeile--kopf { position: static; }
+.pw-tag, .pw-kw { background: var(--flaeche); }
+.pw-tag--heute { background: var(--marke-hell); }
+.pw-kw { background: var(--marke-hell); }
+
+.pw-balken__dm { flex: none; font-size: calc(0.62rem * var(--pw-s, 1));
+                 background: rgba(255,255,255,.25); border-radius: 2px; padding: 0 3px; }
 </style>
 </head>
 <body>
@@ -1358,7 +1408,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "14.0.0";
+const APP_VERSION = "15.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -2130,7 +2180,6 @@ function darfSchreiben() { return meineRolle() === "admin" || meineRolle() === "
 const ROLLEN = {
   admin: "Administrator",
   produktion: "Produktion",
-  planer: "Planer",
 };
 
 // Hinweisbalken, wenn jemand einen Bereich nur ansehen darf
@@ -2626,6 +2675,7 @@ function wochenRaster(maschinen, von, anzahl, staende) {
     }).join("");
 
     return '<tr><th class="fest">' + esc(m.name)
+      + (m.machine_number ? ' <span class="fest__nr">' + esc(m.machine_number) + '</span>' : "")
       + '<span class="fest__auftrag">' + (j ? esc(j.job_number) : "kein Auftrag") + '</span>'
       + (j ? '<span class="fest__stand">Stand ' + zahlText(aktuellerStand(m.id, staende))
              + '</span>' : "")
@@ -2862,10 +2912,7 @@ function farbeVon(wert) {
   return PLANFARBEN.find((f) => f.wert === wert) || PLANFARBEN[0];
 }
 
-function darfPlanen() {
-  const r = meineRolle();
-  return r === "admin" || r === "planer";
-}
+function darfPlanen() { return istAdmin(); }
 
 const FERIEN_ZEILEN = 7;
 
@@ -2898,16 +2945,27 @@ async function seitePlanwand(b) {
   b.classList.add("inhalt--breit");
 
   // So viele Arbeitstage, wie nebeneinander Platz haben.
-  // plan.spalte ist die Breite einer Tagesspalte in Pixeln.
-  // Der Zoom ändert genau diesen Wert, alles andere richtet sich danach.
-  if (!plan.spalte) plan.spalte = Number(einstellungWert("pwspalte", 40)) || 40;
+  // Der Zoom bestimmt, wie viele Arbeitstage sichtbar sind.
+  // Die Spaltenbreite ergibt sich daraus, damit immer alles in die
+  // Breite passt und nichts seitlich weggeschoben wird.
+  if (!plan.tageWunsch) plan.tageWunsch = Number(einstellungWert("pwtage", 15)) || 15;
+  plan.tage = Math.max(5, Math.min(80, plan.tageWunsch));
 
-  plan.skala = Math.max(0.55, Math.min(1.15, plan.spalte / 40));
-  const namensbreite = Math.round(108 * plan.skala);
-  const platz = Math.max(280, b.clientWidth || window.innerWidth) - namensbreite - 4;
+  const gesamt = Math.max(280, b.clientWidth || window.innerWidth) - 8;
+  // Die Namensspalte darf höchstens ein Fünftel einnehmen
+  let namensbreite = Math.min(108, Math.floor(gesamt / 5));
+  plan.spalte = Math.max(9, (gesamt - namensbreite) / plan.tage);
 
-  // So viele Tage, wie bei dieser Spaltenbreite genau hineinpassen
-  plan.tage = Math.max(5, Math.min(80, Math.floor(platz / plan.spalte)));
+  // Sehr eng: Namensspalte schrumpfen, damit die Tage Platz behalten
+  if (plan.spalte < 22) {
+    namensbreite = Math.min(namensbreite, 64);
+    plan.spalte = Math.max(9, (gesamt - namensbreite) / plan.tage);
+  }
+
+  plan.namensbreite = namensbreite;
+  plan.skala = Math.max(0.5, Math.min(1.1, plan.spalte / 40));
+  plan.knapp = plan.spalte < 30;      // nur noch Wochentag oben
+  plan.sehrKnapp = plan.spalte < 18;  // links nur noch die Nummer
 
   b.innerHTML = '<h1 class="seitentitel">Planwand</h1>'
     + '<div id="pw-seite"><div class="laedt">Wird geladen …</div></div>';
@@ -2956,13 +3014,13 @@ async function ansichtPlanwand(ziel, b) {
   document.getElementById("pw-vor").onclick = () => {
     plan.start = naechsterArbeitstag(plusTage(plan.start, 7)); seitePlanwand(b); };
   document.getElementById("pw-rein").onclick = () => {
-    plan.spalte = Math.min(80, plan.spalte + 8);
-    einstellungSetzenWert("pwspalte", plan.spalte);
+    plan.tageWunsch = Math.max(5, plan.tageWunsch - 5);
+    einstellungSetzenWert("pwtage", plan.tageWunsch);
     seitePlanwand(b);
   };
   document.getElementById("pw-raus").onclick = () => {
-    plan.spalte = Math.max(18, plan.spalte - 6);
-    einstellungSetzenWert("pwspalte", plan.spalte);
+    plan.tageWunsch = Math.min(80, plan.tageWunsch + 5);
+    einstellungSetzenWert("pwtage", plan.tageWunsch);
     seitePlanwand(b);
   };
 
@@ -3041,8 +3099,9 @@ function zeichnePlanwand(b) {
         const we = wt === "Sa" || wt === "So";
         return '<div class="pw-tag' + (t === heute ? " pw-tag--heute" : "")
           + (we ? " pw-tag--we" : "") + '">'
-          + '<span class="pw-tag__wt">' + wt + '</span>'
-          + '<span class="pw-tag__datum">' + kurzDatum(t) + '</span></div>';
+          + '<span class="pw-tag__wt">' + (plan.sehrKnapp ? wt.charAt(0) : wt) + '</span>'
+          + (plan.knapp ? "" : '<span class="pw-tag__datum">' + kurzDatum(t) + '</span>')
+          + '</div>';
       }).join("")
     + '</div>';
 
@@ -3073,7 +3132,8 @@ function zeichnePlanwand(b) {
             }).join("");
 
           return '<div class="pw-zeile" data-maschine="' + esc(m.id) + '">'
-            + '<div class="pw-name">' + esc(m.name)
+            + '<div class="pw-name">'
+            + (plan.sehrKnapp && m.machine_number ? esc(m.machine_number) : esc(m.name))
             + (m.machine_number ? '<span>' + esc(m.machine_number) + '</span>' : "")
             + '</div>'
             + '<div class="pw-spuren">' + zellen
@@ -3117,8 +3177,11 @@ function zeichnePlanwand(b) {
 
   document.getElementById("pw-inhalt").innerHTML =
     '<div class="pw-rolle"><div class="pw-tafel" style="--pw-tage:' + plan.tage
-    + ';--pw-s:' + (plan.skala || 1) + ';--pw-spalte:' + (plan.spalte || 40) + 'px">'
-    + kwZeile + kopf + zeilen + ferienZeilen
+    + ';--pw-s:' + (plan.skala || 1)
+    + ';--pw-spalte:' + (plan.spalte || 40) + 'px'
+    + ';--pw-name:' + (plan.namensbreite || 108) + 'px">'
+    + '<div class="pw-kopfblock">' + kwZeile + kopf + '</div>'
+    + zeilen + ferienZeilen
     + (heuteSpalte >= 0
         ? '<div class="pw-heutelinie" style="--heute:' + heuteSpalte + '"></div>' : "")
     + '</div></div>'
@@ -3135,7 +3198,6 @@ function zeichnePlanwand(b) {
 
   balkenVerhalten(b);
   griffVerhalten(b);
-  loeschKnoepfe(b);
   zellenVerhalten(b);
   ferienGriffe(b);
   ferienVerhalten(b);
@@ -3183,6 +3245,9 @@ function planBalken(j, spalte, dauer, angeschnitten) {
     + (!j.material_ok ? '<span class="pw-balken__fehlt" title="Material fehlt">M</span>' : "")
     + '<span class="pw-balken__status">' + (PLANSTATUS[st] || PLANSTATUS.geplant).zeichen + '</span>'
     + '<span class="pw-balken__nr">' + esc(j.job_number) + '</span>'
+    + (j.material_dm
+        ? '<span class="pw-balken__dm">⌀' + j.material_dm
+          + (j.material_toleranz ? " " + esc(j.material_toleranz) : "") + '</span>' : "")
     + (mengeText ? '<span class="pw-balken__prozent">' + mengeText + '</span>' : "")
     + (j.plan_note ? '<span class="pw-balken__zeichen">✎</span>' : "")
     + (j.drawing_url ? '<span class="pw-balken__zeichen">PDF</span>' : "")
@@ -3191,8 +3256,6 @@ function planBalken(j, spalte, dauer, angeschnitten) {
         ? '<span class="pw-griff pw-griff--links" data-griff="links"></span>' : "")
     + (darfPlanen()
         ? '<span class="pw-griff pw-griff--rechts" data-griff="rechts"></span>' : "")
-    + (istAdmin() ? '<button class="pw-loeschen" data-auftragweg="' + esc(j.id)
-        + '" data-nr="' + esc(j.job_number) + '" title="Auftrag löschen">✕</button>' : "")
     + '</div>';
 }
 
@@ -3576,32 +3639,6 @@ function ferienGriffe(b) {
   });
 }
 
-function loeschKnoepfe(b) {
-  const tafel = document.querySelector(".pw-tafel");
-  if (!tafel) return;
-
-  tafel.querySelectorAll("[data-auftragweg]").forEach((el) => {
-    el.addEventListener("pointerdown", (e) => e.stopPropagation());
-    el.onclick = async (e) => {
-      e.stopPropagation();
-      const ok = await doppeltNachfragen(
-        { titel: "Auftrag löschen",
-          text: "Soll " + el.dataset.nr + " wirklich gelöscht werden? "
-              + "Erfasste Stückzahlen gehen dabei verloren.",
-          bestaetigen: "Weiter zum Löschen", gefahr: true },
-        { titel: "Wirklich endgültig löschen?",
-          text: "Letzte Rückfrage. Danach ist der Auftrag weg.",
-          bestaetigen: "Endgültig löschen", gefahr: true });
-      if (!ok) return;
-
-      await db.from("production_records").delete().eq("job_id", el.dataset.auftragweg);
-      const { error } = await db.from("jobs").delete().eq("id", el.dataset.auftragweg);
-      if (error) meldung(fehlertext(error), "fehler");
-      else { meldung("Auftrag gelöscht."); seitePlanwand(b); }
-    };
-  });
-}
-
 function balkenVerhalten(b) {
   const tafel = document.querySelector(".pw-tafel");
   if (!tafel || !darfPlanen()) return;
@@ -3736,7 +3773,13 @@ async function auftragKopieren(b) {
     })));
   if (!wahl) return;
 
-  const vorlage = alle.find((j) => j.id === wahl);
+  const gewaehlt = alle.find((j) => j.id === wahl);
+
+  // Gab es diese Nummer schon öfter, nehmen wir den jüngsten Eintrag,
+  // weil dort meist die aktuellsten Angaben stehen.
+  const gleiche = alle.filter((j) => j.job_number === gewaehlt.job_number);
+  const vorlage = gleiche.sort((x, y) =>
+    String(y.planned_from || "").localeCompare(String(x.planned_from || "")))[0] || gewaehlt;
 
   const maschineWahl = await auswahlSuchen("Auf welche Maschine?",
     prod.maschinen.map((m) => ({
@@ -3768,6 +3811,9 @@ async function auftragKopieren(b) {
     plan_status: "geplant",
     fa_erstellt: vorlage.fa_erstellt,
     material_ok: vorlage.material_ok,
+    material_dm: vorlage.material_dm,
+    material_toleranz: vorlage.material_toleranz,
+    material_menge: vorlage.material_menge,
   });
 
   if (error) meldung(fehlertext(error), "fehler");
@@ -3777,7 +3823,7 @@ async function auftragKopieren(b) {
 async function problemMelden(b) {
   // Nur Aufträge, die noch nicht fertig sind
   const offen = (plan.auftraege || [])
-    .filter((j) => j.plan_status !== "fertig")
+    .filter((j) => j.plan_status !== "fertig" && !j.ended_at)
     .sort((x, y) => (x.job_number || "").localeCompare(y.job_number || ""));
 
   if (!offen.length) {
@@ -3878,10 +3924,40 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum) {
     + '<input id="pl-von" type="date" value="'
     + esc(auftrag ? (auftrag.planned_from || "")
         : (vorgabeDatum || isoDatum(new Date()))) + '"></label>'
-    + '<label class="feld"><span>Dauer in Tagen</span>'
+    + '<label class="feld"><span>Dauer in Arbeitstagen</span>'
     + '<input id="pl-tage" type="number" min="1" step="1" value="'
     + (auftrag ? (auftrag.planned_days || 1) : 1) + '"></label>'
     + '</div>'
+    + '<label class="feld"><span>Letzter Tag</span>'
+    + '<input id="pl-bis" type="date" value="'
+    + esc(auftrag && auftrag.planned_from
+        ? letzterArbeitstag(auftrag.planned_from, auftrag.planned_days || 1) : "") + '">'
+    + '<span class="feldhinweis">Von, Bis und Dauer hängen zusammen. '
+    + 'Änderst du eines, passen sich die anderen an.</span></label>'
+
+    + '<div class="dialog__block"><div class="dialog__blocktitel">Material</div>'
+    + '<div class="zeitraumwahl">'
+    + '<label class="feld"><span>Aussendurchmesser in mm</span>'
+    + '<input id="pl-dm" type="number" step="0.1" min="0" value="'
+    + esc(auftrag && auftrag.material_dm !== null && auftrag.material_dm !== undefined
+        ? auftrag.material_dm : "") + '" placeholder="z. B. 12"></label>'
+    + '<label class="feld"><span>Toleranz</span>'
+    + '<select id="pl-tol">'
+    + ['', 'h6', 'h7', 'h8', 'h9', 'h10', 'h11', 'h12', 'h13'].map((t) =>
+        '<option value="' + t + '"'
+        + (auftrag && (auftrag.material_toleranz || "") === t ? " selected" : "") + '>'
+        + (t || "ohne Toleranz") + '</option>').join("")
+    + '</select></label>'
+    + '</div>'
+    + '<div class="zeitraumwahl">'
+    + '<label class="feld"><span>Menge vorhanden oder bestellt</span>'
+    + '<input id="pl-menge-mat" type="text" value="'
+    + esc(auftrag ? (auftrag.material_menge || "") : "")
+    + '" placeholder="z. B. 40 kg oder 6 Stangen"></label>'
+    + '<label class="feld"><span>Liefertermin</span>'
+    + '<input id="pl-liefer" type="date" value="'
+    + esc(auftrag ? (auftrag.material_liefertermin || "") : "") + '"></label>'
+    + '</div></div>'
 
     + '<div class="feld"><span class="feldlabel">Vorbereitung</span>'
     + '<label class="schalter"><input type="checkbox" id="pl-fa"'
@@ -3941,7 +4017,8 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum) {
 
     + '<div class="dialog__knoepfe">'
     + (auftrag && darf
-        ? '<button class="knopf knopf--gefahr" id="pl-weg">Aus der Planung nehmen</button>' : "")
+        ? '<button class="knopf knopf--gefahr" id="pl-loeschen">Auftrag löschen</button>'
+          + '<button class="knopf knopf--still" id="pl-weg">Aus der Planung nehmen</button>' : "")
     + '<button class="knopf knopf--still" id="pl-nein">Schliessen</button>'
     + (darf ? '<button class="knopf knopf--haupt" id="pl-ja">Speichern</button>' : "")
     + '</div></div>';
@@ -3953,6 +4030,27 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum) {
   huelle.onclick = (e) => { if (e.target === huelle) zu(); };
 
   let pdfAdresse = auftrag ? auftrag.drawing_url : null;
+
+  // Von, Bis und Dauer im Gleichklang halten
+  const felderKoppeln = () => {
+    const von = $("pl-von"), bis = $("pl-bis"), tage = $("pl-tage");
+    if (!von || !bis || !tage) return;
+
+    von.onchange = () => {
+      if (!von.value) return;
+      bis.value = letzterArbeitstag(von.value, Math.max(1, Number(tage.value) || 1));
+    };
+    tage.onchange = () => {
+      if (!von.value) return;
+      bis.value = letzterArbeitstag(von.value, Math.max(1, Number(tage.value) || 1));
+    };
+    bis.onchange = () => {
+      if (!von.value || !bis.value) return;
+      if (bis.value < von.value) { bis.value = von.value; }
+      tage.value = arbeitstageZwischen(von.value, bis.value);
+    };
+  };
+  felderKoppeln();
 
   const probWeg = huelle.querySelector("#pl-problemweg");
   if (probWeg) probWeg.onclick = async () => {
@@ -4012,6 +4110,10 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum) {
       color: planFarbe,
       fa_erstellt: $("pl-fa").checked,
       material_ok: $("pl-material").checked,
+      material_dm: $("pl-dm").value === "" ? null : Number($("pl-dm").value),
+      material_toleranz: $("pl-tol").value || null,
+      material_menge: ($("pl-menge-mat").value || "").trim() || null,
+      material_liefertermin: $("pl-liefer").value || null,
       machine_id: $("pl-maschine").value,
     };
 
@@ -4029,6 +4131,25 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum) {
 
     if (fehler) meldung(fehlertext(fehler), "fehler");
     else { zu(); meldung("Gespeichert."); seitePlanwand(b); }
+  };
+
+  const loeschen = $("pl-loeschen");
+  if (loeschen) loeschen.onclick = async () => {
+    const sicher = await doppeltNachfragen(
+      { titel: "Auftrag löschen",
+        text: "Soll " + auftrag.job_number + " wirklich gelöscht werden? "
+            + "Erfasste Stückzahlen gehen dabei verloren.",
+        bestaetigen: "Weiter zum Löschen", gefahr: true },
+      { titel: "Wirklich endgültig löschen?",
+        text: "Letzte Rückfrage. Danach ist der Auftrag weg.",
+        bestaetigen: "Endgültig löschen", gefahr: true });
+    if (!sicher) return;
+
+    await db.from("production_records").delete().eq("job_id", auftrag.id);
+    const { error } = await db.from("jobs").delete().eq("id", auftrag.id);
+    zu();
+    if (error) meldung(fehlertext(error), "fehler");
+    else { meldung("Auftrag gelöscht."); seitePlanwand(b); }
   };
 
   const weg = $("pl-weg");
@@ -5621,9 +5742,9 @@ async function seiteEinstellungen(b) {
     + '</tbody></table>'
     + '<div class="rollenhilfe">'
     + '<div><strong>Administrator</strong> darf alles, auch Benutzer verwalten.</div>'
-    + '<div><strong>Produktion</strong> darf alles ausser der Benutzerverwaltung.</div>'
-    + '<div><strong>Planer</strong> darf die Planwand bearbeiten.</div>'
-    + '<div>Ansehen darf jeder alles.</div></div>'
+    + '<div><strong>Produktion</strong> darf alles erfassen und bestellen, aber die '
+    + 'Planwand nicht bearbeiten.</div>'
+        + '<div>Ansehen darf jeder alles.</div></div>'
     + '<p class="hinweis">Neue Benutzer legst du im Supabase-Dashboard unter '
     + 'Authentication → Users an, als E-Mail den Namen mit @hoferco.ch.</p></section>'
 
@@ -5636,6 +5757,9 @@ async function seiteEinstellungen(b) {
     + '<button class="knopf" id="ps">Passwort ändern</button></section>'
 
     + '<section class="karte"><h2>Darstellung</h2>'
+    + '<label class="schalter"><input type="checkbox" id="e-dunkel"'
+    + (einstellung("dunkel") ? " checked" : "") + '>'
+    + '<span>Dunkler Modus</span></label>'
     + '<label class="schalter"><input type="checkbox" id="e-wochenende"'
     + (einstellung("wochenende") ? " checked" : "") + '>'
     + '<span>Samstag und Sonntag in der Wochenansicht zeigen</span></label>'
@@ -5712,6 +5836,12 @@ async function seiteEinstellungen(b) {
 
   document.getElementById("e-sichern").addEventListener("click", (e) => {
     datenSichern(e.currentTarget);
+  });
+
+  document.getElementById("e-dunkel").addEventListener("change", (e) => {
+    einstellungSetzen("dunkel", e.target.checked);
+    document.body.classList.toggle("dunkel", e.target.checked);
+    meldung(e.target.checked ? "Dunkler Modus an." : "Heller Modus an.");
   });
 
   document.getElementById("e-wochenende").addEventListener("change", (e) => {
@@ -7206,6 +7336,7 @@ function zeichneGeruest() {
   const anzeige = (profil && (profil.full_name || profil.email)) || "";
   WURZEL.innerHTML = ''
     + '<header class="kopf">'
+    + '<button class="kopf__klapp" id="nav-klapp" title="Menü ein- oder ausklappen">☰</button>'
     + '<img class="kopf__logo" src="./logo.png" alt="Hofer + Co.">'
     + '<span class="kopf__benutzer" data-benutzername>' + esc(anzeige) + '</span>'
     + '<button class="kopf__abmelden" id="ab">Abmelden</button></header>'
@@ -7214,6 +7345,15 @@ function zeichneGeruest() {
         + '<span class="nav__zeichen" aria-hidden="true">' + s.zeichen + '</span>'
         + '<span class="nav__text">' + esc(s.titel) + '</span></a>').join("")
     + '</nav><main class="inhalt" id="inhalt"></main></div>';
+
+  const klapp = document.getElementById("nav-klapp");
+  if (klapp) klapp.onclick = () => {
+    const schmal = !document.body.classList.contains("nav--schmal");
+    document.body.classList.toggle("nav--schmal", schmal);
+    einstellungSetzenWert("navschmal", schmal ? "1" : "0");
+  };
+  if (einstellungWert("navschmal", "0") === "1") document.body.classList.add("nav--schmal");
+
 
   document.getElementById("ab").addEventListener("click", async () => {
     const ok = await nachfragen({ titel: "Abmelden",
