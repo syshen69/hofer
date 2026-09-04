@@ -1365,6 +1365,13 @@ body.dunkel .treffer, body.dunkel .pd-zeile { background: var(--flaeche); }
 
 .pw-balken__dm { flex: none; font-size: calc(0.62rem * var(--pw-s, 1));
                  background: rgba(255,255,255,.25); border-radius: 2px; padding: 0 3px; }
+
+.pw-ferien--anfrage { background: repeating-linear-gradient(45deg,
+                        #cfd5db, #cfd5db 6px, #b9c0c8 6px, #b9c0c8 12px);
+                      color: #3a4149; opacity: .9;
+                      outline: 1px dashed var(--gedaempft); }
+
+body.kopiermodus .pw-balken { cursor: copy; outline: 1px dashed var(--signalgelb); }
 </style>
 </head>
 <body>
@@ -1408,7 +1415,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "15.1.0";
+const APP_VERSION = "16.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -2839,6 +2846,7 @@ const plan = {
   ferien: [],
   suche: "",
   skala: 1,
+  kopierModus: false,
   spalte: 0,
   spalte: 0,
   zoom: null,
@@ -2927,7 +2935,9 @@ function passtZurSuche(j) {
 
 async function ladeFerien() {
   const { data, error } = await zeitlimit(
-    db.from("vacations").select("*").order("von"), 10000, "Ferien");
+    db.from("vacations")
+      .select("*, profiles!vacations_genehmigt_von_fkey(full_name)")
+      .order("von"), 10000, "Ferien");
   if (error) throw error;
   return data || [];
 }
@@ -3037,7 +3047,13 @@ async function ansichtPlanwand(ziel, b) {
   if (prob) prob.onclick = () => problemMelden(b);
 
   const kop = document.getElementById("pw-kopieren");
-  if (kop) kop.onclick = () => auftragKopieren(b);
+  if (kop) {
+    kop.textContent = plan.kopierModus ? "Kopieren abbrechen" : "Auftrag kopieren";
+    kop.onclick = () => {
+      if (plan.kopierModus) kopierModusBeenden(b);
+      else auftragKopieren(b);
+    };
+  }
 
   const zoomAnzeige = document.getElementById("pw-zoomwert");
   if (zoomAnzeige) zoomAnzeige.textContent = plan.tage + " Tage";
@@ -3059,7 +3075,12 @@ async function ansichtPlanwand(ziel, b) {
     return;
   }
 
-  try { plan.ferien = await ladeFerien(); }
+  try {
+    plan.ferien = (await ladeFerien()).map((f) => {
+      f.genehmigt_von_name = f.profiles ? f.profiles.full_name : null;
+      return f;
+    });
+  }
   catch (f) { plan.ferien = []; console.warn("Ferien:", f.message); }
 
   zeichnePlanwand(b);
@@ -3158,10 +3179,13 @@ function zeichnePlanwand(b) {
             if (!sichtbar.length) return "";
             const von = tage.indexOf(sichtbar[0]);
             const feAngeschnitten = belegt[0] !== sichtbar[0];
-            return '<div class="pw-ferien" data-ferien="' + esc(f2.id) + '"'
+            return '<div class="pw-ferien'
+              + (f2.genehmigt === false ? " pw-ferien--anfrage" : "") + '"'
+              + ' data-ferien="' + esc(f2.id) + '"'
               + ' data-von="' + von + '" data-dauer="' + sichtbar.length + '"'
               + ' style="--von:' + von + ';--dauer:' + sichtbar.length + '">'
-              + '<span class="pw-ferien__name">' + esc(f2.person) + '</span>'
+              + '<span class="pw-ferien__name">'
+              + (f2.genehmigt === false ? "? " : "") + esc(f2.person) + '</span>'
               + (darfPlanen() && !feAngeschnitten
                   ? '<span class="pw-griff pw-griff--links" data-fgriff="links"></span>' : "")
               + (darfPlanen()
@@ -3263,7 +3287,9 @@ function planBalken(j, spalte, dauer, angeschnitten) {
 
 function ferienVerhalten(b) {
   const tafel = document.querySelector(".pw-tafel");
-  if (!tafel || !darfPlanen()) return;
+  // Auch die Produktion darf hier arbeiten: sie stellt Anfragen,
+  // die der Administrator danach bestätigt.
+  if (!tafel || !(darfPlanen() || darfSchreiben())) return;
 
   // Leere Stelle antippen: neuen Eintrag anlegen
   tafel.querySelectorAll("[data-fzelle]").forEach((zelle) => {
@@ -3383,31 +3409,50 @@ function freieFerienZeile(von, tage, ausser) {
 async function ferienDialog(eintrag, zeile, datum, b) {
   const start = eintrag ? eintrag.von
     : (datum || naechsterArbeitstag(isoDatum(new Date())));
+  const bisVorgabe = eintrag
+    ? letzterArbeitstag(eintrag.von, eintrag.tage || 1) : start;
+
+  const istAnfrage = eintrag && eintrag.genehmigt === false;
 
   const huelle = document.createElement("div");
   huelle.className = "dialog-huelle";
   huelle.innerHTML = '<div class="dialog">'
-    + '<h2>' + (eintrag ? "Ferien bearbeiten" : "Ferien eintragen") + '</h2>'
-    + (eintrag ? '' : '<p class="klein">Ab ' + esc(kurzDatum(start)) + '</p>')
+    + '<h2>' + (eintrag ? "Ferien" : (darfPlanen() ? "Ferien eintragen" : "Ferien anfragen"))
+    + '</h2>'
+
+    + (eintrag
+      ? '<div class="' + (istAnfrage ? "problemkasten" : "karte--ergebnis meldungszahl") + '">'
+        + (istAnfrage
+          ? '<div class="problemkasten__kopf">Noch nicht bestätigt</div>'
+            + '<div class="klein">Diese Ferien sind angefragt und warten auf den '
+            + 'Administrator.</div>'
+          : '<div class="ergebnis__titel">Bestätigt</div>'
+            + '<div>' + esc(eintrag.genehmigt_von_name || "Administrator")
+            + (eintrag.genehmigt_am ? ' · ' + esc(datumZeitKurz(eintrag.genehmigt_am)) : "")
+            + '</div>')
+        + '</div>'
+      : "")
+
     + '<label class="feld"><span>Wer</span>'
     + '<input id="fd-person" type="text" placeholder="Name" value="'
-    + esc(eintrag ? eintrag.person : "") + '"></label>'
+    + esc(eintrag ? eintrag.person : ((profil && profil.full_name) || "")) + '"></label>'
     + '<div class="zeitraumwahl">'
-    + '<label class="feld"><span>Von</span>'
+    + '<label class="feld"><span>Erster Tag</span>'
     + '<input id="fd-von" type="date" value="' + esc(start) + '"></label>'
-    + '<label class="feld"><span>Bis</span>'
-    + '<input id="fd-bis" type="date" value="'
-    + esc(eintrag ? letzterArbeitstag(eintrag.von, eintrag.tage) : letzterArbeitstag(start, 5))
-    + '"></label>'
+    + '<label class="feld"><span>Letzter Tag</span>'
+    + '<input id="fd-bis" type="date" value="' + esc(bisVorgabe) + '"></label>'
     + '</div>'
-    + '<span class="feldhinweis" id="fd-dauer"></span>'
     + '<label class="feld"><span>Notiz</span>'
     + '<input id="fd-notiz" type="text" placeholder="kann leer bleiben" value="'
     + esc(eintrag ? (eintrag.note || "") : "") + '"></label>'
+
     + '<div class="dialog__knoepfe">'
     + (eintrag ? '<button class="knopf knopf--gefahr" id="fd-weg">Ferien löschen</button>' : "")
+    + (istAnfrage && darfPlanen()
+        ? '<button class="knopf knopf--haupt" id="fd-ok">Bestätigen</button>' : "")
     + '<button class="knopf knopf--still" id="fd-nein">Abbrechen</button>'
-    + '<button class="knopf knopf--haupt" id="fd-ja">Speichern</button>'
+    + '<button class="knopf ' + (istAnfrage && darfPlanen() ? "knopf--still" : "knopf--haupt")
+    + '" id="fd-ja">Speichern</button>'
     + '</div></div>';
   document.body.appendChild(huelle);
 
@@ -3417,32 +3462,24 @@ async function ferienDialog(eintrag, zeile, datum, b) {
   huelle.onclick = (e) => { if (e.target === huelle) zu(); };
   $("fd-person").focus();
 
-  const dauerZeigen = () => {
-    const v = $("fd-von").value, bi = $("fd-bis").value;
-    if (!v || !bi) { $("fd-dauer").textContent = ""; return; }
-    if (bi < v) { $("fd-dauer").textContent = "Das Ende liegt vor dem Anfang."; return; }
-    const n = arbeitstageZwischen(v, bi);
-    $("fd-dauer").textContent = n + (n === 1 ? " Arbeitstag" : " Arbeitstage");
-  };
-  dauerZeigen();
-  $("fd-von").onchange = dauerZeigen;
-  $("fd-bis").onchange = dauerZeigen;
-
   $("fd-ja").onclick = async () => {
     const person = ($("fd-person").value || "").trim();
     if (!person) { meldung("Bitte einen Namen eintragen.", "warn"); return; }
 
     const von = $("fd-von").value || start;
     const bis = $("fd-bis").value || von;
-    const tage = arbeitstageZwischen(von, bis);
+    if (bis < von) { meldung("Der letzte Tag liegt vor dem ersten.", "warn"); return; }
 
+    const tage = arbeitstageZwischen(von, bis);
     const daten = {
       person: person,
       zeile: zeile || freieFerienZeile(von, tage, eintrag ? eintrag.id : null),
-      von: von,
-      tage: tage,
+      von: von, tage: tage,
       note: ($("fd-notiz").value || "").trim() || null,
     };
+
+    // Wer nicht planen darf, stellt eine Anfrage
+    if (!eintrag) daten.genehmigt = darfPlanen();
 
     const { error } = eintrag
       ? await db.from("vacations").update(daten).eq("id", eintrag.id)
@@ -3450,16 +3487,31 @@ async function ferienDialog(eintrag, zeile, datum, b) {
 
     zu();
     if (error) meldung(fehlertext(error), "fehler");
-    else { meldung("Gespeichert."); seitePlanwand(b); }
+    else {
+      meldung(!eintrag && !darfPlanen() ? "Anfrage gestellt." : "Gespeichert.");
+      seitePlanwand(b);
+    }
+  };
+
+  const ok = $("fd-ok");
+  if (ok) ok.onclick = async () => {
+    const { error } = await db.from("vacations").update({
+      genehmigt: true,
+      genehmigt_von: profil.id,
+      genehmigt_am: new Date().toISOString(),
+    }).eq("id", eintrag.id);
+    zu();
+    if (error) meldung(fehlertext(error), "fehler");
+    else { meldung("Ferien bestätigt."); seitePlanwand(b); }
   };
 
   const weg = $("fd-weg");
   if (weg) weg.onclick = async () => {
-    const ok = await nachfragen({
+    const sicher = await nachfragen({
       titel: "Ferien löschen",
       text: "Soll der Eintrag für " + eintrag.person + " gelöscht werden?",
       bestaetigen: "Löschen", gefahr: true });
-    if (!ok) return;
+    if (!sicher) return;
     const { error } = await db.from("vacations").delete().eq("id", eintrag.id);
     zu();
     if (error) meldung(fehlertext(error), "fehler");
@@ -3467,9 +3519,6 @@ async function ferienDialog(eintrag, zeile, datum, b) {
   };
 }
 
-
-// Balken an den Rändern breiter oder schmaler ziehen.
-// Damit ändert sich die geplante Dauer in Arbeitstagen.
 function griffVerhalten(b) {
   const tafel = document.querySelector(".pw-tafel");
   if (!tafel || !darfPlanen()) return;
@@ -3713,7 +3762,15 @@ function balkenVerhalten(b) {
       const auftrag = (plan.auftraege || []).find((j) => j.id === el.dataset.auftrag);
       if (!auftrag) return;
 
-      if (!warZiehen) { planAuftragDialog(auftrag, b); return; }
+      if (!warZiehen) {
+        if (plan.kopierModus) {
+          kopierModusBeenden(b);
+          planAuftragDialog(null, b, null, null, auftrag);
+          return;
+        }
+        planAuftragDialog(auftrag, b);
+        return;
+      }
       if (!ziel) { meldung("Kein Ziel getroffen. Nichts geändert.", "warn"); return; }
 
       const teile = ziel.split("|");
@@ -3744,80 +3801,23 @@ const PROBLEM_ARTEN = [
 ];
 
 // Einen Auftrag auf eine andere Maschine kopieren
-async function auftragKopieren(b) {
-  const alle = (plan.auftraege || [])
-    .slice()
-    .sort((x, y) => (x.job_number || "").localeCompare(y.job_number || ""));
-
-  if (!alle.length) {
-    await nachfragen({ titel: "Nichts zu kopieren",
-      text: "Es ist noch kein Auftrag eingeplant.", bestaetigen: "Verstanden" });
+// Kopieren läuft ohne Zwischenfenster: Meldung unten, dann den
+// gewünschten Balken auf der Wand antippen.
+function auftragKopieren(b) {
+  if (!(plan.auftraege || []).length) {
+    meldung("Es ist noch kein Auftrag eingeplant.", "warn");
     return;
   }
+  plan.kopierModus = true;
+  document.body.classList.add("kopiermodus");
+  meldung("Auftrag antippen, der kopiert werden soll. Nochmal auf Kopieren beendet es.");
+  zeichnePlanwand(b);
+}
 
-  const weiter = await nachfragen({
-    titel: "Auftrag kopieren",
-    text: "So geht es: Zuerst wählst du den Auftrag aus, den du übernehmen willst. "
-        + "Danach wählst du die Maschine. Die Kopie wird automatisch hinter den letzten "
-        + "Auftrag dieser Maschine gehängt. Nummer, Menge, Notiz, Dauer und Farbe "
-        + "werden mitkopiert, Stückzahlen und Meldungen nicht.",
-    bestaetigen: "Verstanden, weiter" });
-  if (!weiter) return;
-
-  const wahl = await auswahlSuchen("Welchen Auftrag kopieren?",
-    alle.map((j) => ({
-      wert: j.id,
-      text: j.job_number + "   " + j.maschine
-        + (j.target_quantity ? "   " + zahlText(j.target_quantity) + " Stück" : ""),
-      such: (j.job_number || "") + " " + (j.maschine || ""),
-    })));
-  if (!wahl) return;
-
-  const gewaehlt = alle.find((j) => j.id === wahl);
-
-  // Gab es diese Nummer schon öfter, nehmen wir den jüngsten Eintrag,
-  // weil dort meist die aktuellsten Angaben stehen.
-  const gleiche = alle.filter((j) => j.job_number === gewaehlt.job_number);
-  const vorlage = gleiche.sort((x, y) =>
-    String(y.planned_from || "").localeCompare(String(x.planned_from || "")))[0] || gewaehlt;
-
-  const maschineWahl = await auswahlSuchen("Auf welche Maschine?",
-    prod.maschinen.map((m) => ({
-      wert: m.id,
-      text: m.name + (m.machine_number ? "   " + m.machine_number : ""),
-      such: (m.name || "") + " " + (m.machine_number || ""),
-    })));
-  if (!maschineWahl) return;
-
-  const start = naechsterFreierTag(maschineWahl);
-
-  const bestaetigt = await nachfragen({
-    titel: "Kopie anlegen",
-    text: vorlage.job_number + " wird auf "
-        + ((prod.maschinen.find((m) => m.id === maschineWahl) || {}).name || "")
-        + " kopiert und beginnt am " + kurzDatum(start) + ".",
-    bestaetigen: "Kopie anlegen" });
-  if (!bestaetigt) return;
-
-  const { error } = await db.from("jobs").insert({
-    machine_id: maschineWahl,
-    job_number: vorlage.job_number,
-    target_quantity: vorlage.target_quantity,
-    planned_from: start,
-    planned_days: vorlage.planned_days || 1,
-    plan_note: vorlage.plan_note,
-    drawing_url: vorlage.drawing_url,
-    color: vorlage.color,
-    plan_status: "geplant",
-    fa_erstellt: vorlage.fa_erstellt,
-    material_ok: vorlage.material_ok,
-    material_dm: vorlage.material_dm,
-    material_toleranz: vorlage.material_toleranz,
-    material_menge: vorlage.material_menge,
-  });
-
-  if (error) meldung(fehlertext(error), "fehler");
-  else { meldung("Kopie angelegt."); seitePlanwand(b); }
+function kopierModusBeenden(b) {
+  plan.kopierModus = false;
+  document.body.classList.remove("kopiermodus");
+  if (b) zeichnePlanwand(b);
 }
 
 async function problemMelden(b) {
@@ -3889,17 +3889,25 @@ async function problemQuittieren(auftrag, b, danach) {
 
 // ---------- Auftrag planen und bearbeiten ----------
 
-async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum) {
+async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorlage) {
   const darf = darfPlanen();
   const maschinen = prod.maschinen;
 
+  // Beim Kopieren wird alles übernommen ausser Nummer, Maschine,
+  // Stückzahl und Zeichnung.
+  const v = vorlage || null;
+
   let planZustand = (auftrag && auftrag.plan_status) || "geplant";
-  let planFarbe = (auftrag && auftrag.color) || "blau";
+  let planFarbe = (auftrag && auftrag.color) || (v && v.color) || "blau";
 
   const huelle = document.createElement("div");
   huelle.className = "dialog-huelle";
   huelle.innerHTML = '<div class="dialog">'
-    + '<h2>' + (auftrag ? esc(auftrag.job_number) : "Auftrag einplanen") + '</h2>'
+    + '<h2>' + (auftrag ? esc(auftrag.job_number)
+        : (vorlage ? "Kopie anlegen" : "Auftrag einplanen")) + '</h2>'
+    + (vorlage
+        ? '<p class="klein">Übernommen von ' + esc(vorlage.job_number)
+          + '. HOCO Nr., Maschine, Stückzahl und Zeichnung bitte neu setzen.</p>' : "")
     + (auftrag
         ? '<p class="klein">' + esc(auftrag.maschine)
           + (auftrag.stand ? ' · Stand ' + zahlText(auftrag.stand) : "")
@@ -3926,7 +3934,8 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum) {
         : (vorgabeDatum || isoDatum(new Date()))) + '"></label>'
     + '<label class="feld"><span>Dauer in Arbeitstagen</span>'
     + '<input id="pl-tage" type="number" min="1" step="1" value="'
-    + (auftrag ? (auftrag.planned_days || 1) : 1) + '"></label>'
+    + (auftrag ? (auftrag.planned_days || 1) : (v ? (v.planned_days || 1) : 1))
+    + '"></label>'
     + '</div>'
     + '<label class="feld"><span>Letzter Tag</span>'
     + '<input id="pl-bis" type="date" value="'
@@ -3940,19 +3949,22 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum) {
     + '<label class="feld"><span>Aussendurchmesser in mm</span>'
     + '<input id="pl-dm" type="number" step="0.1" min="0" value="'
     + esc(auftrag && auftrag.material_dm !== null && auftrag.material_dm !== undefined
-        ? auftrag.material_dm : "") + '" placeholder="z. B. 12"></label>'
+        ? auftrag.material_dm
+        : (v && v.material_dm !== null && v.material_dm !== undefined ? v.material_dm : ""))
+    + '" placeholder="z. B. 12"></label>'
     + '<label class="feld"><span>Toleranz</span>'
     + '<select id="pl-tol">'
     + ['', 'h6', 'h7', 'h8', 'h9', 'h10', 'h11', 'h12', 'h13'].map((t) =>
         '<option value="' + t + '"'
-        + (auftrag && (auftrag.material_toleranz || "") === t ? " selected" : "") + '>'
+        + ((auftrag && (auftrag.material_toleranz || "") === t)
+            || (!auftrag && v && (v.material_toleranz || "") === t) ? " selected" : "") + '>'
         + (t || "ohne Toleranz") + '</option>').join("")
     + '</select></label>'
     + '</div>'
     + '<div class="zeitraumwahl">'
     + '<label class="feld"><span>Menge vorhanden oder bestellt</span>'
     + '<input id="pl-menge-mat" type="text" value="'
-    + esc(auftrag ? (auftrag.material_menge || "") : "")
+    + esc(auftrag ? (auftrag.material_menge || "") : (v ? (v.material_menge || "") : ""))
     + '" placeholder="z. B. 40 kg oder 6 Stangen"></label>'
     + '<label class="feld"><span>Liefertermin</span>'
     + '<input id="pl-liefer" type="date" value="'
@@ -3961,10 +3973,10 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum) {
 
     + '<div class="feld"><span class="feldlabel">Vorbereitung</span>'
     + '<label class="schalter"><input type="checkbox" id="pl-fa"'
-    + (auftrag && auftrag.fa_erstellt ? " checked" : "") + (darf ? "" : " disabled") + '>'
+    + ((auftrag && auftrag.fa_erstellt) || (!auftrag && v && v.fa_erstellt) ? " checked" : "") + (darf ? "" : " disabled") + '>'
     + '<span>FA ist erstellt</span></label>'
     + '<label class="schalter"><input type="checkbox" id="pl-material"'
-    + (auftrag && auftrag.material_ok ? " checked" : "") + (darf ? "" : " disabled") + '>'
+    + ((auftrag && auftrag.material_ok) || (!auftrag && v && v.material_ok) ? " checked" : "") + (darf ? "" : " disabled") + '>'
     + '<span>Material vorhanden oder bestellt</span></label>'
     + '</div>'
 
@@ -3990,7 +4002,8 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum) {
     + '<label class="feld"><span>Notiz für die Maschine</span>'
     + '<textarea id="pl-notiz" rows="5" placeholder="Rüsthinweise, Besonderheiten, Werkzeuge …"'
     + (darf ? "" : " readonly") + '>'
-    + esc(auftrag ? (auftrag.plan_note || "") : "") + '</textarea></label>'
+    + esc(auftrag ? (auftrag.plan_note || "") : (v ? (v.plan_note || "") : ""))
+    + '</textarea></label>'
 
     + '<div class="feld"><span class="feldlabel">Zeichnung als PDF</span>'
     + (auftrag && auftrag.drawing_url
