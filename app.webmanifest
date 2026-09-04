@@ -1,7 +1,7 @@
 {
-  "name": "Hudson Tool – Hofer + Co.",
-  "short_name": "Hudson Tool",
-  "description": "Produktion, Lager und Bestellungen",
+  "name": "Hofer Tool",
+  "short_name": "Hofer Tool",
+  "description": "Planung, Produktion und Bestellungen",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

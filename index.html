@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Hudson Tool – Hofer + Co.</title>
+<title>Hofer Tool</title>
 <meta name="theme-color" content="#003884">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1262,6 +1262,59 @@ a:focus-visible {
 .pw-tag__datum { font-size: calc(0.6rem * var(--pw-s)); }
 .pw-kw { font-size: calc(0.66rem * var(--pw-s)); padding: calc(3px * var(--pw-s)) 0; }
 .fest__nr, .fest__auftrag { font-size: calc(0.68rem * var(--pw-s)); }
+
+/* ---------- Planwand: feste Spaltenbreite, nichts wird gequetscht ---------- */
+.pw-tafel { --pw-s: 1; --pw-spalte: 40px; width: max-content; min-width: 100%; }
+.pw-zeile { grid-template-columns: calc(108px * var(--pw-s))
+            repeat(var(--pw-tage, 15), var(--pw-spalte)); }
+.pw-zeile--kopf { grid-template-columns: calc(108px * var(--pw-s))
+                  repeat(var(--pw-tage, 15), var(--pw-spalte)); }
+.pw-zeile--kw { grid-template-columns: calc(108px * var(--pw-s))
+                repeat(var(--pw-tage, 15), var(--pw-spalte)); }
+.pw-zeile--kopf > div:not(.pw-name) { display: block; }
+.pw-spuren { grid-template-columns: repeat(var(--pw-tage, 15), var(--pw-spalte)); }
+.pw-balken-schicht { grid-template-columns: repeat(var(--pw-tage, 15), var(--pw-spalte)); }
+.pw-kw-spuren { grid-template-columns: repeat(var(--pw-tage, 15), var(--pw-spalte)); }
+
+/* Alles einzeilig, nichts bricht um */
+.pw-name, .pw-park, .pw-tag, .pw-kw, .pw-balken, .pw-ferien,
+.fest__nr, .fest__auftrag, .pw-balken__nr {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pw-name { display: flex; flex-direction: column; justify-content: center; }
+
+/* ---------- Heutiger Tag als roter Strich ---------- */
+.pw-tafel { position: relative; }
+.pw-heutelinie { position: absolute; top: 0; bottom: 0; width: 2px;
+                 background: var(--gefahr); pointer-events: none; z-index: 3;
+                 left: calc(108px * var(--pw-s) + var(--heute) * var(--pw-spalte)
+                       + var(--pw-spalte) / 2); }
+.mkarte__nrneben { font-size: .78rem; font-weight: 400; color: var(--gedaempft); }
+
+/* ---------- Planwand: alles einzeilig ---------- */
+.pw-name, .pw-park, .pw-tag, .pw-kw { white-space: nowrap; overflow: hidden;
+                                      text-overflow: ellipsis; }
+.pw-name span, .fest__nr, .fest__auftrag { white-space: nowrap; }
+.pw-tag__wt, .pw-tag__datum { display: inline; }
+.pw-tag { line-height: 1.25; }
+
+/* ---------- Timeout Area, weitere Spiele ---------- */
+.spass-ampel { height: 180px; display: grid; place-items: center; border-radius: var(--radius);
+               background: var(--stahl); color: #fff; font-size: 1.4rem; font-weight: 650;
+               cursor: pointer; margin: 16px 0; user-select: none; }
+.spass-ampel--rot { background: #7d1a15; }
+.spass-ampel--gruen { background: #1f7a4d; }
+.spass-handrad { display: block; margin: 20px auto; width: 150px; height: 150px;
+                 border-radius: 50%; border: 4px solid var(--marke); background: var(--flaeche);
+                 font-size: 3.4rem; cursor: pointer; transition: transform .06s; }
+.spass-huhn--gross { transition: none; }
+.spass-stapel { position: relative; height: 300px; background: #eef2f7;
+                border: 1px solid var(--linie); border-radius: var(--radius);
+                overflow: hidden; margin: 16px 0; }
+.spass-stapel__wagen { position: absolute; top: 6px; font-size: 1.8rem; }
+.spass-stapel__turm { position: absolute; inset: 0; }
+.spass-stapel__ei { position: absolute; font-size: 1.5rem; }
+.spass-salat { font-size: 1.6rem; font-weight: 700; letter-spacing: .2em; }
 </style>
 </head>
 <body>
@@ -1305,7 +1358,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "12.6.0";
+const APP_VERSION = "14.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -2247,6 +2300,21 @@ function kalenderwoche(text) {
   return 1 + Math.round((ziel - ersterDo) / (7 * 86400000));
 }
 
+function datumMitJahr(text) {
+  if (!text) return "";
+  const d = ausIso(text);
+  return String(d.getDate()).padStart(2, "0") + "."
+    + String(d.getMonth() + 1).padStart(2, "0") + "." + d.getFullYear();
+}
+
+// Datum mit Jahr, z. B. 04.09.2026
+function langDatum(text) {
+  if (!text) return "";
+  const d = ausIso(text);
+  const p2 = (n) => String(n).padStart(2, "0");
+  return p2(d.getDate()) + "." + p2(d.getMonth() + 1) + "." + d.getFullYear();
+}
+
 function kurzDatum(text) {
   const d = ausIso(text);
   return String(d.getDate()).padStart(2, "0") + "." + String(d.getMonth() + 1).padStart(2, "0") + ".";
@@ -2523,6 +2591,8 @@ function tagesRaster(maschinen, datum, staende) {
     const e = staende.proSchluessel[m.id + "|" + datum];
     return '<div class="mkarte">'
       + '<div class="mkarte__kopf"><div class="mkarte__name">' + esc(m.name)
+      + (m.machine_number ? ' <span class="mkarte__nrneben">'
+          + esc(m.machine_number) + '</span>' : "")
       + (m.machine_number ? '<span class="mkarte__nr">' + esc(m.machine_number) + '</span>' : "")
       + '</div></div>'
       + auftragsZeile(m)
@@ -2719,6 +2789,8 @@ const plan = {
   ferien: [],
   suche: "",
   skala: 1,
+  spalte: 0,
+  spalte: 0,
   zoom: null,
 };
 
@@ -2826,13 +2898,16 @@ async function seitePlanwand(b) {
   b.classList.add("inhalt--breit");
 
   // So viele Arbeitstage, wie nebeneinander Platz haben.
-  if (!plan.zoom) plan.zoom = Number(einstellungWert("pwzoom", 1)) || 1;
-  const platz = Math.max(320, b.clientWidth || window.innerWidth) - 108;
-  const spalte = 40 / plan.zoom;
-  plan.tage = Math.max(6, Math.min(60, Math.floor(platz / spalte)));
+  // plan.spalte ist die Breite einer Tagesspalte in Pixeln.
+  // Der Zoom ändert genau diesen Wert, alles andere richtet sich danach.
+  if (!plan.spalte) plan.spalte = Number(einstellungWert("pwspalte", 40)) || 40;
 
-  // Je mehr Tage nebeneinander, desto kleiner alles andere.
-  plan.skala = Math.max(0.55, Math.min(1.2, 1 / plan.zoom));
+  plan.skala = Math.max(0.55, Math.min(1.15, plan.spalte / 40));
+  const namensbreite = Math.round(108 * plan.skala);
+  const platz = Math.max(280, b.clientWidth || window.innerWidth) - namensbreite - 4;
+
+  // So viele Tage, wie bei dieser Spaltenbreite genau hineinpassen
+  plan.tage = Math.max(5, Math.min(80, Math.floor(platz / plan.spalte)));
 
   b.innerHTML = '<h1 class="seitentitel">Planwand</h1>'
     + '<div id="pw-seite"><div class="laedt">Wird geladen …</div></div>';
@@ -2871,6 +2946,7 @@ async function ansichtPlanwand(ziel, b) {
           + '<button class="knopf knopf--haupt" id="pw-neu">+ Auftrag einplanen</button>'
           + '<button class="knopf" id="pw-ferien">+ Ferien eintragen</button>'
           + '<button class="knopf knopf--warnung" id="pw-problem">Problem melden</button>'
+          + '<button class="knopf" id="pw-kopieren">Auftrag kopieren</button>'
           + '</div>'
         : nurLesenHinweis("Du kannst die Planung ansehen. Ändern dürfen Planer und Administratoren."))
     + '<div id="pw-inhalt"><div class="laedt">Planung wird geladen …</div></div>';
@@ -2880,13 +2956,13 @@ async function ansichtPlanwand(ziel, b) {
   document.getElementById("pw-vor").onclick = () => {
     plan.start = naechsterArbeitstag(plusTage(plan.start, 7)); seitePlanwand(b); };
   document.getElementById("pw-rein").onclick = () => {
-    plan.zoom = Math.max(0.55, (plan.zoom || 1) - 0.15);
-    einstellungSetzenWert("pwzoom", plan.zoom);
+    plan.spalte = Math.min(80, plan.spalte + 8);
+    einstellungSetzenWert("pwspalte", plan.spalte);
     seitePlanwand(b);
   };
   document.getElementById("pw-raus").onclick = () => {
-    plan.zoom = Math.min(2.2, (plan.zoom || 1) + 0.2);
-    einstellungSetzenWert("pwzoom", plan.zoom);
+    plan.spalte = Math.max(18, plan.spalte - 6);
+    einstellungSetzenWert("pwspalte", plan.spalte);
     seitePlanwand(b);
   };
 
@@ -2901,6 +2977,9 @@ async function ansichtPlanwand(ziel, b) {
 
   const prob = document.getElementById("pw-problem");
   if (prob) prob.onclick = () => problemMelden(b);
+
+  const kop = document.getElementById("pw-kopieren");
+  if (kop) kop.onclick = () => auftragKopieren(b);
 
   const zoomAnzeige = document.getElementById("pw-zoomwert");
   if (zoomAnzeige) zoomAnzeige.textContent = plan.tage + " Tage";
@@ -2931,6 +3010,9 @@ async function ansichtPlanwand(ziel, b) {
 function zeichnePlanwand(b) {
   const tage = arbeitstage(plan.start, plan.tage);
   plan.sichtbareTage = tage;
+
+  // Wo steht der heutige Tag in der sichtbaren Reihe?
+  const heuteSpalte = tage.indexOf(isoDatum(new Date()));
   const heute = isoDatum(new Date());
 
   document.getElementById("pw-titel").textContent =
@@ -3034,8 +3116,12 @@ function zeichnePlanwand(b) {
       }).join("");
 
   document.getElementById("pw-inhalt").innerHTML =
-    '<div class="pw-rolle"><div class="pw-tafel" style="--pw-tage:' + plan.tage + '">'
-    + kwZeile + kopf + zeilen + ferienZeilen + '</div></div>'
+    '<div class="pw-rolle"><div class="pw-tafel" style="--pw-tage:' + plan.tage
+    + ';--pw-s:' + (plan.skala || 1) + ';--pw-spalte:' + (plan.spalte || 40) + 'px">'
+    + kwZeile + kopf + zeilen + ferienZeilen
+    + (heuteSpalte >= 0
+        ? '<div class="pw-heutelinie" style="--heute:' + heuteSpalte + '"></div>' : "")
+    + '</div></div>'
     + '<div class="pw-legende">'
     + Object.keys(PLANSTATUS).map((k) => '<span>' + PLANSTATUS[k].zeichen + ' '
         + PLANSTATUS[k].name + '</span>').join("")
@@ -3339,7 +3425,7 @@ function griffVerhalten(b) {
       startX = e.clientX;
 
       const spuren = balken.closest(".pw-spuren");
-      spaltenBreite = spuren ? spuren.clientWidth / plan.tage : 40;
+      spaltenBreite = plan.spalte || 40;
 
       vonStart = Number(balken.dataset.von) || 0;
       dauerStart = Number(balken.dataset.dauer) || 1;
@@ -3437,7 +3523,7 @@ function ferienGriffe(b) {
       aktiv = true;
       startX = e.clientX;
       const spuren = balken.closest(".pw-spuren");
-      breite = spuren ? spuren.clientWidth / plan.tage : 40;
+      breite = plan.spalte || 40;
       vonStart = Number(balken.dataset.von) || 0;
       dauerStart = Number(balken.dataset.dauer) || 1;
       vonJetzt = vonStart; dauerJetzt = dauerStart;
@@ -3620,6 +3706,74 @@ const PROBLEM_ARTEN = [
   "Maschine defekt",
 ];
 
+// Einen Auftrag auf eine andere Maschine kopieren
+async function auftragKopieren(b) {
+  const alle = (plan.auftraege || [])
+    .slice()
+    .sort((x, y) => (x.job_number || "").localeCompare(y.job_number || ""));
+
+  if (!alle.length) {
+    await nachfragen({ titel: "Nichts zu kopieren",
+      text: "Es ist noch kein Auftrag eingeplant.", bestaetigen: "Verstanden" });
+    return;
+  }
+
+  const weiter = await nachfragen({
+    titel: "Auftrag kopieren",
+    text: "So geht es: Zuerst wählst du den Auftrag aus, den du übernehmen willst. "
+        + "Danach wählst du die Maschine. Die Kopie wird automatisch hinter den letzten "
+        + "Auftrag dieser Maschine gehängt. Nummer, Menge, Notiz, Dauer und Farbe "
+        + "werden mitkopiert, Stückzahlen und Meldungen nicht.",
+    bestaetigen: "Verstanden, weiter" });
+  if (!weiter) return;
+
+  const wahl = await auswahlSuchen("Welchen Auftrag kopieren?",
+    alle.map((j) => ({
+      wert: j.id,
+      text: j.job_number + "   " + j.maschine
+        + (j.target_quantity ? "   " + zahlText(j.target_quantity) + " Stück" : ""),
+      such: (j.job_number || "") + " " + (j.maschine || ""),
+    })));
+  if (!wahl) return;
+
+  const vorlage = alle.find((j) => j.id === wahl);
+
+  const maschineWahl = await auswahlSuchen("Auf welche Maschine?",
+    prod.maschinen.map((m) => ({
+      wert: m.id,
+      text: m.name + (m.machine_number ? "   " + m.machine_number : ""),
+      such: (m.name || "") + " " + (m.machine_number || ""),
+    })));
+  if (!maschineWahl) return;
+
+  const start = naechsterFreierTag(maschineWahl);
+
+  const bestaetigt = await nachfragen({
+    titel: "Kopie anlegen",
+    text: vorlage.job_number + " wird auf "
+        + ((prod.maschinen.find((m) => m.id === maschineWahl) || {}).name || "")
+        + " kopiert und beginnt am " + kurzDatum(start) + ".",
+    bestaetigen: "Kopie anlegen" });
+  if (!bestaetigt) return;
+
+  const { error } = await db.from("jobs").insert({
+    machine_id: maschineWahl,
+    job_number: vorlage.job_number,
+    target_quantity: vorlage.target_quantity,
+    planned_from: start,
+    planned_days: vorlage.planned_days || 1,
+    plan_note: vorlage.plan_note,
+    drawing_url: vorlage.drawing_url,
+    color: vorlage.color,
+    plan_status: "geplant",
+    fa_erstellt: vorlage.fa_erstellt,
+    material_ok: vorlage.material_ok,
+  });
+
+  if (error) meldung(fehlertext(error), "fehler");
+  else { meldung("Kopie angelegt."); seitePlanwand(b); }
+}
+
 async function problemMelden(b) {
   // Nur Aufträge, die noch nicht fertig sind
   const offen = (plan.auftraege || [])
@@ -3632,7 +3786,7 @@ async function problemMelden(b) {
     return;
   }
 
-  const wahl = await auswahlDialog("Bei welchem Auftrag?",
+  const wahl = await auswahlSuchen("Bei welchem Auftrag?",
     offen.map((j) => ({
       wert: j.id,
       text: j.job_number + (j.problem ? "   ⚠ hat schon eine Meldung" : ""),
@@ -4746,7 +4900,8 @@ async function ladeBestellungen(offen) {
     .order("needed_by", { ascending: true, nullsFirst: false })
     .order("created_at");
   if (offen) a = a.in("status", OFFENE_STATUS);
-  else a = a.limit(100).order("created_at", { ascending: false });
+  else a = a.eq("status", "geliefert").limit(200)
+             .order("created_at", { ascending: false });
 
   const { data, error } = await zeitlimit(a, 12000, "Bestellungen");
   if (error) throw error;
@@ -5017,6 +5172,42 @@ async function artikelSchnellAnlegen(vorgabe) {
 }
 
 // Einfache Auswahl aus einer Liste. Gibt den gewählten Wert zurück.
+// Auswahl mit Suchfeld, für lange Listen
+function auswahlSuchen(titel, optionen) {
+  return new Promise((fertig) => {
+    const h = document.createElement("div");
+    h.className = "dialog-huelle";
+    h.innerHTML = '<div class="dialog"><h2>' + esc(titel) + '</h2>'
+      + '<div class="suchleiste"><input type="search" id="as-suche"'
+      + ' placeholder="Suchen" autocomplete="off"></div>'
+      + '<div class="statuswahl" id="as-liste"></div>'
+      + '<div class="dialog__knoepfe">'
+      + '<button class="knopf knopf--still" data-nein>Abbrechen</button></div></div>';
+    document.body.appendChild(h);
+
+    const zu = (v) => { h.remove(); fertig(v); };
+    h.querySelector("[data-nein]").onclick = () => zu(null);
+    h.onclick = (e) => { if (e.target === h) zu(null); };
+
+    const liste = h.querySelector("#as-liste");
+    const feld = h.querySelector("#as-suche");
+
+    const zeichnen = () => {
+      const t = (feld.value || "").trim().toLowerCase();
+      const treffer = optionen.filter((o) => !t || o.text.toLowerCase().includes(t));
+      liste.innerHTML = treffer.length
+        ? treffer.slice(0, 40).map((o) => '<button class="knopf" data-w="' + esc(o.wert)
+            + '">' + esc(o.text) + '</button>').join("")
+        : '<p class="hinweis">Nichts gefunden.</p>';
+      liste.querySelectorAll("[data-w]").forEach((k) => { k.onclick = () => zu(k.dataset.w); });
+    };
+
+    feld.oninput = zeichnen;
+    zeichnen();
+    feld.focus();
+  });
+}
+
 function auswahlDialog(titel, optionen) {
   return new Promise((fertig) => {
     const h = document.createElement("div");
@@ -5150,21 +5341,28 @@ async function bestHistorie(ziel, b) {
     return;
   }
 
-  ziel.innerHTML = '<section class="karte"><h2>Letzte 100 Positionen</h2>'
-    + (liste.length
-      ? '<table class="tabelle"><thead><tr><th>Datum</th><th>Artikel</th>'
-        + '<th class="mitte">Menge</th><th>Status</th></tr></thead><tbody>'
-        + liste.map((z) => {
+  // Nur abgeschlossene Positionen, offene stehen im Reiter Offen
+  const fertige = (liste || []).filter((z) => z.status === "geliefert");
+
+  ziel.innerHTML = '<section class="karte">'
+    + '<h2>Abgeschlossene Bestellungen'
+    + (fertige.length ? ' <span class="marke">' + fertige.length + '</span>' : "") + '</h2>'
+    + (fertige.length
+      ? '<table class="tabelle"><thead><tr><th>Geliefert</th><th>Artikel</th>'
+        + '<th class="mitte">Menge</th><th>Wer</th></tr></thead><tbody>'
+        + fertige.map((z) => {
             const a = z.articles || {};
-            return '<tr><td class="klein">' + esc(kurzDatum(z.created_at.slice(0, 10))) + '</td>'
+            const wann = (z.delivered_at || z.completed_at || z.created_at || "").slice(0, 10);
+            return '<tr><td class="klein">' + esc(langDatum(wann)) + '</td>'
               + '<td><strong>' + esc(a.article_number || "?") + '</strong> ' + esc(a.name || "")
               + '<div class="klein">' + esc((z.suppliers && z.suppliers.name) || "") + '</div></td>'
               + '<td class="mitte stark">' + zahlText(z.quantity) + '</td>'
-              + '<td><span class="statuschip statuschip--' + esc(z.status) + '">'
-              + esc(BESTELLSTATUS[z.status] || z.status) + '</span></td></tr>';
+              + '<td class="klein">'
+              + esc((z.profiles && (z.profiles.full_name || z.profiles.email)) || "–")
+              + '</td></tr>';
           }).join("")
         + '</tbody></table>'
-      : '<p class="hinweis">Noch keine Bestellungen erfasst.</p>')
+      : '<p class="hinweis">Noch nichts abgeschlossen.</p>')
     + '</section>';
 }
 
@@ -5665,6 +5863,7 @@ function spielStand(name) {
       document.getElementById("sp-best").textContent = spass.bestwerte[name] || 0;
     },
     rekordPruefen() {
+      ergebnisSpeichern(name, s.punkte);
       if (s.punkte > (spass.bestwerte[name] || 0)) {
         spass.bestwerte[name] = s.punkte;
         s.rekordZeigen();
@@ -6313,10 +6512,637 @@ function spielZaehlen(b) {
 //  Die Seite selbst
 // =================================================================
 
+// =================================================================
+//  11. Reaktion: grünes Licht
+// =================================================================
+function spielReaktion(b) {
+  b.innerHTML = spielRahmen("Grünlicht",
+    "Warte, bis das Feld grün wird, und tipp dann so schnell wie möglich. "
+    + "Zu früh gedrückt zählt als Fehlstart.",
+    '<div class="spass-ampel" id="sp-ampel">Warten …</div>', "Starten");
+
+  const st = spielStand("reaktion");
+  st.rekordZeigen();
+  const feld = document.getElementById("sp-ampel");
+  let bereit = false, start = 0, warte = null, runden = 0, summe = 0;
+
+  const neueRunde = () => {
+    bereit = false;
+    feld.className = "spass-ampel spass-ampel--rot";
+    feld.textContent = "Noch nicht …";
+    warte = setTimeout(() => {
+      bereit = true;
+      start = Date.now();
+      feld.className = "spass-ampel spass-ampel--gruen";
+      feld.textContent = "JETZT";
+    }, 900 + zufall(2600));
+  };
+
+  feld.onclick = () => {
+    if (!st.laeuft) return;
+    if (!bereit) {
+      clearTimeout(warte);
+      st.setzeFehler(st.fehler + 1);
+      st.sag("Fehlstart. Nerven behalten.");
+      if (st.fehler >= 3) {
+        st.laeuft = false; st.knopf("Nochmal");
+        feld.className = "spass-ampel"; feld.textContent = "Vorbei";
+        return;
+      }
+      neueRunde();
+      return;
+    }
+    const zeit = Date.now() - start;
+    runden++; summe += zeit;
+    const schnitt = Math.round(summe / runden);
+    st.setzePunkte(Math.max(1, Math.round(30000 / schnitt)));
+    st.sag(zeit + " ms, Schnitt " + schnitt + " ms." + (st.rekordPruefen() ? " Rekord!" : ""));
+    neueRunde();
+  };
+
+  document.getElementById("sp-knopf").onclick = () => {
+    st.laeuft = true; st.setzePunkte(0); st.setzeFehler(0);
+    runden = 0; summe = 0;
+    st.knopf("Neu"); st.sag("Achtung.");
+    neueRunde();
+  };
+}
+
+// =================================================================
+//  12. Gewinde raten
+// =================================================================
+function spielGewinde(b) {
+  const TABELLE = [
+    ["M3", 2.5], ["M4", 3.3], ["M5", 4.2], ["M6", 5.0], ["M8", 6.8],
+    ["M10", 8.5], ["M12", 10.2], ["M16", 14.0], ["M20", 17.5],
+  ];
+
+  b.innerHTML = spielRahmen("Kernloch raten",
+    "Welcher Bohrer gehört zum Gewinde? Drei Fehler und Schluss.",
+    '<div class="spass-frage" id="sp-frage"></div>'
+    + '<div class="spass-antworten" id="sp-antworten"></div>', "Starten");
+
+  const st = spielStand("gewinde");
+  st.rekordZeigen();
+
+  const neueFrage = () => {
+    const eintrag = auswahlZufall(TABELLE);
+    const richtig = eintrag[1];
+    const wahl = [richtig];
+    while (wahl.length < 4) {
+      const f = TABELLE[zufall(TABELLE.length)][1];
+      if (!wahl.includes(f)) wahl.push(f);
+    }
+    wahl.sort(() => Math.random() - 0.5);
+
+    document.getElementById("sp-frage").innerHTML =
+      'Gewinde <strong>' + eintrag[0] + '</strong> — welcher Kernlochbohrer?';
+    document.getElementById("sp-antworten").innerHTML = wahl.map((z) =>
+      '<button class="knopf" data-z="' + z + '">' + z.toFixed(1) + ' mm</button>').join("");
+
+    document.querySelectorAll("[data-z]").forEach((k) => {
+      k.onclick = () => {
+        if (!st.laeuft) return;
+        if (Number(k.dataset.z) === richtig) {
+          st.setzePunkte(st.punkte + 1);
+          st.sag(auswahlZufall(["Sitzt.", "Genau der.", "Auswendig gelernt."]));
+        } else {
+          st.setzeFehler(st.fehler + 1);
+          st.sag("Nein, " + richtig.toFixed(1) + " mm wären richtig.");
+          if (st.fehler >= 3) {
+            st.laeuft = false; st.knopf("Nochmal");
+            st.sag("Schluss. " + st.punkte + " richtig."
+              + (st.rekordPruefen() ? " Rekord!" : ""));
+            return;
+          }
+        }
+        neueFrage();
+      };
+    });
+  };
+
+  document.getElementById("sp-knopf").onclick = () => {
+    st.laeuft = true; st.setzePunkte(0); st.setzeFehler(0);
+    st.knopf("Neu"); st.sag("Los.");
+    neueFrage();
+  };
+}
+
+// =================================================================
+//  13. Schneller klicken
+// =================================================================
+function spielKlicken(b) {
+  b.innerHTML = spielRahmen("Handrad kurbeln",
+    "Zehn Sekunden lang so schnell wie möglich auf das Handrad tippen.",
+    '<button class="spass-handrad" id="sp-rad">⚙️</button>', "Starten");
+
+  const st = spielStand("klicken");
+  st.rekordZeigen();
+  const rad = document.getElementById("sp-rad");
+  let uhr = null, sekunden = 10, dreh = 0;
+
+  rad.onclick = () => {
+    if (!st.laeuft) return;
+    st.setzePunkte(st.punkte + 1);
+    dreh += 24;
+    rad.style.transform = "rotate(" + dreh + "deg)";
+  };
+
+  document.getElementById("sp-knopf").onclick = () => {
+    if (st.laeuft) return;
+    st.laeuft = true; st.setzePunkte(0); st.setzeFehler(0);
+    sekunden = 10; dreh = 0;
+    st.knopf("Läuft"); st.sag("Zehn Sekunden!");
+    uhr = setInterval(() => {
+      sekunden--;
+      st.sag("Noch " + sekunden + " Sekunden.");
+      if (sekunden <= 0) {
+        clearInterval(uhr);
+        st.laeuft = false; st.knopf("Nochmal");
+        st.sag(st.punkte + " Umdrehungen." + (st.rekordPruefen() ? " Rekord!" : ""));
+      }
+    }, 1000);
+  };
+}
+
+// =================================================================
+//  14. Werkstoff zuordnen
+// =================================================================
+function spielWerkstoff(b) {
+  b.innerHTML = spielRahmen("Welcher Werkstoff?",
+    "Zu welchem Werkstoff passt diese Schnittgeschwindigkeit mit Hartmetall?",
+    '<div class="spass-frage" id="sp-frage"></div>'
+    + '<div class="spass-antworten" id="sp-antworten"></div>', "Starten");
+
+  const st = spielStand("werkstoff");
+  st.rekordZeigen();
+
+  const neueFrage = () => {
+    const richtig = auswahlZufall(WERKSTOFFE);
+    const wahl = [richtig];
+    while (wahl.length < 4) {
+      const f = auswahlZufall(WERKSTOFFE);
+      if (!wahl.includes(f)) wahl.push(f);
+    }
+    wahl.sort(() => Math.random() - 0.5);
+
+    document.getElementById("sp-frage").innerHTML =
+      'Vc ≈ <strong>' + richtig.hm + '</strong> m/min mit Hartmetall';
+    document.getElementById("sp-antworten").innerHTML = wahl.map((w) =>
+      '<button class="knopf" data-w="' + esc(w.name) + '">' + esc(w.name) + '</button>').join("");
+
+    document.querySelectorAll("[data-w]").forEach((k) => {
+      k.onclick = () => {
+        if (!st.laeuft) return;
+        if (k.dataset.w === richtig.name) {
+          st.setzePunkte(st.punkte + 1);
+          st.sag(auswahlZufall(["Richtig.", "Der Mann kennt sein Material."]));
+        } else {
+          st.setzeFehler(st.fehler + 1);
+          st.sag("Das war " + richtig.name + ".");
+          if (st.fehler >= 3) {
+            st.laeuft = false; st.knopf("Nochmal");
+            st.sag("Schluss. " + st.punkte + " richtig."
+              + (st.rekordPruefen() ? " Rekord!" : ""));
+            return;
+          }
+        }
+        neueFrage();
+      };
+    });
+  };
+
+  document.getElementById("sp-knopf").onclick = () => {
+    st.laeuft = true; st.setzePunkte(0); st.setzeFehler(0);
+    st.knopf("Neu"); st.sag("Los.");
+    neueFrage();
+  };
+}
+
+// =================================================================
+//  15. Späne ausweichen
+// =================================================================
+function spielAusweichen(b) {
+  b.innerHTML = spielRahmen("Späne ausweichen",
+    "Steuer das Werkstück mit dem Finger oder der Maus. Weich den Spänen aus, "
+    + "so lange du kannst.",
+    '<div class="spass-feld" id="sp-feld">'
+    + '<div class="spass-korb" id="sp-held">🔩</div></div>', "Loslegen");
+
+  const st = spielStand("ausweichen");
+  st.rekordZeigen();
+  const feld = document.getElementById("sp-feld");
+  const held = document.getElementById("sp-held");
+  let x = 50, takt = null, spawn = null, uhr = null, teile = [], tempo = 1.4;
+
+  const setze = (v) => { x = Math.max(4, Math.min(96, v)); held.style.left = x + "%"; };
+  setze(50);
+
+  const ende = () => {
+    clearInterval(takt); clearInterval(spawn); clearInterval(uhr);
+    teile.forEach((t) => t.el.remove()); teile = [];
+    st.laeuft = false; st.knopf("Nochmal");
+    st.sag("Erwischt. " + st.punkte + " Sekunden durchgehalten."
+      + (st.rekordPruefen() ? " Rekord!" : ""));
+  };
+
+  const schritt = () => {
+    teile.forEach((t) => {
+      t.y += tempo;
+      t.el.style.top = t.y + "%";
+      if (t.y >= 80 && t.y <= 92 && Math.abs(t.x - x) < 8) { t.getroffen = true; }
+      if (t.y > 100) t.weg = true;
+    });
+    if (teile.some((t) => t.getroffen)) return ende();
+    teile.filter((t) => t.weg).forEach((t) => t.el.remove());
+    teile = teile.filter((t) => !t.weg);
+    tempo = Math.min(4, tempo + 0.003);
+  };
+
+  const neuesTeil = () => {
+    const el = document.createElement("div");
+    el.className = "spass-ei";
+    el.textContent = "🌀";
+    const px = 4 + zufall(92);
+    el.style.left = px + "%"; el.style.top = "0%";
+    feld.appendChild(el);
+    teile.push({ el: el, x: px, y: 0 });
+  };
+
+  feld.onpointermove = (e) => {
+    if (!st.laeuft) return;
+    const r = feld.getBoundingClientRect();
+    setze((e.clientX - r.left) / r.width * 100);
+  };
+
+  document.getElementById("sp-knopf").onclick = () => {
+    if (st.laeuft) return ende();
+    st.laeuft = true; st.setzePunkte(0); st.setzeFehler(0);
+    tempo = 1.4; teile = [];
+    feld.querySelectorAll(".spass-ei").forEach((e) => e.remove());
+    st.knopf("Abbrechen"); st.sag("Ausweichen!");
+    takt = setInterval(schritt, 24);
+    spawn = setInterval(neuesTeil, 520);
+    uhr = setInterval(() => st.setzePunkte(st.punkte + 1), 1000);
+  };
+}
+
+// =================================================================
+//  16. Hühner sortieren
+// =================================================================
+function spielSortieren(b) {
+  b.innerHTML = spielRahmen("Hühner nach Grösse",
+    "Tipp die Hühner von klein nach gross an. Ein Fehler und die Runde ist futsch.",
+    '<div class="spass-wiese" id="sp-wiese"></div>', "Starten");
+
+  const st = spielStand("sortieren");
+  st.rekordZeigen();
+  const wiese = document.getElementById("sp-wiese");
+  let runde = 0;
+
+  const neueRunde = () => {
+    runde++;
+    const anzahl = Math.min(8, 3 + Math.floor(runde / 2));
+    const groessen = [];
+    while (groessen.length < anzahl) {
+      const g = 1 + zufall(28);
+      if (!groessen.includes(g)) groessen.push(g);
+    }
+    const sortiert = groessen.slice().sort((a, c) => a - c);
+    let naechste = 0;
+
+    wiese.innerHTML = groessen.map((g, i) =>
+      '<button class="spass-huhn spass-huhn--gross" data-g="' + g + '"'
+      + ' style="left:' + (4 + i * (88 / anzahl)) + '%;top:' + (20 + zufall(40))
+      + '%;font-size:' + (1.1 + g / 14) + 'rem">🐔</button>').join("");
+
+    wiese.querySelectorAll("[data-g]").forEach((h) => {
+      h.onclick = () => {
+        if (!st.laeuft) return;
+        if (Number(h.dataset.g) !== sortiert[naechste]) {
+          st.setzeFehler(st.fehler + 1);
+          st.sag("Das war nicht das kleinste.");
+          if (st.fehler >= 3) {
+            st.laeuft = false; st.knopf("Nochmal"); wiese.innerHTML = "";
+            st.sag("Schluss. " + st.punkte + " Runden."
+              + (st.rekordPruefen() ? " Rekord!" : ""));
+            return;
+          }
+          neueRunde();
+          return;
+        }
+        h.remove();
+        naechste++;
+        if (naechste >= anzahl) {
+          st.setzePunkte(st.punkte + 1);
+          st.sag(auswahlZufall(["Sauber sortiert.", "Alle im Stall."]));
+          setTimeout(neueRunde, 500);
+        }
+      };
+    });
+  };
+
+  document.getElementById("sp-knopf").onclick = () => {
+    st.laeuft = true; st.setzePunkte(0); st.setzeFehler(0);
+    runde = 0; st.knopf("Neu"); st.sag("Von klein nach gross.");
+    neueRunde();
+  };
+}
+
+// =================================================================
+//  17. Toleranz schätzen
+// =================================================================
+function spielToleranz(b) {
+  b.innerHTML = spielRahmen("Im Toleranzfeld?",
+    "Sollmass mit Toleranz, daneben das gemessene Mass. Gut oder Ausschuss?",
+    '<div class="spass-frage" id="sp-frage"></div>'
+    + '<div class="spass-antworten">'
+    + '<button class="knopf knopf--haupt" data-gut>Gutteil</button>'
+    + '<button class="knopf knopf--gefahr" data-schlecht>Ausschuss</button></div>', "Starten");
+
+  const st = spielStand("toleranz");
+  st.rekordZeigen();
+  let istGut = false;
+
+  const neueFrage = () => {
+    const soll = 10 + zufall(80);
+    const tol = auswahlZufall([0.02, 0.05, 0.1, 0.2]);
+    const abweichung = (Math.random() * 2 - 1) * tol * 2;
+    const gemessen = soll + abweichung;
+    istGut = Math.abs(abweichung) <= tol;
+
+    document.getElementById("sp-frage").innerHTML =
+      'Soll <strong>' + soll.toFixed(2) + '</strong> ± ' + tol.toFixed(2) + ' mm<br>'
+      + 'Gemessen <strong>' + gemessen.toFixed(3) + '</strong> mm';
+  };
+
+  const pruefen = (antwort) => {
+    if (!st.laeuft) return;
+    if (antwort === istGut) {
+      st.setzePunkte(st.punkte + 1);
+      st.sag(auswahlZufall(SPRUECHE));
+    } else {
+      st.setzeFehler(st.fehler + 1);
+      st.sag(istGut ? "Das war noch im Feld." : "Das war draussen.");
+      if (st.fehler >= 3) {
+        st.laeuft = false; st.knopf("Nochmal");
+        st.sag("Schluss. " + st.punkte + " richtig." + (st.rekordPruefen() ? " Rekord!" : ""));
+        return;
+      }
+    }
+    neueFrage();
+  };
+
+  b.querySelector("[data-gut]").onclick = () => pruefen(true);
+  b.querySelector("[data-schlecht]").onclick = () => pruefen(false);
+
+  document.getElementById("sp-knopf").onclick = () => {
+    st.laeuft = true; st.setzePunkte(0); st.setzeFehler(0);
+    st.knopf("Neu"); st.sag("Messen und entscheiden.");
+    neueFrage();
+  };
+}
+
+// =================================================================
+//  18. Eier stapeln
+// =================================================================
+function spielStapeln(b) {
+  b.innerHTML = spielRahmen("Eier stapeln",
+    "Die Eierschachtel fährt hin und her. Tipp, wenn sie über dem Stapel steht. "
+    + "Je genauer, desto höher kommst du.",
+    '<div class="spass-stapel" id="sp-stapel">'
+    + '<div class="spass-stapel__wagen" id="sp-wagen">🥚</div>'
+    + '<div class="spass-stapel__turm" id="sp-turm"></div></div>', "Starten");
+
+  const st = spielStand("stapeln");
+  st.rekordZeigen();
+  const wagen = document.getElementById("sp-wagen");
+  const turm = document.getElementById("sp-turm");
+  let x = 0, richtung = 1, takt = null, ziel = 50, tempo = 1.4;
+
+  const ende = () => {
+    clearInterval(takt);
+    st.laeuft = false; st.knopf("Nochmal");
+    st.sag("Umgefallen bei " + st.punkte + " Eiern."
+      + (st.rekordPruefen() ? " Rekord!" : ""));
+  };
+
+  document.getElementById("sp-knopf").onclick = () => {
+    if (st.laeuft) {
+      const abstand = Math.abs(x - ziel);
+      if (abstand > 12) {
+        st.setzeFehler(st.fehler + 1);
+        st.sag(auswahlZufall(["Daneben, alles kippt.", "Rührei."]));
+        return ende();
+      }
+      st.setzePunkte(st.punkte + 1);
+      ziel = x;
+      const ei = document.createElement("div");
+      ei.className = "spass-stapel__ei";
+      ei.style.left = x + "%";
+      ei.style.bottom = (st.punkte * 16) + "px";
+      ei.textContent = "🥚";
+      turm.appendChild(ei);
+      tempo = Math.min(3.4, tempo + 0.15);
+      st.sag(auswahlZufall(["Sitzt.", "Weiter so.", "Ruhige Hand."]));
+      return;
+    }
+
+    st.laeuft = true; st.setzePunkte(0); st.setzeFehler(0);
+    turm.innerHTML = ""; ziel = 50; x = 0; richtung = 1; tempo = 1.4;
+    st.knopf("Ablegen"); st.sag("Timing.");
+    clearInterval(takt);
+    takt = setInterval(() => {
+      x += richtung * tempo;
+      if (x >= 92) { x = 92; richtung = -1; }
+      if (x <= 0) { x = 0; richtung = 1; }
+      wagen.style.left = x + "%";
+    }, 16);
+  };
+}
+
+// =================================================================
+//  19. Buchstabensalat
+// =================================================================
+function spielSalat(b) {
+  const WOERTER = ["DREHEN", "FRAESEN", "SPANNEN", "MESSEN", "BOHRER", "SPINDEL",
+    "SUPPORT", "REITSTOCK", "WENDEPLATTE", "TOLERANZ", "MESSING", "TITAN",
+    "SPAENE", "KUEHLUNG", "GEWINDE", "PLANDREHEN"];
+
+  b.innerHTML = spielRahmen("Buchstabensalat",
+    "Welches Werkstattwort steckt dahinter? Drei Fehler und Schluss.",
+    '<div class="spass-frage" id="sp-frage"></div>'
+    + '<div class="spass-antworten" id="sp-antworten"></div>', "Starten");
+
+  const st = spielStand("salat");
+  st.rekordZeigen();
+
+  const neueFrage = () => {
+    const richtig = auswahlZufall(WOERTER);
+    const salat = richtig.split("").sort(() => Math.random() - 0.5).join(" ");
+    const wahl = [richtig];
+    while (wahl.length < 4) {
+      const f = auswahlZufall(WOERTER);
+      if (!wahl.includes(f)) wahl.push(f);
+    }
+    wahl.sort(() => Math.random() - 0.5);
+
+    document.getElementById("sp-frage").innerHTML =
+      '<span class="spass-salat">' + esc(salat) + '</span>';
+    document.getElementById("sp-antworten").innerHTML = wahl.map((w) =>
+      '<button class="knopf" data-w="' + esc(w) + '">' + esc(w) + '</button>').join("");
+
+    document.querySelectorAll("[data-w]").forEach((k) => {
+      k.onclick = () => {
+        if (!st.laeuft) return;
+        if (k.dataset.w === richtig) {
+          st.setzePunkte(st.punkte + 1);
+          st.sag(auswahlZufall(["Erkannt.", "Genau das."]));
+        } else {
+          st.setzeFehler(st.fehler + 1);
+          st.sag("Es war " + richtig + ".");
+          if (st.fehler >= 3) {
+            st.laeuft = false; st.knopf("Nochmal");
+            st.sag("Schluss. " + st.punkte + " richtig."
+              + (st.rekordPruefen() ? " Rekord!" : ""));
+            return;
+          }
+        }
+        neueFrage();
+      };
+    });
+  };
+
+  document.getElementById("sp-knopf").onclick = () => {
+    st.laeuft = true; st.setzePunkte(0); st.setzeFehler(0);
+    st.knopf("Neu"); st.sag("Kombinieren.");
+    neueFrage();
+  };
+}
+
+// =================================================================
+//  20. Der Hühnerhof
+// =================================================================
+function spielHuehnerhof(b) {
+  b.innerHTML = spielRahmen("Der Hühnerhof",
+    "Nur die braunen Hühner gehören in den Stall. Weisse antippen gibt Abzug. "
+    + "Zwanzig Sekunden.",
+    '<div class="spass-wiese" id="sp-wiese"></div>', "Tor auf");
+
+  const st = spielStand("huehnerhof");
+  st.rekordZeigen();
+  const wiese = document.getElementById("sp-wiese");
+  let spawn = null, uhr = null, sekunden = 20;
+
+  const neuesTier = () => {
+    const braun = Math.random() < 0.65;
+    const el = document.createElement("button");
+    el.className = "spass-huhn";
+    el.textContent = braun ? "🐔" : "🕊️";
+    el.style.left = zufall(86) + "%";
+    el.style.top = zufall(74) + "%";
+    el.onclick = () => {
+      if (!st.laeuft) return;
+      if (braun) {
+        st.setzePunkte(st.punkte + 1);
+        st.sag(auswahlZufall(["Rein damit.", "Eins mehr.", "Gutes Huhn."]));
+      } else {
+        st.setzeFehler(st.fehler + 1);
+        st.setzePunkte(Math.max(0, st.punkte - 2));
+        st.sag("Das war eine Taube. Minus zwei.");
+      }
+      el.remove();
+    };
+    wiese.appendChild(el);
+    setTimeout(() => el.remove(), 1500);
+  };
+
+  const ende = () => {
+    clearInterval(spawn); clearInterval(uhr);
+    wiese.innerHTML = "";
+    st.laeuft = false; st.knopf("Nochmal");
+    st.sag("Feierabend im Stall. " + st.punkte + " Punkte."
+      + (st.rekordPruefen() ? " Rekord!" : ""));
+  };
+
+  document.getElementById("sp-knopf").onclick = () => {
+    if (st.laeuft) return ende();
+    st.laeuft = true; st.setzePunkte(0); st.setzeFehler(0);
+    sekunden = 20; wiese.innerHTML = "";
+    st.knopf("Abbrechen"); st.sag("Noch 20 Sekunden.");
+    spawn = setInterval(neuesTier, 400);
+    uhr = setInterval(() => {
+      sekunden--;
+      st.sag("Noch " + sekunden + " Sekunden.");
+      if (sekunden <= 0) ende();
+    }, 1000);
+  };
+}
+
 const SPIELE = [
-  spielStoerung, spielMass, spielHuehner, spielEier, spielMemory,
-  spielZahlen, spielDrehzahl, spielFolge, spielSpaene, spielZaehlen,
+  { fn: spielStoerung,   name: "stoerung",   titel: "Störung an der Linie" },
+  { fn: spielMass,       name: "mass",       titel: "Auf Mass drehen" },
+  { fn: spielHuehner,    name: "huehner",    titel: "Hühner einfangen" },
+  { fn: spielEier,       name: "eier",       titel: "Eier fangen" },
+  { fn: spielMemory,     name: "memory",     titel: "Werkzeug-Memory" },
+  { fn: spielZahlen,     name: "zahlen",     titel: "Zahlen der Reihe nach" },
+  { fn: spielDrehzahl,   name: "drehzahl",   titel: "Drehzahl schätzen" },
+  { fn: spielFolge,      name: "folge",      titel: "Lampenfolge merken" },
+  { fn: spielSpaene,     name: "spaene",     titel: "Späne kehren" },
+  { fn: spielZaehlen,    name: "zaehlen",    titel: "Hühner zählen" },
+  { fn: spielReaktion,   name: "reaktion",   titel: "Grünlicht" },
+  { fn: spielGewinde,    name: "gewinde",    titel: "Kernloch raten" },
+  { fn: spielKlicken,    name: "klicken",    titel: "Handrad kurbeln" },
+  { fn: spielWerkstoff,  name: "werkstoff",  titel: "Welcher Werkstoff?" },
+  { fn: spielAusweichen, name: "ausweichen", titel: "Späne ausweichen" },
+  { fn: spielSortieren,  name: "sortieren",  titel: "Hühner nach Grösse" },
+  { fn: spielToleranz,   name: "toleranz",   titel: "Im Toleranzfeld?" },
+  { fn: spielStapeln,    name: "stapeln",    titel: "Eier stapeln" },
+  { fn: spielSalat,      name: "salat",      titel: "Buchstabensalat" },
+  { fn: spielHuehnerhof, name: "huehnerhof", titel: "Der Hühnerhof" },
 ];
+
+// Top fünf je Spiel, gespeichert in der Datenbank
+async function bestenlisteZeigen() {
+  const ziel = document.getElementById("sp-bestenliste");
+  if (!ziel || !spass.aktuell) return;
+
+  ziel.innerHTML = '<div class="laedt">Bestenliste …</div>';
+  try {
+    const { data, error } = await zeitlimit(
+      db.from("game_scores").select("*").eq("spiel", spass.aktuell.name)
+        .order("punkte", { ascending: false }).limit(5), 8000, "Bestenliste");
+    if (error) throw error;
+
+    const liste = data || [];
+    ziel.innerHTML = '<h3 class="untertitel">Top 5 · ' + esc(spass.aktuell.titel) + '</h3>'
+      + (liste.length
+        ? '<table class="tabelle"><tbody>' + liste.map((z, i) =>
+            '<tr><td class="stark">' + (i + 1) + '.</td>'
+            + '<td>' + esc(z.person) + '</td>'
+            + '<td class="rechts stark">' + zahlText(z.punkte) + '</td></tr>').join("")
+          + '</tbody></table>'
+        : '<p class="hinweis">Noch keine Ergebnisse. Sei der Erste.</p>');
+  } catch (f) {
+    ziel.innerHTML = '<p class="hinweis">Bestenliste nicht verfügbar.</p>';
+  }
+}
+
+// Ergebnis eintragen, wenn es besser ist als der eigene bisherige Wert
+async function ergebnisSpeichern(spielName, punkte) {
+  if (!punkte || punkte <= 0 || !profil) return;
+  const person = profil.full_name || profil.email || "unbekannt";
+  try {
+    const { data } = await db.from("game_scores").select("id, punkte")
+      .eq("spiel", spielName).eq("person", person).maybeSingle();
+
+    if (data && data.punkte >= punkte) return;
+    if (data) await db.from("game_scores").update({ punkte: punkte }).eq("id", data.id);
+    else await db.from("game_scores").insert({ spiel: spielName, person: person, punkte: punkte });
+
+    bestenlisteZeigen();
+  } catch (f) { /* Bestenliste ist Beiwerk, Fehler stören das Spiel nicht */ }
+}
 
 function seiteSpass(b) {
   // Jedes Mal ein anderes Spiel als beim letzten Aufruf
@@ -6326,13 +7152,16 @@ function seiteSpass(b) {
   }
   spass.zuletzt = i;
 
-  b.innerHTML = '<h1 class="seitentitel">Spassecke Tristan</h1>'
+  b.innerHTML = '<h1 class="seitentitel">Timeout Area</h1>'
     + '<div id="sp-spiel"></div>'
+    + '<section class="karte"><div id="sp-bestenliste"></div></section>'
     + '<section class="karte"><h2>Werkstattweisheit</h2>'
     + '<p class="spass-weisheit" id="sp-weisheit"></p>'
     + '<button class="linkknopf" id="sp-weisheit-neu">Noch eine</button></section>';
 
-  SPIELE[i](document.getElementById("sp-spiel"));
+  spass.aktuell = SPIELE[i];
+  SPIELE[i].fn(document.getElementById("sp-spiel"));
+  bestenlisteZeigen();
 
   const anderes = document.getElementById("sp-anderes");
   if (anderes) anderes.onclick = () => seiteSpass(b);
@@ -6357,7 +7186,7 @@ const SEITEN = [
   { pfad: "einkauf",      titel: "Einkauf",      zeichen: SYM.einkauf, zeige: seiteEinkauf },
   { pfad: "rechner",      titel: "Rechner",      zeichen: SYM.rechner, zeige: seiteRechner },
   { pfad: "einstellungen", titel: "Einstellungen", zeichen: SYM.einstellungen, zeige: seiteEinstellungen },
-  { pfad: "spass",        titel: "Spassecke",    zeichen: SYM.spass, zeige: seiteSpass },
+  { pfad: "spass",        titel: "Timeout",       zeichen: SYM.spass, zeige: seiteSpass },
 ];
 
 function zeichneSeite() {
