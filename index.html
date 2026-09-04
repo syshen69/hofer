@@ -1205,6 +1205,38 @@ a:focus-visible {
 .spass-maschine--stoerung .spass-maschine__lampe { background: #ff5a4d;
                          box-shadow: 0 0 12px #ff5a4d; }
 .spass-maschine--stoerung .spass-maschine__nr { color: #ffd9d6; }
+
+/* ---------- Spassecke ---------- */
+.spass-halle--vier { grid-template-columns: repeat(2, 1fr); max-width: 320px; margin: 16px auto; }
+.spass-wiese { position: relative; height: 260px; background: #e6f0e2;
+               border-radius: var(--radius); overflow: hidden; margin: 16px 0;
+               border: 1px solid var(--linie); }
+.spass-wiese--dunkel { background: #23282e; }
+.spass-huhn { position: absolute; background: none; border: none; font-size: 1.9rem;
+              cursor: pointer; padding: 0; line-height: 1;
+              transition: left .35s, top .35s; }
+.spass-huhn--still { transition: none; pointer-events: none; }
+.spass-huhn--gefahr { font-size: 1.6rem; }
+.spass-feld { position: relative; height: 300px; background: #eef2f7;
+              border: 1px solid var(--linie); border-radius: var(--radius);
+              overflow: hidden; margin: 16px 0; touch-action: none; }
+.spass-ei { position: absolute; font-size: 1.6rem; transform: translateX(-50%); }
+.spass-korb { position: absolute; bottom: 6px; font-size: 2.2rem;
+              transform: translateX(-50%); }
+.spass-memory { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+                margin: 16px 0; }
+.spass-karte { aspect-ratio: 1; background: var(--marke); border: none;
+               border-radius: var(--radius); font-size: 1.7rem; cursor: pointer; }
+.spass-karte--offen { background: var(--flaeche); border: 2px solid var(--marke); }
+.spass-karte--paar { background: #eaf6ef; border-color: var(--gut); cursor: default; }
+.spass-zahlen { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+                margin: 16px 0; }
+.spass-zahl-feld { aspect-ratio: 1.4; background: var(--flaeche);
+                   border: 1px solid var(--linie-stark); border-radius: var(--radius);
+                   font: inherit; font-size: 1.3rem; font-weight: 650; cursor: pointer; }
+.spass-zahl-feld--weg { visibility: hidden; }
+.spass-frage { text-align: center; font-size: 1.15rem; margin: 18px 0; }
+.spass-antworten { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 6px; }
 </style>
 </head>
 <body>
@@ -1248,7 +1280,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "12.3.0";
+const APP_VERSION = "12.5.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -1637,13 +1669,7 @@ async function seiteDashboard(b) {
   await zeichneEinkaufKurz(b);
 
   // Karten auf der Startseite führen direkt in ihren Bereich
-  b.querySelectorAll("[data-zu]").forEach((karte) => {
-    karte.classList.add("karte--klickbar");
-    karte.addEventListener("click", (e) => {
-      if (e.target.closest("button, a, input, label")) return;
-      location.hash = "#/" + karte.dataset.zu;
-    });
-  });
+
   await zeichneNotizen();
 
   // Offene Bestellungen
@@ -1694,6 +1720,16 @@ async function seiteDashboard(b) {
         : '<p class="hinweis">Keine offenen Bestellungen.</p>')
       + '</section>';
   }
+
+  // Karten führen in ihren Bereich. Erst jetzt binden, weil einige
+  // Abschnitte vorher noch gar nicht auf der Seite waren.
+  b.querySelectorAll("[data-zu]").forEach((karte) => {
+    karte.classList.add("karte--klickbar");
+    karte.onclick = (e) => {
+      if (e.target.closest("button, a, input, label, select, textarea")) return;
+      location.hash = "#/" + karte.dataset.zu;
+    };
+  });
 }
 
 function statuszeile(anzahl, text, art) {
@@ -2793,14 +2829,9 @@ async function ansichtPlanwand(ziel, b) {
     + '<button class="knopf knopf--klein" id="pw-vor">›</button>'
     + '<div class="pw-zoom">'
     + '<button class="knopf knopf--klein" id="pw-raus" title="mehr Tage zeigen">−</button>'
-    + '<button class="knopf knopf--klein" id="pw-rein" title="weniger Tage zeigen">+</button>'
-    + '</div></div>'
-    + '<div class="pw-zoom">'
-    + '<span class="klein">Zoom</span>'
-    + '<button class="knopf knopf--klein" id="pw-raus" title="mehr Tage zeigen">−</button>'
     + '<span class="klein" id="pw-zoomwert"></span>'
     + '<button class="knopf knopf--klein" id="pw-rein" title="weniger Tage zeigen">+</button>'
-    + '</div>'
+    + '</div></div>'
     + '<div class="suchleiste">'
     + '<input type="search" id="pw-suche" placeholder="Auftrag suchen"'
     + ' value="' + esc(plan.suche) + '" autocomplete="off">'
@@ -2844,17 +2875,6 @@ async function ansichtPlanwand(ziel, b) {
 
   const zoomAnzeige = document.getElementById("pw-zoomwert");
   if (zoomAnzeige) zoomAnzeige.textContent = plan.tage + " Tage";
-
-  const rein = document.getElementById("pw-rein");
-  if (rein) rein.onclick = () => {
-    plan.zoom = Math.max(5, plan.tage - 5);
-    seitePlanwand(b);
-  };
-  const raus = document.getElementById("pw-raus");
-  if (raus) raus.onclick = () => {
-    plan.zoom = Math.min(60, plan.tage + 5);
-    seitePlanwand(b);
-  };
 
   const suchfeld = document.getElementById("pw-suche");
   let taste = null;
@@ -5539,9 +5559,13 @@ SYM.einstellungen = svg('<line x1="4" y1="7" x2="20" y2="7"/>'
 //  speichert nichts in der Datenbank.
 // =================================================================
 
-const spass = {
-  bestwert: 0,
-};
+// =================================================================
+//  SPASSECKE TRISTAN
+//  Bei jedem Aufruf kommt ein anderes Spiel. Alles läuft nur im
+//  Browser und wird nirgends gespeichert.
+// =================================================================
+
+const spass = { bestwerte: {}, zuletzt: -1 };
 
 const SPRUECHE = [
   "Läuft wie geschmiert.",
@@ -5560,142 +5584,735 @@ const FLUECHE = [
   "Das wird eine Reklamation.",
 ];
 
-function seiteSpass(b) {
-  b.innerHTML = '<h1 class="seitentitel">Spassecke Tristan</h1>'
-    + '<section class="karte">'
-    + '<h2>Störung an der Linie</h2>'
-    + '<p class="hinweis">An einer der Maschinen blinkt es rot. Tipp sie an, bevor die '
-    + 'Zeit abläuft. Je schneller du bist, desto mehr Punkte. Drei verpasste Störungen '
-    + 'und die Schicht ist gelaufen.</p>'
+const WEISHEITEN = [
+  "Ein Hundertstel ist kein Fehler, sondern eine Meinungsverschiedenheit.",
+  "Wer misst, misst Mist. Wer nicht misst, macht Ausschuss.",
+  "Die Maschine läuft immer. Ausser wenn jemand zuschaut.",
+  "Kühlschmiermittel ist kein Getränk. Auch nicht am Freitag.",
+  "Das Teil ist fertig, wenn der Chef nicht mehr fragt.",
+  "Ein Werkzeugbruch kommt nie allein.",
+  "Toleranzen sind Vorschläge. Sagt niemand, der bleiben durfte.",
+  "Wenn es beim ersten Mal passt, hast du etwas übersehen.",
+  "Späne im Ärmel sind das Abzeichen der Zunft.",
+  "Der beste Vorschub ist der, bei dem es nicht pfeift.",
+  "Die Maschine hat immer recht. Leider.",
+  "Zwei Dinge laufen nie rund: die Welle und der Montag.",
+  "Ein Huhn im Betrieb legt mehr Eier als ein Meeting.",
+];
 
+// Kleine Helfer für alle Spiele
+function zufall(n) { return Math.floor(Math.random() * n); }
+function auswahlZufall(liste) { return liste[zufall(liste.length)]; }
+
+function spielRahmen(titel, erklaerung, inhalt, knopfText) {
+  return '<section class="karte">'
+    + '<div class="karte__kopf"><h2>' + esc(titel) + '</h2>'
+    + '<button class="linkknopf" id="sp-anderes">Anderes Spiel</button></div>'
+    + '<p class="hinweis">' + esc(erklaerung) + '</p>'
     + '<div class="spass-werte">'
     + '<div><span class="spass-label">Punkte</span>'
     + '<span class="spass-zahl" id="sp-punkte">0</span></div>'
-    + '<div><span class="spass-label">Verpasst</span>'
+    + '<div><span class="spass-label">Fehler</span>'
     + '<span class="spass-zahl" id="sp-fehler">0</span></div>'
     + '<div><span class="spass-label">Rekord</span>'
-    + '<span class="spass-zahl" id="sp-best">' + spass.bestwert + '</span></div>'
+    + '<span class="spass-zahl" id="sp-best">0</span></div>'
     + '</div>'
+    + inhalt
+    + '<div class="spass-text" id="sp-text">Bereit wenn du es bist.</div>'
+    + '<button class="knopf knopf--haupt knopf--breit" id="sp-knopf">'
+    + esc(knopfText || "Los geht's") + '</button>'
+    + '</section>';
+}
 
-    + '<div class="spass-halle" id="sp-halle">'
-    + Array.from({ length: 9 }, (unused, i) =>
-        '<button class="spass-maschine" data-platz="' + i + '">'
+// Verwaltung von Punkten, Fehlern und Rekord
+function spielStand(name) {
+  const s = {
+    punkte: 0, fehler: 0, laeuft: false,
+    setzePunkte(p) { s.punkte = p; document.getElementById("sp-punkte").textContent = p; },
+    setzeFehler(f) { s.fehler = f; document.getElementById("sp-fehler").textContent = f; },
+    sag(t) { document.getElementById("sp-text").textContent = t; },
+    knopf(t) { document.getElementById("sp-knopf").textContent = t; },
+    rekordZeigen() {
+      document.getElementById("sp-best").textContent = spass.bestwerte[name] || 0;
+    },
+    rekordPruefen() {
+      if (s.punkte > (spass.bestwerte[name] || 0)) {
+        spass.bestwerte[name] = s.punkte;
+        s.rekordZeigen();
+        return true;
+      }
+      return false;
+    },
+  };
+  return s;
+}
+
+// =================================================================
+//  1. Störung an der Linie
+// =================================================================
+function spielStoerung(b) {
+  b.innerHTML = spielRahmen("Störung an der Linie",
+    "An einer Maschine blinkt es rot. Tipp sie an, bevor die Zeit abläuft. "
+    + "Drei verpasste Störungen und die Schicht ist gelaufen.",
+    '<div class="spass-halle" id="sp-halle">'
+    + Array.from({ length: 9 }, (u, i) => '<button class="spass-maschine" data-platz="' + i + '">'
         + '<span class="spass-maschine__nr">M' + (i + 1) + '</span>'
         + '<span class="spass-maschine__lampe"></span></button>').join("")
-    + '</div>'
+    + '</div>', "Schicht starten");
 
-    + '<div class="spass-text" id="sp-text">Bereit wenn du es bist.</div>'
-    + '<button class="knopf knopf--haupt knopf--breit" id="sp-knopf">Schicht starten</button>'
-    + '</section>'
+  const st = spielStand("stoerung");
+  st.rekordZeigen();
+  const felder = Array.from(b.querySelectorAll("[data-platz]"));
+  let aktiv = -1, ablauf = null, start = 0, runde = 0;
 
-    + '<section class="karte">'
-    + '<h2>Werkstattweisheit des Tages</h2>'
-    + '<p class="spass-weisheit" id="sp-weisheit"></p>'
-    + '<button class="linkknopf" id="sp-neu">Noch eine</button>'
-    + '</section>';
+  const weg = () => { clearTimeout(ablauf);
+    felder.forEach((f) => f.classList.remove("spass-maschine--stoerung")); aktiv = -1; };
 
-  const WEISHEITEN = [
-    "Ein Hundertstel ist kein Fehler, sondern eine Meinungsverschiedenheit.",
-    "Wer misst, misst Mist. Wer nicht misst, macht Ausschuss.",
-    "Die Maschine läuft immer. Ausser wenn jemand zuschaut.",
-    "Kühlschmiermittel ist kein Getränk. Auch nicht am Freitag.",
-    "Das Teil ist fertig, wenn der Chef nicht mehr fragt.",
-    "Ein Werkzeugbruch kommt nie allein.",
-    "Toleranzen sind Vorschläge. Sagt niemand, der bleiben durfte.",
-    "Wenn es beim ersten Mal passt, hast du etwas übersehen.",
-    "Späne im Ärmel sind das Abzeichen der Zunft.",
-    "Der beste Vorschub ist der, bei dem es nicht pfeift.",
-    "Die Maschine hat immer recht. Leider.",
-    "Zwei Dinge laufen nie rund: die Welle und der Montag.",
-  ];
+  const ende = () => { weg(); st.laeuft = false; st.knopf("Nochmal");
+    st.sag("Schichtende. " + st.punkte + " Punkte." + (st.rekordPruefen() ? " Rekord!" : "")); };
 
-  const weisheitZeigen = () => {
-    document.getElementById("sp-weisheit").textContent =
-      WEISHEITEN[Math.floor(Math.random() * WEISHEITEN.length)];
-  };
-  weisheitZeigen();
-  document.getElementById("sp-neu").onclick = weisheitZeigen;
-
-  // ---------- Das Spiel ----------
-
-  const halle = document.getElementById("sp-halle");
-  const knopf = document.getElementById("sp-knopf");
-  const text = document.getElementById("sp-text");
-  const maschinen = Array.from(halle.querySelectorAll("[data-platz]"));
-
-  let laeuft = false, punkte = 0, verpasst = 0, runde = 0;
-  let aktiv = -1, ablauf = null, startZeit = 0;
-
-  const aufraeumen = () => {
-    clearTimeout(ablauf);
-    maschinen.forEach((m) => m.classList.remove("spass-maschine--stoerung"));
-    aktiv = -1;
-  };
-
-  const beenden = () => {
-    aufraeumen();
-    laeuft = false;
-    knopf.textContent = "Nochmal";
-    text.textContent = "Schichtende. " + punkte
-      + (punkte === 1 ? " Punkt" : " Punkte") + ".";
-    if (punkte > spass.bestwert) {
-      spass.bestwert = punkte;
-      document.getElementById("sp-best").textContent = punkte;
-      text.textContent += " Das ist ein neuer Rekord.";
-    }
-  };
-
-  const naechsteStoerung = () => {
-    if (!laeuft) return;
-    aufraeumen();
-    runde++;
-
-    // Zeitfenster wird enger, hört aber bei 700 ms auf
+  const naechste = () => {
+    if (!st.laeuft) return;
+    weg(); runde++;
     const fenster = Math.max(700, 2000 - runde * 60);
-    aktiv = Math.floor(Math.random() * maschinen.length);
-    maschinen[aktiv].classList.add("spass-maschine--stoerung");
-    startZeit = Date.now();
-
+    aktiv = zufall(felder.length);
+    felder[aktiv].classList.add("spass-maschine--stoerung");
+    start = Date.now();
     ablauf = setTimeout(() => {
-      verpasst++;
-      document.getElementById("sp-fehler").textContent = verpasst;
-      text.textContent = FLUECHE[Math.floor(Math.random() * FLUECHE.length)];
-      if (verpasst >= 3) { beenden(); return; }
-      setTimeout(naechsteStoerung, 400);
+      st.setzeFehler(st.fehler + 1);
+      st.sag(auswahlZufall(FLUECHE));
+      if (st.fehler >= 3) return ende();
+      setTimeout(naechste, 400);
     }, fenster);
   };
 
-  maschinen.forEach((m, i) => {
-    m.onclick = () => {
-      if (!laeuft) return;
+  felder.forEach((f, i) => {
+    f.onclick = () => {
+      if (!st.laeuft) return;
       if (i !== aktiv) {
-        verpasst++;
-        document.getElementById("sp-fehler").textContent = verpasst;
-        text.textContent = "Falsche Maschine. Die lief einwandfrei.";
-        if (verpasst >= 3) beenden();
+        st.setzeFehler(st.fehler + 1);
+        st.sag("Falsche Maschine. Die lief einwandfrei.");
+        if (st.fehler >= 3) ende();
         return;
       }
-      const zeit = Date.now() - startZeit;
-      const gewinn = Math.max(1, Math.round((2000 - zeit) / 100));
-      punkte += gewinn;
-      document.getElementById("sp-punkte").textContent = punkte;
-      text.textContent = SPRUECHE[Math.floor(Math.random() * SPRUECHE.length)]
-        + "   +" + gewinn;
+      const gewinn = Math.max(1, Math.round((2000 - (Date.now() - start)) / 100));
+      st.setzePunkte(st.punkte + gewinn);
+      st.sag(auswahlZufall(SPRUECHE) + "   +" + gewinn);
       clearTimeout(ablauf);
-      setTimeout(naechsteStoerung, 300);
+      setTimeout(naechste, 300);
     };
   });
 
-  knopf.onclick = () => {
-    if (laeuft) { beenden(); return; }
-    laeuft = true;
-    punkte = 0; verpasst = 0; runde = 0;
-    document.getElementById("sp-punkte").textContent = "0";
-    document.getElementById("sp-fehler").textContent = "0";
-    knopf.textContent = "Schicht abbrechen";
-    text.textContent = "Augen auf.";
-    setTimeout(naechsteStoerung, 600);
+  document.getElementById("sp-knopf").onclick = () => {
+    if (st.laeuft) return ende();
+    st.laeuft = true; st.setzePunkte(0); st.setzeFehler(0); runde = 0;
+    st.knopf("Abbrechen"); st.sag("Augen auf.");
+    setTimeout(naechste, 600);
   };
+}
+
+// =================================================================
+//  2. Auf Mass drehen
+// =================================================================
+function spielMass(b) {
+  b.innerHTML = spielRahmen("Auf Mass drehen",
+    "Der Support fährt hin und her. Halt ihn an, wenn er im grünen Feld steht. "
+    + "Mit jedem Teil wird die Toleranz enger.",
+    '<div class="spass-bahn" id="sp-bahn">'
+    + '<div class="spass-ziel" id="sp-ziel"></div>'
+    + '<div class="spass-support" id="sp-support"></div></div>', "Maschine starten");
+
+  const st = spielStand("mass");
+  st.rekordZeigen();
+  const bahn = document.getElementById("sp-bahn");
+  const support = document.getElementById("sp-support");
+  const zielFeld = document.getElementById("sp-ziel");
+  let ist = 0, richtung = 1, ziel = 50, toleranz = 20, takt = null, runde = 0;
+
+  const neueRunde = () => {
+    runde++;
+    toleranz = Math.max(4, 20 - runde * 1.5);
+    ziel = 15 + Math.random() * 70;
+    ist = 0; richtung = 1;
+    zielFeld.style.left = (ziel - toleranz / 2) + "%";
+    zielFeld.style.width = toleranz + "%";
+    const tempo = Math.min(2.4, 0.7 + runde * 0.08);
+    clearInterval(takt);
+    takt = setInterval(() => {
+      ist += richtung * tempo;
+      if (ist >= 100) { ist = 100; richtung = -1; }
+      if (ist <= 0) { ist = 0; richtung = 1; }
+      support.style.left = ist + "%";
+    }, 16);
+  };
+
+  const ende = () => { clearInterval(takt); st.laeuft = false; st.knopf("Nochmal");
+    st.sag("Feierabend. " + st.punkte + " gute Teile." + (st.rekordPruefen() ? " Rekord!" : "")); };
+
+  document.getElementById("sp-knopf").onclick = () => {
+    if (!st.laeuft) {
+      st.laeuft = true; st.setzePunkte(0); st.setzeFehler(0); runde = 0;
+      st.knopf("Anhalten"); st.sag("Konzentration.");
+      neueRunde();
+      return;
+    }
+    if (Math.abs(ist - ziel) <= toleranz / 2) {
+      st.setzePunkte(st.punkte + 1);
+      st.sag(auswahlZufall(SPRUECHE));
+      bahn.classList.add("spass-bahn--gut");
+      setTimeout(() => bahn.classList.remove("spass-bahn--gut"), 250);
+      neueRunde();
+    } else {
+      st.setzeFehler(st.fehler + 1);
+      st.sag(auswahlZufall(FLUECHE));
+      bahn.classList.add("spass-bahn--schlecht");
+      setTimeout(() => bahn.classList.remove("spass-bahn--schlecht"), 250);
+      if (st.fehler >= 3) return ende();
+      neueRunde();
+    }
+  };
+}
+
+// =================================================================
+//  3. Hühner einfangen
+// =================================================================
+function spielHuehner(b) {
+  b.innerHTML = spielRahmen("Hühner einfangen",
+    "Die Hühner sind aus dem Stall. Fang sie ein, bevor die dreissig Sekunden um sind. "
+    + "Sie werden immer schneller.",
+    '<div class="spass-wiese" id="sp-wiese"></div>', "Stalltür auf");
+
+  const st = spielStand("huehner");
+  st.rekordZeigen();
+  const wiese = document.getElementById("sp-wiese");
+  let takt = null, uhr = null, sekunden = 30, tempo = 1;
+
+  const neuesHuhn = () => {
+    const h = document.createElement("button");
+    h.className = "spass-huhn";
+    h.textContent = "🐔";
+    h.style.left = zufall(85) + "%";
+    h.style.top = zufall(75) + "%";
+    h.onclick = () => {
+      if (!st.laeuft) return;
+      st.setzePunkte(st.punkte + 1);
+      st.sag(auswahlZufall(["Gefangen!", "Rein in den Stall.", "Eins weniger.",
+        "Das war ein flinkes.", "Federn fliegen."]));
+      h.remove();
+      neuesHuhn();
+    };
+    wiese.appendChild(h);
+    return h;
+  };
+
+  const bewegen = () => {
+    wiese.querySelectorAll(".spass-huhn").forEach((h) => {
+      h.style.left = Math.max(0, Math.min(88, parseFloat(h.style.left)
+        + (Math.random() - 0.5) * 14 * tempo)) + "%";
+      h.style.top = Math.max(0, Math.min(78, parseFloat(h.style.top)
+        + (Math.random() - 0.5) * 14 * tempo)) + "%";
+    });
+  };
+
+  const ende = () => {
+    clearInterval(takt); clearInterval(uhr);
+    st.laeuft = false; st.knopf("Nochmal");
+    wiese.innerHTML = "";
+    st.sag("Zeit um. " + st.punkte + " Hühner im Stall."
+      + (st.rekordPruefen() ? " Rekord!" : ""));
+  };
+
+  document.getElementById("sp-knopf").onclick = () => {
+    if (st.laeuft) return ende();
+    st.laeuft = true; st.setzePunkte(0); st.setzeFehler(0);
+    sekunden = 30; tempo = 1;
+    wiese.innerHTML = "";
+    for (let i = 0; i < 3; i++) neuesHuhn();
+    st.knopf("Abbrechen"); st.sag("Noch 30 Sekunden.");
+    takt = setInterval(bewegen, 380);
+    uhr = setInterval(() => {
+      sekunden--;
+      tempo = 1 + (30 - sekunden) / 22;
+      st.sag("Noch " + sekunden + " Sekunden.");
+      if (sekunden <= 0) ende();
+    }, 1000);
+  };
+}
+
+// =================================================================
+//  4. Eier fangen
+// =================================================================
+function spielEier(b) {
+  b.innerHTML = spielRahmen("Eier fangen",
+    "Die Hühner legen im Akkord. Schieb den Korb mit den Pfeilen oder per Finger "
+    + "unter die fallenden Eier. Drei zerbrochene und Schluss.",
+    '<div class="spass-feld" id="sp-feld">'
+    + '<div class="spass-korb" id="sp-korb">🧺</div></div>', "Loslegen");
+
+  const st = spielStand("eier");
+  st.rekordZeigen();
+  const feld = document.getElementById("sp-feld");
+  const korb = document.getElementById("sp-korb");
+  let korbX = 50, takt = null, spawn = null, eier = [], tempo = 1.2;
+
+  const setzeKorb = (x) => { korbX = Math.max(4, Math.min(96, x)); korb.style.left = korbX + "%"; };
+  setzeKorb(50);
+
+  const ende = () => {
+    clearInterval(takt); clearInterval(spawn);
+    eier.forEach((e) => e.el.remove()); eier = [];
+    st.laeuft = false; st.knopf("Nochmal");
+    st.sag("Vorbei. " + st.punkte + " Eier heil." + (st.rekordPruefen() ? " Rekord!" : ""));
+  };
+
+  const schritt = () => {
+    eier.forEach((e) => {
+      e.y += tempo;
+      e.el.style.top = e.y + "%";
+      if (e.y >= 82) {
+        if (Math.abs(e.x - korbX) < 9) {
+          st.setzePunkte(st.punkte + 1);
+          st.sag(auswahlZufall(["Gefangen.", "Heil geblieben.", "Sauber."]));
+        } else {
+          st.setzeFehler(st.fehler + 1);
+          st.sag(auswahlZufall(["Rührei.", "Das gibt eine Sauerei.", "Daneben."]));
+        }
+        e.el.remove();
+        e.weg = true;
+      }
+    });
+    eier = eier.filter((e) => !e.weg);
+    if (st.fehler >= 3) ende();
+    tempo = Math.min(3.2, tempo + 0.002);
+  };
+
+  const neuesEi = () => {
+    const el = document.createElement("div");
+    el.className = "spass-ei";
+    el.textContent = "🥚";
+    const x = 4 + zufall(92);
+    el.style.left = x + "%";
+    el.style.top = "0%";
+    feld.appendChild(el);
+    eier.push({ el: el, x: x, y: 0 });
+  };
+
+  feld.onpointermove = (e) => {
+    if (!st.laeuft) return;
+    const r = feld.getBoundingClientRect();
+    setzeKorb((e.clientX - r.left) / r.width * 100);
+  };
+  b.tabIndex = -1;
+  b.onkeydown = (e) => {
+    if (!st.laeuft) return;
+    if (e.key === "ArrowLeft") setzeKorb(korbX - 6);
+    if (e.key === "ArrowRight") setzeKorb(korbX + 6);
+  };
+
+  document.getElementById("sp-knopf").onclick = () => {
+    if (st.laeuft) return ende();
+    st.laeuft = true; st.setzePunkte(0); st.setzeFehler(0);
+    tempo = 1.2; eier = []; feld.querySelectorAll(".spass-ei").forEach((e) => e.remove());
+    st.knopf("Abbrechen"); st.sag("Korb bereithalten.");
+    takt = setInterval(schritt, 24);
+    spawn = setInterval(neuesEi, 900);
+  };
+}
+
+// =================================================================
+//  5. Werkzeug-Memory
+// =================================================================
+function spielMemory(b) {
+  const ZEICHEN = ["🔧", "🔩", "⚙️", "🪛", "📏", "🧲", "🔨", "🪚"];
+  const karten = ZEICHEN.concat(ZEICHEN).sort(() => Math.random() - 0.5);
+
+  b.innerHTML = spielRahmen("Werkzeug-Memory",
+    "Immer zwei gleiche Werkzeuge finden. Je weniger Fehlversuche, desto besser.",
+    '<div class="spass-memory" id="sp-memory">'
+    + karten.map((z, i) => '<button class="spass-karte" data-karte="' + i + '"'
+        + ' data-zeichen="' + z + '"><span></span></button>').join("")
+    + '</div>', "Neu mischen");
+
+  const st = spielStand("memory");
+  st.rekordZeigen();
+  let erste = null, sperre = false, gefunden = 0;
+  st.laeuft = true;
+
+  b.querySelectorAll("[data-karte]").forEach((k) => {
+    k.onclick = () => {
+      if (sperre || k.classList.contains("spass-karte--offen")) return;
+      k.classList.add("spass-karte--offen");
+      k.querySelector("span").textContent = k.dataset.zeichen;
+
+      if (!erste) { erste = k; return; }
+
+      if (erste.dataset.zeichen === k.dataset.zeichen) {
+        st.setzePunkte(st.punkte + 1);
+        gefunden++;
+        erste.classList.add("spass-karte--paar");
+        k.classList.add("spass-karte--paar");
+        erste = null;
+        st.sag(auswahlZufall(["Passt.", "Gefunden.", "Gutes Auge."]));
+        if (gefunden === ZEICHEN.length) {
+          st.sag("Alle Paare gefunden mit " + st.fehler + " Fehlversuchen.");
+          st.laeuft = false;
+        }
+        return;
+      }
+
+      sperre = true;
+      st.setzeFehler(st.fehler + 1);
+      st.sag("Nicht das gleiche.");
+      const a = erste; erste = null;
+      setTimeout(() => {
+        [a, k].forEach((x) => {
+          x.classList.remove("spass-karte--offen");
+          x.querySelector("span").textContent = "";
+        });
+        sperre = false;
+      }, 700);
+    };
+  });
+
+  document.getElementById("sp-knopf").onclick = () => spielMemory(b);
+}
+
+// =================================================================
+//  6. Zahlenreihe
+// =================================================================
+function spielZahlen(b) {
+  b.innerHTML = spielRahmen("Zahlen der Reihe nach",
+    "Tipp die Zahlen von 1 bis 12 in der richtigen Reihenfolge an. So schnell du kannst.",
+    '<div class="spass-zahlen" id="sp-zahlen"></div>', "Starten");
+
+  const st = spielStand("zahlen");
+  st.rekordZeigen();
+  const feld = document.getElementById("sp-zahlen");
+  let naechste = 1, start = 0;
+
+  const mischen = () => {
+    const zahlen = Array.from({ length: 12 }, (u, i) => i + 1).sort(() => Math.random() - 0.5);
+    feld.innerHTML = zahlen.map((z) => '<button class="spass-zahl-feld" data-z="' + z + '">'
+      + z + '</button>').join("");
+    feld.querySelectorAll("[data-z]").forEach((k) => {
+      k.onclick = () => {
+        if (!st.laeuft) return;
+        if (Number(k.dataset.z) !== naechste) {
+          st.setzeFehler(st.fehler + 1);
+          st.sag("Nicht die " + k.dataset.z + ". Gesucht ist die " + naechste + ".");
+          return;
+        }
+        k.classList.add("spass-zahl-feld--weg");
+        naechste++;
+        if (naechste > 12) {
+          const zeit = ((Date.now() - start) / 1000).toFixed(1);
+          st.setzePunkte(Math.max(1, Math.round(600 / zeit) - st.fehler * 5));
+          st.sag("Fertig in " + zeit + " Sekunden."
+            + (st.rekordPruefen() ? " Neuer Rekord!" : ""));
+          st.laeuft = false;
+          st.knopf("Nochmal");
+        }
+      };
+    });
+  };
+
+  document.getElementById("sp-knopf").onclick = () => {
+    st.laeuft = true; st.setzePunkte(0); st.setzeFehler(0);
+    naechste = 1; start = Date.now();
+    st.knopf("Neu"); st.sag("Los.");
+    mischen();
+  };
+  mischen();
+}
+
+// =================================================================
+//  7. Drehzahl schätzen
+// =================================================================
+function spielDrehzahl(b) {
+  b.innerHTML = spielRahmen("Drehzahl schätzen",
+    "Welche Drehzahl ergibt sich? Kopfrechnen mit n = Vc mal 1000 geteilt durch Pi mal d. "
+    + "Drei Fehler und Schluss.",
+    '<div class="spass-frage" id="sp-frage"></div>'
+    + '<div class="spass-antworten" id="sp-antworten"></div>', "Starten");
+
+  const st = spielStand("drehzahl");
+  st.rekordZeigen();
+
+  const neueFrage = () => {
+    const vc = auswahlZufall([60, 80, 100, 120, 150, 180, 200, 250]);
+    const d = auswahlZufall([4, 5, 6, 8, 10, 12, 16, 20, 25]);
+    const richtig = Math.round(vc * 1000 / (Math.PI * d));
+
+    const antworten = [richtig];
+    while (antworten.length < 4) {
+      const falsch = Math.round(richtig * (0.55 + Math.random() * 0.9));
+      if (!antworten.some((a) => Math.abs(a - falsch) < richtig * 0.12)) antworten.push(falsch);
+    }
+    antworten.sort(() => Math.random() - 0.5);
+
+    document.getElementById("sp-frage").innerHTML =
+      'Vc = <strong>' + vc + '</strong> m/min &nbsp;·&nbsp; ⌀ <strong>' + d + '</strong> mm';
+
+    document.getElementById("sp-antworten").innerHTML = antworten.map((a) =>
+      '<button class="knopf" data-a="' + a + '">' + zahlText(a) + '</button>').join("");
+
+    document.querySelectorAll("[data-a]").forEach((k) => {
+      k.onclick = () => {
+        if (!st.laeuft) return;
+        if (Number(k.dataset.a) === richtig) {
+          st.setzePunkte(st.punkte + 1);
+          st.sag(auswahlZufall(["Sitzt.", "Genau.", "Kopfrechnen kann er."]));
+          neueFrage();
+        } else {
+          st.setzeFehler(st.fehler + 1);
+          st.sag("Daneben. Richtig wären " + zahlText(richtig) + " gewesen.");
+          if (st.fehler >= 3) {
+            st.laeuft = false; st.knopf("Nochmal");
+            st.sag("Schluss. " + st.punkte + " richtig."
+              + (st.rekordPruefen() ? " Rekord!" : ""));
+            return;
+          }
+          neueFrage();
+        }
+      };
+    });
+  };
+
+  document.getElementById("sp-knopf").onclick = () => {
+    st.laeuft = true; st.setzePunkte(0); st.setzeFehler(0);
+    st.knopf("Neu"); st.sag("Rechnen.");
+    neueFrage();
+  };
+}
+
+// =================================================================
+//  8. Lampenfolge merken
+// =================================================================
+function spielFolge(b) {
+  b.innerHTML = spielRahmen("Lampenfolge merken",
+    "Die Maschinen leuchten der Reihe nach auf. Tipp die gleiche Reihenfolge nach. "
+    + "Jede Runde kommt eine Lampe dazu.",
+    '<div class="spass-halle spass-halle--vier" id="sp-halle">'
+    + Array.from({ length: 4 }, (u, i) => '<button class="spass-maschine" data-platz="' + i + '">'
+        + '<span class="spass-maschine__lampe"></span></button>').join("")
+    + '</div>', "Starten");
+
+  const st = spielStand("folge");
+  st.rekordZeigen();
+  const felder = Array.from(b.querySelectorAll("[data-platz]"));
+  let folge = [], position = 0, zeigt = false;
+
+  const blinken = (i, dauer) => new Promise((fertig) => {
+    felder[i].classList.add("spass-maschine--stoerung");
+    setTimeout(() => {
+      felder[i].classList.remove("spass-maschine--stoerung");
+      setTimeout(fertig, 140);
+    }, dauer);
+  });
+
+  const zeigen = async () => {
+    zeigt = true;
+    st.sag("Gut hinschauen.");
+    for (const i of folge) await blinken(i, Math.max(240, 500 - folge.length * 20));
+    zeigt = false;
+    position = 0;
+    st.sag("Jetzt du.");
+  };
+
+  const neueRunde = () => {
+    folge.push(zufall(4));
+    st.setzePunkte(folge.length - 1);
+    zeigen();
+  };
+
+  felder.forEach((f, i) => {
+    f.onclick = async () => {
+      if (!st.laeuft || zeigt) return;
+      await blinken(i, 140);
+      if (folge[position] !== i) {
+        st.setzeFehler(st.fehler + 1);
+        st.laeuft = false; st.knopf("Nochmal");
+        st.sag("Falsche Lampe. Geschafft: " + st.punkte + " Runden."
+          + (st.rekordPruefen() ? " Rekord!" : ""));
+        return;
+      }
+      position++;
+      if (position >= folge.length) setTimeout(neueRunde, 500);
+    };
+  });
+
+  document.getElementById("sp-knopf").onclick = () => {
+    st.laeuft = true; st.setzePunkte(0); st.setzeFehler(0);
+    folge = []; st.knopf("Neu");
+    neueRunde();
+  };
+}
+
+// =================================================================
+//  9. Späne kehren
+// =================================================================
+function spielSpaene(b) {
+  b.innerHTML = spielRahmen("Späne kehren",
+    "Zwanzig Sekunden, so viele Späne wie möglich. Aber Vorsicht: "
+    + "Wer eine Wendeplatte erwischt, verliert Punkte.",
+    '<div class="spass-wiese spass-wiese--dunkel" id="sp-wiese"></div>', "Besen holen");
+
+  const st = spielStand("spaene");
+  st.rekordZeigen();
+  const wiese = document.getElementById("sp-wiese");
+  let spawn = null, uhr = null, sekunden = 20;
+
+  const neuesTeil = () => {
+    const platte = Math.random() < 0.25;
+    const el = document.createElement("button");
+    el.className = "spass-huhn" + (platte ? " spass-huhn--gefahr" : "");
+    el.textContent = platte ? "🔷" : "🌀";
+    el.style.left = zufall(86) + "%";
+    el.style.top = zufall(76) + "%";
+    el.onclick = () => {
+      if (!st.laeuft) return;
+      if (platte) {
+        st.setzePunkte(Math.max(0, st.punkte - 3));
+        st.setzeFehler(st.fehler + 1);
+        st.sag("Das war eine Wendeplatte. Minus drei.");
+      } else {
+        st.setzePunkte(st.punkte + 1);
+        st.sag(auswahlZufall(["Weg damit.", "Sauber.", "Der Boden dankt."]));
+      }
+      el.remove();
+    };
+    wiese.appendChild(el);
+    setTimeout(() => el.remove(), 1600);
+  };
+
+  const ende = () => {
+    clearInterval(spawn); clearInterval(uhr);
+    wiese.innerHTML = "";
+    st.laeuft = false; st.knopf("Nochmal");
+    st.sag("Zeit um. " + st.punkte + " Punkte." + (st.rekordPruefen() ? " Rekord!" : ""));
+  };
+
+  document.getElementById("sp-knopf").onclick = () => {
+    if (st.laeuft) return ende();
+    st.laeuft = true; st.setzePunkte(0); st.setzeFehler(0);
+    sekunden = 20; wiese.innerHTML = "";
+    st.knopf("Abbrechen"); st.sag("Noch 20 Sekunden.");
+    spawn = setInterval(neuesTeil, 420);
+    uhr = setInterval(() => {
+      sekunden--;
+      st.sag("Noch " + sekunden + " Sekunden.");
+      if (sekunden <= 0) ende();
+    }, 1000);
+  };
+}
+
+// =================================================================
+//  10. Hühner zählen
+// =================================================================
+function spielZaehlen(b) {
+  b.innerHTML = spielRahmen("Hühner zählen",
+    "Kurz hinschauen, dann sind sie weg. Wie viele waren es? "
+    + "Mit jeder Runde wird es knapper.",
+    '<div class="spass-wiese" id="sp-wiese"></div>'
+    + '<div class="spass-antworten" id="sp-antworten"></div>', "Starten");
+
+  const st = spielStand("zaehlen");
+  st.rekordZeigen();
+  const wiese = document.getElementById("sp-wiese");
+  const antworten = document.getElementById("sp-antworten");
+  let runde = 0;
+
+  const neueRunde = () => {
+    runde++;
+    antworten.innerHTML = "";
+    const anzahl = 3 + zufall(6 + Math.min(6, runde));
+    wiese.innerHTML = "";
+    for (let i = 0; i < anzahl; i++) {
+      const h = document.createElement("div");
+      h.className = "spass-huhn spass-huhn--still";
+      h.textContent = "🐔";
+      h.style.left = zufall(86) + "%";
+      h.style.top = zufall(74) + "%";
+      wiese.appendChild(h);
+    }
+    st.sag("Zählen!");
+
+    setTimeout(() => {
+      wiese.innerHTML = "";
+      st.sag("Wie viele waren es?");
+      const wahl = [anzahl];
+      while (wahl.length < 4) {
+        const f = anzahl + (zufall(7) - 3);
+        if (f > 0 && !wahl.includes(f)) wahl.push(f);
+      }
+      wahl.sort(() => Math.random() - 0.5);
+      antworten.innerHTML = wahl.map((z) => '<button class="knopf" data-z="' + z
+        + '">' + z + '</button>').join("");
+
+      antworten.querySelectorAll("[data-z]").forEach((k) => {
+        k.onclick = () => {
+          if (!st.laeuft) return;
+          if (Number(k.dataset.z) === anzahl) {
+            st.setzePunkte(st.punkte + 1);
+            st.sag("Richtig, " + anzahl + " Stück.");
+            setTimeout(neueRunde, 700);
+          } else {
+            st.setzeFehler(st.fehler + 1);
+            st.sag("Es waren " + anzahl + ".");
+            if (st.fehler >= 3) {
+              st.laeuft = false; st.knopf("Nochmal");
+              st.sag("Schluss. " + st.punkte + " Runden geschafft."
+                + (st.rekordPruefen() ? " Rekord!" : ""));
+              antworten.innerHTML = "";
+              return;
+            }
+            setTimeout(neueRunde, 900);
+          }
+        };
+      });
+    }, Math.max(600, 1800 - runde * 90));
+  };
+
+  document.getElementById("sp-knopf").onclick = () => {
+    st.laeuft = true; st.setzePunkte(0); st.setzeFehler(0);
+    runde = 0; st.knopf("Neu");
+    neueRunde();
+  };
+}
+
+// =================================================================
+//  Die Seite selbst
+// =================================================================
+
+const SPIELE = [
+  spielStoerung, spielMass, spielHuehner, spielEier, spielMemory,
+  spielZahlen, spielDrehzahl, spielFolge, spielSpaene, spielZaehlen,
+];
+
+function seiteSpass(b) {
+  // Jedes Mal ein anderes Spiel als beim letzten Aufruf
+  let i = zufall(SPIELE.length);
+  if (SPIELE.length > 1) {
+    while (i === spass.zuletzt) i = zufall(SPIELE.length);
+  }
+  spass.zuletzt = i;
+
+  b.innerHTML = '<h1 class="seitentitel">Spassecke Tristan</h1>'
+    + '<div id="sp-spiel"></div>'
+    + '<section class="karte"><h2>Werkstattweisheit</h2>'
+    + '<p class="spass-weisheit" id="sp-weisheit"></p>'
+    + '<button class="linkknopf" id="sp-weisheit-neu">Noch eine</button></section>';
+
+  SPIELE[i](document.getElementById("sp-spiel"));
+
+  const anderes = document.getElementById("sp-anderes");
+  if (anderes) anderes.onclick = () => seiteSpass(b);
+
+  const zeigen = () => {
+    document.getElementById("sp-weisheit").textContent = auswahlZufall(WEISHEITEN);
+  };
+  zeigen();
+  document.getElementById("sp-weisheit-neu").onclick = zeigen;
 }
 
 // Spassecke: Späne-Symbol
