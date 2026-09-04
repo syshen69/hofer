@@ -716,46 +716,8 @@ a:focus-visible {
 
 /* ---------- Suchleiste ---------- */
 .suchleiste { display: flex; gap: 8px; margin-bottom: 14px; }
+.pw-aktionen + #pw-inhalt, .pw-aktionen + div { margin-top: 6px; }
 .suchleiste input { flex: 1; }
-
-/* ---------- Trefferliste ---------- */
-.trefferliste { display: grid; gap: 8px; }
-.treffer { display: block; width: 100%; text-align: left; background: var(--flaeche);
-           border: 1px solid var(--linie); border-radius: var(--radius);
-           padding: 12px 14px; font: inherit; cursor: pointer; }
-.treffer:hover { border-color: var(--marke); }
-.treffer__kopf { display: flex; justify-content: space-between; gap: 12px; }
-.treffer__nr { font-weight: 650; }
-.treffer__bestand { font-variant-numeric: tabular-nums; color: var(--gedaempft); }
-.treffer__bestand--knapp { color: var(--gefahr); font-weight: 650; }
-.treffer__name { font-size: .92rem; }
-.treffer__lief { font-size: .78rem; color: var(--gedaempft); }
-
-/* ---------- Artikelkarte ---------- */
-.artikel__kopf { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
-.artikel__nr { font-size: 1.2rem; font-weight: 650; }
-.artikel__name { font-size: .95rem; }
-.artikel__lief { font-size: .8rem; color: var(--gedaempft); margin-top: 4px; }
-.artikel__gesamt { font-size: 2rem; font-weight: 650; line-height: 1; text-align: right;
-                   font-variant-numeric: tabular-nums; }
-.artikel__gesamt span { display: block; font-size: .75rem; font-weight: 400;
-                        color: var(--gedaempft); }
-.artikel__gesamt--knapp { color: var(--gefahr); }
-.warnbalken { margin-top: 12px; padding: 8px 12px; background: #fdf4e3;
-              border-left: 3px solid #c08415; border-radius: var(--radius); font-size: .88rem; }
-.untertitel { margin: 18px 0 8px; font-size: .85rem; font-weight: 650;
-              text-transform: uppercase; letter-spacing: .06em; color: var(--gedaempft); }
-.platzcode { font-weight: 650; letter-spacing: .04em; }
-.aktionen { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
-.karte__fuss { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--linie); }
-.plus { color: var(--gut); }
-.minus { color: var(--gefahr); }
-
-/* ---------- Lagerplätze ---------- */
-.platzgitter { display: flex; flex-wrap: wrap; gap: 6px; }
-.platzchip { padding: 6px 12px; background: var(--marke-hell); color: var(--marke);
-             border-radius: var(--radius); font-weight: 650; font-size: .88rem;
-             letter-spacing: .04em; }
 
 /* ---------- Kamera ---------- */
 .scanner { position: relative; width: 100%; max-width: 520px; background: #12161b;
@@ -1101,8 +1063,8 @@ a:focus-visible {
 .pw-ferien__name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---------- Knöpfe auf der Planwand mit Luft ---------- */
-.pw-aktionen { display: flex; flex-wrap: wrap; gap: 10px;
-               margin: 14px 0 18px; }
+.pw-aktionen { display: flex; flex-wrap: wrap; gap: 12px;
+               margin: 26px 0 30px; }
 .pw-aktionen .knopf { flex: 1 1 200px; }
 .pw-rolle + .pw-legende { margin-top: 12px; }
 .pw-zeile--fein .pw-spuren--fein { min-height: 30px; }
@@ -1150,7 +1112,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "10.3.0";
+const APP_VERSION = "11.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -1552,7 +1514,7 @@ async function seiteDashboard(b) {
 
   await zeichneNotizen();
 
-  // Lager und Bestellungen
+  // Offene Bestellungen
   let offene = 0, ueberfaellig = 0;
   const heute = isoDatum(new Date());
   try {
@@ -1566,10 +1528,10 @@ async function seiteDashboard(b) {
 
   const statusEl = document.getElementById("db-status");
   if (statusEl) {
-    statusEl.innerHTML = '<section class="karte"><h2>Lager und Bestellungen</h2>'
+    statusEl.innerHTML = '<section class="karte"><h2>Bestellungen</h2>'
       + '<div class="statusliste">'
-      + statuszeile(ueberfaellig, "Bestellungen überfällig", ueberfaellig ? "gefahr" : "gut")
-      + statuszeile(offene, "Bestellungen offen", "neutral")
+      + statuszeile(ueberfaellig, "überfällig", ueberfaellig ? "gefahr" : "gut")
+      + statuszeile(offene, "offen", "neutral")
       + '</div></section>';
   }
 }
@@ -1701,8 +1663,8 @@ function begruessung() {
 
 const SICHERUNG_TABELLEN = [
   "profiles", "machine_parks", "machines", "jobs", "production_records",
-  "quality_reports", "suppliers", "articles", "storage_locations",
-  "stock_movements", "stock_balances", "order_items", "todos",
+  "suppliers", "articles", "order_items", "todos",
+  "shopping_items", "vacations",
 ];
 
 async function datenSichern(knopf) {
@@ -3452,31 +3414,10 @@ function betrachter(adresse, titel, istPdf) {
 }
 
 // =================================================================
-//  LAGER
+//  ARTIKEL UND LIEFERANTEN
+//  Werden von den Bestellungen gebraucht. Eine eigene Lagerhaltung
+//  gibt es nicht mehr.
 // =================================================================
-
-const lag = {
-  ansicht: "suche",
-  suchtext: "",
-  treffer: null,
-  artikel: null,
-};
-
-const BEWEGUNGSARTEN = {
-  eingang: "Eingang",
-  entnahme: "Entnahme",
-  umlagerung: "Umlagerung",
-  korrektur: "Korrektur",
-  inventur: "Inventur",
-};
-
-async function ladeLagerplaetze() {
-  const { data, error } = await zeitlimit(
-    db.from("storage_locations").select("*").eq("is_active", true).order("code"),
-    10000, "Lagerplätze");
-  if (error) throw error;
-  return data || [];
-}
 
 async function ladeLieferanten() {
   const { data, error } = await zeitlimit(
@@ -3497,710 +3438,6 @@ async function sucheArtikel(text) {
     12000, "Artikelsuche");
   if (error) throw error;
   return data || [];
-}
-
-async function ladeBestandJeArtikel(artikelId) {
-  const { data, error } = await zeitlimit(
-    db.from("bestand_je_platz").select("*").eq("article_id", artikelId).order("lagerplatz"),
-    10000, "Bestand");
-  if (error) throw error;
-  return data || [];
-}
-
-async function ladeBewegungen(filter) {
-  let a = db.from("bewegungen_lesbar").select("*")
-    .order("created_at", { ascending: false }).limit(30);
-  if (filter && filter.artikel) a = a.eq("article_id", filter.artikel);
-  if (filter && filter.platz) a = a.eq("location_id", filter.platz);
-  const { data, error } = await zeitlimit(a, 10000, "Bewegungen");
-  if (error) throw error;
-  return data || [];
-}
-
-async function bucheBewegung(eintrag) {
-  const { error } = await zeitlimit(db.from("stock_movements").insert(eintrag),
-    12000, "Buchung");
-  if (error) throw error;
-}
-
-// ---------- Seite ----------
-
-async function seiteLager(b) {
-  b.innerHTML = '<h1 class="seitentitel">Lager</h1>'
-    + '<div class="reiter">'
-    + [["suche", "Suche"], ["bewegungen", "Bewegungen"],
-       ["artikel", "Artikel"], ["plaetze", "Lagerplätze"]]
-      .map(([w, t]) => '<button class="reiter__knopf' + (lag.ansicht === w ? " aktiv" : "")
-        + '" data-lager="' + w + '">' + t + '</button>').join("")
-    + '</div>'
-    + (darfSchreiben() ? "" : nurLesenHinweis("Du kannst hier alles ansehen, aber nichts buchen."))
-    + '<div id="lag-inhalt"></div>';
-
-  b.querySelectorAll("[data-lager]").forEach((el) => {
-    el.onclick = () => { lag.ansicht = el.dataset.lager; seiteLager(b); };
-  });
-
-  const ziel = document.getElementById("lag-inhalt");
-  if (lag.ansicht === "bewegungen") return lagerBewegungen(ziel, b);
-  if (lag.ansicht === "artikel") return lagerArtikel(ziel, b);
-  if (lag.ansicht === "plaetze") return lagerPlaetze(ziel, b);
-  return lagerSuche(ziel, b);
-}
-
-// ---------- Suche ----------
-
-async function lagerSuche(ziel, b) {
-  ziel.innerHTML = '<div class="suchleiste">'
-    + '<input type="text" id="l-such" placeholder="Artikelnummer, Name oder Lieferant"'
-    + ' value="' + esc(lag.suchtext) + '" autocomplete="off">'
-    + '</div>'
-    + '<div id="l-treffer"><div class="laedt">Wird gesucht …</div></div>';
-
-  const feld = document.getElementById("l-such");
-  let taste = null;
-  feld.oninput = () => {
-    lag.suchtext = feld.value;
-    clearTimeout(taste);
-    taste = setTimeout(() => trefferZeichnen(b), 300);
-  };
-  feld.onkeydown = (e) => { if (e.key === "Enter") { clearTimeout(taste); trefferZeichnen(b); } };
-  feld.focus();
-
-  trefferZeichnen(b);
-}
-
-async function trefferZeichnen(b) {
-  const kasten = document.getElementById("l-treffer");
-  if (!kasten) return;
-  kasten.innerHTML = '<div class="laedt">Wird gesucht …</div>';
-
-  let liste;
-  try { liste = await sucheArtikel(lag.suchtext); }
-  catch (f) {
-    kasten.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
-    return;
-  }
-
-  if (!liste.length) {
-    kasten.innerHTML = '<div class="karte karte--hinweis">'
-      + '<p>Kein Artikel gefunden' + (lag.suchtext ? ' für "' + esc(lag.suchtext) + '"' : "") + '.</p>'
-      + (darfSchreiben() ? '<button class="knopf" id="l-neu-hier">Artikel anlegen</button>' : "")
-      + '</div>';
-    const k = document.getElementById("l-neu-hier");
-    if (k) k.onclick = () => artikelDialog(null, b, lag.suchtext);
-    return;
-  }
-
-  // Ein einziger Treffer: gleich die Details zeigen
-  if (liste.length === 1) return artikelDetail(kasten, liste[0], b);
-
-  kasten.innerHTML = '<div class="trefferliste">' + liste.map((a) =>
-    '<button class="treffer" data-artikel="' + esc(a.id) + '">'
-    + '<div class="treffer__kopf"><span class="treffer__nr">' + esc(a.article_number) + '</span>'
-    + '<span class="treffer__bestand">'
-    + zahlText(a.gesamtbestand) + ' ' + esc(a.unit) + '</span></div>'
-    + '<div class="treffer__name">' + esc(a.name) + '</div>'
-    + (a.supplier_name ? '<div class="treffer__lief">' + esc(a.supplier_name) + '</div>' : "")
-    + '</button>').join("") + '</div>';
-
-  kasten.querySelectorAll("[data-artikel]").forEach((el) => {
-    el.onclick = () => {
-      const a = liste.find((x) => x.id === el.dataset.artikel);
-      artikelDetail(kasten, a, b);
-    };
-  });
-}
-
-async function artikelDetail(kasten, artikel, b) {
-  kasten.innerHTML = '<div class="laedt">Bestand wird geladen …</div>';
-
-  let plaetze = [], bewegungen = [];
-  try {
-    plaetze = await ladeBestandJeArtikel(artikel.id);
-    bewegungen = await ladeBewegungen({ artikel: artikel.id });
-  } catch (f) {
-    kasten.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
-    return;
-  }
-
-  const darf = darfSchreiben();
-
-  kasten.innerHTML = '<section class="karte artikelkarte">'
-    + '<div class="artikel__kopf">'
-    + '<div><div class="artikel__nr">' + esc(artikel.article_number) + '</div>'
-    + '<div class="artikel__name">' + esc(artikel.name) + '</div>'
-    + (artikel.supplier_name
-        ? '<div class="artikel__lief">Lieferant: ' + (artikel.supplier_website
-            ? '<a class="lieferantlink" href="' + esc(artikel.supplier_website)
-              + '" target="_blank" rel="noopener">' + esc(artikel.supplier_name) + ' ↗</a>'
-            : esc(artikel.supplier_name)) + '</div>' : "")
-    + '</div>'
-    + '<div class="artikel__gesamt">'
-    + zahlText(artikel.gesamtbestand) + '<span>' + esc(artikel.unit) + '</span></div>'
-    + '</div>'
-
-    + '<h3 class="untertitel">Lagerplätze</h3>'
-    + (plaetze.length
-      ? '<table class="tabelle"><tbody>' + plaetze.map((p) =>
-          '<tr><td class="platzcode">' + esc(p.lagerplatz) + '</td>'
-          + '<td class="rechts stark">' + zahlText(p.quantity) + '</td></tr>').join("")
-        + '</tbody></table>'
-      : '<p class="hinweis">Dieser Artikel liegt noch auf keinem Lagerplatz.</p>')
-
-    + (darf ? '<div class="aktionen">'
-        + '<button class="knopf knopf--haupt" data-tun="entnahme">Entnahme</button>'
-        + '<button class="knopf" data-tun="eingang">Wareneingang</button>'
-        + '</div>' : "")
-
-    + '<h3 class="untertitel">Letzte Bewegungen</h3>'
-    + (bewegungen.length
-      ? '<table class="tabelle"><tbody>' + bewegungen.slice(0, 10).map((m) =>
-          '<tr><td class="klein">' + esc(datumZeitKurz(m.created_at)) + '</td>'
-          + '<td>' + esc(BEWEGUNGSARTEN[m.movement_type] || m.movement_type)
-          + '<span class="klein"> ' + esc(m.lagerplatz) + '</span></td>'
-          + '<td class="rechts stark ' + (m.quantity < 0 ? "minus" : "plus") + '">'
-          + leistungText(m.quantity) + '</td>'
-          + '<td class="klein">' + esc(m.benutzer_name || "") + '</td></tr>').join("")
-        + '</tbody></table>'
-      : '<p class="hinweis">Noch keine Bewegungen.</p>')
-
-    + '<div class="karte__fuss">'
-    + '<button class="linkknopf" id="l-zurueck">Zurück zur Suche</button>'
-    + (darf ? ' <button class="linkknopf" id="l-bearbeiten">Artikel bearbeiten</button>' : "")
-    + '</div></section>';
-
-  document.getElementById("l-zurueck").onclick = () => trefferZeichnen(b);
-  const bear = document.getElementById("l-bearbeiten");
-  if (bear) bear.onclick = () => artikelDialog(artikel, b);
-
-  kasten.querySelectorAll("[data-tun]").forEach((el) => {
-    el.onclick = () => buchungsDialog(el.dataset.tun, artikel, plaetze, b);
-  });
-}
-
-// ---------- Buchungen ----------
-
-async function buchungsDialog(art, artikel, plaetze, b) {
-  let alle;
-  try { alle = await ladeLagerplaetze(); }
-  catch (f) { meldung(fehlertext(f), "fehler"); return; }
-
-  if (!alle.length) {
-    meldung("Lege zuerst einen Lagerplatz an.", "warn");
-    return;
-  }
-
-  const belegte = plaetze.map((p) => ({ id: p.location_id, code: p.lagerplatz, menge: p.quantity }));
-
-  const auswahl = (name, label, liste, hinweis) =>
-    '<label class="feld"><span>' + label + '</span>'
-    + '<select id="df-' + name + '">'
-    + liste.map((p) => '<option value="' + esc(p.id) + '">' + esc(p.code)
-        + (p.menge !== undefined ? " (" + zahlText(p.menge) + ")" : "") + '</option>').join("")
-    + '</select>'
-    + (hinweis ? '<span class="feldhinweis">' + esc(hinweis) + '</span>' : "")
-    + '</label>';
-
-  const titel = { entnahme: "Entnahme", eingang: "Wareneingang",
-                  umlagerung: "Umlagern", korrektur: "Bestand korrigieren" }[art];
-
-  const huelle = document.createElement("div");
-  huelle.className = "dialog-huelle";
-  huelle.innerHTML = '<div class="dialog">'
-    + '<h2>' + titel + '</h2>'
-    + '<p>' + esc(artikel.article_number) + ' · ' + esc(artikel.name) + '</p>'
-    + '<form id="bd-form">'
-    + (art === "entnahme"
-        ? auswahl("von", "Von welchem Lagerplatz", belegte.length ? belegte : alle)
-      : art === "eingang"
-        ? auswahl("nach", "Auf welchen Lagerplatz", alle)
-      : art === "umlagerung"
-        ? auswahl("von", "Von", belegte.length ? belegte : alle) + auswahl("nach", "Nach", alle)
-        : auswahl("von", "Welcher Lagerplatz", belegte.length ? belegte : alle))
-    + '<label class="feld"><span>'
-    + (art === "korrektur" ? "Tatsächlicher Bestand" : "Menge") + '</span>'
-    + '<input id="df-menge" type="number" inputmode="numeric" min="0" step="1">'
-    + (art === "korrektur"
-        ? '<span class="feldhinweis">Der gezählte Bestand. Die Differenz wird gebucht.</span>' : "")
-    + '</label>'
-    + '<label class="feld"><span>Notiz</span>'
-    + '<textarea id="df-notiz" rows="2" placeholder="kann leer bleiben"></textarea></label>'
-    + '</form>'
-    + '<div class="dialog__knoepfe">'
-    + '<button class="knopf knopf--still" id="bd-nein">Abbrechen</button>'
-    + '<button class="knopf knopf--haupt" id="bd-ja">' + titel + '</button>'
-    + '</div></div>';
-  document.body.appendChild(huelle);
-
-  const $ = (kennung) => huelle.querySelector("#" + kennung);
-
-  const zu = () => huelle.remove();
-  $("bd-nein").onclick = zu;
-  huelle.onclick = (e) => { if (e.target === huelle) zu(); };
-  $("df-menge").focus();
-
-  const ausfuehren = async () => {
-    const menge = Math.round(Number($("df-menge").value));
-    const notiz = ($("df-notiz").value || "").trim() || null;
-
-    if (!Number.isFinite(menge) || menge < 0) { meldung("Bitte eine Menge eingeben.", "warn"); return; }
-    if (art !== "korrektur" && menge === 0) { meldung("Menge muss grösser als null sein.", "warn"); return; }
-
-    const vonEl = $("df-von");
-    const nachEl = $("df-nach");
-    const vonId = vonEl ? vonEl.value : null;
-    const nachId = nachEl ? nachEl.value : null;
-
-    const code = (id) => (alle.find((p) => p.id === id) || {}).code || "";
-
-    try {
-      if (art === "eingang") {
-        const ok = await nachfragen({ titel: "Wareneingang buchen",
-          text: zahlText(menge) + " Stück " + artikel.article_number + " auf " + code(nachId) + " einlagern?",
-          bestaetigen: "Buchen" });
-        if (!ok) return;
-        await bucheBewegung({ article_id: artikel.id, location_id: nachId,
-          movement_type: "eingang", quantity: menge, note: notiz });
-
-      } else if (art === "entnahme") {
-        const b1 = belegte.find((p) => p.id === vonId);
-        const rest = (b1 ? b1.menge : 0) - menge;
-        const ok = await nachfragen({ titel: "Entnahme buchen",
-          text: zahlText(menge) + " Stück " + artikel.article_number + " von " + code(vonId)
-              + " entnehmen? Danach dort: " + zahlText(rest) + ".",
-          bestaetigen: "Entnehmen", gefahr: rest < 0 });
-        if (!ok) return;
-        await bucheBewegung({ article_id: artikel.id, location_id: vonId,
-          movement_type: "entnahme", quantity: -menge, note: notiz });
-
-      } else if (art === "umlagerung") {
-        if (vonId === nachId) { meldung("Von und Nach sind gleich.", "warn"); return; }
-        const ok = await nachfragen({ titel: "Umlagern",
-          text: zahlText(menge) + " Stück von " + code(vonId) + " nach " + code(nachId) + " umlagern?",
-          bestaetigen: "Umlagern" });
-        if (!ok) return;
-        const gruppe = crypto.randomUUID();
-        await bucheBewegung({ article_id: artikel.id, location_id: vonId,
-          movement_type: "umlagerung", quantity: -menge, note: notiz, transfer_group_id: gruppe });
-        await bucheBewegung({ article_id: artikel.id, location_id: nachId,
-          movement_type: "umlagerung", quantity: menge, note: notiz, transfer_group_id: gruppe });
-
-      } else {
-        const b1 = belegte.find((p) => p.id === vonId);
-        const ist = b1 ? b1.menge : 0;
-        const diff = menge - ist;
-        if (diff === 0) { meldung("Bestand stimmt bereits.", "warn"); return; }
-        const ok = await nachfragen({ titel: "Bestand korrigieren",
-          text: "Auf " + code(vonId) + " sind " + zahlText(ist) + " gebucht, gezählt wurden "
-              + zahlText(menge) + ". Es wird " + leistungText(diff) + " gebucht.",
-          bestaetigen: "Korrigieren", gefahr: true });
-        if (!ok) return;
-        await bucheBewegung({ article_id: artikel.id, location_id: vonId,
-          movement_type: "inventur", quantity: diff, note: notiz });
-      }
-
-      zu();
-      meldung("Gebucht.");
-      lag.suchtext = artikel.article_number;
-      seiteLager(b);
-    } catch (f) {
-      meldung(fehlertext(f), "fehler");
-    }
-  };
-
-  $("bd-ja").onclick = ausfuehren;
-  $("bd-form").onsubmit = (e) => { e.preventDefault(); ausfuehren(); };
-}
-
-// ---------- Bewegungen ----------
-
-async function lagerBewegungen(ziel, b) {
-  ziel.innerHTML = '<div class="laedt">Bewegungen werden geladen …</div>';
-  let liste;
-  try { liste = await ladeBewegungen(null); }
-  catch (f) {
-    ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
-    return;
-  }
-
-  ziel.innerHTML = '<section class="karte"><h2>Letzte Bewegungen</h2>'
-    + (liste.length
-      ? '<table class="tabelle"><thead><tr><th>Wann</th><th>Artikel</th>'
-        + '<th>Platz</th><th class="mitte">Menge</th><th>Wer</th></tr></thead><tbody>'
-        + liste.map((m) => '<tr><td class="klein">' + esc(datumZeitKurz(m.created_at)) + '</td>'
-            + '<td>' + esc(m.article_number)
-            + '<div class="klein">' + esc(BEWEGUNGSARTEN[m.movement_type] || "") + '</div></td>'
-            + '<td class="platzcode">' + esc(m.lagerplatz) + '</td>'
-            + '<td class="mitte stark ' + (m.quantity < 0 ? "minus" : "plus") + '">'
-            + leistungText(m.quantity) + '</td>'
-            + '<td class="klein">' + esc(m.benutzer_name || "") + '</td></tr>').join("")
-        + '</tbody></table>'
-      : '<p class="hinweis">Noch keine Bewegungen erfasst.</p>')
-    + '</section>';
-}
-
-// ---------- Artikel ----------
-
-async function lagerArtikel(ziel, b) {
-  ziel.innerHTML = '<div class="laedt">Artikel werden geladen …</div>';
-  let liste, plaetzeJeArtikel = {};
-  try {
-    liste = await sucheArtikel("");
-    const r = await zeitlimit(db.from("bestand_je_platz").select("article_id, lagerplatz, quantity"),
-      10000, "Lagerplätze");
-    if (!r.error) {
-      (r.data || []).forEach((z) => {
-        (plaetzeJeArtikel[z.article_id] = plaetzeJeArtikel[z.article_id] || []).push(z);
-      });
-    }
-  } catch (f) {
-    ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
-    return;
-  }
-
-  ziel.innerHTML = (darfSchreiben()
-      ? '<button class="knopf knopf--haupt knopf--breit" id="a-neu">+ Neuer Artikel</button>' : "")
-    + '<section class="karte"><h2>Artikel <span class="marke">' + liste.length + '</span></h2>'
-    + (liste.length
-      ? '<table class="tabelle"><thead><tr><th>Nummer</th><th>Bezeichnung</th>'
-        + '<th class="mitte">Bestand</th>' + (darfSchreiben() ? '<th></th>' : "")
-        + '</tr></thead><tbody>'
-        + liste.map((a) => '<tr><td class="stark">' + esc(a.article_number) + '</td>'
-            + '<td>' + esc(a.name)
-            + (a.supplier_name ? '<div class="klein">' + esc(a.supplier_name) + '</div>' : "") + '</td>'
-            + '<td class="mitte">'
-            + zahlText(a.gesamtbestand) + '</td>'
-            + (darfSchreiben() ? '<td class="rechts"><button class="linkknopf" data-bearb="'
-                + esc(a.id) + '">Bearbeiten</button></td>' : "")
-            + '</tr>').join("")
-        + '</tbody></table>'
-      : '<p class="hinweis">Noch keine Artikel angelegt.</p>')
-    + '</section>';
-
-  const neu = document.getElementById("a-neu");
-  if (neu) neu.onclick = () => artikelDialog(null, b);
-
-  ziel.querySelectorAll("[data-bearb]").forEach((el) => {
-    el.onclick = () => artikelDialog(liste.find((x) => x.id === el.dataset.bearb), b);
-  });
-}
-
-async function artikelDialog(artikel, b, vorgabeNummer) {
-  let lieferanten = [], plaetze = [];
-  try { lieferanten = await ladeLieferanten(); } catch (f) { /* geht auch ohne */ }
-  try { plaetze = await ladeLagerplaetze(); } catch (f) { /* geht auch ohne */ }
-
-  const neuerArtikel = !artikel;
-
-  const huelle = document.createElement("div");
-  huelle.className = "dialog-huelle";
-  huelle.innerHTML = '<div class="dialog">'
-    + '<h2>' + (artikel ? "Artikel bearbeiten" : "Neuer Artikel") + '</h2>'
-    + '<form id="ad-form">'
-    + '<label class="feld"><span>Artikelnummer</span>'
-    + '<input id="ad-nr" type="text" autocapitalize="characters" value="'
-    + esc(artikel ? artikel.article_number : (vorgabeNummer || "")) + '">'
-    + '<span class="feldhinweis">Buchstaben, Zahlen, Punkt, Bindestrich und Leerzeichen '
-    + 'sind alle erlaubt.</span></label>'
-    + '<label class="feld"><span>Bezeichnung</span>'
-    + '<input id="ad-name" type="text" value="' + esc(artikel ? artikel.name : "") + '"></label>'
-    + '<div class="zeitraumwahl">'
-    + '<label class="feld"><span>Einheit</span>'
-    + '<input id="ad-einheit" type="text" value="' + esc(artikel ? artikel.unit : "Stück") + '"></label>'
-    + '</div>'
-    + '<label class="feld"><span>Lieferant</span><select id="ad-lief">'
-    + '<option value="">– kein Lieferant –</option>'
-    + lieferanten.map((l) => '<option value="' + esc(l.id) + '"'
-        + (artikel && artikel.supplier_id === l.id ? " selected" : "") + '>'
-        + esc(l.name) + '</option>').join("")
-    + '<option value="__neu">+ Neuer Lieferant …</option>'
-    + '</select></label>'
-
-    + (neuerArtikel
-      ? '<div class="dialog__block"><div class="dialog__blocktitel">Wohin kommt der Artikel?</div>'
-        + '<div class="zeitraumwahl">'
-        + '<label class="feld"><span>Lagerplatz</span><select id="ad-platz">'
-        + plaetze.map((p) => '<option value="' + esc(p.id) + '">' + esc(p.code) + '</option>').join("")
-        + '<option value="__neu">+ Neuer Lagerplatz …</option>'
-        + '</select></label>'
-        + '<label class="feld"><span>Anfangsbestand</span>'
-        + '<input id="ad-bestand" type="number" min="0" step="1" value="0"></label>'
-        + '</div></div>'
-      : "")
-    + '</form>'
-    + '<div class="dialog__knoepfe">'
-    + (artikel ? '<button class="knopf knopf--gefahr" id="ad-weg">Löschen</button>' : "")
-    + '<button class="knopf knopf--still" id="ad-nein">Abbrechen</button>'
-    + '<button class="knopf knopf--haupt" id="ad-ja">Speichern</button>'
-    + '</div></div>';
-  document.body.appendChild(huelle);
-
-  // Nur im eigenen Fenster suchen. Sonst greift der Klick
-  // versehentlich auf einen gleichnamigen Knopf eines anderen Dialogs.
-  const $ = (kennung) => huelle.querySelector("#" + kennung);
-
-  const zu = () => huelle.remove();
-  $("ad-nein").onclick = zu;
-  huelle.onclick = (e) => { if (e.target === huelle) zu(); };
-  $("ad-nr").focus();
-
-  // Neuen Lieferanten direkt hier anlegen
-  const liefWahl = $("ad-lief");
-  if (liefWahl) liefWahl.onchange = async () => {
-    if (liefWahl.value !== "__neu") return;
-    liefWahl.value = "";
-    const w = await dialogFelder({ titel: "Neuer Lieferant",
-      felder: [
-        { name: "name", label: "Name", pflicht: true },
-        { name: "website", label: "Website", platzhalter: "www.beispiel.ch" },
-      ], bestaetigen: "Anlegen" });
-    if (!w) return;
-    let seite = (w.website || "").trim();
-    if (seite && !/^https?:\/\//i.test(seite)) seite = "https://" + seite;
-    const { data, error } = await db.from("suppliers")
-      .insert({ name: w.name, website: seite || null }).select().single();
-    if (error) { meldung(fehlertext(error), "fehler"); return; }
-    const opt = document.createElement("option");
-    opt.value = data.id; opt.textContent = data.name; opt.selected = true;
-    liefWahl.insertBefore(opt, liefWahl.lastElementChild);
-    meldung("Lieferant angelegt.");
-  };
-
-  // Neuen Lagerplatz direkt hier anlegen
-  const platzWahl = $("ad-platz");
-  if (platzWahl) platzWahl.onchange = async () => {
-    if (platzWahl.value !== "__neu") return;
-    platzWahl.value = "";
-    const neuerPlatz = await lagerplatzAnlegen();
-    if (!neuerPlatz) return;
-    const opt = document.createElement("option");
-    opt.value = neuerPlatz.id; opt.textContent = neuerPlatz.code; opt.selected = true;
-    platzWahl.insertBefore(opt, platzWahl.lastElementChild);
-  };
-
-  const speichern = async () => {
-    const daten = {
-      article_number: $("ad-nr").value.trim(),
-      name: $("ad-name").value.trim(),
-      unit: $("ad-einheit").value.trim() || "Stück",
-      supplier_id: liefWahl && liefWahl.value && liefWahl.value !== "__neu"
-        ? liefWahl.value : null,
-    };
-    if (!daten.article_number || !daten.name) {
-      meldung("Artikelnummer und Bezeichnung werden benötigt.", "warn");
-      return;
-    }
-
-    if (artikel) {
-      const { error } = await db.from("articles").update(daten).eq("id", artikel.id);
-      if (error) { meldung(fehlertext(error), "fehler"); return; }
-      zu(); meldung("Gespeichert."); seiteLager(b);
-      return;
-    }
-
-    const { data, error } = await db.from("articles").insert(daten).select().single();
-    if (error) { meldung(fehlertext(error), "fehler"); return; }
-
-    // Anfangsbestand gleich einbuchen
-    const platzId = platzWahl && platzWahl.value && platzWahl.value !== "__neu"
-      ? platzWahl.value : null;
-    const bestandFeld = $("ad-bestand");
-    const menge = Math.max(0, Math.round(Number(bestandFeld ? bestandFeld.value : 0) || 0));
-
-    if (platzId && menge > 0) {
-      try {
-        await bucheBewegung({ article_id: data.id, location_id: platzId,
-          movement_type: "eingang", quantity: menge, note: "Anfangsbestand" });
-      } catch (f) { meldung("Artikel angelegt, aber Bestand nicht gebucht: "
-        + fehlertext(f), "warn"); }
-    }
-
-    zu();
-    meldung("Artikel angelegt.");
-    lag.suchtext = daten.article_number;
-    seiteLager(b);
-  };
-
-  const adJa = $("ad-ja");
-  if (adJa) {
-    adJa.type = "button";
-    adJa.onclick = (e) => { e.preventDefault(); speichern(); };
-  }
-  $("ad-form").onsubmit = (e) => { e.preventDefault(); speichern(); };
-  // Sicherstellung: Enter in jedem Feld des Formulars löst auch speichern aus.
-  $("ad-form").querySelectorAll("input").forEach((el) => {
-    el.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); speichern(); } });
-  });
-
-  const weg = $("ad-weg");
-  if (weg) weg.onclick = async () => {
-    const ok = await doppeltNachfragen(
-      { titel: "Artikel löschen",
-        text: 'Soll "' + artikel.article_number + '" wirklich gelöscht werden? '
-            + "Wenn Bestand oder Bewegungen daran hängen, lehnt die Datenbank das ab. "
-            + "Deaktivieren wäre der sichere Weg.",
-        bestaetigen: "Weiter zum Löschen", gefahr: true },
-      { titel: "Wirklich endgültig löschen?",
-        text: "Letzte Rückfrage. Danach ist der Artikel unwiderruflich weg.",
-        bestaetigen: "Endgültig löschen", gefahr: true });
-    if (!ok) return;
-
-    const { error } = await db.from("articles").delete().eq("id", artikel.id);
-    if (error) {
-      const nochmal = await nachfragen({ titel: "Löschen nicht möglich",
-        text: fehlertext(error) + " Soll der Artikel stattdessen deaktiviert werden?",
-        bestaetigen: "Deaktivieren" });
-      if (!nochmal) return;
-      const r = await db.from("articles").update({ is_active: false }).eq("id", artikel.id);
-      if (r.error) { meldung(fehlertext(r.error), "fehler"); return; }
-      zu(); meldung("Deaktiviert."); seiteLager(b);
-      return;
-    }
-    zu(); meldung("Artikel gelöscht."); lag.suchtext = ""; seiteLager(b);
-  };
-}
-
-// ---------- Lagerplätze ----------
-
-async function lagerPlaetze(ziel, b) {
-  ziel.innerHTML = '<div class="laedt">Lagerplätze werden geladen …</div>';
-  let liste;
-  try { liste = await ladeLagerplaetze(); }
-  catch (f) {
-    ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
-    return;
-  }
-
-  // Nach Schrank gruppieren
-  const gruppen = {};
-  liste.forEach((p) => { (gruppen[p.cabinet || "Ohne Schrank"] =
-    gruppen[p.cabinet || "Ohne Schrank"] || []).push(p); });
-
-  ziel.innerHTML = (darfSchreiben()
-      ? '<button class="knopf knopf--haupt knopf--breit" id="p-neu">+ Lagerplatz anlegen</button>' : "")
-    + (liste.length
-      ? Object.keys(gruppen).sort().map((schrank) =>
-          '<section class="karte"><h2>Schrank ' + esc(schrank) + '</h2>'
-          + '<div class="platzgitter">' + gruppen[schrank].map((p) =>
-              (darfSchreiben()
-                ? '<button class="platzchip platzchip--klick" data-platz="' + esc(p.id) + '"'
-                  + ' title="' + esc(p.description || "") + '">' + esc(p.code) + '</button>'
-                : '<span class="platzchip">' + esc(p.code) + '</span>')).join("")
-          + '</div></section>').join("")
-      : '<div class="karte karte--hinweis"><p>Noch keine Lagerplätze angelegt. '
-        + 'Ein Lagerplatz besteht aus Schrank, Schublade und optional einer Koordinate. '
-        + 'A, 1, B4 ergibt den Code A1B4, ohne Koordinate einfach A1.</p></div>');
-
-  ziel.querySelectorAll("[data-platz]").forEach((el) => {
-    el.onclick = async () => {
-      const platz = liste.find((x) => x.id === el.dataset.platz);
-      if (!platz) return;
-
-      const huelle = document.createElement("div");
-      huelle.className = "dialog-huelle";
-      huelle.innerHTML = '<div class="dialog"><h2>Lagerplatz ' + esc(platz.code) + '</h2>'
-        + '<p>' + esc(platz.description || "Keine Beschreibung hinterlegt.") + '</p>'
-        + '<div class="statuswahl">'
-        + '<button class="knopf" data-tun="deaktiv">Deaktivieren</button>'
-        + (istAdmin() ? '<button class="knopf knopf--gefahr" data-tun="weg">Löschen</button>' : "")
-        + '</div><div class="dialog__knoepfe">'
-        + '<button class="knopf knopf--still" data-nein>Schliessen</button></div></div>';
-      document.body.appendChild(huelle);
-
-      const zu = () => huelle.remove();
-      huelle.querySelector("[data-nein]").onclick = zu;
-      huelle.onclick = (e) => { if (e.target === huelle) zu(); };
-
-      huelle.querySelectorAll("[data-tun]").forEach((k) => {
-        k.onclick = async () => {
-          if (k.dataset.tun === "deaktiv") {
-            const ok = await nachfragen({ titel: "Lagerplatz deaktivieren",
-              text: "Der Platz verschwindet aus den Listen. Gebuchte Bestände bleiben erhalten.",
-              bestaetigen: "Deaktivieren", gefahr: true });
-            if (!ok) return;
-            const { error } = await db.from("storage_locations")
-              .update({ is_active: false }).eq("id", platz.id);
-            zu();
-            if (error) meldung(fehlertext(error), "fehler");
-            else { meldung("Deaktiviert."); seiteLager(b); }
-          } else {
-            const w = await loeschen({ tabelle: "storage_locations", id: platz.id,
-              titel: "Lagerplatz löschen",
-              text: 'Soll "' + platz.code + '" endgültig gelöscht werden? '
-                  + 'Wenn dort noch Bestand oder Bewegungen liegen, wird das abgelehnt.' });
-            zu();
-            if (w) seiteLager(b);
-          }
-        };
-      });
-    };
-  });
-
-  const neu = document.getElementById("p-neu");
-  if (neu) neu.onclick = async () => {
-    const p = await lagerplatzAnlegen();
-    if (p) seiteLager(b);
-  };
-
-  ziel.querySelectorAll("[data-platz-bearb]").forEach((el) => {
-    el.onclick = async () => {
-      const w = await dialogFelder({ titel: "Lagerplatz umbenennen",
-        felder: [{ name: "code", label: "Code", wert: el.dataset.code, pflicht: true }],
-        bestaetigen: "Speichern" });
-      if (!w) return;
-      const code = w.code.toUpperCase().replace(/\s+/g, "");
-      const { error } = await db.from("storage_locations")
-        .update({ code: code }).eq("id", el.dataset.platzBearb);
-      if (error) meldung(fehlertext(error), "fehler");
-      else { meldung("Gespeichert."); seiteLager(b); }
-    };
-  });
-
-  ziel.querySelectorAll("[data-platz-weg]").forEach((el) => {
-    el.onclick = async () => {
-      const code = el.dataset.code;
-      const ok = await doppeltNachfragen(
-        { titel: "Lagerplatz löschen",
-          text: 'Soll "' + code + '" wirklich gelöscht werden? Wenn dort noch Bestand '
-              + "gebucht ist, lehnt die Datenbank das ab.",
-          bestaetigen: "Weiter zum Löschen", gefahr: true },
-        { titel: "Wirklich endgültig löschen?",
-          text: "Letzte Rückfrage. Danach ist der Lagerplatz weg.",
-          bestaetigen: "Endgültig löschen", gefahr: true });
-      if (!ok) return;
-
-      const { error } = await db.from("storage_locations").delete().eq("id", el.dataset.platzWeg);
-      if (error) meldung(fehlertext(error), "fehler");
-      else { meldung("Lagerplatz gelöscht."); seiteLager(b); }
-    };
-  });
-}
-
-// Legt einen Lagerplatz an und gibt ihn zurück. Wird auch aus dem
-// Artikeldialog heraus aufgerufen.
-async function lagerplatzAnlegen() {
-  const w = await dialogFelder({ titel: "Lagerplatz anlegen",
-    text: "Aus Schrank, Schublade und Koordinate wird der Code gebildet, zum Beispiel A1B4. "
-        + "Ohne Koordinate entsteht A1.",
-    felder: [
-      { name: "schrank", label: "Schrank", pflicht: true, platzhalter: "A" },
-      { name: "ebene", label: "Schublade", pflicht: true, platzhalter: "1" },
-      { name: "koordinate", label: "Koordinate", platzhalter: "B4, kann leer bleiben" },
-      { name: "notiz", label: "Beschreibung", platzhalter: "kann leer bleiben" },
-    ],
-    bestaetigen: "Anlegen" });
-  if (!w) return null;
-
-  const code = (w.schrank + w.ebene + (w.koordinate || "")).toUpperCase().replace(/\s+/g, "");
-  const { data, error } = await db.from("storage_locations").insert({
-    code: code, cabinet: w.schrank.toUpperCase(), level: w.ebene,
-    coordinate: w.koordinate ? w.koordinate.toUpperCase() : null,
-    description: w.notiz || null
-  }).select().single();
-
-  if (error) { meldung(fehlertext(error), "fehler"); return null; }
-  meldung("Lagerplatz " + code + " angelegt.");
-  return data;
 }
 
 // =================================================================
@@ -4679,6 +3916,7 @@ function rechnerWinkel(ziel) {
 
 const best = {
   ansicht: "offen",
+  artikelSuche: "",
   lieferantId: null,
 };
 
@@ -4708,7 +3946,8 @@ async function ladeBestellungen(offen) {
 async function seiteBestellungen(b) {
   b.innerHTML = '<h1 class="seitentitel">Bestellungen</h1>'
     + '<div class="reiter">'
-    + [["offen", "Offen"], ["historie", "Historie"], ["lieferanten", "Lieferanten"]]
+    + [["offen", "Offen"], ["historie", "Historie"],
+       ["artikel", "Artikel"], ["lieferanten", "Lieferanten"]]
       .map(([w, t]) => '<button class="reiter__knopf' + (best.ansicht === w ? " aktiv" : "")
         + '" data-best="' + w + '">' + t + '</button>').join("")
     + '</div>'
@@ -4720,6 +3959,7 @@ async function seiteBestellungen(b) {
   });
 
   const ziel = document.getElementById("best-inhalt");
+  if (best.ansicht === "artikel") return bestArtikel(ziel, b);
   if (best.ansicht === "lieferanten") return bestLieferanten(ziel, b);
   if (best.ansicht === "historie") return bestHistorie(ziel, b);
   return bestOffen(ziel, b);
@@ -4883,82 +4123,26 @@ async function bestOffen(ziel, b) {
   });
 }
 
-// Beim Liefern gleich ins Lager buchen.
+// Beim Liefern nur noch den Status setzen. Eine Lagerhaltung
+// gibt es nicht mehr.
 async function lieferungEinlagern(z, b) {
   const a = z.articles || {};
 
-  let plaetze = [];
-  try { plaetze = await ladeLagerplaetze(); }
-  catch (f) { meldung(fehlertext(f), "fehler"); return; }
+  const ok = await nachfragen({
+    titel: "Lieferung eingetroffen",
+    text: (a.article_number || "") + " " + (a.name || "")
+        + " · " + zahlText(z.quantity) + " Stück. Position auf geliefert setzen?",
+    bestaetigen: "Ja, geliefert" });
+  if (!ok) return;
 
-  const huelle = document.createElement("div");
-  huelle.className = "dialog-huelle";
-  huelle.innerHTML = '<div class="dialog"><h2>Lieferung eingetroffen</h2>'
-    + '<p><strong>' + esc(a.article_number || "") + '</strong> ' + esc(a.name || "") + '</p>'
-    + '<label class="feld"><span>Gelieferte Menge</span>'
-    + '<input id="li-menge" type="number" min="0" step="1" value="' + z.quantity + '"></label>'
-    + '<label class="feld"><span>Wohin einlagern</span><select id="li-platz">'
-    + '<option value="">– nicht einlagern –</option>'
-    + plaetze.map((p2) => '<option value="' + esc(p2.id) + '">' + esc(p2.code) + '</option>').join("")
-    + '<option value="__neu">+ Neuer Lagerplatz …</option>'
-    + '</select>'
-    + '<span class="feldhinweis">Der Bestand wird sofort gebucht. Wähle "nicht einlagern", '
-    + 'wenn du das später von Hand machen willst.</span></label>'
-    + '<div class="dialog__knoepfe">'
-    + '<button class="knopf knopf--still" id="li-nein">Abbrechen</button>'
-    + '<button class="knopf knopf--haupt" id="li-ja">Als geliefert buchen</button>'
-    + '</div></div>';
-  document.body.appendChild(huelle);
+  const { error } = await db.from("order_items").update({
+    status: "geliefert",
+    delivered_at: new Date().toISOString(),
+    completed_at: new Date().toISOString(),
+  }).eq("id", z.id);
 
-  const $ = (k) => huelle.querySelector("#" + k);
-  const zu = () => huelle.remove();
-  $("li-nein").onclick = zu;
-  huelle.onclick = (e) => { if (e.target === huelle) zu(); };
-
-  const platzWahl = $("li-platz");
-  platzWahl.onchange = async () => {
-    if (platzWahl.value !== "__neu") return;
-    platzWahl.value = "";
-    const neuerPlatz = await lagerplatzAnlegen();
-    if (!neuerPlatz) return;
-    plaetze.push(neuerPlatz);
-    const opt = document.createElement("option");
-    opt.value = neuerPlatz.id; opt.textContent = neuerPlatz.code; opt.selected = true;
-    platzWahl.insertBefore(opt, platzWahl.lastElementChild);
-  };
-
-  $("li-ja").onclick = async () => {
-    const menge = Math.max(0, Math.round(Number($("li-menge").value) || 0));
-    const platzId = platzWahl.value && platzWahl.value !== "__neu" ? platzWahl.value : null;
-    const platzCode = platzId ? (plaetze.find((p2) => p2.id === platzId) || {}).code : null;
-
-    const ok = await nachfragen({ titel: "Lieferung buchen",
-      text: platzId
-        ? zahlText(menge) + " Stück werden auf " + platzCode + " eingelagert."
-        : "Die Position wird auf geliefert gesetzt, ohne Lagerbuchung.",
-      bestaetigen: "Ja, buchen" });
-    if (!ok) return;
-
-    if (platzId && menge > 0) {
-      try {
-        await bucheBewegung({ article_id: z.article_id, location_id: platzId,
-          movement_type: "eingang", quantity: menge,
-          note: "Lieferung Bestellung " + (a.article_number || "") });
-      } catch (f) { meldung(fehlertext(f), "fehler"); return; }
-    }
-
-    const { error } = await db.from("order_items").update({
-      status: "geliefert",
-      delivered_at: new Date().toISOString(),
-      delivered_location: platzId,
-      completed_at: new Date().toISOString(),
-    }).eq("id", z.id);
-
-    zu();
-    if (error) meldung(fehlertext(error), "fehler");
-    else { meldung(platzId ? "Geliefert und eingelagert." : "Als geliefert gebucht.");
-           seiteBestellungen(b); }
-  };
+  if (error) meldung(fehlertext(error), "fehler");
+  else { meldung("Als geliefert gebucht."); seiteBestellungen(b); }
 }
 
 // ---------- Neue Position ----------
@@ -5168,6 +4352,142 @@ async function bestHistorie(ziel, b) {
         + '</tbody></table>'
       : '<p class="hinweis">Noch keine Bestellungen erfasst.</p>')
     + '</section>';
+}
+
+// ---------- Artikel ----------
+
+async function bestArtikel(ziel, b) {
+  ziel.innerHTML = '<div class="suchleiste">'
+    + '<input type="search" id="ar-suche" placeholder="Artikelnummer, Name oder Lieferant"'
+    + ' value="' + esc(best.artikelSuche || "") + '" autocomplete="off"></div>'
+    + (darfSchreiben()
+        ? '<button class="knopf knopf--haupt knopf--breit" id="ar-neu">+ Neuer Artikel</button>'
+        : "")
+    + '<div id="ar-liste"><div class="laedt">Wird geladen …</div></div>';
+
+  const feld = document.getElementById("ar-suche");
+  let taste = null;
+  feld.oninput = () => {
+    best.artikelSuche = feld.value;
+    clearTimeout(taste);
+    taste = setTimeout(() => artikelListe(b), 300);
+  };
+
+  const neu = document.getElementById("ar-neu");
+  if (neu) neu.onclick = async () => {
+    const a = await artikelSchnellAnlegen("");
+    if (a) seiteBestellungen(b);
+  };
+
+  artikelListe(b);
+}
+
+async function artikelListe(b) {
+  const kasten = document.getElementById("ar-liste");
+  if (!kasten) return;
+
+  let liste;
+  try { liste = await sucheArtikel(best.artikelSuche || ""); }
+  catch (f) {
+    kasten.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  kasten.innerHTML = '<section class="karte">'
+    + '<h2>Artikel <span class="marke">' + liste.length + '</span></h2>'
+    + (liste.length
+      ? '<table class="tabelle"><thead><tr><th>Nummer</th><th>Bezeichnung</th>'
+        + '<th>Lieferant</th>' + (darfSchreiben() ? '<th></th>' : "")
+        + '</tr></thead><tbody>'
+        + liste.map((a) => '<tr>'
+            + '<td class="stark">' + esc(a.article_number) + '</td>'
+            + '<td>' + esc(a.name)
+            + (a.unit && a.unit !== "Stück" ? '<div class="klein">' + esc(a.unit) + '</div>' : "")
+            + '</td>'
+            + '<td class="klein">' + (a.supplier_name
+                ? (a.supplier_website
+                    ? '<a class="lieferantlink" href="' + esc(a.supplier_website)
+                      + '" target="_blank" rel="noopener">' + esc(a.supplier_name) + ' ↗</a>'
+                    : esc(a.supplier_name))
+                : "–") + '</td>'
+            + (darfSchreiben()
+                ? '<td class="rechts nowrap">'
+                  + '<button class="linkknopf" data-arbearb="' + esc(a.id) + '">Bearbeiten</button>'
+                  + '<button class="linkknopf linkknopf--gefahr" data-arweg="' + esc(a.id)
+                  + '" data-nr="' + esc(a.article_number) + '">Löschen</button></td>'
+                : "")
+            + '</tr>').join("")
+        + '</tbody></table>'
+      : '<p class="hinweis">'
+        + (best.artikelSuche ? "Kein Artikel gefunden." : "Noch keine Artikel angelegt.")
+        + '</p>')
+    + '</section>';
+
+  kasten.querySelectorAll("[data-arbearb]").forEach((el) => {
+    el.onclick = () => artikelBearbeiten(liste.find((x) => x.id === el.dataset.arbearb), b);
+  });
+
+  kasten.querySelectorAll("[data-arweg]").forEach((el) => {
+    el.onclick = async () => {
+      const ok = await doppeltNachfragen(
+        { titel: "Artikel löschen",
+          text: 'Soll "' + el.dataset.nr + '" wirklich gelöscht werden? '
+              + "Wenn er in Bestellungen vorkommt, lehnt die Datenbank das ab.",
+          bestaetigen: "Weiter zum Löschen", gefahr: true },
+        { titel: "Wirklich endgültig löschen?",
+          text: "Letzte Rückfrage. Danach ist der Artikel weg.",
+          bestaetigen: "Endgültig löschen", gefahr: true });
+      if (!ok) return;
+
+      const { error } = await db.from("articles").delete().eq("id", el.dataset.arweg);
+      if (error) {
+        const aus = await nachfragen({ titel: "Löschen nicht möglich",
+          text: fehlertext(error) + " Soll der Artikel stattdessen ausgeblendet werden?",
+          bestaetigen: "Ausblenden" });
+        if (!aus) return;
+        const r = await db.from("articles").update({ is_active: false }).eq("id", el.dataset.arweg);
+        if (r.error) { meldung(fehlertext(r.error), "fehler"); return; }
+        meldung("Ausgeblendet.");
+      } else {
+        meldung("Artikel gelöscht.");
+      }
+      artikelListe(b);
+    };
+  });
+}
+
+async function artikelBearbeiten(artikel, b) {
+  if (!artikel) return;
+
+  let lieferanten = [];
+  try { lieferanten = await ladeLieferanten(); } catch (f) { /* geht auch ohne */ }
+
+  const w = await dialogFelder({
+    titel: "Artikel bearbeiten",
+    felder: [
+      { name: "nummer", label: "Artikelnummer", pflicht: true, wert: artikel.article_number },
+      { name: "name", label: "Bezeichnung", pflicht: true, wert: artikel.name },
+      { name: "einheit", label: "Einheit", wert: artikel.unit || "Stück" },
+    ],
+    bestaetigen: "Weiter",
+  });
+  if (!w) return;
+
+  let lieferantId = artikel.supplier_id || null;
+  if (lieferanten.length) {
+    const wahl = await auswahlDialog("Lieferant",
+      lieferanten.map((l) => ({ wert: l.id, text: l.name }))
+        .concat([{ wert: "", text: "– kein Lieferant –" }]));
+    if (wahl !== null) lieferantId = wahl || null;
+  }
+
+  const { error } = await db.from("articles").update({
+    article_number: w.nummer, name: w.name,
+    unit: w.einheit || "Stück", supplier_id: lieferantId,
+  }).eq("id", artikel.id);
+
+  if (error) meldung(fehlertext(error), "fehler");
+  else { meldung("Gespeichert."); artikelListe(b); }
 }
 
 // ---------- Lieferanten ----------
@@ -5424,12 +4744,6 @@ SYM.produktion = svg('<circle cx="12" cy="12" r="3.2"/>'
   + '<path d="M12 2.6v2.6M12 18.8v2.6M4.4 12H1.8M22.2 12h-2.6'
   + 'M6.3 6.3 4.5 4.5M19.5 19.5l-1.8-1.8M17.7 6.3l1.8-1.8M4.5 19.5l1.8-1.8"/>');
 
-// Lager: gestapelte Kisten
-SYM.lager = svg('<rect x="3" y="3.5" width="18" height="6" rx="1.5"/>'
-  + '<rect x="3" y="9.5" width="18" height="5.5" rx="1.5"/>'
-  + '<rect x="3" y="15" width="18" height="5.5" rx="1.5"/>'
-  + '<line x1="9.5" y1="12.2" x2="14.5" y2="12.2"/>');
-
 // Bestellungen: Lieferschein mit Haken
 SYM.bestellungen = svg('<path d="M6 2.8h9l4 4v14.4H6z"/><path d="M15 2.8v4h4"/>'
   + '<path d="M9 13l1.8 1.8L14.5 11"/><line x1="9" y1="17.6" x2="15" y2="17.6"/>');
@@ -5457,7 +4771,6 @@ const SEITEN = [
   { pfad: "bestellungen", titel: "Bestellungen", zeichen: SYM.bestellungen, zeige: seiteBestellungen },
   { pfad: "einkauf",      titel: "Einkauf",      zeichen: SYM.einkauf, zeige: seiteEinkauf },
   { pfad: "rechner",      titel: "Rechner",      zeichen: SYM.rechner, zeige: seiteRechner },
-  { pfad: "lager",        titel: "Lager",        zeichen: SYM.lager, zeige: seiteLager },
   { pfad: "einstellungen", titel: "Einstellungen", zeichen: SYM.einstellungen, zeige: seiteEinstellungen },
 ];
 
