@@ -1095,6 +1095,21 @@ a:focus-visible {
 
 .karte--warnung { border-left: 4px solid #c08415; background: #fffcf5; }
 .karte--warnung h2 { color: #8a5c10; }
+
+/* ---------- Balken in der Breite ziehen ---------- */
+.pw-griff { position: absolute; top: 0; bottom: 0; width: 14px; cursor: ew-resize;
+            touch-action: none; z-index: 2; }
+.pw-griff--links { left: -2px; }
+.pw-griff--rechts { right: -2px; }
+.pw-griff::after { content: ""; position: absolute; top: 25%; bottom: 25%;
+                   width: 3px; border-radius: 2px; background: rgba(255,255,255,.55); }
+.pw-griff--links::after { left: 4px; }
+.pw-griff--rechts::after { right: 4px; }
+.pw-balken:hover .pw-griff::after { background: rgba(255,255,255,.9); }
+.pw-balken--groesse { outline: 2px solid var(--signalgelb); outline-offset: 1px; }
+
+/* ---------- Mehr Luft unter den Knöpfen ---------- */
+.pw-aktionen { margin-bottom: 48px !important; }
 </style>
 </head>
 <body>
@@ -1138,7 +1153,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "11.3.0";
+const APP_VERSION = "11.4.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -2607,6 +2622,7 @@ async function ansichtPlanwand(ziel, b) {
 
 function zeichnePlanwand(b) {
   const tage = arbeitstage(plan.start, plan.tage);
+  plan.sichtbareTage = tage;
   const heute = isoDatum(new Date());
 
   document.getElementById("pw-titel").textContent =
@@ -2701,6 +2717,7 @@ function zeichnePlanwand(b) {
     + '</p>';
 
   balkenVerhalten(b);
+  griffVerhalten(b);
   ferienVerhalten(b);
 }
 
@@ -2726,6 +2743,8 @@ function planBalken(j, spalte, dauer, angeschnitten) {
   return '<div class="pw-balken' + (fertig ? " pw-balken--fertig" : "")
     + (angeschnitten ? " pw-balken--offen" : "") + '"'
     + ' data-auftrag="' + esc(j.id) + '"'
+    + ' data-von="' + spalte + '" data-dauer="' + Math.max(1, dauer) + '"'
+    + ' data-angeschnitten="' + (angeschnitten ? "1" : "0") + '"'
     + ' style="--von:' + spalte + ';--dauer:' + Math.max(1, dauer)
     + ';background:' + hg + ';color:' + vg + ';' + rand + '">'
     + (anteil !== null
@@ -2737,7 +2756,12 @@ function planBalken(j, spalte, dauer, angeschnitten) {
     + (anteil !== null ? '<span class="pw-balken__prozent">' + anteil + '%</span>' : "")
     + (j.plan_note ? '<span class="pw-balken__zeichen">✎</span>' : "")
     + (j.drawing_url ? '<span class="pw-balken__zeichen">PDF</span>' : "")
-    + '</div></div>';
+    + '</div>'
+    + (darfPlanen() && !angeschnitten
+        ? '<span class="pw-griff pw-griff--links" data-griff="links"></span>' : "")
+    + (darfPlanen()
+        ? '<span class="pw-griff pw-griff--rechts" data-griff="rechts"></span>' : "")
+    + '</div>';
 }
 
 // ---------- Antippen und Verschieben ----------
@@ -2916,6 +2940,93 @@ async function ferienDialog(eintrag, zeile, datum, b) {
   };
 }
 
+
+// Balken an den Rändern breiter oder schmaler ziehen.
+// Damit ändert sich die geplante Dauer in Arbeitstagen.
+function griffVerhalten(b) {
+  const tafel = document.querySelector(".pw-tafel");
+  if (!tafel || !darfPlanen()) return;
+
+  tafel.querySelectorAll("[data-griff]").forEach((griff) => {
+    const balken = griff.closest("[data-auftrag]");
+    if (!balken) return;
+
+    let aktiv = false, startX = 0, spaltenBreite = 0;
+    let vonStart = 0, dauerStart = 0, vonJetzt = 0, dauerJetzt = 0;
+
+    griff.addEventListener("pointerdown", (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      aktiv = true;
+      startX = e.clientX;
+
+      const spuren = balken.closest(".pw-spuren");
+      spaltenBreite = spuren ? spuren.clientWidth / plan.tage : 40;
+
+      vonStart = Number(balken.dataset.von) || 0;
+      dauerStart = Number(balken.dataset.dauer) || 1;
+      vonJetzt = vonStart;
+      dauerJetzt = dauerStart;
+
+      balken.classList.add("pw-balken--groesse");
+      try { griff.setPointerCapture(e.pointerId); } catch (f) { /* egal */ }
+    });
+
+    griff.addEventListener("pointermove", (e) => {
+      if (!aktiv) return;
+      e.preventDefault();
+
+      const schritte = Math.round((e.clientX - startX) / spaltenBreite);
+
+      if (griff.dataset.griff === "rechts") {
+        dauerJetzt = Math.max(1, Math.min(plan.tage - vonStart, dauerStart + schritte));
+        vonJetzt = vonStart;
+      } else {
+        const neuVon = Math.max(0, Math.min(vonStart + dauerStart - 1, vonStart + schritte));
+        vonJetzt = neuVon;
+        dauerJetzt = Math.max(1, dauerStart - (neuVon - vonStart));
+      }
+
+      balken.style.setProperty("--von", vonJetzt);
+      balken.style.setProperty("--dauer", dauerJetzt);
+
+      const p2 = balken.querySelector(".pw-balken__prozent");
+      if (p2) p2.textContent = dauerJetzt + (dauerJetzt === 1 ? " Tag" : " Tage");
+    });
+
+    griff.addEventListener("pointerup", async (e) => {
+      if (!aktiv) return;
+      aktiv = false;
+      e.stopPropagation();
+      balken.classList.remove("pw-balken--groesse");
+
+      if (vonJetzt === vonStart && dauerJetzt === dauerStart) { seitePlanwand(b); return; }
+
+      const auftrag = (plan.auftraege || []).find((j) => j.id === balken.dataset.auftrag);
+      if (!auftrag) return;
+
+      const daten = { planned_days: dauerJetzt };
+
+      // Beim linken Griff verschiebt sich auch der erste Tag
+      if (griff.dataset.griff === "links") {
+        const tage = plan.sichtbareTage || [];
+        if (tage[vonJetzt]) daten.planned_from = tage[vonJetzt];
+      }
+
+      const { error } = await db.from("jobs").update(daten).eq("id", auftrag.id);
+      if (error) meldung(fehlertext(error), "fehler");
+      else {
+        meldung(dauerJetzt + (dauerJetzt === 1 ? " Tag" : " Tage") + " eingeplant.");
+        seitePlanwand(b);
+      }
+    });
+
+    griff.addEventListener("pointercancel", () => {
+      aktiv = false;
+      balken.classList.remove("pw-balken--groesse");
+    });
+  });
+}
 
 function balkenVerhalten(b) {
   const tafel = document.querySelector(".pw-tafel");
