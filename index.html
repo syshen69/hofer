@@ -38,7 +38,7 @@
   --gefahr: #b3261e;
   --gut: #1f7a4d;
 
-  --kopfhoehe: 62px;
+  --kopfhoehe: 72px;
   --navhoehe: 62px;
   --radius: 4px;
 
@@ -85,7 +85,7 @@ html, body {
   border-bottom: 2px solid var(--marke);
 }
 
-.kopf__logo { height: 40px; width: auto; display: block; }
+.kopf__logo { height: 50px; width: auto; display: block; }
 
 .kopf__benutzer {
   margin-left: auto;
@@ -362,11 +362,13 @@ a:focus-visible {
 
 .login__marke {
   margin-bottom: 26px;
-  padding-bottom: 18px;
+  padding-bottom: 14px;
   border-bottom: 2px solid var(--marke);
   text-align: center;
 }
-.login__logo { width: 100%; max-width: 240px; height: auto; }
+.login__logo { width: 100%; max-width: 300px; height: auto; }
+.login__bild { width: calc(100% + 48px); margin: -28px -24px 0; display: block;
+               border-radius: var(--radius) var(--radius) 0 0; }
 .login__untertitel {
   margin-top: 10px;
   font-size: .8rem;
@@ -1063,8 +1065,10 @@ a:focus-visible {
 .pw-ferien__name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---------- Knöpfe auf der Planwand mit Luft ---------- */
-.pw-aktionen { display: flex; flex-wrap: wrap; gap: 12px;
-               margin: 26px 0 30px; }
+.pw-aktionen { display: flex; flex-wrap: wrap; gap: 14px;
+               margin: 32px 0 36px; padding: 18px;
+               background: var(--flaeche); border: 1px solid var(--linie);
+               border-radius: var(--radius); }
 .pw-aktionen .knopf { flex: 1 1 200px; }
 .pw-rolle + .pw-legende { margin-top: 12px; }
 .pw-zeile--fein .pw-spuren--fein { min-height: 30px; }
@@ -1112,7 +1116,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "11.1.0";
+const APP_VERSION = "11.2.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -1278,7 +1282,7 @@ function zeigeLogin() {
   WURZEL.innerHTML = ''
     + '<div class="login"><div class="login__karte">'
     + '<div class="login__marke">'
-    + '<img class="login__logo" src="./logo.png" alt="Hofer + Co. Präzisionsdrehteile">'
+    + '<img class="login__bild" src="./login.png" alt="Hofer + Co. Präzisionsdrehteile">'
     + '<div class="login__untertitel">' + esc(APP_UNTERTITEL) + '</div>'
     + '</div>'
     + '<form id="lf" novalidate>'
@@ -2766,53 +2770,78 @@ function freieFerienZeile(von, tage, ausser) {
 }
 
 async function ferienDialog(eintrag, zeile, datum, b) {
-  const w = await dialogFelder({
-    titel: eintrag ? "Ferien bearbeiten" : "Ferien eintragen",
-    text: eintrag ? "" : (datum ? "Ab " + kurzDatum(datum) : ""),
-    felder: [
-      { name: "person", label: "Wer", pflicht: true,
-        wert: eintrag ? eintrag.person : "", platzhalter: "Name" },
-      { name: "tage", label: "Wie viele Arbeitstage", typ: "number",
-        wert: eintrag ? eintrag.tage : 5 },
-      { name: "von", label: "Erster Tag", typ: "date",
-        wert: eintrag ? eintrag.von : (datum || naechsterArbeitstag(isoDatum(new Date()))) },
-      { name: "notiz", label: "Notiz", wert: eintrag ? (eintrag.note || "") : "",
-        platzhalter: "kann leer bleiben" },
-    ],
-    bestaetigen: eintrag ? "Speichern" : "Eintragen",
-  });
+  const start = eintrag ? eintrag.von
+    : (datum || naechsterArbeitstag(isoDatum(new Date())));
 
-  if (!w) {
-    // Abbrechen bei einem vorhandenen Eintrag: Löschen anbieten
-    if (!eintrag) return;
-    const weg = await nachfragen({ titel: "Ferien löschen",
-      text: "Soll der Eintrag für " + eintrag.person + " gelöscht werden?",
-      bestaetigen: "Löschen", gefahr: true });
-    if (!weg) return;
-    const { error } = await db.from("vacations").delete().eq("id", eintrag.id);
+  const huelle = document.createElement("div");
+  huelle.className = "dialog-huelle";
+  huelle.innerHTML = '<div class="dialog">'
+    + '<h2>' + (eintrag ? "Ferien bearbeiten" : "Ferien eintragen") + '</h2>'
+    + (eintrag ? '' : '<p class="klein">Ab ' + esc(kurzDatum(start)) + '</p>')
+    + '<label class="feld"><span>Wer</span>'
+    + '<input id="fd-person" type="text" placeholder="Name" value="'
+    + esc(eintrag ? eintrag.person : "") + '"></label>'
+    + '<div class="zeitraumwahl">'
+    + '<label class="feld"><span>Erster Tag</span>'
+    + '<input id="fd-von" type="date" value="' + esc(start) + '"></label>'
+    + '<label class="feld"><span>Arbeitstage</span>'
+    + '<input id="fd-tage" type="number" min="1" step="1" value="'
+    + (eintrag ? eintrag.tage : 5) + '"></label>'
+    + '</div>'
+    + '<label class="feld"><span>Notiz</span>'
+    + '<input id="fd-notiz" type="text" placeholder="kann leer bleiben" value="'
+    + esc(eintrag ? (eintrag.note || "") : "") + '"></label>'
+    + '<div class="dialog__knoepfe">'
+    + (eintrag ? '<button class="knopf knopf--gefahr" id="fd-weg">Ferien löschen</button>' : "")
+    + '<button class="knopf knopf--still" id="fd-nein">Abbrechen</button>'
+    + '<button class="knopf knopf--haupt" id="fd-ja">Speichern</button>'
+    + '</div></div>';
+  document.body.appendChild(huelle);
+
+  const $ = (k) => huelle.querySelector("#" + k);
+  const zu = () => huelle.remove();
+  $("fd-nein").onclick = zu;
+  huelle.onclick = (e) => { if (e.target === huelle) zu(); };
+  $("fd-person").focus();
+
+  $("fd-ja").onclick = async () => {
+    const person = ($("fd-person").value || "").trim();
+    if (!person) { meldung("Bitte einen Namen eintragen.", "warn"); return; }
+
+    const von = $("fd-von").value || start;
+    const tage = Math.max(1, Math.round(Number($("fd-tage").value) || 1));
+
+    const daten = {
+      person: person,
+      zeile: zeile || freieFerienZeile(von, tage, eintrag ? eintrag.id : null),
+      von: von,
+      tage: tage,
+      note: ($("fd-notiz").value || "").trim() || null,
+    };
+
+    const { error } = eintrag
+      ? await db.from("vacations").update(daten).eq("id", eintrag.id)
+      : await db.from("vacations").insert(daten);
+
+    zu();
     if (error) meldung(fehlertext(error), "fehler");
-    else { meldung("Gelöscht."); seitePlanwand(b); }
-    return;
-  }
-
-  const von = w.von || datum || naechsterArbeitstag(isoDatum(new Date()));
-  const tage = Math.max(1, Math.round(w.tage || 1));
-
-  const daten = {
-    person: w.person,
-    zeile: zeile || freieFerienZeile(von, tage, eintrag ? eintrag.id : null),
-    von: von,
-    tage: tage,
-    note: w.notiz || null,
+    else { meldung("Gespeichert."); seitePlanwand(b); }
   };
 
-  const { error } = eintrag
-    ? await db.from("vacations").update(daten).eq("id", eintrag.id)
-    : await db.from("vacations").insert(daten);
-
-  if (error) meldung(fehlertext(error), "fehler");
-  else { meldung("Gespeichert."); seitePlanwand(b); }
+  const weg = $("fd-weg");
+  if (weg) weg.onclick = async () => {
+    const ok = await nachfragen({
+      titel: "Ferien löschen",
+      text: "Soll der Eintrag für " + eintrag.person + " gelöscht werden?",
+      bestaetigen: "Löschen", gefahr: true });
+    if (!ok) return;
+    const { error } = await db.from("vacations").delete().eq("id", eintrag.id);
+    zu();
+    if (error) meldung(fehlertext(error), "fehler");
+    else { meldung("Gelöscht."); seitePlanwand(b); }
+  };
 }
+
 
 function balkenVerhalten(b) {
   const tafel = document.querySelector(".pw-tafel");
@@ -3137,6 +3166,7 @@ async function ansichtUebersicht(ziel, b) {
       }).join("");
 
       return '<tr><th class="fest">' + esc(m.name)
+        + (m.machine_number ? '<span class="fest__nr">' + esc(m.machine_number) + '</span>' : "")
         + '<span class="fest__auftrag">' + (j ? esc(j.job_number) : "kein Auftrag") + '</span>'
         + (j ? '<span class="fest__stand">Stand ' + zahlText(aktuellerStand(m.id, staende))
                + '</span>' : "")
