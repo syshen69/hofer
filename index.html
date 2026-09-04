@@ -909,17 +909,21 @@ a:focus-visible {
                  font-weight: 600; fill: var(--tinte); }
 
 /* ---------- Planwand ---------- */
-.pw-rolle { overflow-x: auto; background: var(--flaeche);
+/* Eigenes Scrollfenster: nur so kann die Datumszeile beim
+   Herunterscrollen oben mitwandern. */
+.pw-rolle { overflow: auto; max-height: calc(100vh - 210px);
+            background: var(--flaeche);
             border: 1px solid var(--linie); border-radius: var(--radius); }
 .pw-tafel { min-width: 640px; }
-.pw-zeile { display: grid; grid-template-columns: 130px 1fr; align-items: stretch;
+.pw-zeile { display: grid; grid-template-columns: 108px 1fr; align-items: stretch;
             border-bottom: 1px solid var(--linie); }
 .pw-zeile--kopf { position: sticky; top: 0; z-index: 3; background: var(--flaeche);
                   border-bottom: 2px solid var(--linie-stark); }
 .pw-name { padding: 8px 10px; font-size: .85rem; font-weight: 600;
            border-right: 1px solid var(--linie); background: var(--flaeche);
            position: sticky; left: 0; z-index: 2; }
-.pw-name span { display: block; font-weight: 400; font-size: .72rem; color: var(--gedaempft); }
+.pw-name span { font-weight: 400; font-size: .7rem; color: var(--gedaempft);
+                margin-left: 5px; }
 .pw-name--kopf { font-size: .75rem; color: var(--gedaempft); }
 .pw-park { padding: 8px 10px; background: var(--marke-hell); color: var(--marke);
            font-size: .78rem; font-weight: 700; text-transform: uppercase;
@@ -927,7 +931,7 @@ a:focus-visible {
 
 .pw-zeile--kopf > div:not(.pw-name) { display: grid;
   grid-template-columns: repeat(var(--pw-tage, 15), 1fr); }
-.pw-zeile--kopf { grid-template-columns: 130px repeat(var(--pw-tage, 15), 1fr); }
+.pw-zeile--kopf { grid-template-columns: 108px repeat(var(--pw-tage, 15), 1fr); }
 .pw-tag { padding: 6px 2px; text-align: center; font-size: .7rem;
           border-left: 1px solid var(--linie); }
 .pw-tag--we { background: #f7f8fa; color: var(--gedaempft); }
@@ -1112,7 +1116,7 @@ a:focus-visible {
 .pw-aktionen .knopf { flex: 1 1 210px; }
 
 /* ---------- Planwand: schmalere Balken, KW-Zeile ---------- */
-.pw-spuren { min-height: 38px !important; }
+
 .pw-balken { padding: 3px 6px; font-size: .72rem; }
 .pw-balken-schicht { inset: 2px 0; }
 .pw-balken__prozent { font-size: .66rem; }
@@ -1124,7 +1128,7 @@ a:focus-visible {
                font-size: .65rem; line-height: 1; cursor: pointer; z-index: 3;
                padding: 0; display: none; }
 .pw-balken:hover .pw-loeschen { display: block; }
-.pw-zeile--kw { grid-template-columns: 130px 1fr; border-bottom: 1px solid var(--linie);
+.pw-zeile--kw { grid-template-columns: 108px 1fr; border-bottom: 1px solid var(--linie);
                 position: sticky; top: 0; z-index: 4; background: var(--flaeche); }
 .pw-kw-spuren { display: grid;
                 grid-template-columns: repeat(var(--pw-tage, 15), 1fr); }
@@ -1158,6 +1162,49 @@ a:focus-visible {
 .spass-text { text-align: center; margin-bottom: 12px; font-weight: 600;
               min-height: 1.4em; }
 .spass-weisheit { font-size: 1.05rem; font-style: italic; margin: 0 0 10px; }
+
+/* ---------- Planwand kompakter ---------- */
+.pw-spuren { min-height: 30px; }
+.pw-name { padding: 5px 8px; font-size: .78rem; }
+.pw-park { padding: 5px 8px; font-size: .7rem; }
+.pw-balken { padding: 2px 5px; font-size: .68rem; gap: 4px; border-radius: 2px; }
+.pw-balken-schicht { inset: 2px 0; }
+.pw-balken__prozent { font-size: .62rem; }
+.pw-balken__status, .pw-balken__warnung { font-size: .68rem; }
+.pw-balken__fehlt { font-size: .55rem; }
+.pw-tag { padding: 4px 2px; font-size: .66rem; }
+.pw-tag__datum { font-size: .6rem; }
+.pw-spuren--fein { min-height: 24px; }
+.pw-ferien { font-size: .66rem; padding: 1px 5px; }
+
+/* Beide Kopfzeilen wandern beim Scrollen mit */
+.pw-zeile--kw { position: sticky; top: 0; z-index: 5; }
+.pw-zeile--kopf { position: sticky; top: 22px !important; z-index: 4; }
+.pw-name { position: sticky; left: 0; z-index: 2; }
+.pw-zeile--kw .pw-name, .pw-zeile--kopf .pw-name { z-index: 6; }
+
+.pw-zoom { display: flex; gap: 4px; margin-left: 8px; }
+.pw-zoom .knopf { min-width: 40px; font-size: 1.05rem; font-weight: 700; }
+
+/* ---------- Zoom auf der Planwand ---------- */
+.pw-zoom { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.pw-zoom .knopf { min-height: 34px; padding: 4px 14px; font-size: 1.05rem; }
+#pw-zoomwert { min-width: 62px; text-align: center; }
+
+/* ---------- Spassecke: Maschinenhalle ---------- */
+.spass-halle { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+               margin: 16px 0; }
+.spass-maschine { position: relative; aspect-ratio: 1.4; background: var(--stahl);
+                  border: 2px solid #2a323b; border-radius: var(--radius);
+                  cursor: pointer; display: grid; place-items: center; gap: 6px;
+                  transition: background .08s; padding: 6px; }
+.spass-maschine__nr { color: #7d8792; font-size: .8rem; font-weight: 650; }
+.spass-maschine__lampe { width: 16px; height: 16px; border-radius: 50%;
+                         background: #39424c; }
+.spass-maschine--stoerung { background: #7d1a15; border-color: var(--gefahr); }
+.spass-maschine--stoerung .spass-maschine__lampe { background: #ff5a4d;
+                         box-shadow: 0 0 12px #ff5a4d; }
+.spass-maschine--stoerung .spass-maschine__nr { color: #ffd9d6; }
 </style>
 </head>
 <body>
@@ -1201,7 +1248,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "12.1.0";
+const APP_VERSION = "12.3.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -1259,6 +1306,18 @@ function einstellung(name) {
   try { return localStorage.getItem("hudson." + name) === "1"; }
   catch (e) { return false; }
 }
+function einstellungWert(name, standard) {
+  try {
+    const w = localStorage.getItem("hudson." + name);
+    return w === null ? standard : w;
+  } catch (e) { return standard; }
+}
+
+function einstellungSetzenWert(name, wert) {
+  try { localStorage.setItem("hudson." + name, String(wert)); }
+  catch (e) { /* im privaten Modus nicht verfügbar */ }
+}
+
 function einstellungSetzen(name, wert) {
   try { localStorage.setItem("hudson." + name, wert ? "1" : "0"); }
   catch (e) { /* z. B. im privaten Modus nicht verfügbar */ }
@@ -1509,7 +1568,7 @@ async function holeWetter() {
 
 async function ladeTodos() {
   const { data, error } = await zeitlimit(
-    db.from("todos").select("*").eq("is_done", false)
+    db.from("todos").select("*, profiles!todos_created_by_fkey(full_name, email)").eq("is_done", false)
       .order("due_date", { ascending: true, nullsFirst: false })
       .order("created_at").limit(20),
     8000, "Notizen");
@@ -1601,11 +1660,39 @@ async function seiteDashboard(b) {
 
   const statusEl = document.getElementById("db-status");
   if (statusEl) {
-    statusEl.innerHTML = '<section class="karte" data-zu="bestellungen"><h2>Bestellungen</h2>'
-      + '<div class="statusliste">'
-      + statuszeile(ueberfaellig, "überfällig", ueberfaellig ? "gefahr" : "gut")
-      + statuszeile(offene, "offen", "neutral")
-      + '</div></section>';
+    let offeneListe = [];
+    try {
+      const { data, error } = await zeitlimit(
+        db.from("order_items")
+          .select("*, articles(article_number, name), suppliers(name, website)")
+          .in("status", ["offen", "bestellt", "teilweise_geliefert"])
+          .order("needed_by", { ascending: true, nullsFirst: false })
+          .limit(25),
+        9000, "Bestellungen");
+      if (!error) offeneListe = data || [];
+    } catch (f) { console.warn("Bestellungen:", f.message); }
+
+    statusEl.innerHTML = '<section class="karte" data-zu="bestellungen">'
+      + '<h2>Offene Bestellungen'
+      + (offeneListe.length ? ' <span class="marke">' + offeneListe.length + '</span>' : "")
+      + '</h2>'
+      + (offeneListe.length
+        ? '<table class="tabelle"><tbody>' + offeneListe.map((z) => {
+            const a2 = z.articles || {};
+            const spaet = z.needed_by && z.needed_by < heute;
+            return '<tr><td><strong>' + esc(a2.article_number || "?") + '</strong> '
+              + esc(a2.name || "")
+              + '<div class="klein">'
+              + esc((z.suppliers && z.suppliers.name) || "ohne Lieferant")
+              + ' · <span class="statuschip statuschip--' + esc(z.status) + '">'
+              + esc(BESTELLSTATUS[z.status] || z.status) + '</span>'
+              + (z.needed_by ? ' <span class="' + (spaet ? "minus stark" : "") + '">bis '
+                  + kurzDatum(z.needed_by) + '</span>' : "")
+              + '</div></td>'
+              + '<td class="mitte stark">' + zahlText(z.quantity) + '</td></tr>';
+          }).join("") + '</tbody></table>'
+        : '<p class="hinweis">Keine offenen Bestellungen.</p>')
+      + '</section>';
   }
 }
 
@@ -1749,7 +1836,10 @@ async function zeichneNotizen() {
     + (todos.length
       ? '<div class="notizen">' + todos.map((t) => '<label class="notiz">'
           + '<input type="checkbox" data-erledigt="' + esc(t.id) + '">'
-          + '<span class="notiz__text">' + esc(t.text) + '</span>'
+          + '<span class="notiz__text">' + esc(t.text)
+          + '<span class="klein"> von '
+          + esc((t.profiles && (t.profiles.full_name || t.profiles.email)) || "unbekannt")
+          + '</span></span>'
           + (t.due_date
             ? '<span class="notiz__frist' + (t.due_date < heute ? " notiz__frist--spaet" : "") + '">'
               + kurzDatum(t.due_date) + '</span>' : "")
@@ -2562,10 +2652,12 @@ function auftragsKnoepfeBinden(raster, b) {
 
 const plan = {
   start: null,      // erster sichtbarer Tag
+  zoom: null,       // 1 ist normal, kleiner zeigt mehr Tage
   tage: 15,   // drei Wochen zu je fünf Arbeitstagen
   auftraege: null,
   ferien: [],
   suche: "",
+  zoom: null,
 };
 
 // Farben für die Balken
@@ -2672,8 +2764,10 @@ async function seitePlanwand(b) {
   b.classList.add("inhalt--breit");
 
   // So viele Arbeitstage, wie nebeneinander Platz haben.
-  const platz = Math.max(320, b.clientWidth || window.innerWidth) - 130;
-  plan.tage = Math.max(10, Math.min(35, Math.floor(platz / 52)));
+  if (!plan.zoom) plan.zoom = Number(einstellungWert("pwzoom", 1)) || 1;
+  const platz = Math.max(320, b.clientWidth || window.innerWidth) - 108;
+  const spalte = 40 / plan.zoom;
+  plan.tage = Math.max(6, Math.min(60, Math.floor(platz / spalte)));
 
   b.innerHTML = '<h1 class="seitentitel">Planwand</h1>'
     + '<div id="pw-seite"><div class="laedt">Wird geladen …</div></div>';
@@ -2696,7 +2790,17 @@ async function ansichtPlanwand(ziel, b) {
     + '<button class="knopf knopf--klein" id="pw-zurueck">‹</button>'
     + '<div class="steuerung__mitte"><div class="steuerung__titel" id="pw-titel"></div>'
     + '<button class="linkknopf" id="pw-heute">Heute</button></div>'
-    + '<button class="knopf knopf--klein" id="pw-vor">›</button></div>'
+    + '<button class="knopf knopf--klein" id="pw-vor">›</button>'
+    + '<div class="pw-zoom">'
+    + '<button class="knopf knopf--klein" id="pw-raus" title="mehr Tage zeigen">−</button>'
+    + '<button class="knopf knopf--klein" id="pw-rein" title="weniger Tage zeigen">+</button>'
+    + '</div></div>'
+    + '<div class="pw-zoom">'
+    + '<span class="klein">Zoom</span>'
+    + '<button class="knopf knopf--klein" id="pw-raus" title="mehr Tage zeigen">−</button>'
+    + '<span class="klein" id="pw-zoomwert"></span>'
+    + '<button class="knopf knopf--klein" id="pw-rein" title="weniger Tage zeigen">+</button>'
+    + '</div>'
     + '<div class="suchleiste">'
     + '<input type="search" id="pw-suche" placeholder="Auftrag suchen"'
     + ' value="' + esc(plan.suche) + '" autocomplete="off">'
@@ -2715,6 +2819,17 @@ async function ansichtPlanwand(ziel, b) {
     plan.start = naechsterArbeitstag(plusTage(plan.start, -7)); seitePlanwand(b); };
   document.getElementById("pw-vor").onclick = () => {
     plan.start = naechsterArbeitstag(plusTage(plan.start, 7)); seitePlanwand(b); };
+  document.getElementById("pw-rein").onclick = () => {
+    plan.zoom = Math.max(0.55, (plan.zoom || 1) - 0.15);
+    einstellungSetzenWert("pwzoom", plan.zoom);
+    seitePlanwand(b);
+  };
+  document.getElementById("pw-raus").onclick = () => {
+    plan.zoom = Math.min(2.2, (plan.zoom || 1) + 0.2);
+    einstellungSetzenWert("pwzoom", plan.zoom);
+    seitePlanwand(b);
+  };
+
   document.getElementById("pw-heute").onclick = () => {
     plan.start = naechsterArbeitstag(wochenStart(isoDatum(new Date()))); seitePlanwand(b); };
 
@@ -2726,6 +2841,20 @@ async function ansichtPlanwand(ziel, b) {
 
   const prob = document.getElementById("pw-problem");
   if (prob) prob.onclick = () => problemMelden(b);
+
+  const zoomAnzeige = document.getElementById("pw-zoomwert");
+  if (zoomAnzeige) zoomAnzeige.textContent = plan.tage + " Tage";
+
+  const rein = document.getElementById("pw-rein");
+  if (rein) rein.onclick = () => {
+    plan.zoom = Math.max(5, plan.tage - 5);
+    seitePlanwand(b);
+  };
+  const raus = document.getElementById("pw-raus");
+  if (raus) raus.onclick = () => {
+    plan.zoom = Math.min(60, plan.tage + 5);
+    seitePlanwand(b);
+  };
 
   const suchfeld = document.getElementById("pw-suche");
   let taste = null;
@@ -3544,7 +3673,8 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum) {
     + '<div class="zeitraumwahl">'
     + '<label class="feld"><span>Geplant ab</span>'
     + '<input id="pl-von" type="date" value="'
-    + esc(auftrag ? (auftrag.planned_from || "") : isoDatum(new Date())) + '"></label>'
+    + esc(auftrag ? (auftrag.planned_from || "")
+        : (vorgabeDatum || isoDatum(new Date()))) + '"></label>'
     + '<label class="feld"><span>Dauer in Tagen</span>'
     + '<input id="pl-tage" type="number" min="1" step="1" value="'
     + (auftrag ? (auftrag.planned_days || 1) : 1) + '"></label>'
@@ -4624,6 +4754,7 @@ async function bestOffen(ziel, b) {
       + (z.needed_by ? '<span class="' + (spaet ? "minus stark" : "") + '">bis '
           + kurzDatum(z.needed_by) + '</span>' : "")
       + (z.note ? ' · ' + esc(z.note) : "")
+      + ' · von ' + esc((z.profiles && (z.profiles.full_name || z.profiles.email)) || "unbekannt")
       + '</div></td>'
       + '<td class="mitte stark">' + zahlText(z.quantity) + '</td>'
       + (darfSchreiben()
@@ -4656,7 +4787,10 @@ async function bestOffen(ziel, b) {
           + ' <span class="marke">' + eigene.length + '</span></h2>'
           + Object.keys(gruppen).sort().map((name) =>
               '<section class="karte"><div class="karte__kopf">'
-              + '<h2>' + esc(name) + '</h2>'
+              + '<h2>' + (seiten[name]
+                  ? '<a class="lieferantlink" href="' + esc(seiten[name]) + '"'
+                    + ' target="_blank" rel="noopener">' + esc(name) + ' ↗</a>'
+                  : esc(name)) + '</h2>'
               + '<span class="klein">' + gruppen[name].length + ' Position'
               + (gruppen[name].length === 1 ? "" : "en") + '</span></div>'
               + '<table class="tabelle"><tbody>'
@@ -5406,15 +5540,7 @@ SYM.einstellungen = svg('<line x1="4" y1="7" x2="20" y2="7"/>'
 // =================================================================
 
 const spass = {
-  laeuft: false,
-  punkte: 0,
   bestwert: 0,
-  toleranz: 0,
-  ziel: 0,
-  ist: 0,
-  richtung: 1,
-  takt: null,
-  runde: 0,
 };
 
 const SPRUECHE = [
@@ -5435,31 +5561,32 @@ const FLUECHE = [
 ];
 
 function seiteSpass(b) {
-  b.innerHTML = '<h1 class="seitentitel">Tristans Spassecke</h1>'
+  b.innerHTML = '<h1 class="seitentitel">Spassecke Tristan</h1>'
     + '<section class="karte">'
-    + '<h2>Auf Mass drehen</h2>'
-    + '<p class="hinweis">Der Support fährt hin und her. Drück auf Anhalten, wenn er '
-    + 'genau im grünen Feld steht. Je länger du überlebst, desto enger wird die Toleranz. '
-    + 'Drei Ausschussteile und Feierabend.</p>'
+    + '<h2>Störung an der Linie</h2>'
+    + '<p class="hinweis">An einer der Maschinen blinkt es rot. Tipp sie an, bevor die '
+    + 'Zeit abläuft. Je schneller du bist, desto mehr Punkte. Drei verpasste Störungen '
+    + 'und die Schicht ist gelaufen.</p>'
 
-    + '<div class="spass-anzeige">'
     + '<div class="spass-werte">'
-    + '<div><span class="spass-label">Teile gut</span>'
+    + '<div><span class="spass-label">Punkte</span>'
     + '<span class="spass-zahl" id="sp-punkte">0</span></div>'
-    + '<div><span class="spass-label">Ausschuss</span>'
+    + '<div><span class="spass-label">Verpasst</span>'
     + '<span class="spass-zahl" id="sp-fehler">0</span></div>'
     + '<div><span class="spass-label">Rekord</span>'
-    + '<span class="spass-zahl" id="sp-best">0</span></div>'
+    + '<span class="spass-zahl" id="sp-best">' + spass.bestwert + '</span></div>'
     + '</div>'
 
-    + '<div class="spass-bahn" id="sp-bahn">'
-    + '<div class="spass-ziel" id="sp-ziel"></div>'
-    + '<div class="spass-support" id="sp-support"></div>'
+    + '<div class="spass-halle" id="sp-halle">'
+    + Array.from({ length: 9 }, (unused, i) =>
+        '<button class="spass-maschine" data-platz="' + i + '">'
+        + '<span class="spass-maschine__nr">M' + (i + 1) + '</span>'
+        + '<span class="spass-maschine__lampe"></span></button>').join("")
     + '</div>'
 
     + '<div class="spass-text" id="sp-text">Bereit wenn du es bist.</div>'
-    + '<button class="knopf knopf--haupt knopf--breit" id="sp-knopf">Maschine starten</button>'
-    + '</div></section>'
+    + '<button class="knopf knopf--haupt knopf--breit" id="sp-knopf">Schicht starten</button>'
+    + '</section>'
 
     + '<section class="karte">'
     + '<h2>Werkstattweisheit des Tages</h2>'
@@ -5478,6 +5605,8 @@ function seiteSpass(b) {
     "Wenn es beim ersten Mal passt, hast du etwas übersehen.",
     "Späne im Ärmel sind das Abzeichen der Zunft.",
     "Der beste Vorschub ist der, bei dem es nicht pfeift.",
+    "Die Maschine hat immer recht. Leider.",
+    "Zwei Dinge laufen nie rund: die Welle und der Montag.",
   ];
 
   const weisheitZeigen = () => {
@@ -5489,87 +5618,83 @@ function seiteSpass(b) {
 
   // ---------- Das Spiel ----------
 
-  const bahn = document.getElementById("sp-bahn");
-  const support = document.getElementById("sp-support");
-  const zielFeld = document.getElementById("sp-ziel");
+  const halle = document.getElementById("sp-halle");
   const knopf = document.getElementById("sp-knopf");
   const text = document.getElementById("sp-text");
-  let fehler = 0;
+  const maschinen = Array.from(halle.querySelectorAll("[data-platz]"));
 
-  const neueRunde = () => {
-    spass.runde++;
-    // Toleranz wird mit jeder Runde enger, hört aber bei 4 Prozent auf
-    spass.toleranz = Math.max(4, 20 - spass.runde * 1.5);
-    spass.ziel = 15 + Math.random() * 70;
-    spass.ist = 0;
-    spass.richtung = 1;
+  let laeuft = false, punkte = 0, verpasst = 0, runde = 0;
+  let aktiv = -1, ablauf = null, startZeit = 0;
 
-    zielFeld.style.left = (spass.ziel - spass.toleranz / 2) + "%";
-    zielFeld.style.width = spass.toleranz + "%";
-
-    const tempo = Math.min(2.4, 0.7 + spass.runde * 0.08);
-    clearInterval(spass.takt);
-    spass.takt = setInterval(() => {
-      spass.ist += spass.richtung * tempo;
-      if (spass.ist >= 100) { spass.ist = 100; spass.richtung = -1; }
-      if (spass.ist <= 0) { spass.ist = 0; spass.richtung = 1; }
-      support.style.left = spass.ist + "%";
-    }, 16);
+  const aufraeumen = () => {
+    clearTimeout(ablauf);
+    maschinen.forEach((m) => m.classList.remove("spass-maschine--stoerung"));
+    aktiv = -1;
   };
 
   const beenden = () => {
-    clearInterval(spass.takt);
-    spass.laeuft = false;
+    aufraeumen();
+    laeuft = false;
     knopf.textContent = "Nochmal";
-    text.textContent = "Feierabend. " + spass.punkte
-      + (spass.punkte === 1 ? " gutes Teil" : " gute Teile") + " geschafft.";
-    if (spass.punkte > spass.bestwert) {
-      spass.bestwert = spass.punkte;
-      document.getElementById("sp-best").textContent = spass.bestwert;
-      text.textContent += " Neuer Rekord!";
+    text.textContent = "Schichtende. " + punkte
+      + (punkte === 1 ? " Punkt" : " Punkte") + ".";
+    if (punkte > spass.bestwert) {
+      spass.bestwert = punkte;
+      document.getElementById("sp-best").textContent = punkte;
+      text.textContent += " Das ist ein neuer Rekord.";
     }
   };
 
-  const anhalten = () => {
-    const abstand = Math.abs(spass.ist - spass.ziel);
-    if (abstand <= spass.toleranz / 2) {
-      spass.punkte++;
-      document.getElementById("sp-punkte").textContent = spass.punkte;
-      text.textContent = SPRUECHE[Math.floor(Math.random() * SPRUECHE.length)];
-      bahn.classList.add("spass-bahn--gut");
-      setTimeout(() => bahn.classList.remove("spass-bahn--gut"), 250);
-      neueRunde();
-    } else {
-      fehler++;
-      document.getElementById("sp-fehler").textContent = fehler;
+  const naechsteStoerung = () => {
+    if (!laeuft) return;
+    aufraeumen();
+    runde++;
+
+    // Zeitfenster wird enger, hört aber bei 700 ms auf
+    const fenster = Math.max(700, 2000 - runde * 60);
+    aktiv = Math.floor(Math.random() * maschinen.length);
+    maschinen[aktiv].classList.add("spass-maschine--stoerung");
+    startZeit = Date.now();
+
+    ablauf = setTimeout(() => {
+      verpasst++;
+      document.getElementById("sp-fehler").textContent = verpasst;
       text.textContent = FLUECHE[Math.floor(Math.random() * FLUECHE.length)];
-      bahn.classList.add("spass-bahn--schlecht");
-      setTimeout(() => bahn.classList.remove("spass-bahn--schlecht"), 250);
-      if (fehler >= 3) { beenden(); return; }
-      neueRunde();
-    }
+      if (verpasst >= 3) { beenden(); return; }
+      setTimeout(naechsteStoerung, 400);
+    }, fenster);
   };
+
+  maschinen.forEach((m, i) => {
+    m.onclick = () => {
+      if (!laeuft) return;
+      if (i !== aktiv) {
+        verpasst++;
+        document.getElementById("sp-fehler").textContent = verpasst;
+        text.textContent = "Falsche Maschine. Die lief einwandfrei.";
+        if (verpasst >= 3) beenden();
+        return;
+      }
+      const zeit = Date.now() - startZeit;
+      const gewinn = Math.max(1, Math.round((2000 - zeit) / 100));
+      punkte += gewinn;
+      document.getElementById("sp-punkte").textContent = punkte;
+      text.textContent = SPRUECHE[Math.floor(Math.random() * SPRUECHE.length)]
+        + "   +" + gewinn;
+      clearTimeout(ablauf);
+      setTimeout(naechsteStoerung, 300);
+    };
+  });
 
   knopf.onclick = () => {
-    if (!spass.laeuft) {
-      spass.laeuft = true;
-      spass.punkte = 0;
-      spass.runde = 0;
-      fehler = 0;
-      document.getElementById("sp-punkte").textContent = "0";
-      document.getElementById("sp-fehler").textContent = "0";
-      knopf.textContent = "Anhalten";
-      text.textContent = "Konzentration.";
-      neueRunde();
-    } else {
-      anhalten();
-    }
-  };
-
-  // Leertaste geht auch
-  b.tabIndex = -1;
-  b.onkeydown = (e) => {
-    if (e.code === "Space") { e.preventDefault(); knopf.click(); }
+    if (laeuft) { beenden(); return; }
+    laeuft = true;
+    punkte = 0; verpasst = 0; runde = 0;
+    document.getElementById("sp-punkte").textContent = "0";
+    document.getElementById("sp-fehler").textContent = "0";
+    knopf.textContent = "Schicht abbrechen";
+    text.textContent = "Augen auf.";
+    setTimeout(naechsteStoerung, 600);
   };
 }
 
