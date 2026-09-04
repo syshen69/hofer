@@ -1073,6 +1073,28 @@ a:focus-visible {
 .pw-rolle + .pw-legende { margin-top: 12px; }
 .pw-zeile--fein .pw-spuren--fein { min-height: 30px; }
 .pw-park--ferien { margin-top: 4px; border-top: 2px solid var(--linie-stark); }
+
+/* ---------- Probleme an Aufträgen ---------- */
+.knopf--warnung { border-color: #c08415; color: #8a5c10; }
+.knopf--warnung:hover { background: #fdf4e3; }
+.pw-balken__warnung { flex: none; font-size: .8rem; }
+.problemkasten { margin: 18px 0 6px; padding: 12px 14px; background: #fdf4e3;
+                 border-left: 4px solid #c08415; border-radius: var(--radius); }
+.problemkasten__kopf { font-weight: 650; font-size: .85rem; color: #8a5c10;
+                       margin-bottom: 4px; }
+.problemkasten__text { white-space: pre-wrap; margin-bottom: 6px; }
+.problemkasten .knopf { margin-top: 8px; }
+
+/* ---------- Problemliste auf der Startseite ---------- */
+.problemzeile { display: flex; align-items: flex-start; gap: 10px;
+                padding: 10px 0; border-bottom: 1px solid var(--linie); }
+.problemzeile:last-child { border-bottom: none; }
+.problemzeile__zeichen { color: #c08415; font-size: 1.1rem; flex: none; }
+.problemzeile__inhalt { flex: 1; }
+.problemzeile__nr { font-weight: 650; }
+
+.karte--warnung { border-left: 4px solid #c08415; background: #fffcf5; }
+.karte--warnung h2 { color: #8a5c10; }
 </style>
 </head>
 <body>
@@ -1116,7 +1138,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "11.2.0";
+const APP_VERSION = "11.3.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -1446,6 +1468,7 @@ async function seiteDashboard(b) {
 
     + '<p class="gruss">' + esc(begruessung()) + (name ? ", " + esc(name) : "") + '</p>'
 
+    + '<div id="db-probleme"></div>'
     + '<div id="db-auftraege"><div class="laedt">Aufträge werden geladen …</div></div>'
     + '<div id="db-notizen"></div>'
     + '<div id="db-status"></div>';
@@ -1516,6 +1539,7 @@ async function seiteDashboard(b) {
       '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
   }
 
+  await zeichneProbleme(b);
   await zeichneNotizen();
 
   // Offene Bestellungen
@@ -1544,6 +1568,51 @@ function statuszeile(anzahl, text, art) {
   return '<div class="statuszeile statuszeile--' + art + '">'
     + '<span class="statuszeile__zahl">' + zahlText(anzahl) + '</span>'
     + '<span>' + esc(text) + '</span></div>';
+}
+
+// Gemeldete Probleme von der Planwand, damit man sie beim Start sieht.
+async function zeichneProbleme(b) {
+  const ziel = document.getElementById("db-probleme");
+  if (!ziel) return;
+
+  let liste = [];
+  try {
+    const { data, error } = await zeitlimit(
+      db.from("planwand").select("*").not("problem", "is", null)
+        .order("problem_at", { ascending: false }), 10000, "Probleme");
+    if (error) throw error;
+    liste = data || [];
+  } catch (f) {
+    console.warn("Probleme:", f.message);
+    return;
+  }
+
+  if (!liste.length) { ziel.innerHTML = ""; return; }
+
+  ziel.innerHTML = '<section class="karte karte--warnung">'
+    + '<h2>⚠ Gemeldete Probleme <span class="marke">' + liste.length + '</span></h2>'
+    + liste.map((j) => '<div class="problemzeile">'
+        + '<span class="problemzeile__zeichen">⚠</span>'
+        + '<div class="problemzeile__inhalt">'
+        + '<div class="problemzeile__nr">' + esc(j.job_number)
+        + '<span class="klein"> ' + esc(j.maschine)
+        + (j.maschine_nr ? " · " + esc(j.maschine_nr) : "") + '</span></div>'
+        + '<div>' + esc(j.problem) + '</div>'
+        + '<div class="klein">' + esc(j.problem_von || "")
+        + (j.problem_at ? " · " + esc(datumZeitKurz(j.problem_at)) : "") + '</div>'
+        + '</div>'
+        + (darfSchreiben() || darfPlanen()
+            ? '<button class="linkknopf" data-probweg="' + esc(j.id) + '">Erledigt</button>'
+            : "")
+        + '</div>').join("")
+    + '</section>';
+
+  ziel.querySelectorAll("[data-probweg]").forEach((el) => {
+    el.onclick = async () => {
+      const j = liste.find((x) => x.id === el.dataset.probweg);
+      if (j) await problemQuittieren(j, b, () => seiteDashboard(b));
+    };
+  });
 }
 
 async function zeichneNotizen() {
@@ -2492,6 +2561,7 @@ async function ansichtPlanwand(ziel, b) {
         ? '<div class="aktionen">'
           + '<button class="knopf knopf--haupt" id="pw-neu">+ Auftrag einplanen</button>'
           + '<button class="knopf" id="pw-ferien">+ Ferien eintragen</button>'
+          + '<button class="knopf knopf--warnung" id="pw-problem">Problem melden</button>'
           + '</div>'
         : nurLesenHinweis("Du kannst die Planung ansehen. Ändern dürfen Planer und Administratoren."))
     + '<div id="pw-inhalt"><div class="laedt">Planung wird geladen …</div></div>';
@@ -2508,6 +2578,9 @@ async function ansichtPlanwand(ziel, b) {
 
   const fer = document.getElementById("pw-ferien");
   if (fer) fer.onclick = () => ferienDialog(null, null, null, b);
+
+  const prob = document.getElementById("pw-problem");
+  if (prob) prob.onclick = () => problemMelden(b);
 
   const suchfeld = document.getElementById("pw-suche");
   let taste = null;
@@ -2658,6 +2731,7 @@ function planBalken(j, spalte, dauer, angeschnitten) {
     + (anteil !== null
         ? '<div class="pw-fortschritt" style="width:' + anteil + '%"></div>' : "")
     + '<div class="pw-balken__inhalt">'
+    + (j.problem ? '<span class="pw-balken__warnung" title="' + esc(j.problem) + '">⚠</span>' : "")
     + '<span class="pw-balken__status">' + (PLANSTATUS[st] || PLANSTATUS.geplant).zeichen + '</span>'
     + '<span class="pw-balken__nr">' + esc(j.job_number) + '</span>'
     + (anteil !== null ? '<span class="pw-balken__prozent">' + anteil + '%</span>' : "")
@@ -2937,6 +3011,83 @@ function balkenVerhalten(b) {
   });
 }
 
+// ---------- Probleme an Aufträgen ----------
+
+const PROBLEM_ARTEN = [
+  "FA fehlt",
+  "Material fehlt",
+  "Werkzeug fehlt",
+  "Zeichnung fehlt",
+  "Maschine defekt",
+];
+
+async function problemMelden(b) {
+  // Nur Aufträge, die noch nicht fertig sind
+  const offen = (plan.auftraege || [])
+    .filter((j) => j.plan_status !== "fertig")
+    .sort((x, y) => (x.job_number || "").localeCompare(y.job_number || ""));
+
+  if (!offen.length) {
+    await nachfragen({ titel: "Keine Aufträge",
+      text: "Es ist kein offener Auftrag eingeplant.", bestaetigen: "Verstanden" });
+    return;
+  }
+
+  const wahl = await auswahlDialog("Bei welchem Auftrag?",
+    offen.map((j) => ({
+      wert: j.id,
+      text: j.job_number + "   " + j.maschine + (j.problem ? "   (hat schon eine Meldung)" : ""),
+    })));
+  if (!wahl) return;
+
+  const auftrag = offen.find((j) => j.id === wahl);
+
+  const art = await auswahlDialog("Was fehlt oder stimmt nicht?",
+    PROBLEM_ARTEN.map((t) => ({ wert: t, text: t }))
+      .concat([{ wert: "__eigen", text: "Eigene Nachricht schreiben" }]));
+  if (!art) return;
+
+  let text = art;
+  if (art === "__eigen") {
+    const w = await dialogFelder({
+      titel: "Was ist das Problem?",
+      text: "Auftrag " + auftrag.job_number,
+      felder: [{ name: "text", label: "Nachricht", typ: "textarea", pflicht: true,
+                 platzhalter: "Kurz beschreiben, was fehlt oder klemmt" }],
+      bestaetigen: "Melden" });
+    if (!w) return;
+    text = w.text;
+  }
+
+  const { error } = await db.from("jobs").update({
+    problem: text,
+    problem_at: new Date().toISOString(),
+    problem_by: profil.id,
+  }).eq("id", auftrag.id);
+
+  if (error) meldung(fehlertext(error), "fehler");
+  else { meldung("Problem gemeldet."); seitePlanwand(b); }
+}
+
+async function problemQuittieren(auftrag, b, danach) {
+  const ok = await doppeltNachfragen(
+    { titel: "Problem erledigt?",
+      text: "Auftrag " + auftrag.job_number + ": " + (auftrag.problem || "")
+          + " — ist das wirklich behoben?",
+      bestaetigen: "Ja, weiter" },
+    { titel: "Meldung entfernen",
+      text: "Die Meldung verschwindet danach von der Planwand und von der Startseite.",
+      bestaetigen: "Meldung entfernen" });
+  if (!ok) return;
+
+  const { error } = await db.from("jobs").update({
+    problem: null, problem_at: null, problem_by: null,
+  }).eq("id", auftrag.id);
+
+  if (error) meldung(fehlertext(error), "fehler");
+  else { meldung("Erledigt."); if (danach) danach(); else seitePlanwand(b); }
+}
+
 // ---------- Auftrag planen und bearbeiten ----------
 
 async function planAuftragDialog(auftrag, b) {
@@ -3013,6 +3164,17 @@ async function planAuftragDialog(auftrag, b) {
         : "")
     + '</div>'
 
+    + (auftrag && auftrag.problem
+        ? '<div class="problemkasten">'
+          + '<div class="problemkasten__kopf">⚠ Gemeldetes Problem</div>'
+          + '<div class="problemkasten__text">' + esc(auftrag.problem) + '</div>'
+          + '<div class="klein">' + esc(auftrag.problem_von || "")
+          + (auftrag.problem_at ? ' · ' + esc(datumZeitKurz(auftrag.problem_at)) : "") + '</div>'
+          + (darf ? '<button type="button" class="knopf knopf--klein" id="pl-problemweg">'
+              + 'Problem erledigt</button>' : "")
+          + '</div>'
+        : "")
+
     + '<div class="dialog__knoepfe">'
     + (auftrag && darf
         ? '<button class="knopf knopf--gefahr" id="pl-weg">Aus der Planung nehmen</button>' : "")
@@ -3027,6 +3189,12 @@ async function planAuftragDialog(auftrag, b) {
   huelle.onclick = (e) => { if (e.target === huelle) zu(); };
 
   let pdfAdresse = auftrag ? auftrag.drawing_url : null;
+
+  const probWeg = huelle.querySelector("#pl-problemweg");
+  if (probWeg) probWeg.onclick = async () => {
+    zu();
+    await problemQuittieren(auftrag, b);
+  };
 
   const pdfKnopf = huelle.querySelector("[data-pdfzeigen]");
   if (pdfKnopf) pdfKnopf.onclick = () =>
