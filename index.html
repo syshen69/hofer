@@ -718,7 +718,6 @@ a:focus-visible {
 
 /* ---------- Suchleiste ---------- */
 .suchleiste { display: flex; gap: 8px; margin-bottom: 14px; }
-.pw-aktionen + #pw-inhalt, .pw-aktionen + div { margin-top: 6px; }
 .suchleiste input { flex: 1; }
 
 /* ---------- Kamera ---------- */
@@ -1065,10 +1064,6 @@ a:focus-visible {
 .pw-ferien__name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---------- Knöpfe auf der Planwand mit Luft ---------- */
-.pw-aktionen { display: flex; flex-wrap: wrap; gap: 14px;
-               margin: 32px 0 36px; padding: 18px;
-               background: var(--flaeche); border: 1px solid var(--linie);
-               border-radius: var(--radius); }
 .pw-aktionen .knopf { flex: 1 1 200px; }
 .pw-rolle + .pw-legende { margin-top: 12px; }
 .pw-zeile--fein .pw-spuren--fein { min-height: 30px; }
@@ -1109,7 +1104,13 @@ a:focus-visible {
 .pw-balken--groesse { outline: 2px solid var(--signalgelb); outline-offset: 1px; }
 
 /* ---------- Mehr Luft unter den Knöpfen ---------- */
-.pw-aktionen { margin-bottom: 48px !important; }
+
+/* ---------- Knopfreihe auf der Planwand ---------- */
+.pw-aktionen { display: flex; flex-wrap: wrap; gap: 14px;
+               margin: 28px 0 44px; padding: 18px;
+               background: var(--flaeche); border: 1px solid var(--linie);
+               border-radius: var(--radius); }
+.pw-aktionen .knopf { flex: 1 1 210px; }
 </style>
 </head>
 <body>
@@ -1153,7 +1154,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "11.4.0";
+const APP_VERSION = "11.5.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -2448,6 +2449,7 @@ const PLANFARBEN = [
   { wert: "gelb",    name: "Gelb",    hex: "#f0b429", schrift: "#3a2c05" },
   { wert: "violett", name: "Violett", hex: "#5b3a9e", schrift: "#fff" },
   { wert: "tuerkis", name: "Türkis",  hex: "#0d7d8c", schrift: "#fff" },
+  { wert: "rosa",    name: "Rosa",    hex: "#d4638f", schrift: "#fff" },
   { wert: "grau",    name: "Grau",    hex: "#7a838d", schrift: "#fff" },
   { wert: "weiss",   name: "Weiss",   hex: "#ffffff", schrift: "#1d2430" },
 ];
@@ -2573,7 +2575,7 @@ async function ansichtPlanwand(ziel, b) {
     + (plan.suche ? '<button class="knopf" id="pw-suche-weg">Zurücksetzen</button>' : "")
     + '</div>'
     + (darfPlanen()
-        ? '<div class="aktionen">'
+        ? '<div class="pw-aktionen">'
           + '<button class="knopf knopf--haupt" id="pw-neu">+ Auftrag einplanen</button>'
           + '<button class="knopf" id="pw-ferien">+ Ferien eintragen</button>'
           + '<button class="knopf knopf--warnung" id="pw-problem">Problem melden</button>'
