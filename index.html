@@ -1372,6 +1372,80 @@ body.dunkel .treffer, body.dunkel .pd-zeile { background: var(--flaeche); }
                       outline: 1px dashed var(--gedaempft); }
 
 body.kopiermodus .pw-balken { cursor: copy; outline: 1px dashed var(--signalgelb); }
+
+/* ---------- Dunkler Modus: Lesbarkeit überall ---------- */
+body.dunkel {
+  /* Das Firmenblau ist auf dunklem Grund zu dunkel, deshalb hier heller */
+  --marke: #6ba4ff;
+  --marke-dunkel: #8fbcff;
+  --marke-hell: #1e2a3a;
+  --aktion: #6ba4ff;
+  --aktion-dunkel: #8fbcff;
+  --stahl: #1c2229;
+  --gut: #4ec98a;
+  --gefahr: #ff6f63;
+  --signalgelb: #f0b429;
+}
+
+/* Auf hellen Flächen bleibt dunkle Schrift richtig, alles andere wird hell */
+body.dunkel .knopf--haupt,
+body.dunkel .marke,
+body.dunkel .parkwahl__knopf.aktiv,
+body.dunkel .moduswahl__knopf.aktiv,
+body.dunkel .wahlknopf.aktiv,
+body.dunkel .karte--ergebnis,
+body.dunkel .spass-karte { color: #10161d; }
+
+body.dunkel .karte--ergebnis .hinweis { color: rgba(0, 0, 0, .6); }
+
+/* Farbige Hinweisflächen behalten helle Hintergründe, damit die
+   dunkle Schrift darauf lesbar bleibt */
+body.dunkel .problemkasten,
+body.dunkel .warnbalken,
+body.dunkel .karte--warnung,
+body.dunkel .fehltchip,
+body.dunkel .statuschip { color: #241a05; }
+body.dunkel .karte--warnung h2 { color: #7a5310; }
+
+body.dunkel .statuszeile--warn,
+body.dunkel .statuszeile--gefahr,
+body.dunkel .statuszeile--gut { color: #10161d; }
+
+/* Tabellen, Kopf- und Randtexte */
+body.dunkel .tabelle th,
+body.dunkel .klein,
+body.dunkel .hinweis,
+body.dunkel .feldhinweis,
+body.dunkel .untertitel,
+body.dunkel .spass-label,
+body.dunkel .kennzahl__titel,
+body.dunkel .feld > span { color: var(--gedaempft); }
+
+body.dunkel .tabelle td,
+body.dunkel .kennzahl__wert,
+body.dunkel .spass-zahl,
+body.dunkel .seitentitel,
+body.dunkel .karte h2,
+body.dunkel .notiz__text,
+body.dunkel .gruss { color: var(--tinte); }
+
+/* Planwand */
+body.dunkel .pw-kw { background: #1e2a3a; color: #9cc4ff; }
+body.dunkel .pw-tag--heute { background: #24344a; }
+body.dunkel .pw-zelle--heute { background: rgba(107, 164, 255, .10); }
+body.dunkel .pw-park { background: #1e2a3a; color: #9cc4ff; }
+body.dunkel .pw-ferien--anfrage { background: repeating-linear-gradient(45deg,
+    #3a444f, #3a444f 6px, #2f3841 6px, #2f3841 12px); color: #dfe5ec; }
+
+/* Spiele und Zeichnungen */
+body.dunkel .zeichnung { background: var(--flaeche); }
+body.dunkel .spass-wiese { background: #22301f; }
+body.dunkel .spass-feld, body.dunkel .spass-stapel { background: #232a32; }
+body.dunkel .spass-zahl-feld { background: var(--flaeche); color: var(--tinte); }
+body.dunkel .platzchip { background: #1e2a3a; color: #9cc4ff; }
+
+/* Anmeldung bleibt wie sie ist */
+body.dunkel .login__karte { background: #1c2229; }
 </style>
 </head>
 <body>
@@ -1415,7 +1489,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "16.0.0";
+const APP_VERSION = "16.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
