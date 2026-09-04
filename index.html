@@ -1237,6 +1237,31 @@ a:focus-visible {
 .spass-zahl-feld--weg { visibility: hidden; }
 .spass-frage { text-align: center; font-size: 1.15rem; margin: 18px 0; }
 .spass-antworten { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 6px; }
+
+/* ---------- Planwand: alles skaliert mit dem Zoom ---------- */
+.pw-tafel { --pw-s: 1; }
+.pw-zeile { grid-template-columns: calc(108px * var(--pw-s)) 1fr; }
+.pw-zeile--kopf { grid-template-columns: calc(108px * var(--pw-s))
+                  repeat(var(--pw-tage, 15), 1fr); }
+.pw-zeile--kw { grid-template-columns: calc(108px * var(--pw-s)) 1fr; }
+.pw-name { padding: calc(5px * var(--pw-s)) calc(8px * var(--pw-s));
+           font-size: calc(0.78rem * var(--pw-s)); }
+.pw-name span { font-size: calc(0.7rem * var(--pw-s)); }
+.pw-park { padding: calc(5px * var(--pw-s)) calc(8px * var(--pw-s));
+           font-size: calc(0.7rem * var(--pw-s)); }
+.pw-spuren { min-height: calc(30px * var(--pw-s)); }
+.pw-spuren--fein { min-height: calc(24px * var(--pw-s)); }
+.pw-balken { padding: calc(2px * var(--pw-s)) calc(5px * var(--pw-s));
+             font-size: calc(0.68rem * var(--pw-s)); gap: calc(4px * var(--pw-s)); }
+.pw-balken__prozent { font-size: calc(0.62rem * var(--pw-s)); }
+.pw-balken__status, .pw-balken__warnung { font-size: calc(0.68rem * var(--pw-s)); }
+.pw-balken__fehlt { font-size: calc(0.55rem * var(--pw-s)); }
+.pw-ferien { font-size: calc(0.66rem * var(--pw-s));
+             padding: calc(1px * var(--pw-s)) calc(5px * var(--pw-s)); }
+.pw-tag { padding: calc(4px * var(--pw-s)) 2px; font-size: calc(0.66rem * var(--pw-s)); }
+.pw-tag__datum { font-size: calc(0.6rem * var(--pw-s)); }
+.pw-kw { font-size: calc(0.66rem * var(--pw-s)); padding: calc(3px * var(--pw-s)) 0; }
+.fest__nr, .fest__auftrag { font-size: calc(0.68rem * var(--pw-s)); }
 </style>
 </head>
 <body>
@@ -1280,7 +1305,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "12.5.0";
+const APP_VERSION = "12.6.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -2693,6 +2718,7 @@ const plan = {
   auftraege: null,
   ferien: [],
   suche: "",
+  skala: 1,
   zoom: null,
 };
 
@@ -2804,6 +2830,9 @@ async function seitePlanwand(b) {
   const platz = Math.max(320, b.clientWidth || window.innerWidth) - 108;
   const spalte = 40 / plan.zoom;
   plan.tage = Math.max(6, Math.min(60, Math.floor(platz / spalte)));
+
+  // Je mehr Tage nebeneinander, desto kleiner alles andere.
+  plan.skala = Math.max(0.55, Math.min(1.2, 1 / plan.zoom));
 
   b.innerHTML = '<h1 class="seitentitel">Planwand</h1>'
     + '<div id="pw-seite"><div class="laedt">Wird geladen …</div></div>';
