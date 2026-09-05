@@ -8,7 +8,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="manifest" href="./app.webmanifest">
-<link rel="icon" href="./icon-192.png">
+<link rel="icon" href="./favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="./icon-192.png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <style>
 /* ---------------------------------------------------------------
@@ -1446,6 +1447,74 @@ body.dunkel .platzchip { background: #1e2a3a; color: #9cc4ff; }
 
 /* Anmeldung bleibt wie sie ist */
 body.dunkel .login__karte { background: #1c2229; }
+
+/* ---------- Kopfzeile: Schalter und Profilbild ---------- */
+.kopf__dunkel { background: none; border: 1px solid var(--linie-stark);
+                color: var(--marke); border-radius: var(--radius);
+                width: 38px; height: 38px; font-size: 1rem; cursor: pointer;
+                flex: none; margin-left: auto; }
+.kopf__bild { width: 34px; height: 34px; border-radius: 50%; object-fit: cover;
+              flex: none; border: 2px solid var(--linie-stark); }
+.kopf__bild--leer { display: grid; place-items: center; background: var(--marke);
+                    color: #fff; font-weight: 650; font-size: .9rem; }
+.kopf__benutzer { margin-left: 0; }
+.profilbild-gross { width: 84px; height: 84px; border-radius: 50%; object-fit: cover;
+                    border: 2px solid var(--linie-stark); }
+
+.kontokopf { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+.kontokopf .bildknopf { flex: 0 0 auto; }
+
+.gebzeile { display: flex; align-items: center; gap: 12px; padding: 9px 0;
+            border-bottom: 1px solid var(--linie); }
+.gebzeile:last-child { border-bottom: none; }
+.gebtorte { font-size: 1.5rem; }
+
+.parkzeile { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+             padding: 10px 0; border-bottom: 1px solid var(--linie); }
+.parkzeile__name { min-width: 150px; font-weight: 600; }
+.parkzeile__wahl { display: flex; gap: 12px; flex-wrap: wrap; }
+.parkchip { display: flex; align-items: center; gap: 6px; font-size: .9rem; cursor: pointer; }
+.parkchip input { width: 18px; height: 18px; }
+
+.gcode { background: #16191c; color: #e6eaef; padding: 14px 16px;
+         border-radius: var(--radius); font-family: ui-monospace, Menlo, Consolas, monospace;
+         font-size: .92rem; line-height: 1.55; overflow-x: auto; margin: 0 0 12px;
+         white-space: pre; user-select: text; }
+
+/* ---------- Dunkler Modus: restliche schwarze Schrift ---------- */
+body.dunkel .spass-zahl, body.dunkel .spass-text,
+body.dunkel .spass-weisheit, body.dunkel .spass-karte--paar,
+body.dunkel .spass-frage, body.dunkel .spass-salat { color: var(--tinte); }
+body.dunkel .spass-werte > div { background: #232a32; }
+body.dunkel .spass-maschine { background: #10161d; }
+body.dunkel .spass-karte--offen { background: var(--flaeche); color: var(--tinte); }
+body.dunkel .spass-ampel { color: #fff; }
+
+body.dunkel .mkarte, body.dunkel .treffer, body.dunkel .kachel,
+body.dunkel .wahlknopf, body.dunkel .parkwahl__knopf,
+body.dunkel .moduswahl__knopf, body.dunkel .sortknopf,
+body.dunkel .reiter__knopf, body.dunkel .unterreiter__knopf {
+  background: var(--flaeche); color: var(--tinte); }
+
+body.dunkel .mkarte__name, body.dunkel .tagzeile__name,
+body.dunkel .artikel__nr, body.dunkel .artikel__name,
+body.dunkel .auftrag__nr, body.dunkel .steuerung__titel,
+body.dunkel .problemzeile__nr, body.dunkel .notiz,
+body.dunkel .gebzeile, body.dunkel .parkzeile__name,
+body.dunkel .kzeile, body.dunkel .meldungsnotiz,
+body.dunkel .tagsumme, body.dunkel .balken__kopf,
+body.dunkel .ergebnisreihe, body.dunkel .dialog,
+body.dunkel .dialog h2, body.dunkel .dialog p { color: var(--tinte); }
+
+body.dunkel .meldungsnotiz { background: #232a32; }
+body.dunkel .toast { background: #2a323b; }
+body.dunkel .pw-balken--fertig { background: #545c65 !important; }
+body.dunkel .zbeschriftung { fill: var(--tinte); }
+body.dunkel .kennzahl { background: var(--flaeche); }
+body.dunkel .karte--raster, body.dunkel .raster .fest,
+body.dunkel .raster .summe { background: var(--flaeche); color: var(--tinte); }
+body.dunkel .raster .summe { background: #232a32; }
+body.dunkel .raster .heute { background: #24344a; }
 </style>
 </head>
 <body>
@@ -1489,11 +1558,66 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "16.1.0";
+const APP_VERSION = "17.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
 // -----------------------------------------------------------------
+
+// Schliesst ein Fenster mit Escape und beim Klick daneben.
+// Wichtig: nur wenn Druck UND Loslassen daneben passieren, sonst
+// bricht das Markieren von Text im Fenster die Eingabe ab.
+function dialogSchliessen(huelle, zu) {
+  let startAussen = false;
+
+  huelle.addEventListener("pointerdown", (e) => {
+    startAussen = (e.target === huelle);
+  });
+
+  huelle.addEventListener("click", (e) => {
+    if (e.target === huelle && startAussen) zu();
+    startAussen = false;
+  });
+
+  const taste = (e) => {
+    if (e.key !== "Escape") return;
+    if (!document.body.contains(huelle)) {
+      document.removeEventListener("keydown", taste);
+      return;
+    }
+    e.preventDefault();
+    document.removeEventListener("keydown", taste);
+    zu();
+  };
+  document.addEventListener("keydown", taste);
+}
+
+// Verkleinert ein Bild vor dem Hochladen
+function bildVerkleinern(datei, maxKante) {
+  return new Promise((fertig, ablehnen) => {
+    const leser = new FileReader();
+    leser.onload = () => {
+      const bild = new Image();
+      bild.onload = () => {
+        const max = maxKante || 1200;
+        let bw = bild.width, bh = bild.height;
+        if (bw > max || bh > max) {
+          const f = Math.min(max / bw, max / bh);
+          bw = Math.round(bw * f); bh = Math.round(bh * f);
+        }
+        const c = document.createElement("canvas");
+        c.width = bw; c.height = bh;
+        c.getContext("2d").drawImage(bild, 0, 0, bw, bh);
+        c.toBlob((blob) => blob ? fertig(blob) : ablehnen(new Error("Bild nicht lesbar")),
+          "image/jpeg", 0.85);
+      };
+      bild.onerror = () => ablehnen(new Error("Bild nicht lesbar"));
+      bild.src = leser.result;
+    };
+    leser.onerror = () => ablehnen(new Error("Datei nicht lesbar"));
+    leser.readAsDataURL(datei);
+  });
+}
 
 function esc(w) {
   if (w === null || w === undefined) return "";
@@ -1647,7 +1771,7 @@ async function profilLaden() {
 
   try {
     const { data, error } = await zeitlimit(
-      db.from("profiles").select("id, email, full_name, role, is_active")
+      db.from("profiles").select("id, email, full_name, role, is_active, geburtstag, bild_url, parks")
         .eq("id", s.user.id).single(), 10000, "Profil");
     if (error || !data) throw error || new Error("kein Profil");
     profil = data;
@@ -1834,6 +1958,7 @@ async function seiteDashboard(b) {
     + '<div id="db-probleme"></div>'
     + '<div id="db-vorbereitung"></div>'
     + '<div id="db-einkauf"></div>'
+    + '<div id="db-geburtstage"></div>'
     + '<div id="db-notizen"></div>'
     + '<div id="db-status"></div>';
 
@@ -1876,6 +2001,7 @@ async function seiteDashboard(b) {
   await zeichneProbleme(b);
   await zeichneVorbereitung(b);
   await zeichneEinkaufKurz(b);
+  await zeichneGeburtstage();
 
   // Karten auf der Startseite führen direkt in ihren Bereich
 
@@ -2058,6 +2184,63 @@ async function zeichneEinkaufKurz(b) {
           + (z.menge ? ' <span class="klein">' + esc(z.menge) + '</span>' : "") + '</span>'
           + '</div>').join("") + '</div>'
       : '<p class="hinweis">Nichts einzukaufen.</p>')
+    + '</section>';
+}
+
+// Geburtstage der nächsten zwei Wochen
+async function zeichneGeburtstage() {
+  const ziel = document.getElementById("db-geburtstage");
+  if (!ziel) return;
+
+  let leute = [];
+  try {
+    const { data, error } = await zeitlimit(
+      db.from("profiles").select("full_name, email, geburtstag, bild_url")
+        .not("geburtstag", "is", null).eq("is_active", true), 8000, "Geburtstage");
+    if (error) throw error;
+    leute = data || [];
+  } catch (f) { return; }
+
+  const heute = new Date();
+  const kommend = [];
+
+  leute.forEach((m) => {
+    const g = ausIso(m.geburtstag);
+    // Nächster Geburtstag ab heute
+    let naechster = new Date(heute.getFullYear(), g.getMonth(), g.getDate());
+    if (naechster < new Date(heute.getFullYear(), heute.getMonth(), heute.getDate())) {
+      naechster = new Date(heute.getFullYear() + 1, g.getMonth(), g.getDate());
+    }
+    const tage = Math.round((naechster - new Date(heute.getFullYear(),
+      heute.getMonth(), heute.getDate())) / 86400000);
+    if (tage <= 14) {
+      kommend.push({
+        name: m.full_name || m.email,
+        bild: m.bild_url,
+        datum: isoDatum(naechster),
+        tage: tage,
+        alter: naechster.getFullYear() - g.getFullYear(),
+      });
+    }
+  });
+
+  if (!kommend.length) { ziel.innerHTML = ""; return; }
+  kommend.sort((a, c) => a.tage - c.tage);
+
+  ziel.innerHTML = '<section class="karte"><h2>Geburtstage</h2>'
+    + kommend.map((m) => '<div class="gebzeile">'
+        + (m.bild
+            ? '<img class="kopf__bild" src="' + esc(m.bild) + '" alt="">'
+            : '<span class="kopf__bild kopf__bild--leer">'
+              + esc(m.name.charAt(0).toUpperCase()) + '</span>')
+        + '<div class="problemzeile__inhalt">'
+        + '<div class="problemzeile__nr">' + esc(m.name)
+        + ' <span class="klein">wird ' + m.alter + '</span></div>'
+        + '<div class="klein">' + (m.tage === 0 ? "Heute!"
+            : m.tage === 1 ? "Morgen" : "in " + m.tage + " Tagen")
+        + ' · ' + esc(kurzDatum(m.datum)) + '</div></div>'
+        + (m.tage === 0 ? '<span class="gebtorte">🎂</span>' : "")
+        + '</div>').join("")
     + '</section>';
 }
 
@@ -2254,13 +2437,29 @@ function ladeHerunter(inhalt, dateiname, art) {
 //  RECHTE
 // =================================================================
 
+// Auf welche Maschinenparks hat der angemeldete Benutzer Zugriff?
+// Leere Liste heisst: alle.
+function meineParks() {
+  return (profil && Array.isArray(profil.parks)) ? profil.parks : [];
+}
+
+function parkErlaubt(parkId) {
+  if (istAdmin()) return true;
+  const p = meineParks();
+  return !p.length || p.indexOf(parkId) !== -1;
+}
+
 function meineRolle() { return (profil && profil.role) || "produktion"; }
 function istAdmin() { return meineRolle() === "admin"; }
-function darfSchreiben() { return meineRolle() === "admin" || meineRolle() === "produktion"; }
+function darfSchreiben() {
+  const r = meineRolle();
+  return r === "admin" || r === "langdreher" || r === "kurzdreher";
+}
 
 const ROLLEN = {
   admin: "Administrator",
-  produktion: "Produktion",
+  langdreher: "Langdreher",
+  kurzdreher: "Kurzdreher",
 };
 
 // Hinweisbalken, wenn jemand einen Bereich nur ansehen darf
@@ -2334,7 +2533,7 @@ function dialogFelder(o) {
 
     huelle.querySelector("[data-ja]").onclick = absenden;
     huelle.querySelector("[data-nein]").onclick = () => schliessen(null);
-    huelle.onclick = (e) => { if (e.target === huelle) schliessen(null); };
+    dialogSchliessen(huelle, () => schliessen(null));
     huelle.querySelector("form").onsubmit = (e) => { e.preventDefault(); absenden(); };
 
     const erstes = huelle.querySelector("input, textarea");
@@ -2468,7 +2667,8 @@ async function ladeParks(auchInaktive) {
   if (!auchInaktive) a = a.eq("is_active", true);
   const { data, error } = await zeitlimit(a, 10000, "Maschinenparks");
   if (error) throw error;
-  return data || [];
+  // Nur die Parks zeigen, für die der Benutzer freigeschaltet ist
+  return (data || []).filter((p) => parkErlaubt(p.id));
 }
 
 async function ladeMaschinen(auchInaktive) {
@@ -2476,7 +2676,7 @@ async function ladeMaschinen(auchInaktive) {
   if (!auchInaktive) a = a.eq("is_active", true);
   const { data, error } = await zeitlimit(a, 10000, "Maschinen");
   if (error) throw error;
-  return data || [];
+  return (data || []).filter((m) => parkErlaubt(m.park_id));
 }
 
 async function ladeLaufendeAuftraege() {
@@ -3033,17 +3233,17 @@ async function seitePlanwand(b) {
   // Die Spaltenbreite ergibt sich daraus, damit immer alles in die
   // Breite passt und nichts seitlich weggeschoben wird.
   if (!plan.tageWunsch) plan.tageWunsch = Number(einstellungWert("pwtage", 15)) || 15;
-  plan.tage = Math.max(5, Math.min(80, plan.tageWunsch));
+  plan.tage = Math.max(5, Math.min(120, plan.tageWunsch));
 
   const gesamt = Math.max(280, b.clientWidth || window.innerWidth) - 8;
   // Die Namensspalte darf höchstens ein Fünftel einnehmen
   let namensbreite = Math.min(108, Math.floor(gesamt / 5));
-  plan.spalte = Math.max(9, (gesamt - namensbreite) / plan.tage);
+  plan.spalte = Math.max(5, (gesamt - namensbreite) / plan.tage);
 
   // Sehr eng: Namensspalte schrumpfen, damit die Tage Platz behalten
   if (plan.spalte < 22) {
     namensbreite = Math.min(namensbreite, 64);
-    plan.spalte = Math.max(9, (gesamt - namensbreite) / plan.tage);
+    plan.spalte = Math.max(5, (gesamt - namensbreite) / plan.tage);
   }
 
   plan.namensbreite = namensbreite;
@@ -3103,7 +3303,7 @@ async function ansichtPlanwand(ziel, b) {
     seitePlanwand(b);
   };
   document.getElementById("pw-raus").onclick = () => {
-    plan.tageWunsch = Math.min(80, plan.tageWunsch + 5);
+    plan.tageWunsch = Math.min(120, plan.tageWunsch + 5);
     einstellungSetzenWert("pwtage", plan.tageWunsch);
     seitePlanwand(b);
   };
@@ -3533,7 +3733,7 @@ async function ferienDialog(eintrag, zeile, datum, b) {
   const $ = (k) => huelle.querySelector("#" + k);
   const zu = () => huelle.remove();
   $("fd-nein").onclick = zu;
-  huelle.onclick = (e) => { if (e.target === huelle) zu(); };
+  dialogSchliessen(huelle, zu);
   $("fd-person").focus();
 
   $("fd-ja").onclick = async () => {
@@ -4114,7 +4314,7 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
   const $ = (k) => huelle.querySelector("#" + k);
   const zu = () => huelle.remove();
   $("pl-nein").onclick = zu;
-  huelle.onclick = (e) => { if (e.target === huelle) zu(); };
+  dialogSchliessen(huelle, zu);
 
   let pdfAdresse = auftrag ? auftrag.drawing_url : null;
 
@@ -4582,7 +4782,7 @@ function betrachter(adresse, titel, istPdf) {
 
   const zu = () => huelle.remove();
   huelle.querySelector("[data-zu]").onclick = zu;
-  huelle.onclick = (e) => { if (e.target === huelle) zu(); };
+  dialogSchliessen(huelle, zu);
 }
 
 // =================================================================
@@ -4787,7 +4987,7 @@ const rech = {
 function seiteRechner(b) {
   b.innerHTML = '<h1 class="seitentitel">Rechner</h1>'
     + '<div class="reiter">'
-    + [["drehzahl", "Drehzahl"], ["winkel", "Winkel und Fase"]]
+    + [["drehzahl", "Drehzahl"], ["winkel", "Winkel und Fase"], ["gcode", "G-Code"]]
         .map(([w, t]) => '<button class="reiter__knopf' + (rech.ansicht === w ? " aktiv" : "")
           + '" data-rech="' + w + '">' + t + '</button>').join("")
     + '</div><div id="rech-inhalt"></div>';
@@ -4798,6 +4998,7 @@ function seiteRechner(b) {
 
   const ziel = document.getElementById("rech-inhalt");
   if (rech.ansicht === "winkel") return rechnerWinkel(ziel);
+  if (rech.ansicht === "gcode") return rechnerGcode(ziel);
   return rechnerDrehzahl(ziel, b);
 }
 
@@ -4884,6 +5085,201 @@ function rechnerDrehzahl(ziel, b) {
   binde("r-d", "durchmesser");
   binde("r-z", "zaehne");
   binde("r-fz", "fz");
+}
+
+// ---------- G-Code für Fase und Radius ----------
+
+const gcode = {
+  richtung: "stirn",     // stirn = von der Fläche auf den Durchmesser
+  dm: "20",              // Enddurchmesser
+  zStart: "0",           // Z am Anfang
+  fase: "1",             // Fasenbreite
+  winkel: "45",
+  radius: "0.2",
+  radienAn: true,
+  vorschub: "0.03",
+  vorschubFein: "0.02",
+  ueberlauf: "0.5",
+  laenge: "2",
+};
+
+// Zeichnung: zeigt, was das Programm macht
+function bildGcode(g) {
+  const dm = parseFloat(g.dm) || 20;
+  const fase = parseFloat(g.fase) || 1;
+  const winkel = parseFloat(g.winkel) || 45;
+  const rad = g.radienAn ? (parseFloat(g.radius) || 0) : 0;
+  const stirn = g.richtung === "stirn";
+
+  // Massstab für die Zeichnung
+  const hoehe = 150;
+  const mitte = 175;
+  const skala = Math.min(3.2, 110 / Math.max(4, dm / 2));
+  const r = (dm / 2) * skala;
+  const b = fase * skala;
+  const t = b / Math.tan(bogenGrad(winkel));
+
+  const oben = mitte - r;
+  const xStart = 90;
+
+  // Kontur: Stirnfläche links, Fase, dann Zylinder nach rechts
+  const kontur = stirn
+    ? 'M' + xStart + ',' + mitte
+      + ' L' + xStart + ',' + (oben + b)
+      + ' L' + (xStart + t) + ',' + oben
+      + ' L' + (xStart + 190) + ',' + oben
+    : 'M' + (xStart + 190) + ',' + oben
+      + ' L' + (xStart + t) + ',' + oben
+      + ' L' + xStart + ',' + (oben + b)
+      + ' L' + xStart + ',' + mitte;
+
+  return '<svg viewBox="0 0 340 220" class="zeichnung" role="img"'
+    + ' aria-label="Drehteil mit Fase">'
+    // Mittellinie
+    + '<line x1="40" y1="' + mitte + '" x2="320" y2="' + mitte + '"'
+    + ' stroke="var(--linie-stark)" stroke-width="1" stroke-dasharray="8 4 2 4"/>'
+    // Werkstück
+    + '<path d="' + kontur + ' L' + (xStart + 190) + ',' + mitte + ' Z"'
+    + ' fill="var(--marke-hell)" stroke="var(--marke)" stroke-width="2.5"/>'
+    // Fase hervorheben
+    + '<line x1="' + xStart + '" y1="' + (oben + b) + '" x2="' + (xStart + t) + '" y2="' + oben + '"'
+    + ' stroke="var(--gefahr)" stroke-width="3"/>'
+    // Masse
+    + '<line x1="' + (xStart - 26) + '" y1="' + oben + '" x2="' + (xStart - 26) + '" y2="' + mitte + '"'
+    + ' stroke="var(--tinte)" stroke-width="1"/>'
+    + '<text x="' + (xStart - 30) + '" y="' + (oben + r / 2) + '" class="zbeschriftung"'
+    + ' text-anchor="end">⌀' + dm + '</text>'
+    + '<text x="' + (xStart + t / 2 + 6) + '" y="' + (oben - 8) + '" class="zbeschriftung">'
+    + fase + ' × ' + winkel + '°</text>'
+    + (rad > 0
+        ? '<text x="' + (xStart + t + 30) + '" y="' + (oben - 8) + '" class="zbeschriftung">'
+          + 'R' + rad + '</text>'
+        : "")
+    + '<text x="' + xStart + '" y="' + (mitte + 22) + '" class="zbeschriftung"'
+    + ' text-anchor="middle">Z' + (parseFloat(g.zStart) || 0) + '</text>'
+    + '</svg>';
+}
+
+function baueGcode(g) {
+  const dm = parseFloat(g.dm) || 0;
+  const z0 = parseFloat(g.zStart) || 0;
+  const fase = parseFloat(g.fase) || 0;
+  const winkel = parseFloat(g.winkel) || 45;
+  const rad = g.radienAn ? (parseFloat(g.radius) || 0) : 0;
+  const f = (parseFloat(g.vorschub) || 0.03).toFixed(2);
+  const ff = (parseFloat(g.vorschubFein) || 0.02).toFixed(2);
+  const ueber = parseFloat(g.ueberlauf) || 0.5;
+  const laenge = parseFloat(g.laenge) || 2;
+
+  const anfahrDm = (dm + 2).toFixed(2);
+  const tiefe = fase / Math.tan(bogenGrad(winkel));
+  const zEnde = (z0 + tiefe).toFixed(3);
+  const dmNachFase = (dm - 2 * fase).toFixed(3);
+
+  const zeilen = [];
+
+  if (g.richtung === "stirn") {
+    // Von der Stirnfläche auf den Durchmesser
+    zeilen.push("G0X" + anfahrDm + "Z" + z0.toFixed(2));
+    zeilen.push("G1X-0.5F" + f);
+    zeilen.push("G1X0.00");
+    zeilen.push("G1,A90.," + (rad > 0 ? "R" + rad.toFixed(2) : "R0") + "F" + ff);
+    zeilen.push(",A" + winkel.toFixed(0) + ".X" + dmNachFase + "Z" + zEnde
+      + (rad > 0 ? ",R" + rad.toFixed(2) : "") + "F" + ff);
+    zeilen.push("G1X" + dm.toFixed(3) + "Z" + (z0 + laenge).toFixed(2) + "F" + f);
+  } else {
+    // Vom Durchmesser auf die Stirnfläche, also Kantenbruch aussen
+    zeilen.push("G0X" + anfahrDm + "Z" + (z0 + laenge).toFixed(2));
+    zeilen.push("G1X" + dm.toFixed(3) + "F" + f);
+    zeilen.push("G1Z" + zEnde + "F" + f);
+    zeilen.push("G1,A" + (180 - winkel).toFixed(0) + ".X" + dmNachFase + "Z" + z0.toFixed(3)
+      + (rad > 0 ? ",R" + rad.toFixed(2) : "") + "F" + ff);
+    zeilen.push("G1X-0.5F" + ff);
+    zeilen.push("G0X" + anfahrDm);
+  }
+
+  zeilen.push("G0X" + (dm + 4).toFixed(2) + "Z" + (z0 + laenge + ueber).toFixed(2));
+  return zeilen.join("\n");
+}
+
+function rechnerGcode(ziel) {
+  const text = baueGcode(gcode);
+
+  ziel.innerHTML = ''
+    + '<section class="karte"><h2>Was soll gedreht werden?</h2>'
+    + bildGcode(gcode)
+    + '<div class="moduswahl">'
+    + '<button class="moduswahl__knopf' + (gcode.richtung === "stirn" ? " aktiv" : "")
+    + '" data-gr="stirn">Stirn zum Durchmesser</button>'
+    + '<button class="moduswahl__knopf' + (gcode.richtung === "aussen" ? " aktiv" : "")
+    + '" data-gr="aussen">Durchmesser zur Stirn</button>'
+    + '</div>'
+
+    + '<div class="zeitraumwahl">'
+    + '<label class="feld"><span>Durchmesser in mm</span>'
+    + '<input type="number" id="g-dm" step="0.01" value="' + esc(gcode.dm) + '"></label>'
+    + '<label class="feld"><span>Z am Anfang</span>'
+    + '<input type="number" id="g-z" step="0.01" value="' + esc(gcode.zStart) + '"></label>'
+    + '</div>'
+
+    + '<div class="zeitraumwahl">'
+    + '<label class="feld"><span>Fasenbreite in mm</span>'
+    + '<input type="number" id="g-fase" step="0.05" value="' + esc(gcode.fase) + '"></label>'
+    + '<label class="feld"><span>Winkel in Grad</span>'
+    + '<input type="number" id="g-winkel" step="1" value="' + esc(gcode.winkel) + '"></label>'
+    + '</div>'
+
+    + '<label class="schalter"><input type="checkbox" id="g-radan"'
+    + (gcode.radienAn ? " checked" : "") + '>'
+    + '<span>Übergänge verrunden</span></label>'
+    + (gcode.radienAn
+      ? '<label class="feld"><span>Radius in mm</span>'
+        + '<input type="number" id="g-radius" step="0.05" value="' + esc(gcode.radius) + '"></label>'
+      : "")
+
+    + '<div class="zeitraumwahl">'
+    + '<label class="feld"><span>Vorschub grob</span>'
+    + '<input type="number" id="g-f" step="0.005" value="' + esc(gcode.vorschub) + '"></label>'
+    + '<label class="feld"><span>Vorschub fein</span>'
+    + '<input type="number" id="g-ff" step="0.005" value="' + esc(gcode.vorschubFein) + '"></label>'
+    + '</div>'
+
+    + '<label class="feld"><span>Länge des Zylinders in mm</span>'
+    + '<input type="number" id="g-laenge" step="0.1" value="' + esc(gcode.laenge) + '"></label>'
+    + '</section>'
+
+    + '<section class="karte"><div class="karte__kopf"><h2>Programm</h2>'
+    + '<button class="linkknopf" id="g-kopieren">Kopieren</button></div>'
+    + '<pre class="gcode">' + esc(text) + '</pre>'
+    + '<p class="hinweis">Fanuc-Schreibweise mit Winkel- und Radiusangaben. '
+    + 'Bitte vor dem ersten Lauf am Simulator prüfen. Werkzeugaufruf, Drehzahl und '
+    + 'Kühlung fehlen bewusst, die stehen bei euch im Rahmenprogramm.</p>'
+    + '</section>';
+
+  const binde = (id, feld) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.onchange = () => { gcode[feld] = el.value; rechnerGcode(ziel); };
+  };
+  binde("g-dm", "dm"); binde("g-z", "zStart"); binde("g-fase", "fase");
+  binde("g-winkel", "winkel"); binde("g-radius", "radius");
+  binde("g-f", "vorschub"); binde("g-ff", "vorschubFein"); binde("g-laenge", "laenge");
+
+  ziel.querySelectorAll("[data-gr]").forEach((el) => {
+    el.onclick = () => { gcode.richtung = el.dataset.gr; rechnerGcode(ziel); };
+  });
+
+  const radAn = document.getElementById("g-radan");
+  if (radAn) radAn.onchange = () => { gcode.radienAn = radAn.checked; rechnerGcode(ziel); };
+
+  document.getElementById("g-kopieren").onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      meldung("Programm kopiert.");
+    } catch (f) {
+      meldung("Kopieren nicht möglich. Bitte von Hand markieren.", "warn");
+    }
+  };
 }
 
 // ---------- Winkel und Fase ----------
@@ -5395,7 +5791,7 @@ function auswahlSuchen(titel, optionen) {
 
     const zu = (v) => { h.remove(); fertig(v); };
     h.querySelector("[data-nein]").onclick = () => zu(null);
-    h.onclick = (e) => { if (e.target === h) zu(null); };
+    dialogSchliessen(h, () => zu(null));
 
     const liste = h.querySelector("#as-liste");
     const feld = h.querySelector("#as-suche");
@@ -5429,7 +5825,7 @@ function auswahlDialog(titel, optionen) {
     document.body.appendChild(h);
     const zu = (v) => { h.remove(); fertig(v); };
     h.querySelector("[data-nein]").onclick = () => zu(null);
-    h.onclick = (e) => { if (e.target === h) zu(null); };
+    dialogSchliessen(h, () => zu(null));
     h.querySelectorAll("[data-w]").forEach((el) => { el.onclick = () => zu(el.dataset.w); });
   });
 }
@@ -5463,7 +5859,7 @@ async function positionDialog(b) {
   let gewaehlt = null;
   const zu = () => huelle.remove();
   $("pd-nein").onclick = zu;
-  huelle.onclick = (e) => { if (e.target === huelle) zu(); };
+  dialogSchliessen(huelle, zu);
 
   const feld = $("pd-such");
   const trefferBox = $("pd-treffer");
@@ -5798,7 +6194,7 @@ async function seiteEinstellungen(b) {
   let benutzer = [];
   try {
     const { data, error } = await zeitlimit(
-      db.from("profiles").select("id, email, full_name, role, is_active")
+      db.from("profiles").select("id, email, full_name, role, is_active, geburtstag, bild_url, parks")
         .order("full_name"), 10000, "Benutzerliste");
     if (error) throw error;
     benutzer = data || [];
@@ -5832,10 +6228,30 @@ async function seiteEinstellungen(b) {
     + '<div><strong>Produktion</strong> darf alles erfassen und bestellen, aber die '
     + 'Planwand nicht bearbeiten.</div>'
         + '<div>Ansehen darf jeder alles.</div></div>'
+    + (besitzer
+        ? '<h3 class="untertitel">Zugriff auf Maschinenparks</h3>'
+          + '<p class="hinweis">Ohne Auswahl sieht jemand alle Parks. '
+          + 'Sonst nur die angehakten. Administratoren sehen immer alles.</p>'
+          + '<div id="parkzugriff"><div class="laedt">Parks werden geladen …</div></div>'
+        : "")
     + '<p class="hinweis">Neue Benutzer legst du im Supabase-Dashboard unter '
     + 'Authentication → Users an, als E-Mail den Namen mit @hoferco.ch.</p></section>'
 
     + '<section class="karte"><h2>Mein Konto</h2>'
+    + '<div class="kontokopf">'
+    + (ich && ich.bild_url
+        ? '<img class="profilbild-gross" id="mk-bild" src="' + esc(ich.bild_url) + '" alt="">'
+        : '<span class="profilbild-gross kopf__bild--leer" id="mk-bild">'
+          + esc(((ich && (ich.full_name || ich.email)) || "?").charAt(0).toUpperCase())
+          + '</span>')
+    + '<label class="knopf bildknopf">Bild wählen'
+    + '<input type="file" id="mk-datei" accept="image/*" hidden></label>'
+    + '</div>'
+    + '<label class="feld"><span>Geburtstag</span>'
+    + '<input type="date" id="mk-geburtstag" value="'
+    + esc((ich && ich.geburtstag) || "") + '">'
+    + '<span class="feldhinweis">Erscheint auf der Startseite, '
+    + 'wenn er in den nächsten zwei Wochen ansteht.</span></label>'
     + '<label class="feld"><span>Anzeigename</span>'
     + '<input type="text" id="mn" value="' + esc((profil && profil.full_name) || "") + '"></label>'
     + '<button class="knopf" id="ns">Name speichern</button>'
@@ -5907,6 +6323,72 @@ async function seiteEinstellungen(b) {
       else { meldung(ein ? "Benutzer aktiviert." : "Benutzer deaktiviert."); seiteEinstellungen(b); }
     });
   });
+
+  // Parkzuweisung je Benutzer
+  const parkKasten = document.getElementById("parkzugriff");
+  if (parkKasten) {
+    try {
+      const { data } = await db.from("machine_parks").select("id, name")
+        .eq("is_active", true).order("name");
+      const parks = data || [];
+
+      parkKasten.innerHTML = benutzer.filter((u) => u.role !== "admin").map((u) =>
+        '<div class="parkzeile"><div class="parkzeile__name">'
+        + esc(u.full_name || u.email) + '</div>'
+        + '<div class="parkzeile__wahl">'
+        + parks.map((pk) => '<label class="parkchip">'
+            + '<input type="checkbox" data-pu="' + esc(u.id) + '" data-pp="' + esc(pk.id) + '"'
+            + ((u.parks || []).indexOf(pk.id) !== -1 ? " checked" : "") + '>'
+            + '<span>' + esc(pk.name) + '</span></label>').join("")
+        + '</div></div>').join("")
+        || '<p class="hinweis">Keine weiteren Benutzer.</p>';
+
+      parkKasten.querySelectorAll("[data-pu]").forEach((el) => {
+        el.onchange = async () => {
+          const nutzer = benutzer.find((u) => u.id === el.dataset.pu);
+          const bisher = (nutzer.parks || []).slice();
+          const i = bisher.indexOf(el.dataset.pp);
+          if (el.checked && i === -1) bisher.push(el.dataset.pp);
+          if (!el.checked && i !== -1) bisher.splice(i, 1);
+
+          const { error } = await db.from("profiles").update({ parks: bisher })
+            .eq("id", nutzer.id);
+          if (error) { meldung(fehlertext(error), "fehler"); el.checked = !el.checked; }
+          else { nutzer.parks = bisher; meldung("Zugriff gespeichert."); }
+        };
+      });
+    } catch (f) {
+      parkKasten.innerHTML = '<p class="hinweis">Parks konnten nicht geladen werden.</p>';
+    }
+  }
+
+  const datei = document.getElementById("mk-datei");
+  if (datei) datei.onchange = async (e) => {
+    const f = (e.target.files || [])[0];
+    if (!f) return;
+    meldung("Bild wird hochgeladen …");
+    try {
+      const klein = await bildVerkleinern(f, 400);
+      const name = "profil/" + ich.id + "-" + Date.now() + ".jpg";
+      const r = await db.storage.from("profilbilder").upload(name, klein,
+        { contentType: "image/jpeg" });
+      if (r.error) throw r.error;
+      const url = db.storage.from("profilbilder").getPublicUrl(name).data.publicUrl;
+      const u = await db.from("profiles").update({ bild_url: url }).eq("id", ich.id);
+      if (u.error) throw u.error;
+      profil.bild_url = url;
+      meldung("Bild gespeichert.");
+      seiteEinstellungen(b);
+    } catch (f2) { meldung(fehlertext(f2), "fehler"); }
+  };
+
+  const gebFeld = document.getElementById("mk-geburtstag");
+  if (gebFeld) gebFeld.onchange = async () => {
+    const { error } = await db.from("profiles")
+      .update({ geburtstag: gebFeld.value || null }).eq("id", ich.id);
+    if (error) meldung(fehlertext(error), "fehler");
+    else { profil.geburtstag = gebFeld.value || null; meldung("Geburtstag gespeichert."); }
+  };
 
   document.getElementById("ns").addEventListener("click", async () => {
     const name = document.getElementById("mn").value.trim();
@@ -7425,6 +7907,13 @@ function zeichneGeruest() {
     + '<header class="kopf">'
     + '<button class="kopf__klapp" id="nav-klapp" title="Menü ein- oder ausklappen">☰</button>'
     + '<img class="kopf__logo" src="./logo.png" alt="Hofer + Co.">'
+    + '<button class="kopf__dunkel" id="kopf-dunkel" title="Heller oder dunkler Modus">'
+    + (einstellung("dunkel") ? "☀" : "☾") + '</button>'
+    + (profil && profil.bild_url
+        ? '<img class="kopf__bild" src="' + esc(profil.bild_url) + '" alt="">'
+        : '<span class="kopf__bild kopf__bild--leer">'
+          + esc(((profil && (profil.full_name || profil.email)) || "?").charAt(0).toUpperCase())
+          + '</span>')
     + '<span class="kopf__benutzer" data-benutzername>' + esc(anzeige) + '</span>'
     + '<button class="kopf__abmelden" id="ab">Abmelden</button></header>'
     + '<div class="rahmen"><nav class="nav" aria-label="Hauptnavigation">'
@@ -7432,6 +7921,14 @@ function zeichneGeruest() {
         + '<span class="nav__zeichen" aria-hidden="true">' + s.zeichen + '</span>'
         + '<span class="nav__text">' + esc(s.titel) + '</span></a>').join("")
     + '</nav><main class="inhalt" id="inhalt"></main></div>';
+
+  const dunkelKnopf = document.getElementById("kopf-dunkel");
+  if (dunkelKnopf) dunkelKnopf.onclick = () => {
+    const an = !document.body.classList.contains("dunkel");
+    document.body.classList.toggle("dunkel", an);
+    einstellungSetzen("dunkel", an);
+    dunkelKnopf.textContent = an ? "☀" : "☾";
+  };
 
   const klapp = document.getElementById("nav-klapp");
   if (klapp) klapp.onclick = () => {
