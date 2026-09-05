@@ -1453,12 +1453,12 @@ body.dunkel .login__karte { background: #1c2229; }
                 color: var(--marke); border-radius: var(--radius);
                 width: 38px; height: 38px; font-size: 1rem; cursor: pointer;
                 flex: none; margin-left: auto; }
-.kopf__bild { width: 34px; height: 34px; border-radius: 50%; object-fit: cover;
+.kopf__bild { width: 34px; height: 34px; border-radius: 5px; object-fit: cover;
               flex: none; border: 2px solid var(--linie-stark); }
 .kopf__bild--leer { display: grid; place-items: center; background: var(--marke);
                     color: #fff; font-weight: 650; font-size: .9rem; }
 .kopf__benutzer { margin-left: 0; }
-.profilbild-gross { width: 84px; height: 84px; border-radius: 50%; object-fit: cover;
+.profilbild-gross { width: 84px; height: 84px; border-radius: 8px; object-fit: cover;
                     border: 2px solid var(--linie-stark); }
 
 .kontokopf { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
@@ -1515,6 +1515,75 @@ body.dunkel .karte--raster, body.dunkel .raster .fest,
 body.dunkel .raster .summe { background: var(--flaeche); color: var(--tinte); }
 body.dunkel .raster .summe { background: #232a32; }
 body.dunkel .raster .heute { background: #24344a; }
+
+/* ---------- Bild zuschneiden ---------- */
+.zuschnitt { position: relative; display: inline-block; max-width: 100%;
+             margin: 8px 0 14px; line-height: 0; touch-action: none; }
+.zuschnitt img { max-width: 100%; max-height: 46vh; display: block; }
+.zuschnitt__rahmen { position: absolute; border: 2px solid var(--signalgelb);
+                     box-shadow: 0 0 0 9999px rgba(0,0,0,.45); cursor: move;
+                     touch-action: none; }
+.zuschnitt__griff { position: absolute; right: -9px; bottom: -9px;
+                    width: 20px; height: 20px; background: var(--signalgelb);
+                    border-radius: 3px; cursor: nwse-resize; touch-action: none; }
+.zuschnitt__vorschau { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.zuschnitt__vorschau canvas { border-radius: 8px; border: 2px solid var(--linie-stark);
+                              width: 84px; height: 84px; }
+
+/* ---------- Dunkler Modus: alles hell, nichts schwarz ---------- */
+/* :where hat keine Spezifität, spätere Regeln gewinnen also weiterhin */
+body.dunkel :where(div, span, p, td, th, li, label, small, strong, em,
+                   h1, h2, h3, h4, section, header, nav, article, summary,
+                   button, input, select, textarea, pre, code) {
+  color: inherit;
+}
+body.dunkel { color: var(--tinte); }
+
+/* Auf hellen Flächen bleibt dunkle Schrift richtig */
+body.dunkel .knopf--haupt, body.dunkel .knopf--gefahr,
+body.dunkel .marke, body.dunkel .statuschip, body.dunkel .fehltchip,
+body.dunkel .problemkasten, body.dunkel .warnbalken,
+body.dunkel .karte--warnung, body.dunkel .karte--ergebnis,
+body.dunkel .parkwahl__knopf.aktiv, body.dunkel .moduswahl__knopf.aktiv,
+body.dunkel .wahlknopf.aktiv, body.dunkel .statuszeile--warn,
+body.dunkel .statuszeile--gefahr, body.dunkel .statuszeile--gut,
+body.dunkel .priochip, body.dunkel .vorschlag {
+  color: #10161d;
+}
+body.dunkel .knopf--haupt :where(span, strong),
+body.dunkel .karte--ergebnis :where(div, span) { color: inherit; }
+body.dunkel .karte--warnung h2 { color: #7a5310; }
+
+/* Gedämpfte Nebentexte bleiben gedämpft, aber hell genug */
+body.dunkel :where(.klein, .hinweis, .feldhinweis, .untertitel,
+                   .spass-label, .kennzahl__titel, .tabelle th,
+                   .nav__punkt, .steuerung__mitte .linkknopf) { color: var(--gedaempft); }
+
+/* Eingaben und Auswahl */
+body.dunkel input, body.dunkel select, body.dunkel textarea,
+body.dunkel option { background: #232a32; color: var(--tinte); }
+body.dunkel option { background: #232a32; }
+body.dunkel ::selection { background: rgba(107, 164, 255, .35); color: #fff; }
+body.dunkel :focus-visible { outline-color: #6ba4ff; }
+
+/* Flächen */
+body.dunkel :where(.karte, .dialog, .mkarte, .treffer, .kachel, .nav,
+                   .kopf, .pw-rolle, .pw-tafel, .pw-name, .pw-kopfblock,
+                   .pw-zeile--kopf, .pw-zeile--kw, .karte--raster,
+                   .raster .fest, .spass-karte--offen, .spass-zahl-feld,
+                   .kennzahl, .pd-zeile) { background: var(--flaeche); }
+body.dunkel :where(.statuszeile, .meldungsnotiz, .spass-werte > div,
+                   .raster .summe, .parkzeile) { background: #232a32; }
+body.dunkel .spass-maschine { background: #10161d; }
+body.dunkel .zbeschriftung { fill: var(--tinte); }
+
+.pw-adminleiste { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.schalter--admin { background: var(--marke-hell); padding: 8px 14px;
+                   border-radius: var(--radius); margin-bottom: 0; }
+
+.zuschnitt { display: grid; place-items: center; margin: 12px 0; }
+.zuschnitt canvas { border-radius: 6px; border: 2px solid var(--linie-stark);
+                    cursor: grab; touch-action: none; }
 </style>
 </head>
 <body>
@@ -1558,7 +1627,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "17.0.0";
+const APP_VERSION = "18.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -1592,7 +1661,85 @@ function dialogSchliessen(huelle, zu) {
   document.addEventListener("keydown", taste);
 }
 
-// Verkleinert ein Bild vor dem Hochladen
+// Bild quadratisch zuschneiden. Zeigt eine Vorschau und liefert
+function bildZuschneiden(datei, kante) {
+  return new Promise((fertig) => {
+    const leser = new FileReader();
+    leser.onload = () => {
+      const bild = new Image();
+      bild.onload = () => {
+        const huelle = document.createElement("div");
+        huelle.className = "dialog-huelle";
+        huelle.innerHTML = '<div class="dialog">'
+          + '<h2>Bild zuschneiden</h2>'
+          + '<p class="klein">Ziehe das Bild zurecht und stelle die Grösse ein. '
+          + 'Der gezeigte Ausschnitt wird gespeichert.</p>'
+          + '<div class="zuschnitt" id="zs-buehne">'
+          + '<canvas id="zs-leinwand"></canvas></div>'
+          + '<label class="feld"><span>Grösse</span>'
+          + '<input type="range" id="zs-zoom" min="100" max="300" value="100"></label>'
+          + '<div class="dialog__knoepfe">'
+          + '<button class="knopf knopf--still" id="zs-nein">Abbrechen</button>'
+          + '<button class="knopf knopf--haupt" id="zs-ja">Übernehmen</button>'
+          + '</div></div>';
+        document.body.appendChild(huelle);
+
+        const leinwand = huelle.querySelector("#zs-leinwand");
+        const ctx = leinwand.getContext("2d");
+        const seite = 260;
+        leinwand.width = seite;
+        leinwand.height = seite;
+
+        let zoom = 1, vx = 0, vy = 0;
+        const grund = Math.max(seite / bild.width, seite / bild.height);
+
+        const zeichnen = () => {
+          const f = grund * zoom;
+          const bw = bild.width * f, bh = bild.height * f;
+          vx = Math.min(0, Math.max(seite - bw, vx));
+          vy = Math.min(0, Math.max(seite - bh, vy));
+          ctx.fillStyle = "#1c2229";
+          ctx.fillRect(0, 0, seite, seite);
+          ctx.drawImage(bild, vx, vy, bw, bh);
+        };
+        zeichnen();
+
+        let zieht = false, lx = 0, ly = 0;
+        leinwand.addEventListener("pointerdown", (e) => {
+          zieht = true; lx = e.clientX; ly = e.clientY;
+          leinwand.setPointerCapture(e.pointerId);
+        });
+        leinwand.addEventListener("pointermove", (e) => {
+          if (!zieht) return;
+          vx += e.clientX - lx; vy += e.clientY - ly;
+          lx = e.clientX; ly = e.clientY;
+          zeichnen();
+        });
+        leinwand.addEventListener("pointerup", () => { zieht = false; });
+
+        huelle.querySelector("#zs-zoom").oninput = (e) => {
+          zoom = Number(e.target.value) / 100;
+          zeichnen();
+        };
+
+        const zu = (wert) => { huelle.remove(); fertig(wert); };
+        huelle.querySelector("#zs-nein").onclick = () => zu(null);
+        dialogSchliessen(huelle, () => zu(null));
+
+        huelle.querySelector("#zs-ja").onclick = () => {
+          const ziel = document.createElement("canvas");
+          const g = kante || 400;
+          ziel.width = g; ziel.height = g;
+          ziel.getContext("2d").drawImage(leinwand, 0, 0, seite, seite, 0, 0, g, g);
+          ziel.toBlob((blob) => zu(blob), "image/jpeg", 0.88);
+        };
+      };
+      bild.src = leser.result;
+    };
+    leser.readAsDataURL(datei);
+  });
+}
+
 function bildVerkleinern(datei, maxKante) {
   return new Promise((fertig, ablehnen) => {
     const leser = new FileReader();
@@ -2667,7 +2814,9 @@ async function ladeParks(auchInaktive) {
   if (!auchInaktive) a = a.eq("is_active", true);
   const { data, error } = await zeitlimit(a, 10000, "Maschinenparks");
   if (error) throw error;
-  // Nur die Parks zeigen, für die der Benutzer freigeschaltet ist
+  // Auf der Planwand sieht jeder alles, in der Produktion nur die
+  // freigeschalteten Parks.
+  if (plan.alleParks) return data || [];
   return (data || []).filter((p) => parkErlaubt(p.id));
 }
 
@@ -2676,6 +2825,7 @@ async function ladeMaschinen(auchInaktive) {
   if (!auchInaktive) a = a.eq("is_active", true);
   const { data, error } = await zeitlimit(a, 10000, "Maschinen");
   if (error) throw error;
+  if (plan.alleParks) return data || [];
   return (data || []).filter((m) => parkErlaubt(m.park_id));
 }
 
@@ -3121,6 +3271,7 @@ const plan = {
   suche: "",
   skala: 1,
   kopierModus: false,
+  adminModus: false,
   spalte: 0,
   spalte: 0,
   zoom: null,
@@ -3194,7 +3345,9 @@ function farbeVon(wert) {
   return PLANFARBEN.find((f) => f.wert === wert) || PLANFARBEN[0];
 }
 
-function darfPlanen() { return istAdmin(); }
+// Auf der Planwand darf jeder alles sehen. Geändert wird erst,
+// wenn ein Administrator den Bearbeiten-Modus einschaltet.
+function darfPlanen() { return istAdmin() && plan.adminModus === true; }
 
 const FERIEN_ZEILEN = 7;
 
@@ -3225,6 +3378,7 @@ async function ladePlanAuftraege() {
 }
 
 async function seitePlanwand(b) {
+  if (plan.adminModus === false && einstellung("pwadmin")) plan.adminModus = true;
   // Diese Seite darf die ganze Fensterbreite nutzen.
   b.classList.add("inhalt--breit");
 
@@ -3255,8 +3409,10 @@ async function seitePlanwand(b) {
     + '<div id="pw-seite"><div class="laedt">Wird geladen …</div></div>';
 
   try {
+    plan.alleParks = true;
     prod.parks = await ladeParks(false);
     prod.maschinen = await ladeMaschinen(false);
+    plan.alleParks = false;
   } catch (f) {
     document.getElementById("pw-seite").innerHTML =
       '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
@@ -3283,6 +3439,13 @@ async function ansichtPlanwand(ziel, b) {
     + ' value="' + esc(plan.suche) + '" autocomplete="off">'
     + (plan.suche ? '<button class="knopf" id="pw-suche-weg">Zurücksetzen</button>' : "")
     + '</div>'
+    + (istAdmin()
+        ? '<div class="pw-adminleiste">'
+          + '<label class="schalter schalter--admin">'
+          + '<input type="checkbox" id="pw-admin"' + (plan.adminModus ? " checked" : "") + '>'
+          + '<span>Bearbeiten eingeschaltet</span></label>'
+          + '</div>'
+        : "")
     + (darfPlanen()
         ? '<div class="pw-aktionen">'
           + '<button class="knopf knopf--haupt" id="pw-neu">+ Auftrag einplanen</button>'
@@ -3319,6 +3482,15 @@ async function ansichtPlanwand(ziel, b) {
 
   const prob = document.getElementById("pw-problem");
   if (prob) prob.onclick = () => problemMelden(b);
+
+  const adminSchalter = document.getElementById("pw-admin");
+  if (adminSchalter) adminSchalter.onchange = () => {
+    plan.adminModus = adminSchalter.checked;
+    einstellungSetzen("pwadmin", plan.adminModus);
+    meldung(plan.adminModus ? "Bearbeiten ist eingeschaltet."
+      : "Bearbeiten ist ausgeschaltet.");
+    seitePlanwand(b);
+  };
 
   const kop = document.getElementById("pw-kopieren");
   if (kop) {
@@ -4110,7 +4282,8 @@ async function problemMelden(b) {
     offen.map((j) => ({
       wert: j.id,
       text: j.job_number + (j.problem ? "   ⚠ hat schon eine Meldung" : ""),
-    })));
+      such: (j.job_number || "") + " " + (j.maschine || ""),
+    })), 5);
   if (!wahl) return;
 
   const auftrag = offen.find((j) => j.id === wahl);
@@ -5777,7 +5950,7 @@ async function artikelSchnellAnlegen(vorgabe) {
 
 // Einfache Auswahl aus einer Liste. Gibt den gewählten Wert zurück.
 // Auswahl mit Suchfeld, für lange Listen
-function auswahlSuchen(titel, optionen) {
+function auswahlSuchen(titel, optionen, mindestens) {
   return new Promise((fertig) => {
     const h = document.createElement("div");
     h.className = "dialog-huelle";
@@ -6324,12 +6497,14 @@ async function seiteEinstellungen(b) {
     });
   });
 
-  // Parkzuweisung je Benutzer
+  // Parkzuweisung je Benutzer. Läuft nebenher, damit die Seite
+  // nicht darauf wartet.
   const parkKasten = document.getElementById("parkzugriff");
-  if (parkKasten) {
+  if (parkKasten) (async () => {
     try {
-      const { data } = await db.from("machine_parks").select("id, name")
-        .eq("is_active", true).order("name");
+      const { data } = await zeitlimit(
+        db.from("machine_parks").select("id, name")
+          .eq("is_active", true).order("name"), 8000, "Parks");
       const parks = data || [];
 
       parkKasten.innerHTML = benutzer.filter((u) => u.role !== "admin").map((u) =>
@@ -6360,19 +6535,20 @@ async function seiteEinstellungen(b) {
     } catch (f) {
       parkKasten.innerHTML = '<p class="hinweis">Parks konnten nicht geladen werden.</p>';
     }
-  }
+  })();
 
   const datei = document.getElementById("mk-datei");
   if (datei) datei.onchange = async (e) => {
     const f = (e.target.files || [])[0];
     if (!f) return;
-    meldung("Bild wird hochgeladen …");
     try {
-      const klein = await bildVerkleinern(f, 400);
+      const klein = await bildZuschneiden(f);
+      if (!klein) return;
       const name = "profil/" + ich.id + "-" + Date.now() + ".jpg";
       const r = await db.storage.from("profilbilder").upload(name, klein,
         { contentType: "image/jpeg" });
       if (r.error) throw r.error;
+      meldung("Bild wird hochgeladen …");
       const url = db.storage.from("profilbilder").getPublicUrl(name).data.publicUrl;
       const u = await db.from("profiles").update({ bild_url: url }).eq("id", ich.id);
       if (u.error) throw u.error;
@@ -7960,6 +8136,10 @@ window.addEventListener("hashchange", () => {
 // -----------------------------------------------------------------
 //  Start
 // -----------------------------------------------------------------
+
+// Gespeicherte Darstellung sofort anwenden, noch vor dem Anmelden
+if (einstellung("dunkel")) document.body.classList.add("dunkel");
+if (einstellungWert("navschmal", "0") === "1") document.body.classList.add("nav--schmal");
 
 try {
   stand("Verbindung wird aufgebaut …");
