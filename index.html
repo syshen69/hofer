@@ -1584,6 +1584,18 @@ body.dunkel .zbeschriftung { fill: var(--tinte); }
 .zuschnitt { display: grid; place-items: center; margin: 12px 0; }
 .zuschnitt canvas { border-radius: 6px; border: 2px solid var(--linie-stark);
                     cursor: grab; touch-action: none; }
+
+.kopf__admin { background: none; border: 1px solid var(--linie-stark);
+               color: var(--gedaempft); border-radius: var(--radius);
+               padding: 8px 14px; font: inherit; font-size: .82rem;
+               font-weight: 600; cursor: pointer; flex: none; }
+.kopf__admin.aktiv { background: var(--marke); border-color: var(--marke); color: #fff; }
+
+.versionsecke { position: fixed; right: 8px; z-index: 5;
+                bottom: calc(var(--navhoehe) + 6px);
+                font-size: .68rem; color: var(--gedaempft); opacity: .7;
+                pointer-events: none; }
+@media (min-width: 780px) { .versionsecke { bottom: 6px; } }
 </style>
 </head>
 <body>
@@ -1627,7 +1639,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "18.0.0";
+const APP_VERSION = "18.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -2600,11 +2612,13 @@ function meineRolle() { return (profil && profil.role) || "produktion"; }
 function istAdmin() { return meineRolle() === "admin"; }
 function darfSchreiben() {
   const r = meineRolle();
-  return r === "admin" || r === "langdreher" || r === "kurzdreher";
+  return r === "admin" || r === "planwand"
+    || r === "langdreher" || r === "kurzdreher";
 }
 
 const ROLLEN = {
   admin: "Administrator",
+  planwand: "Planwand",
   langdreher: "Langdreher",
   kurzdreher: "Kurzdreher",
 };
@@ -3347,7 +3361,13 @@ function farbeVon(wert) {
 
 // Auf der Planwand darf jeder alles sehen. Geändert wird erst,
 // wenn ein Administrator den Bearbeiten-Modus einschaltet.
-function darfPlanen() { return istAdmin() && plan.adminModus === true; }
+// Wer den Bearbeiten-Schalter überhaupt bekommt
+function darfPlanwandBearbeiten() {
+  const r = meineRolle();
+  return r === "admin" || r === "planwand";
+}
+
+function darfPlanen() { return darfPlanwandBearbeiten() && plan.adminModus === true; }
 
 const FERIEN_ZEILEN = 7;
 
@@ -3439,13 +3459,6 @@ async function ansichtPlanwand(ziel, b) {
     + ' value="' + esc(plan.suche) + '" autocomplete="off">'
     + (plan.suche ? '<button class="knopf" id="pw-suche-weg">Zurücksetzen</button>' : "")
     + '</div>'
-    + (istAdmin()
-        ? '<div class="pw-adminleiste">'
-          + '<label class="schalter schalter--admin">'
-          + '<input type="checkbox" id="pw-admin"' + (plan.adminModus ? " checked" : "") + '>'
-          + '<span>Bearbeiten eingeschaltet</span></label>'
-          + '</div>'
-        : "")
     + (darfPlanen()
         ? '<div class="pw-aktionen">'
           + '<button class="knopf knopf--haupt" id="pw-neu">+ Auftrag einplanen</button>'
@@ -3482,15 +3495,6 @@ async function ansichtPlanwand(ziel, b) {
 
   const prob = document.getElementById("pw-problem");
   if (prob) prob.onclick = () => problemMelden(b);
-
-  const adminSchalter = document.getElementById("pw-admin");
-  if (adminSchalter) adminSchalter.onchange = () => {
-    plan.adminModus = adminSchalter.checked;
-    einstellungSetzen("pwadmin", plan.adminModus);
-    meldung(plan.adminModus ? "Bearbeiten ist eingeschaltet."
-      : "Bearbeiten ist ausgeschaltet.");
-    seitePlanwand(b);
-  };
 
   const kop = document.getElementById("pw-kopieren");
   if (kop) {
@@ -6365,16 +6369,30 @@ async function seiteEinstellungen(b) {
   b.innerHTML = '<h1 class="seitentitel">Einstellungen</h1><div class="laedt">Benutzer werden geladen …</div>';
 
   let benutzer = [];
+  let neueSpalten = true;
+
+  // Erst mit allen Feldern versuchen. Fehlt in der Datenbank eine
+  // der neueren Spalten, wird ohne sie geladen, statt hängen zu bleiben.
   try {
     const { data, error } = await zeitlimit(
-      db.from("profiles").select("id, email, full_name, role, is_active, geburtstag, bild_url, parks")
-        .order("full_name"), 10000, "Benutzerliste");
+      db.from("profiles")
+        .select("id, email, full_name, role, is_active, geburtstag, bild_url, parks")
+        .order("full_name"), 9000, "Benutzerliste");
     if (error) throw error;
     benutzer = data || [];
   } catch (f) {
-    b.innerHTML = '<h1 class="seitentitel">Einstellungen</h1>'
-      + '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
-    return;
+    neueSpalten = false;
+    try {
+      const { data, error } = await zeitlimit(
+        db.from("profiles").select("id, email, full_name, role, is_active")
+          .order("full_name"), 9000, "Benutzerliste");
+      if (error) throw error;
+      benutzer = data || [];
+    } catch (f2) {
+      b.innerHTML = '<h1 class="seitentitel">Einstellungen</h1>'
+        + '<div class="karte karte--fehler"><p>' + esc(fehlertext(f2)) + '</p></div>';
+      return;
+    }
   }
 
   const besitzer = istAdmin();
@@ -6401,7 +6419,7 @@ async function seiteEinstellungen(b) {
     + '<div><strong>Produktion</strong> darf alles erfassen und bestellen, aber die '
     + 'Planwand nicht bearbeiten.</div>'
         + '<div>Ansehen darf jeder alles.</div></div>'
-    + (besitzer
+    + (besitzer && neueSpalten
         ? '<h3 class="untertitel">Zugriff auf Maschinenparks</h3>'
           + '<p class="hinweis">Ohne Auswahl sieht jemand alle Parks. '
           + 'Sonst nur die angehakten. Administratoren sehen immer alles.</p>'
@@ -6411,7 +6429,7 @@ async function seiteEinstellungen(b) {
     + 'Authentication → Users an, als E-Mail den Namen mit @hoferco.ch.</p></section>'
 
     + '<section class="karte"><h2>Mein Konto</h2>'
-    + '<div class="kontokopf">'
+    + (neueSpalten ? '<div class="kontokopf">' : '<div hidden>')
     + (ich && ich.bild_url
         ? '<img class="profilbild-gross" id="mk-bild" src="' + esc(ich.bild_url) + '" alt="">'
         : '<span class="profilbild-gross kopf__bild--leer" id="mk-bild">'
@@ -8060,8 +8078,8 @@ const SEITEN = [
   { pfad: "bestellungen", titel: "Bestellungen", zeichen: SYM.bestellungen, zeige: seiteBestellungen },
   { pfad: "einkauf",      titel: "Einkauf",      zeichen: SYM.einkauf, zeige: seiteEinkauf },
   { pfad: "rechner",      titel: "Rechner",      zeichen: SYM.rechner, zeige: seiteRechner },
-  { pfad: "einstellungen", titel: "Einstellungen", zeichen: SYM.einstellungen, zeige: seiteEinstellungen },
   { pfad: "spass",        titel: "Timeout",       zeichen: SYM.spass, zeige: seiteSpass },
+  { pfad: "einstellungen", titel: "Einstellungen", zeichen: SYM.einstellungen, zeige: seiteEinstellungen },
 ];
 
 function zeichneSeite() {
@@ -8082,9 +8100,11 @@ function zeichneGeruest() {
   WURZEL.innerHTML = ''
     + '<header class="kopf">'
     + '<button class="kopf__klapp" id="nav-klapp" title="Menü ein- oder ausklappen">☰</button>'
+    + (darfPlanwandBearbeiten()
+        ? '<button class="kopf__admin' + (plan.adminModus ? " aktiv" : "") + '" id="kopf-admin"'
+          + ' title="Planwand bearbeiten ein- oder ausschalten">Bearbeiten</button>'
+        : "")
     + '<img class="kopf__logo" src="./logo.png" alt="Hofer + Co.">'
-    + '<button class="kopf__dunkel" id="kopf-dunkel" title="Heller oder dunkler Modus">'
-    + (einstellung("dunkel") ? "☀" : "☾") + '</button>'
     + (profil && profil.bild_url
         ? '<img class="kopf__bild" src="' + esc(profil.bild_url) + '" alt="">'
         : '<span class="kopf__bild kopf__bild--leer">'
@@ -8098,12 +8118,13 @@ function zeichneGeruest() {
         + '<span class="nav__text">' + esc(s.titel) + '</span></a>').join("")
     + '</nav><main class="inhalt" id="inhalt"></main></div>';
 
-  const dunkelKnopf = document.getElementById("kopf-dunkel");
-  if (dunkelKnopf) dunkelKnopf.onclick = () => {
-    const an = !document.body.classList.contains("dunkel");
-    document.body.classList.toggle("dunkel", an);
-    einstellungSetzen("dunkel", an);
-    dunkelKnopf.textContent = an ? "☀" : "☾";
+  const adminKnopf = document.getElementById("kopf-admin");
+  if (adminKnopf) adminKnopf.onclick = () => {
+    plan.adminModus = !plan.adminModus;
+    einstellungSetzen("pwadmin", plan.adminModus);
+    adminKnopf.classList.toggle("aktiv", plan.adminModus);
+    meldung(plan.adminModus ? "Bearbeiten eingeschaltet." : "Bearbeiten ausgeschaltet.");
+    if (aktuellerPfad && aktuellerPfad() === "planwand") zeichneSeite();
   };
 
   const klapp = document.getElementById("nav-klapp");
