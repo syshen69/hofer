@@ -1496,7 +1496,7 @@ body.dunkel .statuschip, body.dunkel .fehltchip, body.dunkel .marke {
 body.dunkel .karte--ergebnis { background: #23405f; border-color: #2f5580; }
 body.dunkel .knopf--haupt { background: var(--marke); }
 body.dunkel .knopf--gefahr { background: #a33028; }
-body.dunkel .kopf__admin.aktiv { background: var(--marke); }
+body.dunkel .kopf__admin.aktiv { background: #b3261e; border-color: #b3261e; }
 body.dunkel .pw-kw, body.dunkel .pw-park { background: #22303f; }
 body.dunkel .pw-tag--heute { background: #24344a; }
 body.dunkel .spass-maschine { background: #10161d; }
@@ -1517,6 +1517,10 @@ body.dunkel input[type="radio"]:checked { accent-color: #6ba4ff; }
 .schalter:focus-within, .parkchip:focus-within {
   outline: 2px solid var(--marke); outline-offset: 2px; border-radius: var(--radius); }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--marke); }
+
+.pw-balken--treffer { outline: 3px solid var(--signalgelb); outline-offset: 2px;
+                      animation: pulsen 1s ease-in-out 2; }
+@keyframes pulsen { 0%, 100% { filter: none; } 50% { filter: brightness(1.5); } }
 </style>
 </head>
 <body>
@@ -1560,7 +1564,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "19.2.0";
+const APP_VERSION = "19.3.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -2038,9 +2042,9 @@ async function seiteDashboard(b) {
     + '<div id="db-probleme"></div>'
     + '<div id="db-vorbereitung"></div>'
     + '<div id="db-einkauf"></div>'
-    + '<div id="db-geburtstage"></div>'
     + '<div id="db-notizen"></div>'
-    + '<div id="db-status"></div>';
+    + '<div id="db-status"></div>'
+    + '<div id="db-geburtstage"></div>';
 
   // Uhr
   const uhrEl = document.getElementById("uhr");
@@ -3401,9 +3405,9 @@ async function ansichtPlanwand(ziel, b) {
     + '<button class="knopf knopf--klein" id="pw-rein" title="weniger Tage zeigen">+</button>'
     + '</div></div>'
     + '<div class="suchleiste">'
-    + '<input type="search" id="pw-suche" placeholder="Auftrag suchen"'
-    + ' value="' + esc(plan.suche) + '" autocomplete="off">'
-    + (plan.suche ? '<button class="knopf" id="pw-suche-weg">Zurücksetzen</button>' : "")
+    + '<input type="search" id="pw-suche" placeholder="HOCO Nr. eingeben und Enter"'
+    + ' autocomplete="off">'
+    + '<button class="knopf" id="pw-suche-los">Suchen</button>'
     + '</div>'
     + (darfPlanen()
         ? '<div class="pw-aktionen">'
@@ -3454,14 +3458,15 @@ async function ansichtPlanwand(ziel, b) {
   const zoomAnzeige = document.getElementById("pw-zoomwert");
   if (zoomAnzeige) zoomAnzeige.textContent = plan.tage + " Tage";
 
+  // Die Suche filtert nicht mehr, sie springt zum Auftrag.
   const suchfeld = document.getElementById("pw-suche");
-  let taste = null;
-  suchfeld.oninput = () => {
-    clearTimeout(taste);
-    taste = setTimeout(() => { plan.suche = suchfeld.value; zeichnePlanwand(b); }, 300);
+  suchfeld.onkeydown = (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    zumAuftragSpringen(suchfeld.value, b);
   };
-  const suchWeg = document.getElementById("pw-suche-weg");
-  if (suchWeg) suchWeg.onclick = () => { plan.suche = ""; seitePlanwand(b); };
+  const suchKnopf = document.getElementById("pw-suche-los");
+  if (suchKnopf) suchKnopf.onclick = () => zumAuftragSpringen(suchfeld.value, b);
 
   try {
     plan.auftraege = await ladePlanAuftraege();
@@ -3486,6 +3491,50 @@ async function ansichtPlanwand(ziel, b) {
       + esc(f && f.message ? f.message : String(f)) + '</p></div>';
     console.error("Planwand zeichnen:", f);
   }
+}
+
+// Sucht den Auftrag und schiebt die Wand dorthin. Bei mehreren
+// Treffern erst die Auswahl.
+async function zumAuftragSpringen(text, b) {
+  const t = (text || "").trim().toLowerCase();
+  if (!t) return;
+
+  const treffer = (plan.auftraege || []).filter((j) =>
+    (j.job_number || "").toLowerCase().includes(t)
+    || (j.plan_note || "").toLowerCase().includes(t));
+
+  if (!treffer.length) {
+    meldung("Kein Auftrag mit " + text + " gefunden.", "warn");
+    return;
+  }
+
+  let ziel = treffer[0];
+  if (treffer.length > 1) {
+    const wahl = await auswahlSuchen("Mehrere Treffer",
+      treffer.map((j) => ({
+        wert: j.id,
+        text: j.job_number + "   " + j.maschine
+          + (j.planned_from ? "   ab " + kurzDatum(j.planned_from) : ""),
+        such: (j.job_number || "") + " " + (j.maschine || ""),
+      })));
+    if (!wahl) return;
+    ziel = treffer.find((j) => j.id === wahl);
+  }
+
+  // Zeitraum so verschieben, dass der Auftrag sichtbar ist
+  if (ziel.planned_from) {
+    plan.start = naechsterArbeitstag(plusTage(ziel.planned_from, -2));
+    await seitePlanwand(b);
+  }
+
+  // Balken hervorheben und ins Bild holen
+  setTimeout(() => {
+    const el = document.querySelector('[data-auftrag="' + CSS.escape(ziel.id) + '"]');
+    if (!el) { meldung("Der Auftrag liegt ausserhalb des Zeitraums.", "warn"); return; }
+    el.classList.add("pw-balken--treffer");
+    el.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
+    setTimeout(() => el.classList.remove("pw-balken--treffer"), 2600);
+  }, 120);
 }
 
 function zeichnePlanwand(b) {
@@ -3540,8 +3589,7 @@ function zeichnePlanwand(b) {
 
           // Balken für diese Maschine im sichtbaren Zeitraum
           const balken = plan.auftraege
-            .filter((j) => j.machine_id === m.id && j.planned_from
-                            && (!plan.suche || passtZurSuche(j)))
+            .filter((j) => j.machine_id === m.id && j.planned_from)
             .map((j) => {
               // Alle Arbeitstage, die dieser Auftrag belegt
               const belegt = arbeitstage(j.planned_from, j.planned_days || 1);
