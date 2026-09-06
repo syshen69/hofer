@@ -1560,7 +1560,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "19.1.0";
+const APP_VERSION = "19.2.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -2279,36 +2279,47 @@ async function zeichneGeburtstage() {
         .not("geburtstag", "is", null).eq("is_active", true), 8000, "Geburtstage");
     if (error) throw error;
     leute = data || [];
-  } catch (f) { return; }
+  } catch (f) {
+    // Fehlt die Spalte in der Datenbank, sagen wir das offen,
+    // statt den Bereich still verschwinden zu lassen.
+    ziel.innerHTML = '<section class="karte"><h2>Geburtstage</h2>'
+      + '<p class="hinweis">Noch nicht verfügbar: ' + esc(fehlertext(f))
+      + '</p></section>';
+    return;
+  }
+
+  if (!leute.length) {
+    ziel.innerHTML = '<section class="karte"><h2>Geburtstage</h2>'
+      + '<p class="hinweis">Noch kein Geburtstag hinterlegt. '
+      + 'Jeder trägt seinen unter Einstellungen ein.</p></section>';
+    return;
+  }
 
   const heute = new Date();
-  const kommend = [];
+  const heuteNur = new Date(heute.getFullYear(), heute.getMonth(), heute.getDate());
 
-  leute.forEach((m) => {
+  const alle = leute.map((m) => {
     const g = ausIso(m.geburtstag);
-    // Nächster Geburtstag ab heute
     let naechster = new Date(heute.getFullYear(), g.getMonth(), g.getDate());
-    if (naechster < new Date(heute.getFullYear(), heute.getMonth(), heute.getDate())) {
+    if (naechster < heuteNur) {
       naechster = new Date(heute.getFullYear() + 1, g.getMonth(), g.getDate());
     }
-    const tage = Math.round((naechster - new Date(heute.getFullYear(),
-      heute.getMonth(), heute.getDate())) / 86400000);
-    if (tage <= 14) {
-      kommend.push({
-        name: m.full_name || m.email,
-        bild: m.bild_url,
-        datum: isoDatum(naechster),
-        tage: tage,
-        alter: naechster.getFullYear() - g.getFullYear(),
-      });
-    }
-  });
+    return {
+      name: m.full_name || m.email,
+      bild: m.bild_url,
+      datum: isoDatum(naechster),
+      tage: Math.round((naechster - heuteNur) / 86400000),
+      alter: naechster.getFullYear() - g.getFullYear(),
+    };
+  }).sort((a2, c) => a2.tage - c.tage);
 
-  if (!kommend.length) { ziel.innerHTML = ""; return; }
-  kommend.sort((a, c) => a.tage - c.tage);
+  // Alle innerhalb von 30 Tagen, höchstens fünf.
+  // Sind es weniger als fünf, wird mit den nächstfolgenden aufgefüllt.
+  let liste = alle.filter((m) => m.tage <= 30).slice(0, 5);
+  if (liste.length < 5) liste = alle.slice(0, 5);
 
   ziel.innerHTML = '<section class="karte"><h2>Geburtstage</h2>'
-    + kommend.map((m) => '<div class="gebzeile">'
+    + liste.map((m) => '<div class="gebzeile">'
         + (m.bild
             ? '<img class="kopf__bild" src="' + esc(m.bild) + '" alt="">'
             : '<span class="kopf__bild kopf__bild--leer">'
@@ -2316,14 +2327,15 @@ async function zeichneGeburtstage() {
         + '<div class="problemzeile__inhalt">'
         + '<div class="problemzeile__nr">' + esc(m.name)
         + ' <span class="klein">wird ' + m.alter + '</span></div>'
-        + '<div class="klein">' + (m.tage === 0 ? "Heute!"
-            : m.tage === 1 ? "Morgen" : "in " + m.tage + " Tagen")
-        + ' · ' + esc(kurzDatum(m.datum)) + '</div></div>'
+        + '<div class="klein">'
+        + (m.tage === 0 ? "Heute!"
+           : m.tage === 1 ? "Morgen"
+           : "in " + m.tage + (m.tage > 30 ? " Tagen, also später" : " Tagen"))
+        + ' · ' + esc(langDatum(m.datum)) + '</div></div>'
         + (m.tage === 0 ? '<span class="gebtorte">🎂</span>' : "")
         + '</div>').join("")
     + '</section>';
 }
-
 async function zeichneNotizen() {
   const ziel = document.getElementById("db-notizen");
   if (!ziel) return;
@@ -3305,6 +3317,8 @@ function darfPlanen() {
   if (!darfBearbeitenKnopf()) return false;
   return plan.adminModus === true;
 }
+
+const FERIEN_ZEILEN = 7;
 
 async function ladeFerien() {
   const { data, error } = await zeitlimit(
