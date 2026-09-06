@@ -488,10 +488,12 @@ a:focus-visible {
 
 /* ---------- Reiter innerhalb einer Seite ---------- */
 .reiter { display: flex; gap: 4px; margin-bottom: 16px;
-          border-bottom: 1px solid var(--linie-stark); }
+          border-bottom: 1px solid var(--linie-stark);
+          overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .reiter__knopf { background: none; border: none; border-bottom: 3px solid transparent;
                  padding: 10px 14px; font: inherit; font-weight: 600;
-                 color: var(--gedaempft); cursor: pointer; }
+                 color: var(--gedaempft); cursor: pointer;
+                 white-space: nowrap; flex: none; }
 .reiter__knopf.aktiv { color: var(--marke); border-bottom-color: var(--marke); }
 
 /* ---------- Auswahl des Maschinenparks ---------- */
@@ -1574,7 +1576,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "20.0.0";
+const APP_VERSION = "20.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -5292,7 +5294,8 @@ const rech = {
 function seiteRechner(b) {
   b.innerHTML = '<h1 class="seitentitel">Rechner</h1>'
     + '<div class="reiter">'
-    + [["drehzahl", "Drehzahl"], ["winkel", "Winkel und Fase"], ["gcode", "G-Code"]]
+    + [["drehzahl", "Drehzahl"], ["winkel", "Winkel und Fase"], ["gcode", "G-Code"],
+        ["programm", "Programm"]]
         .map(([w, t]) => '<button class="reiter__knopf' + (rech.ansicht === w ? " aktiv" : "")
           + '" data-rech="' + w + '">' + t + '</button>').join("")
     + '</div><div id="rech-inhalt"></div>';
@@ -5304,6 +5307,7 @@ function seiteRechner(b) {
   const ziel = document.getElementById("rech-inhalt");
   if (rech.ansicht === "winkel") return rechnerWinkel(ziel);
   if (rech.ansicht === "gcode") return rechnerGcode(ziel);
+  if (rech.ansicht === "programm") return rechnerProgramm(ziel);
   return rechnerDrehzahl(ziel, b);
 }
 
@@ -5783,6 +5787,506 @@ function rechnerWinkel(ziel) {
     wink.a = wink.g = wink.h = wink.winkel = "";
     rechnerWinkel(ziel);
   };
+}
+
+// ---------- Programm-Entwurf (Werkzeugvorschlag + Fanuc-Programm) ----------
+//
+// Erfasst die Arbeitsschritte eines Drehteils von Hand (eine Zeichnung kann
+// als Foto oder PDF nur zur Ansicht angehängt werden, sie wird nicht
+// automatisch ausgewertet) und schlägt daraus eine minimale Werkzeugliste
+// sowie ein Fanuc-Programmgerüst vor. Das Ergebnis ist immer ein ENTWURF:
+// Werkzeugpositionen, Zustellungen und Schnittwerte müssen vor dem ersten
+// Lauf von einer Fachkraft geprüft werden.
+
+const STAR_MODELLE = [
+  { id: "SW-20",   name: "Star SW-20",   stangeMax: 20 },
+  { id: "SB20RG",  name: "Star SB-20R/RG", stangeMax: 20 },
+  { id: "SB16",    name: "Star SB-16",   stangeMax: 16 },
+  { id: "SR-10",   name: "Star SR-10",   stangeMax: 10 },
+];
+
+const OP_TYPEN = [
+  { id: "aussen",         name: "Aussendrehen / Absatz" },
+  { id: "bohren",         name: "Bohren" },
+  { id: "gewinde_innen",  name: "Gewindebohren (Innengewinde)" },
+  { id: "gewinde_aussen", name: "Aussengewinde drehen" },
+  { id: "einstich",       name: "Einstich / Nut" },
+  { id: "raendeln",       name: "Rändeln" },
+  { id: "abstechen",      name: "Abstechen" },
+];
+
+// Schnittgeschwindigkeit für Bohren/Gewindebohren mit HSS-Bohrer, je Werkstoff
+// in derselben Reihenfolge wie WERKSTOFFE. Deutlich niedriger als beim
+// Drehen mit Wendeplatte – ein Spiralbohrer verträgt viel weniger.
+const BOHR_VC = [25, 12, 60, 40, 20, 30, 20, 8, 60];
+
+// Steigung nach ISO-Regelgewinde, metrisch. Nur ein Richtwert –
+// bei Feingewinde oder Sondersteigung bitte "M6x0.5" eintragen.
+const METRISCH_STEIGUNG = {
+  2: 0.4, 2.5: 0.45, 3: 0.5, 4: 0.7, 5: 0.8, 6: 1.0,
+  8: 1.25, 10: 1.5, 12: 1.75, 14: 2.0, 16: 2.0, 18: 2.5, 20: 2.5,
+};
+
+let progOpZaehler = 0;
+
+const prog = {
+  maschine: "SW-20",
+  werkstoff: 0,
+  schneidstoff: "hm",
+  stangeDm: "20",
+  teileLaenge: "60",
+  stueckzahl: "1",
+  bildUrl: "",
+  bildTyp: "",
+  bildName: "",
+  operationen: [],
+};
+
+function neueOperation(typ) {
+  progOpZaehler += 1;
+  return {
+    id: progOpZaehler,
+    typ: typ || "aussen",
+    position: "haupt",   // haupt = Hauptspindel/Vorderseite, gegen = Gegenspindel/Rückseite
+    dmStart: "",
+    dmZiel: "",
+    laenge: "",
+    tiefe: "",
+    durchgehend: false,
+    norm: "M6",
+    breite: "2",
+  };
+}
+
+function opName(typ) {
+  const e = OP_TYPEN.find((o) => o.id === typ);
+  return e ? e.name : typ;
+}
+
+function gewindeSteigung(norm) {
+  const text = String(norm || "").toUpperCase().replace("M", "").trim();
+  if (text.includes("X")) {
+    const p = parseFloat(text.split("X")[1].replace(",", "."));
+    if (!isNaN(p) && p > 0) return p;
+  }
+  const d = parseFloat(text);
+  if (!isNaN(d) && METRISCH_STEIGUNG[d]) return METRISCH_STEIGUNG[d];
+  return 1.0; // kein Regelwert gefunden – Notfallwert, bitte prüfen
+}
+
+function gewindeDurchmesser(norm) {
+  const text = String(norm || "").toUpperCase().replace("M", "").trim();
+  const d = parseFloat(text.split("X")[0]);
+  return isNaN(d) || d <= 0 ? 6 : d;
+}
+
+const pad2 = (n) => String(n).padStart(2, "0");
+
+// Fasst gleichartige Arbeitsschritte zu möglichst wenigen Werkzeugen zusammen.
+function werkzeugeBestimmen(operationen) {
+  const liste = [];
+  const finde = (schluessel) => liste.find((w) => w.schluessel === schluessel);
+  const hinzufuegen = (schluessel, bezeichnung, hinweis, op) => {
+    let w = finde(schluessel);
+    if (!w) { w = { schluessel, bezeichnung, hinweis, typen: [] }; liste.push(w); }
+    w.typen.push(op);
+  };
+
+  operationen.forEach((op) => {
+    if (op.typ === "aussen") {
+      const dmZiel = parseFloat(op.dmZiel);
+      const mini = !isNaN(dmZiel) && dmZiel > 0 && dmZiel < 3;
+      hinzufuegen(mini ? "aussen-mini" : "aussen-standard",
+        mini ? "Aussendreher für kleine Durchmesser (< 3 mm)" : "Aussendreher, neutral (Plan-/Konturdrehen)",
+        mini ? "Wendeplatte mit kleinem Eckenradius, z. B. VCGT, 0,1–0,2 mm R"
+             : "Wendeplatte z. B. CCGT/DCGT, Einstellwinkel 93°, positiv für Automatendrehen",
+        op);
+    } else if (op.typ === "bohren") {
+      const d = Math.round((parseFloat(op.dmZiel) || 0) * 10) / 10;
+      const tiefLoch = d > 0 && ((parseFloat(op.tiefe) || 0) / d) > 5;
+      hinzufuegen("bohrer-" + d, "Spiralbohrer ⌀ " + d + " mm",
+        tiefLoch ? "Tiefes Loch (L/D > 5): Innenkühlung und Spanbruch programmieren"
+                 : "HSS-Co oder VHM je nach Werkstoff", op);
+    } else if (op.typ === "gewinde_innen") {
+      hinzufuegen("gewbohr-" + op.norm, "Gewindebohrer " + op.norm,
+        "Rigides Gewindebohren (Spindel/Vorschub synchron) oder Dehnschaftbohrer verwenden", op);
+    } else if (op.typ === "gewinde_aussen") {
+      hinzufuegen("gewdreh-" + op.norm, "Gewindedrehplatte für Aussengewinde " + op.norm,
+        "60°-Vollprofilplatte passend zur Steigung, Spitzenradius beachten", op);
+    } else if (op.typ === "einstich" || op.typ === "abstechen") {
+      const breite = parseFloat(op.breite) || 2;
+      hinzufuegen("stech-" + breite,
+        (op.typ === "abstechen" ? "Abstech-/Stechdreher, Breite " : "Stechdreher, Breite ") + breite + " mm",
+        "Neutral oder rechts/links je nach Lage der Nut. Gleiche Breite nutzt dasselbe Werkzeug wie Einstich/Abstich.",
+        op);
+    } else if (op.typ === "raendeln") {
+      hinzufuegen("raendel", "Rändelwerkzeug (Drückrändel)",
+        "Teilung nach Vorgabe, Andruckkraft je nach Durchmesser prüfen", op);
+    }
+  });
+
+  return liste;
+}
+
+function baueProgrammText(p, werkzeugliste) {
+  const werkstoff = WERKSTOFFE[p.werkstoff];
+  const vc = p.schneidstoff === "hss" ? werkstoff.hss : werkstoff.hm;
+  const modell = STAR_MODELLE.find((m) => m.id === p.maschine) || STAR_MODELLE[0];
+  const stange = parseFloat(p.stangeDm) || 20;
+
+  const nBerechnen = (d, vcWert) => {
+    const dd = Math.max(1, parseFloat(d) || stange);
+    return Math.min(8000, Math.max(200, Math.round(((vcWert || vc) * 1000) / (Math.PI * dd))));
+  };
+  const vcBohren = BOHR_VC[p.werkstoff] || 20;
+  const nBohren = (d) => Math.min(8000, Math.max(50, Math.round((vcBohren * 1000) / (Math.PI * Math.max(1, d)))));
+
+  const zeilen = [];
+  zeilen.push("%");
+  zeilen.push("O0001 (PROGRAMM-ENTWURF)");
+  zeilen.push("(ACHTUNG: ENTWURF - VOR GEBRAUCH AN DER MASCHINE PRUEFEN)");
+  zeilen.push("(MASCHINE: " + modell.name.toUpperCase() + ")");
+  zeilen.push("(ROHTEIL: RUND D" + stange.toFixed(1) + " X "
+    + (parseFloat(p.teileLaenge) || 0).toFixed(1) + " MM, " + werkstoff.name.toUpperCase() + ")");
+  zeilen.push("(STUECKZAHL: " + (parseInt(p.stueckzahl, 10) || 1) + ")");
+  zeilen.push("");
+  zeilen.push("G28U0.W0. (REFERENZPUNKT ANFAHREN)");
+  zeilen.push("G50S4500 (GRENZDREHZAHL - PRUEFEN)");
+  zeilen.push("");
+
+  p.operationen.forEach((op, i) => {
+    const werkzeug = werkzeugliste.find((w) => w.typen.includes(op));
+    if (!werkzeug) return;
+    const wi = werkzeugliste.indexOf(werkzeug);
+    const t = "T" + pad2(wi + 1) + pad2(wi + 1);
+    const seite = op.position === "gegen" ? "GEGENSPINDEL" : "HAUPTSPINDEL";
+
+    zeilen.push("(--- SCHRITT " + (i + 1) + ": " + opName(op.typ).toUpperCase() + ", " + seite + " ---)");
+    zeilen.push(t + " (" + werkzeug.bezeichnung + " - PLATZHALTERPOSITION PRUEFEN)");
+
+    if (op.typ === "aussen") {
+      const dmStart = parseFloat(op.dmStart) || stange;
+      const dmZiel = parseFloat(op.dmZiel) || dmStart;
+      const laenge = parseFloat(op.laenge) || 10;
+      zeilen.push("G96S" + vc.toFixed(0) + "M03 (VC=" + vc.toFixed(0) + " M/MIN, CA. "
+        + nBerechnen(dmStart) + " 1/MIN)");
+      zeilen.push("G0X" + (dmStart + 2).toFixed(2) + "Z2.");
+      zeilen.push("G1Z0F0.1");
+      zeilen.push("G1X" + dmZiel.toFixed(2) + "Z-" + laenge.toFixed(2)
+        + "F0.08 (KONTUR - SCHRUPP-/SCHLICHTSCHNITTE PRUEFEN)");
+      zeilen.push("G0X" + (dmStart + 4).toFixed(2));
+      zeilen.push("G97");
+    } else if (op.typ === "bohren") {
+      const d = parseFloat(op.dmZiel) || 3;
+      const tiefe = op.durchgehend ? (parseFloat(p.teileLaenge) || 10) + 2 : (parseFloat(op.tiefe) || 5);
+      const vorschub = Math.max(0.02, Math.min(0.25, d * 0.05)).toFixed(3);
+      zeilen.push("G97S" + nBohren(d) + "M03 (VC=" + vcBohren + " M/MIN FUER HSS-BOHRER, PRUEFEN)");
+      zeilen.push("G0X0.Z2.");
+      zeilen.push("G74R1. (RUECKZUG JE PECK - PRUEFEN)");
+      zeilen.push("G74Z-" + tiefe.toFixed(2) + "Q3000F" + vorschub
+        + " (PECKBOHREN, Q IN MIKROMETER - PRUEFEN)");
+      zeilen.push("G0Z2.");
+    } else if (op.typ === "gewinde_innen") {
+      const steigung = gewindeSteigung(op.norm);
+      const tiefe = parseFloat(op.tiefe) || 10;
+      const nTap = nBohren(gewindeDurchmesser(op.norm));
+      zeilen.push("G97S" + nTap + "M03 (NIEDRIGE DREHZAHL FUER GEWINDEBOHREN, PRUEFEN)");
+      zeilen.push("G0X0.Z2.");
+      zeilen.push("G84Z-" + tiefe.toFixed(2) + "R2.F" + steigung.toFixed(2)
+        + " (RIGIDES GEWINDEBOHREN " + op.norm + ", M29 VOR G84 JE NACH STEUERUNG PRUEFEN)");
+      zeilen.push("G0Z2.");
+    } else if (op.typ === "gewinde_aussen") {
+      const steigung = gewindeSteigung(op.norm);
+      const dmAussen = parseFloat(op.dmStart) || 10;
+      const laenge = parseFloat(op.laenge) || 10;
+      const tiefeGewinde = steigung * 0.65;
+      zeilen.push("G97S" + Math.min(2500, nBerechnen(dmAussen, vc * 0.6)) + "M03 (VC REDUZIERT FUER GEWINDEDREHEN)");
+      zeilen.push("G0X" + (dmAussen + 2).toFixed(2) + "Z2.");
+      zeilen.push("G76P010060Q100F" + steigung.toFixed(2)
+        + " (SCHLICHTGAENGE/FASENWINKEL/MINDESTSPAN - PRUEFEN)");
+      zeilen.push("G76X" + (dmAussen - 2 * tiefeGewinde).toFixed(3) + "Z-" + laenge.toFixed(2)
+        + "P" + Math.round(tiefeGewinde * 1000) + "Q100F" + steigung.toFixed(2)
+        + " (GEWINDE " + op.norm + ", TIEFE CA. " + tiefeGewinde.toFixed(3) + " MM)");
+      zeilen.push("G0X" + (dmAussen + 4).toFixed(2));
+    } else if (op.typ === "einstich") {
+      const dmGrund = parseFloat(op.dmZiel) || 10;
+      const breite = parseFloat(op.breite) || 2;
+      zeilen.push("G97S" + nBerechnen(dmGrund) + "M03");
+      zeilen.push("G0X" + (dmGrund + 6).toFixed(2) + "Z0.");
+      zeilen.push("G1X" + dmGrund.toFixed(2) + "F0.03 (EINSTECHEN, BREITE " + breite + " MM)");
+      zeilen.push("G4X0.3");
+      zeilen.push("G0X" + (dmGrund + 6).toFixed(2));
+    } else if (op.typ === "raendeln") {
+      const dm = parseFloat(op.dmStart) || 10;
+      const laenge = parseFloat(op.laenge) || 10;
+      zeilen.push("G97S800M03 (DREHZAHL FUER RAENDELN NIEDRIG HALTEN)");
+      zeilen.push("G0X" + (dm + 2).toFixed(2) + "Z2.");
+      zeilen.push("G1X" + dm.toFixed(2) + "F0.05");
+      zeilen.push("G1Z-" + laenge.toFixed(2) + "F0.1 (RAENDELN, GGF. 2-3 UEBERLAEUFE)");
+      zeilen.push("G0X" + (dm + 4).toFixed(2));
+    } else if (op.typ === "abstechen") {
+      const dm = parseFloat(op.dmZiel) || 0;
+      const breite = parseFloat(op.breite) || 2;
+      zeilen.push("G97S" + Math.min(nBerechnen(stange), 3000) + "M03");
+      zeilen.push("G0X" + (stange + 4).toFixed(2) + "Z0.");
+      zeilen.push("G1X" + dm.toFixed(2) + "F0.03 (ABSTECHEN, BREITE " + breite
+        + " MM, VORSCHUB ZUM ENDE REDUZIEREN)");
+      zeilen.push("G0X" + (stange + 6).toFixed(2));
+    }
+    zeilen.push("M01 (OPTIONALER HALT)");
+    zeilen.push("");
+  });
+
+  zeilen.push("G28U0.W0. (REFERENZPUNKT, ABSTECHEN/UEBERGABE PRUEFEN)");
+  zeilen.push("M20 (ZYKLUSENDE - IM EINZELZYKLUS-BETRIEB HAELT DIE MASCHINE HIER AN)");
+  zeilen.push("M99 (SPRUNG ZUM PROGRAMMANFANG - LAEUFT SONST FORTLAUFEND WEITER, BIS VON HAND ANGEHALTEN)");
+  zeilen.push("%");
+  return zeilen.join("\n");
+}
+
+function operationFelderHtml(op) {
+  const p = "op-" + op.id + "-";
+  const feld = (id, label, wert, opts) => {
+    opts = opts || {};
+    return '<label class="feld"><span>' + esc(label) + '</span>'
+      + '<input type="' + (opts.typ || "number") + '" id="' + id + '"'
+      + (opts.typ !== "text" ? ' inputmode="decimal" step="' + (opts.step || "0.1") + '"' : "")
+      + ' value="' + esc(wert === undefined || wert === null ? "" : wert) + '"'
+      + (opts.platzhalter ? ' placeholder="' + esc(opts.platzhalter) + '"' : "") + '></label>';
+  };
+
+  if (op.typ === "aussen") {
+    return '<div class="zeitraumwahl">'
+      + feld(p + "dmstart", "Start-Ø in mm", op.dmStart, { platzhalter: "z. B. Stangen-Ø" })
+      + feld(p + "dmziel", "Ziel-Ø in mm", op.dmZiel) + '</div>'
+      + feld(p + "laenge", "Länge dieser Stufe in mm", op.laenge);
+  }
+  if (op.typ === "bohren") {
+    return '<div class="zeitraumwahl">'
+      + feld(p + "dmziel", "Bohrungs-Ø in mm", op.dmZiel)
+      + feld(p + "tiefe", "Tiefe in mm", op.tiefe, { platzhalter: op.durchgehend ? "durchgehend" : "" })
+      + '</div>'
+      + '<label class="schalter"><input type="checkbox" id="' + p + 'durch"'
+      + (op.durchgehend ? " checked" : "") + '><span>Durchgehende Bohrung</span></label>';
+  }
+  if (op.typ === "gewinde_innen") {
+    return '<div class="zeitraumwahl">'
+      + feld(p + "norm", "Gewinde, z. B. M6", op.norm, { typ: "text" })
+      + feld(p + "tiefe", "Gewindetiefe in mm", op.tiefe) + '</div>';
+  }
+  if (op.typ === "gewinde_aussen") {
+    return '<div class="zeitraumwahl">'
+      + feld(p + "norm", "Gewinde, z. B. M6", op.norm, { typ: "text" })
+      + feld(p + "dmstart", "Aussen-Ø vor Gewinde in mm", op.dmStart) + '</div>'
+      + feld(p + "laenge", "Gewindelänge in mm", op.laenge);
+  }
+  if (op.typ === "einstich") {
+    return '<div class="zeitraumwahl">'
+      + feld(p + "dmziel", "Nutgrund-Ø in mm", op.dmZiel)
+      + feld(p + "breite", "Breite in mm", op.breite) + '</div>';
+  }
+  if (op.typ === "raendeln") {
+    return '<div class="zeitraumwahl">'
+      + feld(p + "dmstart", "Ø vor dem Rändeln in mm", op.dmStart)
+      + feld(p + "laenge", "Länge in mm", op.laenge) + '</div>';
+  }
+  if (op.typ === "abstechen") {
+    return '<div class="zeitraumwahl">'
+      + feld(p + "dmziel", "Ø beim Abstechen in mm", op.dmZiel, { platzhalter: "meist 0" })
+      + feld(p + "breite", "Breite in mm", op.breite) + '</div>';
+  }
+  return "";
+}
+
+function operationZeileHtml(op, index) {
+  return '<div class="karte">'
+    + '<div class="karte__kopf"><h2>Schritt ' + (index + 1) + '</h2>'
+    + '<button type="button" class="chipweg" data-opweg="' + op.id + '" title="Schritt entfernen">✕</button></div>'
+    + '<select class="auswahl" id="op-' + op.id + '-typ">'
+    + OP_TYPEN.map((t) => '<option value="' + t.id + '"' + (t.id === op.typ ? " selected" : "") + '>'
+        + esc(t.name) + '</option>').join("")
+    + '</select>'
+    + '<div class="moduswahl" style="margin-top:10px">'
+    + '<button type="button" class="moduswahl__knopf' + (op.position !== "gegen" ? " aktiv" : "")
+    + '" data-oppos="' + op.id + '" data-wert="haupt">Hauptspindel</button>'
+    + '<button type="button" class="moduswahl__knopf' + (op.position === "gegen" ? " aktiv" : "")
+    + '" data-oppos="' + op.id + '" data-wert="gegen">Gegenspindel</button>'
+    + '</div>'
+    + operationFelderHtml(op)
+    + '</div>';
+}
+
+function rechnerProgramm(ziel) {
+  const modell = STAR_MODELLE.find((m) => m.id === prog.maschine) || STAR_MODELLE[0];
+  const stangeUeber = (parseFloat(prog.stangeDm) || 0) > modell.stangeMax;
+  const werkzeugliste = werkzeugeBestimmen(prog.operationen);
+  const programmText = prog.operationen.length ? baueProgrammText(prog, werkzeugliste) : "";
+
+  ziel.innerHTML = ''
+    + '<section class="karte"><h2>Zeichnung</h2>'
+    + (prog.bildUrl
+        ? (prog.bildTyp === "pdf"
+            ? '<p><a class="knopf pdflink" href="' + esc(prog.bildUrl) + '" target="_blank" rel="noopener">'
+              + esc(prog.bildName || "PDF ansehen") + '</a></p>'
+            : '<img src="' + prog.bildUrl + '" alt="Zeichnung" style="max-width:260px;border:1px '
+              + 'solid var(--linie);border-radius:var(--radius);display:block;margin-bottom:10px">')
+        : "")
+    + '<label class="knopf bildknopf">Foto oder PDF wählen'
+    + '<input type="file" id="prog-datei" accept="image/*,application/pdf" hidden></label>'
+    + '<p class="hinweis">Nur zur Ansicht während der Eingabe, wird nicht gespeichert. Masse und '
+    + 'Toleranzen bitte unten von Hand eintragen – ein automatisches Auslesen aus Fotos oder '
+    + 'Scans ist nicht zuverlässig möglich.</p>'
+    + '</section>'
+
+    + '<section class="karte"><h2>Maschine und Rohteil</h2>'
+    + '<div class="wahlgitter">'
+    + STAR_MODELLE.map((m) => '<button type="button" class="wahlknopf' + (prog.maschine === m.id ? " aktiv" : "")
+        + '" data-progmasch="' + m.id + '">' + esc(m.name) + '</button>').join("")
+    + '</div>'
+    + '<p class="feldhinweis">Stangenkapazität laut Typbezeichnung ca. ' + modell.stangeMax
+    + ' mm – bitte am Maschinen-Datenblatt prüfen.</p>'
+
+    + '<h2 class="untertitel">Werkstoff</h2>'
+    + '<div class="wahlgitter">'
+    + WERKSTOFFE.map((m, i) => '<button type="button" class="wahlknopf' + (i === prog.werkstoff ? " aktiv" : "")
+        + '" data-progwerkstoff="' + i + '">' + esc(m.name) + '</button>').join("")
+    + '</div>'
+    + '<div class="moduswahl">'
+    + '<button type="button" class="moduswahl__knopf' + (prog.schneidstoff === "hss" ? " aktiv" : "")
+    + '" data-progschneid="hss">HSS</button>'
+    + '<button type="button" class="moduswahl__knopf' + (prog.schneidstoff === "hm" ? " aktiv" : "")
+    + '" data-progschneid="hm">Hartmetall</button>'
+    + '</div>'
+
+    + '<div class="zeitraumwahl">'
+    + '<label class="feld"><span>Stangendurchmesser in mm</span>'
+    + '<input type="number" id="prog-stange" inputmode="decimal" step="0.1" value="'
+    + esc(prog.stangeDm) + '"></label>'
+    + '<label class="feld"><span>Fertigteil-Länge in mm</span>'
+    + '<input type="number" id="prog-laenge" inputmode="decimal" step="0.1" value="'
+    + esc(prog.teileLaenge) + '"></label>'
+    + '</div>'
+    + '<label class="feld"><span>Stückzahl</span>'
+    + '<input type="number" id="prog-stueck" inputmode="numeric" step="1" value="'
+    + esc(prog.stueckzahl) + '"></label>'
+    + (stangeUeber
+        ? '<p class="hinweis">⚠ Stangendurchmesser (' + esc(prog.stangeDm) + ' mm) liegt über der üblichen '
+          + 'Kapazität der ' + esc(modell.name) + ' (~' + modell.stangeMax + ' mm). Maschine/Führungsbuchse prüfen.</p>'
+        : "")
+    + '</section>'
+
+    + '<section class="karte"><div class="karte__kopf"><h2>Arbeitsschritte</h2>'
+    + '<button class="linkknopf" id="prog-opneu">+ Schritt hinzufügen</button></div>'
+    + (prog.operationen.length
+        ? '' : '<p class="hinweis">Noch keine Arbeitsschritte erfasst.</p>')
+    + '</section>'
+    + prog.operationen.map((op, i) => operationZeileHtml(op, i)).join("")
+
+    + '<section class="karte"><h2>Werkzeugliste (Vorschlag)</h2>'
+    + (werkzeugliste.length
+        ? '<table class="tabelle"><thead><tr><th>Pos.</th><th>Werkzeug</th>'
+          + '<th>Einsatz</th><th>Hinweis</th></tr></thead><tbody>'
+          + werkzeugliste.map((w, i) => '<tr><td>T' + pad2(i + 1) + pad2(i + 1) + '</td><td class="stark">'
+              + esc(w.bezeichnung) + '</td><td>Schritt '
+              + w.typen.map((o) => prog.operationen.indexOf(o) + 1).join(", ")
+              + '</td><td>' + esc(w.hinweis) + '</td></tr>').join("")
+          + '</tbody></table>'
+        : '<p class="hinweis">Noch keine Arbeitsschritte erfasst.</p>')
+    + '</section>'
+
+    + '<section class="karte karte--warnung"><h2>Programm-Entwurf</h2>'
+    + '<p>Automatisch erzeugter <strong>Entwurf</strong> nach allgemeinen Regeln. Werkzeugpositionen, '
+    + 'Zustellungen, Rückzüge und Schnittwerte sind Platzhalter und müssen von einer Fachkraft geprüft '
+    + 'und vor dem ersten Lauf am Simulator getestet werden. Keine Herstellerfreigabe, keine Garantie '
+    + 'auf Kollisionsfreiheit.</p>'
+    + (programmText
+        ? '<div class="karte__kopf"><h2 class="untertitel">Fanuc-Programm</h2>'
+          + '<button class="linkknopf" id="prog-kopieren">Kopieren</button></div>'
+          + '<pre class="gcode">' + esc(programmText) + '</pre>'
+        : "")
+    + '</section>';
+
+  // ---------- Bindungen ----------
+
+  const dateiEl = document.getElementById("prog-datei");
+  if (dateiEl) dateiEl.onchange = async () => {
+    const f = dateiEl.files && dateiEl.files[0];
+    if (!f) return;
+    if (prog.bildUrl) URL.revokeObjectURL(prog.bildUrl);
+    try {
+      if (f.type === "application/pdf") {
+        prog.bildUrl = URL.createObjectURL(f);
+        prog.bildTyp = "pdf";
+      } else {
+        const klein = await bildVerkleinern(f, 900);
+        prog.bildUrl = URL.createObjectURL(klein);
+        prog.bildTyp = "bild";
+      }
+      prog.bildName = f.name;
+      rechnerProgramm(ziel);
+    } catch (fehler) {
+      meldung("Datei konnte nicht geladen werden.", "warn");
+    }
+  };
+
+  ziel.querySelectorAll("[data-progmasch]").forEach((el) => {
+    el.onclick = () => { prog.maschine = el.dataset.progmasch; rechnerProgramm(ziel); };
+  });
+  ziel.querySelectorAll("[data-progwerkstoff]").forEach((el) => {
+    el.onclick = () => { prog.werkstoff = Number(el.dataset.progwerkstoff); rechnerProgramm(ziel); };
+  });
+  ziel.querySelectorAll("[data-progschneid]").forEach((el) => {
+    el.onclick = () => { prog.schneidstoff = el.dataset.progschneid; rechnerProgramm(ziel); };
+  });
+
+  const bindeProg = (id, feld) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.onchange = () => { prog[feld] = el.value; rechnerProgramm(ziel); };
+  };
+  bindeProg("prog-stange", "stangeDm");
+  bindeProg("prog-laenge", "teileLaenge");
+  bindeProg("prog-stueck", "stueckzahl");
+
+  const opNeu = document.getElementById("prog-opneu");
+  if (opNeu) opNeu.onclick = () => { prog.operationen.push(neueOperation("aussen")); rechnerProgramm(ziel); };
+
+  const kopierBtn = document.getElementById("prog-kopieren");
+  if (kopierBtn) kopierBtn.onclick = async () => {
+    try { await navigator.clipboard.writeText(programmText); meldung("Programm kopiert."); }
+    catch (f) { meldung("Kopieren nicht möglich. Bitte von Hand markieren.", "warn"); }
+  };
+
+  ziel.querySelectorAll("[data-opweg]").forEach((el) => {
+    el.onclick = () => {
+      prog.operationen = prog.operationen.filter((o) => o.id !== Number(el.dataset.opweg));
+      rechnerProgramm(ziel);
+    };
+  });
+
+  prog.operationen.forEach((op) => {
+    const typEl = document.getElementById("op-" + op.id + "-typ");
+    if (typEl) typEl.onchange = () => { op.typ = typEl.value; rechnerProgramm(ziel); };
+
+    ziel.querySelectorAll('[data-oppos="' + op.id + '"]').forEach((el) => {
+      el.onclick = () => { op.position = el.dataset.wert; rechnerProgramm(ziel); };
+    });
+
+    const bindeOp = (suffix, feld) => {
+      const el = document.getElementById("op-" + op.id + "-" + suffix);
+      if (!el) return;
+      el.onchange = () => { op[feld] = el.value; rechnerProgramm(ziel); };
+    };
+    bindeOp("dmstart", "dmStart");
+    bindeOp("dmziel", "dmZiel");
+    bindeOp("laenge", "laenge");
+    bindeOp("tiefe", "tiefe");
+    bindeOp("norm", "norm");
+    bindeOp("breite", "breite");
+
+    const durchEl = document.getElementById("op-" + op.id + "-durch");
+    if (durchEl) durchEl.onchange = () => { op.durchgehend = durchEl.checked; rechnerProgramm(ziel); };
+  });
 }
 
 // =================================================================
