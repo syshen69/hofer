@@ -1596,6 +1596,50 @@ body.dunkel .zbeschriftung { fill: var(--tinte); }
                 font-size: .68rem; color: var(--gedaempft); opacity: .7;
                 pointer-events: none; }
 @media (min-width: 780px) { .versionsecke { bottom: 6px; } }
+
+/* ---------- Kopfzeile: Anordnung ---------- */
+.kopf { gap: 10px; }
+.kopf__logo { margin-right: 4px; }
+.kopf__admin { margin-left: 18px; }
+.kopf__luecke { flex: 1 1 auto; }
+.kopf__benutzer { margin-left: 0; max-width: 220px; }
+.kopf__dunkel { display: none; }
+
+/* ---------- Dunkler Modus: ausnahmslos helle Schrift ---------- */
+body.dunkel, body.dunkel * { color: var(--tinte); }
+
+/* Nur diese Flächen sind hell und brauchen dunkle Schrift */
+body.dunkel .knopf--haupt, body.dunkel .knopf--haupt *,
+body.dunkel .knopf--gefahr, body.dunkel .knopf--gefahr *,
+body.dunkel .marke, body.dunkel .statuschip, body.dunkel .fehltchip,
+body.dunkel .problemkasten, body.dunkel .problemkasten *,
+body.dunkel .warnbalken, body.dunkel .karte--warnung,
+body.dunkel .karte--warnung *, body.dunkel .karte--ergebnis,
+body.dunkel .karte--ergebnis *, body.dunkel .statuszeile--warn,
+body.dunkel .statuszeile--warn *, body.dunkel .statuszeile--gefahr,
+body.dunkel .statuszeile--gefahr *, body.dunkel .statuszeile--gut,
+body.dunkel .statuszeile--gut *, body.dunkel .parkwahl__knopf.aktiv,
+body.dunkel .moduswahl__knopf.aktiv, body.dunkel .wahlknopf.aktiv,
+body.dunkel .kopf__admin.aktiv, body.dunkel .vorschlag,
+body.dunkel .spass-karte, body.dunkel .pw-balken,
+body.dunkel .pw-balken *, body.dunkel .pw-ferien, body.dunkel .pw-ferien *,
+body.dunkel .toast, body.dunkel .toast * { color: #10161d; }
+
+body.dunkel .toast, body.dunkel .toast * { color: #fff; }
+body.dunkel .kopf__bild--leer { color: #fff; }
+
+/* Gedämpfte Nebentexte etwas zurückgenommen, aber lesbar */
+body.dunkel .klein, body.dunkel .hinweis, body.dunkel .feldhinweis,
+body.dunkel .untertitel, body.dunkel .tabelle th,
+body.dunkel .kennzahl__titel, body.dunkel .spass-label,
+body.dunkel .versionsecke { color: var(--gedaempft); }
+
+/* Auswahl und Fokus als blauer Rahmen */
+body.dunkel ::selection { background: rgba(107, 164, 255, .32); color: #fff; }
+body.dunkel :focus-visible { outline: 2px solid #6ba4ff; outline-offset: 2px; }
+body.dunkel input:focus, body.dunkel select:focus, body.dunkel textarea:focus {
+  border-color: #6ba4ff; box-shadow: 0 0 0 2px rgba(107, 164, 255, .3); }
+body.dunkel .knopf:focus-visible { border-color: #6ba4ff; }
 </style>
 </head>
 <body>
@@ -1639,7 +1683,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "18.1.0";
+const APP_VERSION = "19.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -2603,9 +2647,20 @@ function meineParks() {
 }
 
 function parkErlaubt(parkId) {
-  if (istAdmin()) return true;
-  const p = meineParks();
-  return !p.length || p.indexOf(parkId) !== -1;
+  if (istAdmin() || meineRolle() === "planwand") return true;
+
+  // Ausdrücklich zugewiesene Parks haben Vorrang
+  const zugewiesen = meineParks();
+  if (zugewiesen.length) return zugewiesen.indexOf(parkId) !== -1;
+
+  // Sonst entscheidet der Name des Parks zur Rolle
+  const park = (prod.parks || []).concat(plan.parksAlle || [])
+    .find((p) => p.id === parkId);
+  const name = ((park && park.name) || "").toLowerCase();
+  const r = meineRolle();
+  if (r === "kurzdreher") return name.includes("kurz");
+  if (r === "langdreher") return name.includes("lang");
+  return true;
 }
 
 function meineRolle() { return (profil && profil.role) || "produktion"; }
@@ -2828,9 +2883,8 @@ async function ladeParks(auchInaktive) {
   if (!auchInaktive) a = a.eq("is_active", true);
   const { data, error } = await zeitlimit(a, 10000, "Maschinenparks");
   if (error) throw error;
-  // Auf der Planwand sieht jeder alles, in der Produktion nur die
-  // freigeschalteten Parks.
-  if (plan.alleParks) return data || [];
+  // Alle Parks merken, damit der Namensvergleich funktioniert
+  plan.parksAlle = data || [];
   return (data || []).filter((p) => parkErlaubt(p.id));
 }
 
@@ -2839,7 +2893,6 @@ async function ladeMaschinen(auchInaktive) {
   if (!auchInaktive) a = a.eq("is_active", true);
   const { data, error } = await zeitlimit(a, 10000, "Maschinen");
   if (error) throw error;
-  if (plan.alleParks) return data || [];
   return (data || []).filter((m) => parkErlaubt(m.park_id));
 }
 
@@ -3362,22 +3415,18 @@ function farbeVon(wert) {
 // Auf der Planwand darf jeder alles sehen. Geändert wird erst,
 // wenn ein Administrator den Bearbeiten-Modus einschaltet.
 // Wer den Bearbeiten-Schalter überhaupt bekommt
-function darfPlanwandBearbeiten() {
-  const r = meineRolle();
-  return r === "admin" || r === "planwand";
+// Wer bekommt den Bearbeiten-Knopf überhaupt zu sehen?
+// Administratoren nicht: sie dürfen ohnehin immer.
+function darfBearbeitenKnopf() {
+  if (istAdmin()) return false;
+  return meineRolle() === "planwand" || (profil && profil.darf_bearbeiten === true);
 }
 
-function darfPlanen() { return darfPlanwandBearbeiten() && plan.adminModus === true; }
-
-const FERIEN_ZEILEN = 7;
-
-// Sucht in Auftragsnummer, Notiz und Maschine
-function passtZurSuche(j) {
-  const t = (plan.suche || "").trim().toLowerCase();
-  if (!t) return true;
-  return (j.job_number || "").toLowerCase().includes(t)
-    || (j.plan_note || "").toLowerCase().includes(t)
-    || (j.maschine || "").toLowerCase().includes(t);
+// Darf gerade auf der Planwand geändert werden?
+function darfPlanen() {
+  if (istAdmin()) return true;
+  if (!darfBearbeitenKnopf()) return false;
+  return plan.adminModus === true;
 }
 
 async function ladeFerien() {
@@ -3429,10 +3478,8 @@ async function seitePlanwand(b) {
     + '<div id="pw-seite"><div class="laedt">Wird geladen …</div></div>';
 
   try {
-    plan.alleParks = true;
     prod.parks = await ladeParks(false);
     prod.maschinen = await ladeMaschinen(false);
-    plan.alleParks = false;
   } catch (f) {
     document.getElementById("pw-seite").innerHTML =
       '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
@@ -6366,88 +6413,32 @@ async function lieferantDialog(lieferant, b) {
 }
 
 async function seiteEinstellungen(b) {
-  b.innerHTML = '<h1 class="seitentitel">Einstellungen</h1><div class="laedt">Benutzer werden geladen …</div>';
+  const ich = profil || {};
+  const bin = istAdmin();
 
-  let benutzer = [];
-  let neueSpalten = true;
-
-  // Erst mit allen Feldern versuchen. Fehlt in der Datenbank eine
-  // der neueren Spalten, wird ohne sie geladen, statt hängen zu bleiben.
-  try {
-    const { data, error } = await zeitlimit(
-      db.from("profiles")
-        .select("id, email, full_name, role, is_active, geburtstag, bild_url, parks")
-        .order("full_name"), 9000, "Benutzerliste");
-    if (error) throw error;
-    benutzer = data || [];
-  } catch (f) {
-    neueSpalten = false;
-    try {
-      const { data, error } = await zeitlimit(
-        db.from("profiles").select("id, email, full_name, role, is_active")
-          .order("full_name"), 9000, "Benutzerliste");
-      if (error) throw error;
-      benutzer = data || [];
-    } catch (f2) {
-      b.innerHTML = '<h1 class="seitentitel">Einstellungen</h1>'
-        + '<div class="karte karte--fehler"><p>' + esc(fehlertext(f2)) + '</p></div>';
-      return;
-    }
-  }
-
-  const besitzer = istAdmin();
-
+  // Die Seite wird sofort aufgebaut. Die Benutzerliste kommt danach,
+  // damit hier nie mehr etwas hängen bleibt.
   b.innerHTML = '<h1 class="seitentitel">Einstellungen</h1>'
-    + '<section class="karte"><h2>Benutzer</h2><table class="tabelle">'
-    + '<thead><tr><th>Name</th><th>Rolle</th><th>Status</th></tr></thead><tbody>'
-    + benutzer.map((u) => '<tr class="' + (u.is_active ? "" : "zeile--inaktiv") + '">'
-        + '<td>' + esc(u.full_name || "–")
-        + (profil && u.id === profil.id ? ' <span class="marke">du</span>' : "") + '</td>'
-        + '<td>' + (besitzer && profil.id !== u.id
-            ? '<select class="auswahl" data-rolle="' + esc(u.id) + '">'
-              + Object.keys(ROLLEN).map((w) => '<option value="' + w + '"'
-                  + (u.role === w ? " selected" : "") + '>' + ROLLEN[w] + '</option>').join("")
-              + '</select>'
-            : esc(ROLLEN[u.role] || u.role)) + '</td>'
-        + '<td>' + (besitzer && profil.id !== u.id
-            ? '<button class="linkknopf" data-aktiv="' + esc(u.id) + '" data-wert="'
-              + (u.is_active ? "0" : "1") + '">' + (u.is_active ? "Deaktivieren" : "Aktivieren") + '</button>'
-            : (u.is_active ? "aktiv" : "inaktiv")) + '</td></tr>').join("")
-    + '</tbody></table>'
-    + '<div class="rollenhilfe">'
-    + '<div><strong>Administrator</strong> darf alles, auch Benutzer verwalten.</div>'
-    + '<div><strong>Produktion</strong> darf alles erfassen und bestellen, aber die '
-    + 'Planwand nicht bearbeiten.</div>'
-        + '<div>Ansehen darf jeder alles.</div></div>'
-    + (besitzer && neueSpalten
-        ? '<h3 class="untertitel">Zugriff auf Maschinenparks</h3>'
-          + '<p class="hinweis">Ohne Auswahl sieht jemand alle Parks. '
-          + 'Sonst nur die angehakten. Administratoren sehen immer alles.</p>'
-          + '<div id="parkzugriff"><div class="laedt">Parks werden geladen …</div></div>'
-        : "")
-    + '<p class="hinweis">Neue Benutzer legst du im Supabase-Dashboard unter '
-    + 'Authentication → Users an, als E-Mail den Namen mit @hoferco.ch.</p></section>'
 
     + '<section class="karte"><h2>Mein Konto</h2>'
-    + (neueSpalten ? '<div class="kontokopf">' : '<div hidden>')
-    + (ich && ich.bild_url
-        ? '<img class="profilbild-gross" id="mk-bild" src="' + esc(ich.bild_url) + '" alt="">'
-        : '<span class="profilbild-gross kopf__bild--leer" id="mk-bild">'
-          + esc(((ich && (ich.full_name || ich.email)) || "?").charAt(0).toUpperCase())
-          + '</span>')
+    + '<div class="kontokopf">'
+    + (ich.bild_url
+        ? '<img class="profilbild-gross" src="' + esc(ich.bild_url) + '" alt="">'
+        : '<span class="profilbild-gross kopf__bild--leer">'
+          + esc(((ich.full_name || ich.email) || "?").charAt(0).toUpperCase()) + '</span>')
     + '<label class="knopf bildknopf">Bild wählen'
     + '<input type="file" id="mk-datei" accept="image/*" hidden></label>'
     + '</div>'
-    + '<label class="feld"><span>Geburtstag</span>'
-    + '<input type="date" id="mk-geburtstag" value="'
-    + esc((ich && ich.geburtstag) || "") + '">'
-    + '<span class="feldhinweis">Erscheint auf der Startseite, '
-    + 'wenn er in den nächsten zwei Wochen ansteht.</span></label>'
     + '<label class="feld"><span>Anzeigename</span>'
-    + '<input type="text" id="mn" value="' + esc((profil && profil.full_name) || "") + '"></label>'
+    + '<input type="text" id="mn" value="' + esc(ich.full_name || "") + '"></label>'
     + '<button class="knopf" id="ns">Name speichern</button>'
+    + '<label class="feld feld--abstand"><span>Geburtstag</span>'
+    + '<input type="date" id="mk-geburtstag" value="' + esc(ich.geburtstag || "") + '">'
+    + '<span class="feldhinweis">Erscheint auf der Startseite, wenn er in den '
+    + 'nächsten zwei Wochen ansteht.</span></label>'
     + '<label class="feld feld--abstand"><span>Neues Passwort</span>'
-    + '<input type="password" id="np" autocomplete="new-password" placeholder="mindestens 8 Zeichen"></label>'
+    + '<input type="password" id="np" autocomplete="new-password"'
+    + ' placeholder="mindestens 8 Zeichen"></label>'
     + '<button class="knopf" id="ps">Passwort ändern</button></section>'
 
     + '<section class="karte"><h2>Darstellung</h2>'
@@ -6460,113 +6451,69 @@ async function seiteEinstellungen(b) {
     + '<label class="schalter"><input type="checkbox" id="e-wochestart"'
     + (einstellung("wochestart") ? " checked" : "") + '>'
     + '<span>Erfassung immer mit der Wochenansicht öffnen</span></label>'
-    + '<p class="hinweis">Diese Einstellungen gelten nur auf diesem Gerät.</p>'
+    + '<p class="hinweis">Gilt nur auf diesem Gerät.</p></section>'
+
+    + '<section class="karte"><h2>Benutzer</h2>'
+    + '<div id="benutzerliste"><div class="laedt">Wird geladen …</div></div>'
+    + '<div class="rollenhilfe">'
+    + '<div><strong>Administrator</strong> darf alles, ohne etwas einzuschalten.</div>'
+    + '<div><strong>Planwand</strong> sieht alle Parks und darf ändern, '
+    + 'sobald oben Bearbeiten eingeschaltet ist.</div>'
+    + '<div><strong>Langdreher</strong> und <strong>Kurzdreher</strong> sehen nur '
+    + 'ihren Park, in Produktion und Planwand.</div></div>'
     + '</section>'
 
-    + '<section class="karte"><h2>Datensicherung</h2>'
-    + '<p class="klein">Der kostenlose Tarif macht keine automatischen Sicherungen. '
-    + 'Lade die Daten regelmässig herunter, am besten einmal pro Woche, und lege die '
-    + 'Dateien an einem sicheren Ort ab.</p>'
-    + '<button class="knopf knopf--haupt" id="e-sichern">Daten sichern</button>'
-    + '<p class="hinweis">Du erhältst eine vollständige Datei mit allem sowie einzelne '
-    + 'CSV-Dateien für Excel.</p>'
-    + '</section>'
+    + '<section class="karte"><h2>Über die App</h2>'
+    + '<p class="klein">Version ' + esc(APP_VERSION) + ' · angemeldet als '
+    + esc(ich.email || "") + '</p></section>';
 
-    + '<section class="karte"><h2>Über die App</h2><p class="klein">Version ' + esc(APP_VERSION)
-    + ' · angemeldet als ' + esc((profil && profil.email) || "") + '</p></section>';
+  // ---------- Darstellung ----------
+  document.getElementById("e-dunkel").onchange = (e) => {
+    einstellungSetzen("dunkel", e.target.checked);
+    document.body.classList.toggle("dunkel", e.target.checked);
+  };
+  document.getElementById("e-wochenende").onchange = (e) =>
+    einstellungSetzen("wochenende", e.target.checked);
+  document.getElementById("e-wochestart").onchange = (e) =>
+    einstellungSetzen("wochestart", e.target.checked);
 
-  b.querySelectorAll("[data-rolle]").forEach((el) => {
-    const vorher = el.value;
-    el.addEventListener("change", async () => {
-      const person = benutzer.find((u) => u.id === el.dataset.rolle);
-      const ok = await nachfragen({
-        titel: "Rolle ändern?",
-        text: (person ? (person.full_name || person.email) : "Dieser Benutzer")
-            + " bekommt die Rolle " + (ROLLEN[el.value] || el.value) + ".",
-        bestaetigen: "Ja, ändern" });
+  // ---------- Eigenes Konto ----------
+  document.getElementById("ns").onclick = async () => {
+    const name = document.getElementById("mn").value.trim();
+    const { error } = await db.from("profiles").update({ full_name: name }).eq("id", ich.id);
+    if (error) return meldung(fehlertext(error), "fehler");
+    profil.full_name = name;
+    const anz = document.querySelector("[data-benutzername]");
+    if (anz) anz.textContent = name || ich.email;
+    meldung("Name gespeichert.");
+  };
 
-      if (!ok) { el.value = vorher; return; }
+  document.getElementById("ps").onclick = async () => {
+    const pw = document.getElementById("np").value;
+    if (pw.length < 8) return meldung("Mindestens 8 Zeichen.", "warn");
+    const { error } = await db.auth.updateUser({ password: pw });
+    if (error) meldung(fehlertext(error), "fehler");
+    else { document.getElementById("np").value = ""; meldung("Passwort geändert."); }
+  };
 
-      const { error } = await db.from("profiles").update({ role: el.value }).eq("id", el.dataset.rolle);
-      if (error) { meldung(fehlertext(error), "fehler"); seiteEinstellungen(b); }
-      else { meldung("Rolle geändert."); seiteEinstellungen(b); }
-    });
-  });
+  const gebFeld = document.getElementById("mk-geburtstag");
+  gebFeld.onchange = async () => {
+    const { error } = await db.from("profiles")
+      .update({ geburtstag: gebFeld.value || null }).eq("id", ich.id);
+    if (error) meldung(fehlertext(error), "fehler");
+    else { profil.geburtstag = gebFeld.value || null; meldung("Gespeichert."); }
+  };
 
-  b.querySelectorAll("[data-aktiv]").forEach((el) => {
-    el.addEventListener("click", async () => {
-      const ein = el.dataset.wert === "1";
-      if (ein) {
-        const ok = await nachfragen({ titel: "Benutzer aktivieren",
-          text: "Die Person kann sich danach wieder anmelden.",
-          bestaetigen: "Ja, aktivieren" });
-        if (!ok) return;
-      }
-      if (!ein) {
-        const ok = await nachfragen({
-          titel: "Benutzer deaktivieren",
-          text: "Die Person kann sich danach nicht mehr anmelden. Bisherige Einträge bleiben erhalten.",
-          bestaetigen: "Deaktivieren", gefahr: true });
-        if (!ok) return;
-      }
-      const { error } = await db.from("profiles").update({ is_active: ein }).eq("id", el.dataset.aktiv);
-      if (error) meldung(fehlertext(error), "fehler");
-      else { meldung(ein ? "Benutzer aktiviert." : "Benutzer deaktiviert."); seiteEinstellungen(b); }
-    });
-  });
-
-  // Parkzuweisung je Benutzer. Läuft nebenher, damit die Seite
-  // nicht darauf wartet.
-  const parkKasten = document.getElementById("parkzugriff");
-  if (parkKasten) (async () => {
-    try {
-      const { data } = await zeitlimit(
-        db.from("machine_parks").select("id, name")
-          .eq("is_active", true).order("name"), 8000, "Parks");
-      const parks = data || [];
-
-      parkKasten.innerHTML = benutzer.filter((u) => u.role !== "admin").map((u) =>
-        '<div class="parkzeile"><div class="parkzeile__name">'
-        + esc(u.full_name || u.email) + '</div>'
-        + '<div class="parkzeile__wahl">'
-        + parks.map((pk) => '<label class="parkchip">'
-            + '<input type="checkbox" data-pu="' + esc(u.id) + '" data-pp="' + esc(pk.id) + '"'
-            + ((u.parks || []).indexOf(pk.id) !== -1 ? " checked" : "") + '>'
-            + '<span>' + esc(pk.name) + '</span></label>').join("")
-        + '</div></div>').join("")
-        || '<p class="hinweis">Keine weiteren Benutzer.</p>';
-
-      parkKasten.querySelectorAll("[data-pu]").forEach((el) => {
-        el.onchange = async () => {
-          const nutzer = benutzer.find((u) => u.id === el.dataset.pu);
-          const bisher = (nutzer.parks || []).slice();
-          const i = bisher.indexOf(el.dataset.pp);
-          if (el.checked && i === -1) bisher.push(el.dataset.pp);
-          if (!el.checked && i !== -1) bisher.splice(i, 1);
-
-          const { error } = await db.from("profiles").update({ parks: bisher })
-            .eq("id", nutzer.id);
-          if (error) { meldung(fehlertext(error), "fehler"); el.checked = !el.checked; }
-          else { nutzer.parks = bisher; meldung("Zugriff gespeichert."); }
-        };
-      });
-    } catch (f) {
-      parkKasten.innerHTML = '<p class="hinweis">Parks konnten nicht geladen werden.</p>';
-    }
-  })();
-
-  const datei = document.getElementById("mk-datei");
-  if (datei) datei.onchange = async (e) => {
+  document.getElementById("mk-datei").onchange = async (e) => {
     const f = (e.target.files || [])[0];
     if (!f) return;
     try {
-      const klein = await bildZuschneiden(f);
+      const klein = await bildZuschneiden(f, 400);
       if (!klein) return;
       const name = "profil/" + ich.id + "-" + Date.now() + ".jpg";
       const r = await db.storage.from("profilbilder").upload(name, klein,
         { contentType: "image/jpeg" });
       if (r.error) throw r.error;
-      meldung("Bild wird hochgeladen …");
       const url = db.storage.from("profilbilder").getPublicUrl(name).data.publicUrl;
       const u = await db.from("profiles").update({ bild_url: url }).eq("id", ich.id);
       if (u.error) throw u.error;
@@ -6576,55 +6523,128 @@ async function seiteEinstellungen(b) {
     } catch (f2) { meldung(fehlertext(f2), "fehler"); }
   };
 
-  const gebFeld = document.getElementById("mk-geburtstag");
-  if (gebFeld) gebFeld.onchange = async () => {
-    const { error } = await db.from("profiles")
-      .update({ geburtstag: gebFeld.value || null }).eq("id", ich.id);
-    if (error) meldung(fehlertext(error), "fehler");
-    else { profil.geburtstag = gebFeld.value || null; meldung("Geburtstag gespeichert."); }
-  };
+  // ---------- Benutzerliste, nachgeladen ----------
+  benutzerlisteLaden(b, bin);
+}
 
-  document.getElementById("ns").addEventListener("click", async () => {
-    const name = document.getElementById("mn").value.trim();
-    const { error } = await db.from("profiles").update({ full_name: name }).eq("id", profil.id);
-    if (error) meldung(fehlertext(error), "fehler");
-    else {
-      profil.full_name = name;
-      const anz = document.querySelector("[data-benutzername]");
-      if (anz) anz.textContent = name || profil.email;
-      meldung("Name gespeichert.");
-    }
+async function benutzerlisteLaden(b, bin) {
+  const ziel = document.getElementById("benutzerliste");
+  if (!ziel) return;
+
+  let leute = [], parks = [];
+  try {
+    const r = await zeitlimit(db.from("profiles").select("*").order("full_name"),
+      9000, "Benutzer");
+    if (r.error) throw r.error;
+    leute = r.data || [];
+  } catch (f) {
+    ziel.innerHTML = '<p class="hinweis">Benutzer konnten nicht geladen werden: '
+      + esc(fehlertext(f)) + '</p>';
+    return;
+  }
+
+  try {
+    const r = await zeitlimit(db.from("machine_parks").select("id, name")
+      .eq("is_active", true).order("name"), 8000, "Parks");
+    if (!r.error) parks = r.data || [];
+  } catch (f) { /* ohne Parks geht es auch */ }
+
+  ziel.innerHTML = '<table class="tabelle"><thead><tr>'
+    + '<th>Name</th><th>Rolle</th><th>Bearbeiten</th><th>Status</th>'
+    + '</tr></thead><tbody>'
+    + leute.map((u) => {
+        const selbst = u.id === (profil && profil.id);
+        return '<tr class="' + (u.is_active ? "" : "zeile--inaktiv") + '">'
+          + '<td>' + esc(u.full_name || u.email)
+          + (selbst ? ' <span class="marke">du</span>' : "") + '</td>'
+          + '<td>' + (bin && !selbst
+              ? '<select class="auswahl" data-rolle="' + esc(u.id) + '">'
+                + Object.keys(ROLLEN).map((w) => '<option value="' + w + '"'
+                    + (u.role === w ? " selected" : "") + '>' + ROLLEN[w] + '</option>').join("")
+                + '</select>'
+              : esc(ROLLEN[u.role] || u.role)) + '</td>'
+          + '<td>' + (bin && !selbst && u.role !== "admin"
+              ? '<input type="checkbox" data-bearb="' + esc(u.id) + '"'
+                + (u.darf_bearbeiten ? " checked" : "") + '>'
+              : (u.role === "admin" ? "immer" : (u.darf_bearbeiten ? "ja" : "nein"))) + '</td>'
+          + '<td>' + (bin && !selbst
+              ? '<button class="linkknopf" data-aktiv="' + esc(u.id) + '" data-wert="'
+                + (u.is_active ? "0" : "1") + '">'
+                + (u.is_active ? "Deaktivieren" : "Aktivieren") + '</button>'
+              : (u.is_active ? "aktiv" : "inaktiv")) + '</td>'
+          + '</tr>';
+      }).join("")
+    + '</tbody></table>'
+
+    + (bin && parks.length
+      ? '<h3 class="untertitel">Zugriff auf Maschinenparks</h3>'
+        + '<p class="hinweis">Ohne Haken entscheidet die Rolle: Langdreher sieht '
+        + 'Parks mit "lang" im Namen, Kurzdreher solche mit "kurz".</p>'
+        + leute.filter((u) => u.role !== "admin" && u.role !== "planwand").map((u) =>
+            '<div class="parkzeile"><div class="parkzeile__name">'
+            + esc(u.full_name || u.email) + '</div><div class="parkzeile__wahl">'
+            + parks.map((pk) => '<label class="parkchip">'
+                + '<input type="checkbox" data-pu="' + esc(u.id) + '" data-pp="' + esc(pk.id) + '"'
+                + ((u.parks || []).indexOf(pk.id) !== -1 ? " checked" : "") + '>'
+                + '<span>' + esc(pk.name) + '</span></label>').join("")
+            + '</div></div>').join("")
+      : "");
+
+  if (!bin) return;
+
+  ziel.querySelectorAll("[data-rolle]").forEach((el) => {
+    const vorher = el.value;
+    el.onchange = async () => {
+      const ok = await nachfragen({ titel: "Rolle ändern?",
+        text: "Neue Rolle: " + (ROLLEN[el.value] || el.value),
+        bestaetigen: "Ja, ändern" });
+      if (!ok) { el.value = vorher; return; }
+      const { error } = await db.from("profiles").update({ role: el.value })
+        .eq("id", el.dataset.rolle);
+      if (error) { meldung(fehlertext(error), "fehler"); el.value = vorher; }
+      else { meldung("Rolle geändert."); benutzerlisteLaden(b, bin); }
+    };
   });
 
-
-  document.getElementById("e-sichern").addEventListener("click", (e) => {
-    datenSichern(e.currentTarget);
+  ziel.querySelectorAll("[data-bearb]").forEach((el) => {
+    el.onchange = async () => {
+      const { error } = await db.from("profiles")
+        .update({ darf_bearbeiten: el.checked }).eq("id", el.dataset.bearb);
+      if (error) { meldung(fehlertext(error), "fehler"); el.checked = !el.checked; }
+      else meldung(el.checked ? "Darf jetzt bearbeiten." : "Bearbeiten entzogen.");
+    };
   });
 
-  document.getElementById("e-dunkel").addEventListener("change", (e) => {
-    einstellungSetzen("dunkel", e.target.checked);
-    document.body.classList.toggle("dunkel", e.target.checked);
-    meldung(e.target.checked ? "Dunkler Modus an." : "Heller Modus an.");
+  ziel.querySelectorAll("[data-aktiv]").forEach((el) => {
+    el.onclick = async () => {
+      const ein = el.dataset.wert === "1";
+      const ok = await nachfragen({
+        titel: ein ? "Benutzer aktivieren" : "Benutzer deaktivieren",
+        text: ein ? "Die Person kann sich danach wieder anmelden."
+                  : "Die Person kann sich danach nicht mehr anmelden.",
+        bestaetigen: ein ? "Aktivieren" : "Deaktivieren", gefahr: !ein });
+      if (!ok) return;
+      const { error } = await db.from("profiles").update({ is_active: ein })
+        .eq("id", el.dataset.aktiv);
+      if (error) meldung(fehlertext(error), "fehler");
+      else benutzerlisteLaden(b, bin);
+    };
   });
 
-  document.getElementById("e-wochenende").addEventListener("change", (e) => {
-    einstellungSetzen("wochenende", e.target.checked);
-    meldung("Gespeichert.");
-  });
-  document.getElementById("e-wochestart").addEventListener("change", (e) => {
-    einstellungSetzen("wochestart", e.target.checked);
-    prod.modus = e.target.checked ? "woche" : "tag";
-    meldung("Gespeichert.");
-  });
-
-  document.getElementById("ps").addEventListener("click", async () => {
-    const pw = document.getElementById("np").value;
-    if (pw.length < 8) { meldung("Das Passwort braucht mindestens 8 Zeichen.", "warn"); return; }
-    const { error } = await db.auth.updateUser({ password: pw });
-    if (error) meldung(fehlertext(error), "fehler");
-    else { document.getElementById("np").value = ""; meldung("Passwort geändert."); }
+  ziel.querySelectorAll("[data-pu]").forEach((el) => {
+    el.onchange = async () => {
+      const u = leute.find((x) => x.id === el.dataset.pu);
+      const liste = (u.parks || []).slice();
+      const i = liste.indexOf(el.dataset.pp);
+      if (el.checked && i === -1) liste.push(el.dataset.pp);
+      if (!el.checked && i !== -1) liste.splice(i, 1);
+      const { error } = await db.from("profiles").update({ parks: liste }).eq("id", u.id);
+      if (error) { meldung(fehlertext(error), "fehler"); el.checked = !el.checked; }
+      else { u.parks = liste; meldung("Zugriff gespeichert."); }
+    };
   });
 }
+
 
 // -----------------------------------------------------------------
 //  Navigation
@@ -8100,23 +8120,26 @@ function zeichneGeruest() {
   WURZEL.innerHTML = ''
     + '<header class="kopf">'
     + '<button class="kopf__klapp" id="nav-klapp" title="Menü ein- oder ausklappen">☰</button>'
-    + (darfPlanwandBearbeiten()
-        ? '<button class="kopf__admin' + (plan.adminModus ? " aktiv" : "") + '" id="kopf-admin"'
-          + ' title="Planwand bearbeiten ein- oder ausschalten">Bearbeiten</button>'
-        : "")
     + '<img class="kopf__logo" src="./logo.png" alt="Hofer + Co.">'
+    + (darfBearbeitenKnopf()
+        ? '<button class="kopf__admin' + (plan.adminModus ? " aktiv" : "") + '" id="kopf-admin"'
+          + ' title="Bearbeiten ein- oder ausschalten">Bearbeiten</button>'
+        : "")
+    + '<span class="kopf__luecke"></span>'
     + (profil && profil.bild_url
         ? '<img class="kopf__bild" src="' + esc(profil.bild_url) + '" alt="">'
         : '<span class="kopf__bild kopf__bild--leer">'
           + esc(((profil && (profil.full_name || profil.email)) || "?").charAt(0).toUpperCase())
           + '</span>')
     + '<span class="kopf__benutzer" data-benutzername>' + esc(anzeige) + '</span>'
-    + '<button class="kopf__abmelden" id="ab">Abmelden</button></header>'
+    + '<button class="kopf__abmelden" id="ab">Abmelden</button>'
+    + '</header>'
     + '<div class="rahmen"><nav class="nav" aria-label="Hauptnavigation">'
     + SEITEN.map((s) => '<a class="nav__punkt" data-nav="' + s.pfad + '" href="#/' + s.pfad + '">'
         + '<span class="nav__zeichen" aria-hidden="true">' + s.zeichen + '</span>'
         + '<span class="nav__text">' + esc(s.titel) + '</span></a>').join("")
-    + '</nav><main class="inhalt" id="inhalt"></main></div>';
+    + '</nav><main class="inhalt" id="inhalt"></main></div>'
+    + '<div class="versionsecke">v' + esc(APP_VERSION) + '</div>';
 
   const adminKnopf = document.getElementById("kopf-admin");
   if (adminKnopf) adminKnopf.onclick = () => {
