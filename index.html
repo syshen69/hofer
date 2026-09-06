@@ -1324,29 +1324,6 @@ a:focus-visible {
   body.nav--schmal .nav__zeichen { font-size: 1.25rem; }
 }
 
-/* ---------- Dunkler Modus ---------- */
-body.dunkel {
-  --grund: #14181d;
-  --flaeche: #1c2229;
-  --tinte: #e6eaef;
-  --gedaempft: #97a3b0;
-  --linie: #2b333c;
-  --linie-stark: #3a444f;
-  --marke-hell: #1e2b3d;
-}
-body.dunkel .kopf { background: #1c2229; border-bottom-color: var(--marke); }
-body.dunkel .kopf__logo { filter: brightness(0) invert(1); }
-body.dunkel .karte, body.dunkel .nav { background: var(--flaeche); }
-body.dunkel .pw-rolle, body.dunkel .pw-tafel { background: var(--flaeche); }
-body.dunkel .pw-name, body.dunkel .pw-zeile--kopf,
-body.dunkel .pw-zeile--kw { background: var(--flaeche); }
-body.dunkel .knopf { background: var(--flaeche); color: var(--tinte); }
-body.dunkel .knopf--haupt { background: var(--marke); color: #fff; }
-body.dunkel input, body.dunkel select, body.dunkel textarea {
-  background: #232a32; color: var(--tinte); border-color: var(--linie-stark); }
-body.dunkel .statuszeile { background: #232a32; }
-body.dunkel .zeile--inaktiv { background: #232a32; }
-body.dunkel .treffer, body.dunkel .pd-zeile { background: var(--flaeche); }
 
 /* ---------- Planwand: nichts läuft mehr seitlich hinaus ---------- */
 .pw-rolle { overflow-x: hidden; }
@@ -1374,79 +1351,6 @@ body.dunkel .treffer, body.dunkel .pd-zeile { background: var(--flaeche); }
 
 body.kopiermodus .pw-balken { cursor: copy; outline: 1px dashed var(--signalgelb); }
 
-/* ---------- Dunkler Modus: Lesbarkeit überall ---------- */
-body.dunkel {
-  /* Das Firmenblau ist auf dunklem Grund zu dunkel, deshalb hier heller */
-  --marke: #6ba4ff;
-  --marke-dunkel: #8fbcff;
-  --marke-hell: #1e2a3a;
-  --aktion: #6ba4ff;
-  --aktion-dunkel: #8fbcff;
-  --stahl: #1c2229;
-  --gut: #4ec98a;
-  --gefahr: #ff6f63;
-  --signalgelb: #f0b429;
-}
-
-/* Auf hellen Flächen bleibt dunkle Schrift richtig, alles andere wird hell */
-body.dunkel .knopf--haupt,
-body.dunkel .marke,
-body.dunkel .parkwahl__knopf.aktiv,
-body.dunkel .moduswahl__knopf.aktiv,
-body.dunkel .wahlknopf.aktiv,
-body.dunkel .karte--ergebnis,
-body.dunkel .spass-karte { color: #10161d; }
-
-body.dunkel .karte--ergebnis .hinweis { color: rgba(0, 0, 0, .6); }
-
-/* Farbige Hinweisflächen behalten helle Hintergründe, damit die
-   dunkle Schrift darauf lesbar bleibt */
-body.dunkel .problemkasten,
-body.dunkel .warnbalken,
-body.dunkel .karte--warnung,
-body.dunkel .fehltchip,
-body.dunkel .statuschip { color: #241a05; }
-body.dunkel .karte--warnung h2 { color: #7a5310; }
-
-body.dunkel .statuszeile--warn,
-body.dunkel .statuszeile--gefahr,
-body.dunkel .statuszeile--gut { color: #10161d; }
-
-/* Tabellen, Kopf- und Randtexte */
-body.dunkel .tabelle th,
-body.dunkel .klein,
-body.dunkel .hinweis,
-body.dunkel .feldhinweis,
-body.dunkel .untertitel,
-body.dunkel .spass-label,
-body.dunkel .kennzahl__titel,
-body.dunkel .feld > span { color: var(--gedaempft); }
-
-body.dunkel .tabelle td,
-body.dunkel .kennzahl__wert,
-body.dunkel .spass-zahl,
-body.dunkel .seitentitel,
-body.dunkel .karte h2,
-body.dunkel .notiz__text,
-body.dunkel .gruss { color: var(--tinte); }
-
-/* Planwand */
-body.dunkel .pw-kw { background: #1e2a3a; color: #9cc4ff; }
-body.dunkel .pw-tag--heute { background: #24344a; }
-body.dunkel .pw-zelle--heute { background: rgba(107, 164, 255, .10); }
-body.dunkel .pw-park { background: #1e2a3a; color: #9cc4ff; }
-body.dunkel .pw-ferien--anfrage { background: repeating-linear-gradient(45deg,
-    #3a444f, #3a444f 6px, #2f3841 6px, #2f3841 12px); color: #dfe5ec; }
-
-/* Spiele und Zeichnungen */
-body.dunkel .zeichnung { background: var(--flaeche); }
-body.dunkel .spass-wiese { background: #22301f; }
-body.dunkel .spass-feld, body.dunkel .spass-stapel { background: #232a32; }
-body.dunkel .spass-zahl-feld { background: var(--flaeche); color: var(--tinte); }
-body.dunkel .platzchip { background: #1e2a3a; color: #9cc4ff; }
-
-/* Anmeldung bleibt wie sie ist */
-body.dunkel .login__karte { background: #1c2229; }
 
 /* ---------- Kopfzeile: Schalter und Profilbild ---------- */
 .kopf__dunkel { background: none; border: 1px solid var(--linie-stark);
@@ -1481,40 +1385,6 @@ body.dunkel .login__karte { background: #1c2229; }
          font-size: .92rem; line-height: 1.55; overflow-x: auto; margin: 0 0 12px;
          white-space: pre; user-select: text; }
 
-/* ---------- Dunkler Modus: restliche schwarze Schrift ---------- */
-body.dunkel .spass-zahl, body.dunkel .spass-text,
-body.dunkel .spass-weisheit, body.dunkel .spass-karte--paar,
-body.dunkel .spass-frage, body.dunkel .spass-salat { color: var(--tinte); }
-body.dunkel .spass-werte > div { background: #232a32; }
-body.dunkel .spass-maschine { background: #10161d; }
-body.dunkel .spass-karte--offen { background: var(--flaeche); color: var(--tinte); }
-body.dunkel .spass-ampel { color: #fff; }
-
-body.dunkel .mkarte, body.dunkel .treffer, body.dunkel .kachel,
-body.dunkel .wahlknopf, body.dunkel .parkwahl__knopf,
-body.dunkel .moduswahl__knopf, body.dunkel .sortknopf,
-body.dunkel .reiter__knopf, body.dunkel .unterreiter__knopf {
-  background: var(--flaeche); color: var(--tinte); }
-
-body.dunkel .mkarte__name, body.dunkel .tagzeile__name,
-body.dunkel .artikel__nr, body.dunkel .artikel__name,
-body.dunkel .auftrag__nr, body.dunkel .steuerung__titel,
-body.dunkel .problemzeile__nr, body.dunkel .notiz,
-body.dunkel .gebzeile, body.dunkel .parkzeile__name,
-body.dunkel .kzeile, body.dunkel .meldungsnotiz,
-body.dunkel .tagsumme, body.dunkel .balken__kopf,
-body.dunkel .ergebnisreihe, body.dunkel .dialog,
-body.dunkel .dialog h2, body.dunkel .dialog p { color: var(--tinte); }
-
-body.dunkel .meldungsnotiz { background: #232a32; }
-body.dunkel .toast { background: #2a323b; }
-body.dunkel .pw-balken--fertig { background: #545c65 !important; }
-body.dunkel .zbeschriftung { fill: var(--tinte); }
-body.dunkel .kennzahl { background: var(--flaeche); }
-body.dunkel .karte--raster, body.dunkel .raster .fest,
-body.dunkel .raster .summe { background: var(--flaeche); color: var(--tinte); }
-body.dunkel .raster .summe { background: #232a32; }
-body.dunkel .raster .heute { background: #24344a; }
 
 /* ---------- Bild zuschneiden ---------- */
 .zuschnitt { position: relative; display: inline-block; max-width: 100%;
@@ -1530,72 +1400,6 @@ body.dunkel .raster .heute { background: #24344a; }
 .zuschnitt__vorschau canvas { border-radius: 8px; border: 2px solid var(--linie-stark);
                               width: 84px; height: 84px; }
 
-/* ---------- Dunkler Modus: alles hell, nichts schwarz ---------- */
-/* :where hat keine Spezifität, spätere Regeln gewinnen also weiterhin */
-body.dunkel :where(div, span, p, td, th, li, label, small, strong, em,
-                   h1, h2, h3, h4, section, header, nav, article, summary,
-                   button, input, select, textarea, pre, code) {
-  color: inherit;
-}
-body.dunkel { color: var(--tinte); }
-
-/* Auf hellen Flächen bleibt dunkle Schrift richtig */
-body.dunkel .knopf--haupt, body.dunkel .knopf--gefahr,
-body.dunkel .marke, body.dunkel .statuschip, body.dunkel .fehltchip,
-body.dunkel .problemkasten, body.dunkel .warnbalken,
-body.dunkel .karte--warnung, body.dunkel .karte--ergebnis,
-body.dunkel .parkwahl__knopf.aktiv, body.dunkel .moduswahl__knopf.aktiv,
-body.dunkel .wahlknopf.aktiv, body.dunkel .statuszeile--warn,
-body.dunkel .statuszeile--gefahr, body.dunkel .statuszeile--gut,
-body.dunkel .priochip, body.dunkel .vorschlag {
-  color: #10161d;
-}
-body.dunkel .knopf--haupt :where(span, strong),
-body.dunkel .karte--ergebnis :where(div, span) { color: inherit; }
-body.dunkel .karte--warnung h2 { color: #7a5310; }
-
-/* Gedämpfte Nebentexte bleiben gedämpft, aber hell genug */
-body.dunkel :where(.klein, .hinweis, .feldhinweis, .untertitel,
-                   .spass-label, .kennzahl__titel, .tabelle th,
-                   .nav__punkt, .steuerung__mitte .linkknopf) { color: var(--gedaempft); }
-
-/* Eingaben und Auswahl */
-body.dunkel input, body.dunkel select, body.dunkel textarea,
-body.dunkel option { background: #232a32; color: var(--tinte); }
-body.dunkel option { background: #232a32; }
-body.dunkel ::selection { background: rgba(107, 164, 255, .35); color: #fff; }
-body.dunkel :focus-visible { outline-color: #6ba4ff; }
-
-/* Flächen */
-body.dunkel :where(.karte, .dialog, .mkarte, .treffer, .kachel, .nav,
-                   .kopf, .pw-rolle, .pw-tafel, .pw-name, .pw-kopfblock,
-                   .pw-zeile--kopf, .pw-zeile--kw, .karte--raster,
-                   .raster .fest, .spass-karte--offen, .spass-zahl-feld,
-                   .kennzahl, .pd-zeile) { background: var(--flaeche); }
-body.dunkel :where(.statuszeile, .meldungsnotiz, .spass-werte > div,
-                   .raster .summe, .parkzeile) { background: #232a32; }
-body.dunkel .spass-maschine { background: #10161d; }
-body.dunkel .zbeschriftung { fill: var(--tinte); }
-
-.pw-adminleiste { display: flex; justify-content: flex-end; margin-bottom: 8px; }
-.schalter--admin { background: var(--marke-hell); padding: 8px 14px;
-                   border-radius: var(--radius); margin-bottom: 0; }
-
-.zuschnitt { display: grid; place-items: center; margin: 12px 0; }
-.zuschnitt canvas { border-radius: 6px; border: 2px solid var(--linie-stark);
-                    cursor: grab; touch-action: none; }
-
-.kopf__admin { background: none; border: 1px solid var(--linie-stark);
-               color: var(--gedaempft); border-radius: var(--radius);
-               padding: 8px 14px; font: inherit; font-size: .82rem;
-               font-weight: 600; cursor: pointer; flex: none; }
-.kopf__admin.aktiv { background: var(--marke); border-color: var(--marke); color: #fff; }
-
-.versionsecke { position: fixed; right: 8px; z-index: 5;
-                bottom: calc(var(--navhoehe) + 6px);
-                font-size: .68rem; color: var(--gedaempft); opacity: .7;
-                pointer-events: none; }
-@media (min-width: 780px) { .versionsecke { bottom: 6px; } }
 
 /* ---------- Kopfzeile: Anordnung ---------- */
 .kopf { gap: 10px; }
@@ -1640,6 +1444,79 @@ body.dunkel :focus-visible { outline: 2px solid #6ba4ff; outline-offset: 2px; }
 body.dunkel input:focus, body.dunkel select:focus, body.dunkel textarea:focus {
   border-color: #6ba4ff; box-shadow: 0 0 0 2px rgba(107, 164, 255, .3); }
 body.dunkel .knopf:focus-visible { border-color: #6ba4ff; }
+
+/* ---------- Dunkler Modus ---------- */
+body.dunkel {
+  --grund: #14181d;
+  --flaeche: #1c2229;
+  --tinte: #ffffff;
+  --gedaempft: #b9c3ce;
+  --linie: #2b333c;
+  --linie-stark: #3a444f;
+  --marke: #6ba4ff;
+  --marke-dunkel: #8fbcff;
+  --marke-hell: #1e2a3a;
+  --aktion: #6ba4ff;
+  --aktion-dunkel: #8fbcff;
+  --stahl: #1c2229;
+  --gut: #4ec98a;
+  --gefahr: #ff6f63;
+  background: var(--grund);
+}
+
+/* Jede Schrift ist weiss. Keine Ausnahmen. */
+body.dunkel, body.dunkel * { color: #ffffff !important; }
+body.dunkel .klein, body.dunkel .hinweis, body.dunkel .feldhinweis,
+body.dunkel .versionsecke { color: var(--gedaempft) !important; }
+
+/* Flächen dunkel, damit weisse Schrift überall trägt */
+body.dunkel .karte, body.dunkel .dialog, body.dunkel .nav, body.dunkel .kopf,
+body.dunkel .mkarte, body.dunkel .treffer, body.dunkel .kachel,
+body.dunkel .pw-rolle, body.dunkel .pw-tafel, body.dunkel .pw-name,
+body.dunkel .pw-kopfblock, body.dunkel .pw-zeile--kopf, body.dunkel .pw-zeile--kw,
+body.dunkel .karte--raster, body.dunkel .raster .fest, body.dunkel .kennzahl,
+body.dunkel .pd-zeile, body.dunkel .spass-karte, body.dunkel .spass-zahl-feld,
+body.dunkel .wahlknopf, body.dunkel .parkwahl__knopf, body.dunkel .moduswahl__knopf,
+body.dunkel .reiter__knopf, body.dunkel .unterreiter__knopf, body.dunkel .knopf,
+body.dunkel .login__karte { background: var(--flaeche); }
+
+body.dunkel .statuszeile, body.dunkel .meldungsnotiz, body.dunkel .raster .summe,
+body.dunkel .parkzeile, body.dunkel .spass-werte > div, body.dunkel .kontokopf,
+body.dunkel input, body.dunkel select, body.dunkel textarea,
+body.dunkel option { background: #232a32; }
+
+/* Farbige Hinweisflächen bekommen dunkle Töne statt heller */
+body.dunkel .problemkasten, body.dunkel .warnbalken,
+body.dunkel .karte--warnung { background: #3a2f14; border-left-color: #d99a20; }
+body.dunkel .statuszeile--warn { background: #3a2f14; }
+body.dunkel .statuszeile--gefahr { background: #3d1f1c; }
+body.dunkel .statuszeile--gut { background: #1c3527; }
+body.dunkel .statuschip, body.dunkel .fehltchip, body.dunkel .marke {
+  background: #2f3a47; }
+body.dunkel .karte--ergebnis { background: #23405f; border-color: #2f5580; }
+body.dunkel .knopf--haupt { background: var(--marke); }
+body.dunkel .knopf--gefahr { background: #a33028; }
+body.dunkel .kopf__admin.aktiv { background: var(--marke); }
+body.dunkel .pw-kw, body.dunkel .pw-park { background: #22303f; }
+body.dunkel .pw-tag--heute { background: #24344a; }
+body.dunkel .spass-maschine { background: #10161d; }
+body.dunkel .zbeschriftung { fill: #ffffff; }
+body.dunkel .gcode { background: #0f1317; }
+
+/* Auswahl: blauer Rahmen */
+body.dunkel ::selection { background: rgba(107, 164, 255, .35); }
+body.dunkel :focus-visible { outline: 2px solid #6ba4ff; outline-offset: 2px; }
+body.dunkel input:focus, body.dunkel select:focus, body.dunkel textarea:focus {
+  border-color: #6ba4ff; box-shadow: 0 0 0 2px rgba(107, 164, 255, .35); }
+body.dunkel .schalter:focus-within, body.dunkel .moduswahl__knopf:focus-visible,
+body.dunkel .parkchip:focus-within { outline: 2px solid #6ba4ff; outline-offset: 2px;
+  border-radius: var(--radius); }
+body.dunkel input[type="checkbox"]:checked,
+body.dunkel input[type="radio"]:checked { accent-color: #6ba4ff; }
+
+.schalter:focus-within, .parkchip:focus-within {
+  outline: 2px solid var(--marke); outline-offset: 2px; border-radius: var(--radius); }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--marke); }
 </style>
 </head>
 <body>
@@ -1683,7 +1560,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "19.0.0";
+const APP_VERSION = "19.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -3485,7 +3362,15 @@ async function seitePlanwand(b) {
       '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
     return;
   }
-  return ansichtPlanwand(document.getElementById("pw-seite"), b);
+  try {
+    return await ansichtPlanwand(document.getElementById("pw-seite"), b);
+  } catch (f) {
+    const ziel = document.getElementById("pw-seite");
+    if (ziel) ziel.innerHTML = '<div class="karte karte--fehler">'
+      + '<h2>Die Planwand konnte nicht aufgebaut werden</h2>'
+      + '<p>' + esc(f && f.message ? f.message : String(f)) + '</p></div>';
+    console.error("Planwand:", f);
+  }
 }
 
 async function ansichtPlanwand(ziel, b) {
@@ -3580,7 +3465,13 @@ async function ansichtPlanwand(ziel, b) {
   }
   catch (f) { plan.ferien = []; console.warn("Ferien:", f.message); }
 
-  zeichnePlanwand(b);
+  try {
+    zeichnePlanwand(b);
+  } catch (f) {
+    ziel.innerHTML = '<div class="karte karte--fehler"><p>'
+      + esc(f && f.message ? f.message : String(f)) + '</p></div>';
+    console.error("Planwand zeichnen:", f);
+  }
 }
 
 function zeichnePlanwand(b) {
@@ -6453,15 +6344,18 @@ async function seiteEinstellungen(b) {
     + '<span>Erfassung immer mit der Wochenansicht öffnen</span></label>'
     + '<p class="hinweis">Gilt nur auf diesem Gerät.</p></section>'
 
-    + '<section class="karte"><h2>Benutzer</h2>'
-    + '<div id="benutzerliste"><div class="laedt">Wird geladen …</div></div>'
-    + '<div class="rollenhilfe">'
-    + '<div><strong>Administrator</strong> darf alles, ohne etwas einzuschalten.</div>'
-    + '<div><strong>Planwand</strong> sieht alle Parks und darf ändern, '
-    + 'sobald oben Bearbeiten eingeschaltet ist.</div>'
-    + '<div><strong>Langdreher</strong> und <strong>Kurzdreher</strong> sehen nur '
-    + 'ihren Park, in Produktion und Planwand.</div></div>'
-    + '</section>'
+    + (bin
+      ? '<section class="karte"><h2>Benutzer</h2>'
+        + '<div id="benutzerliste"><div class="laedt">Wird geladen …</div></div>'
+        + '<div class="rollenhilfe">'
+        + '<div><strong>Administrator</strong> darf alles, ohne etwas einzuschalten.</div>'
+        + '<div><strong>Planwand</strong> sieht alle Parks und darf ändern, '
+        + 'sobald oben Bearbeiten eingeschaltet ist.</div>'
+        + '<div><strong>Langdreher</strong> und <strong>Kurzdreher</strong> sehen nur '
+        + 'ihren Park, in Produktion und Planwand.</div></div></section>'
+      : '<section class="karte"><h2>Meine Rolle</h2>'
+        + '<p><strong>' + esc(ROLLEN[ich.role] || ich.role || "") + '</strong></p>'
+        + '</section>')
 
     + '<section class="karte"><h2>Über die App</h2>'
     + '<p class="klein">Version ' + esc(APP_VERSION) + ' · angemeldet als '
@@ -6524,7 +6418,7 @@ async function seiteEinstellungen(b) {
   };
 
   // ---------- Benutzerliste, nachgeladen ----------
-  benutzerlisteLaden(b, bin);
+  if (bin) benutzerlisteLaden(b, bin);
 }
 
 async function benutzerlisteLaden(b, bin) {
