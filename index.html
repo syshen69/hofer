@@ -1525,6 +1525,12 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--marke); }
 .pw-balken--treffer { outline: 3px solid var(--signalgelb); outline-offset: 2px;
                       animation: pulsen 1s ease-in-out 2; }
 @keyframes pulsen { 0%, 100% { filter: none; } 50% { filter: brightness(1.5); } }
+
+.kopf__rueck { background: none; border: 1px solid var(--linie-stark);
+               color: var(--marke); border-radius: var(--radius);
+               width: 38px; height: 38px; font-size: 1.1rem; cursor: pointer;
+               flex: none; margin-left: 8px; }
+.kopf__rueck:hover { background: var(--marke-hell); }
 </style>
 </head>
 <body>
@@ -1568,7 +1574,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "19.3.0";
+const APP_VERSION = "20.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -1706,6 +1712,52 @@ function bildVerkleinern(datei, maxKante) {
     leser.readAsDataURL(datei);
   });
 }
+
+// =================================================================
+//  RÜCKGÄNGIG
+//  Jede Änderung, die sich sauber zurücknehmen lässt, wird hier
+//  abgelegt. Strg + Z oder der Knopf nimmt den letzten Schritt zurück.
+// =================================================================
+
+const rueckgaengigListe = [];
+
+function merkeSchritt(text, zuruecknehmen) {
+  rueckgaengigListe.push({ text: text, tun: zuruecknehmen });
+  if (rueckgaengigListe.length > 30) rueckgaengigListe.shift();
+  knopfRueckgaengigZeigen();
+}
+
+function knopfRueckgaengigZeigen() {
+  const k = document.getElementById("rueck-knopf");
+  if (!k) return;
+  k.hidden = rueckgaengigListe.length === 0;
+  k.title = rueckgaengigListe.length
+    ? "Rückgängig: " + rueckgaengigListe[rueckgaengigListe.length - 1].text
+    : "";
+}
+
+async function schrittZurueck() {
+  const letzter = rueckgaengigListe.pop();
+  knopfRueckgaengigZeigen();
+  if (!letzter) { meldung("Nichts zum Zurücknehmen.", "warn"); return; }
+
+  try {
+    await letzter.tun();
+    meldung("Zurückgenommen: " + letzter.text);
+  } catch (f) {
+    meldung("Zurücknehmen fehlgeschlagen: " + fehlertext(f), "fehler");
+  }
+}
+
+document.addEventListener("keydown", (e) => {
+  const inFeld = e.target && (e.target.tagName === "INPUT"
+    || e.target.tagName === "TEXTAREA" || e.target.isContentEditable);
+  if (inFeld) return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+    e.preventDefault();
+    schrittZurueck();
+  }
+});
 
 function esc(w) {
   if (w === null || w === undefined) return "";
@@ -3114,6 +3166,17 @@ function eingabenBinden(raster, staende, b) {
       el.classList.add("menge--speichert");
       try {
         await speichereStand(el.dataset.maschine, el.dataset.datum, stand, el.dataset.auftrag);
+        const vorherWert = alt ? alt.quantity : null;
+        const mId = el.dataset.maschine, dat = el.dataset.datum, aId = el.dataset.auftrag;
+        merkeSchritt("Zählerstand vom " + kurzDatum(dat), async () => {
+          if (vorherWert === null) {
+            await db.from("production_records").delete()
+              .eq("machine_id", mId).eq("record_date", dat);
+          } else {
+            await speichereStand(mId, dat, vorherWert, aId);
+          }
+          seiteProduktion(b);
+        });
         el.classList.remove("menge--speichert");
         el.classList.add("menge--gespeichert");
         setTimeout(() => el.classList.remove("menge--gespeichert"), 900);
@@ -3314,16 +3377,21 @@ function farbeVon(wert) {
 // Wer den Bearbeiten-Schalter überhaupt bekommt
 // Wer bekommt den Bearbeiten-Knopf überhaupt zu sehen?
 // Administratoren nicht: sie dürfen ohnehin immer.
-function darfBearbeitenKnopf() {
-  if (istAdmin()) return false;
-  return meineRolle() === "planwand" || (profil && profil.darf_bearbeiten === true);
+// Den Knopf sieht jeder. Ob er tatsächlich etwas bewirkt,
+// entscheidet die Rolle beim Einschalten.
+// Den Knopf sieht jeder. Ob er wirklich etwas bewirkt, entscheidet
+// die Rolle beziehungsweise das zugeteilte Recht.
+function darfBearbeitenKnopf() { return true; }
+
+function darfWirklichBearbeiten() {
+  return istAdmin() || meineRolle() === "planwand"
+    || (profil && profil.darf_bearbeiten === true);
 }
 
 // Darf gerade auf der Planwand geändert werden?
 function darfPlanen() {
   if (istAdmin()) return true;
-  if (!darfBearbeitenKnopf()) return false;
-  return plan.adminModus === true;
+  return darfWirklichBearbeiten() && plan.adminModus === true;
 }
 
 const FERIEN_ZEILEN = 7;
@@ -3817,10 +3885,17 @@ function ferienVerhalten(b) {
       if (!ziel) { meldung("Ferien lassen sich nur in die Ferienzeilen schieben.", "warn"); return; }
 
       const teile = ziel.split("|");
+      const altZ = f2.zeile, altVon = f2.von;
       const { error } = await db.from("vacations")
         .update({ zeile: Number(teile[0]), von: teile[1] }).eq("id", f2.id);
       if (error) meldung(fehlertext(error), "fehler");
-      else { meldung("Verschoben."); seitePlanwand(b); }
+      else {
+        merkeSchritt("Ferien von " + f2.person, async () => {
+          await db.from("vacations").update({ zeile: altZ, von: altVon }).eq("id", f2.id);
+          seitePlanwand(b);
+        });
+        meldung("Verschoben."); seitePlanwand(b);
+      }
     });
 
     el.addEventListener("pointercancel", aufraeumen);
@@ -4043,9 +4118,15 @@ function griffVerhalten(b) {
         if (tage[vonJetzt]) daten.planned_from = tage[vonJetzt];
       }
 
+      const altD = auftrag.planned_days, altV = auftrag.planned_from;
       const { error } = await db.from("jobs").update(daten).eq("id", auftrag.id);
       if (error) meldung(fehlertext(error), "fehler");
       else {
+        merkeSchritt("Dauer von " + auftrag.job_number, async () => {
+          await db.from("jobs")
+            .update({ planned_days: altD, planned_from: altV }).eq("id", auftrag.id);
+          seitePlanwand(b);
+        });
         meldung(dauerJetzt + (dauerJetzt === 1 ? " Tag" : " Tage") + " eingeplant.");
         seitePlanwand(b);
       }
@@ -4231,12 +4312,21 @@ function balkenVerhalten(b) {
       const maschineId = teile[0], datum = teile[1];
       if (maschineId === auftrag.machine_id && datum === auftrag.planned_from) return;
 
+      const vorherM = auftrag.machine_id, vorherD = auftrag.planned_from;
       const { error } = await db.from("jobs")
         .update({ machine_id: maschineId, planned_from: datum })
         .eq("id", auftrag.id);
 
       if (error) meldung(fehlertext(error), "fehler");
-      else { meldung("Verschoben."); seitePlanwand(b); }
+      else {
+        merkeSchritt("Verschieben von " + auftrag.job_number, async () => {
+          await db.from("jobs")
+            .update({ machine_id: vorherM, planned_from: vorherD })
+            .eq("id", auftrag.id);
+          seitePlanwand(b);
+        });
+        meldung("Verschoben."); seitePlanwand(b);
+      }
     });
 
     el.addEventListener("pointercancel", aufraeumen);
@@ -4635,11 +4725,23 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
         bestaetigen: "Endgültig löschen", gefahr: true });
     if (!sicher) return;
 
+    // Für das Zurücknehmen den ganzen Datensatz sichern
+    const sicherung = await db.from("jobs").select("*").eq("id", auftrag.id).single();
+
     await db.from("production_records").delete().eq("job_id", auftrag.id);
     const { error } = await db.from("jobs").delete().eq("id", auftrag.id);
     zu();
     if (error) meldung(fehlertext(error), "fehler");
-    else { meldung("Auftrag gelöscht."); seitePlanwand(b); }
+    else {
+      if (sicherung.data) {
+        merkeSchritt("Löschen von " + auftrag.job_number, async () => {
+          await db.from("jobs").insert(sicherung.data);
+          seitePlanwand(b);
+        });
+      }
+      meldung("Auftrag gelöscht. Mit Strg+Z zurücknehmen.");
+      seitePlanwand(b);
+    }
   };
 
   const weg = $("pl-weg");
@@ -8107,6 +8209,8 @@ function zeichneGeruest() {
         ? '<button class="kopf__admin' + (plan.adminModus ? " aktiv" : "") + '" id="kopf-admin"'
           + ' title="Bearbeiten ein- oder ausschalten">Bearbeiten</button>'
         : "")
+    + '<button class="kopf__rueck" id="rueck-knopf" hidden'
+    + ' title="Rückgängig">↶</button>'
     + '<span class="kopf__luecke"></span>'
     + (profil && profil.bild_url
         ? '<img class="kopf__bild" src="' + esc(profil.bild_url) + '" alt="">'
@@ -8123,8 +8227,26 @@ function zeichneGeruest() {
     + '</nav><main class="inhalt" id="inhalt"></main></div>'
     + '<div class="versionsecke">v' + esc(APP_VERSION) + '</div>';
 
+  const rueck = document.getElementById("rueck-knopf");
+  if (rueck) rueck.onclick = schrittZurueck;
+  knopfRueckgaengigZeigen();
+
   const adminKnopf = document.getElementById("kopf-admin");
+  if (adminKnopf && istAdmin()) {
+    adminKnopf.classList.add("aktiv");
+    adminKnopf.title = "Als Administrator ist Bearbeiten immer eingeschaltet";
+  }
+
   if (adminKnopf) adminKnopf.onclick = () => {
+    if (istAdmin()) {
+      meldung("Als Administrator darfst du ohnehin alles ändern.");
+      return;
+    }
+    if (!darfUeberhauptBearbeiten()) {
+      meldung("Dafür fehlt dir die Berechtigung. Ein Administrator kann sie "
+        + "in den Einstellungen vergeben.", "warn");
+      return;
+    }
     plan.adminModus = !plan.adminModus;
     einstellungSetzen("pwadmin", plan.adminModus);
     adminKnopf.classList.toggle("aktiv", plan.adminModus);
