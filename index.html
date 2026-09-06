@@ -1404,7 +1404,10 @@ body.kopiermodus .pw-balken { cursor: copy; outline: 1px dashed var(--signalgelb
 /* ---------- Kopfzeile: Anordnung ---------- */
 .kopf { gap: 10px; }
 .kopf__logo { margin-right: 4px; }
-.kopf__admin { margin-left: 18px; }
+.kopf__admin { background: none; border: 1px solid var(--marke);
+               color: var(--marke); border-radius: var(--radius);
+               padding: 8px 14px; font: inherit; font-size: .82rem;
+               font-weight: 600; cursor: pointer; flex: none; margin-left: 18px; }
 .kopf__luecke { flex: 1 1 auto; }
 .kopf__benutzer { margin-left: 0; max-width: 220px; }
 .kopf__dunkel { display: none; }
@@ -1496,7 +1499,8 @@ body.dunkel .statuschip, body.dunkel .fehltchip, body.dunkel .marke {
 body.dunkel .karte--ergebnis { background: #23405f; border-color: #2f5580; }
 body.dunkel .knopf--haupt { background: var(--marke); }
 body.dunkel .knopf--gefahr { background: #a33028; }
-body.dunkel .kopf__admin.aktiv { background: #b3261e; border-color: #b3261e; }
+body.dunkel .kopf__admin.aktiv { background: var(--gefahr); border-color: var(--gefahr);
+                     color: #fff; }
 body.dunkel .pw-kw, body.dunkel .pw-park { background: #22303f; }
 body.dunkel .pw-tag--heute { background: #24344a; }
 body.dunkel .spass-maschine { background: #10161d; }
@@ -4271,10 +4275,8 @@ function kopierModusBeenden(b) {
 }
 
 async function problemMelden(b) {
-  // Nur Aufträge, die noch nicht fertig sind
   const offen = (plan.auftraege || [])
-    .filter((j) => j.plan_status !== "fertig" && !j.ended_at)
-    .sort((x, y) => (x.job_number || "").localeCompare(y.job_number || ""));
+    .filter((j) => j.plan_status !== "fertig" && !j.ended_at);
 
   if (!offen.length) {
     await nachfragen({ titel: "Keine Aufträge",
@@ -4282,15 +4284,39 @@ async function problemMelden(b) {
     return;
   }
 
-  const wahl = await auswahlSuchen("Bei welchem Auftrag?",
-    offen.map((j) => ({
-      wert: j.id,
-      text: j.job_number + (j.problem ? "   ⚠ hat schon eine Meldung" : ""),
-      such: (j.job_number || "") + " " + (j.maschine || ""),
-    })), 5);
-  if (!wahl) return;
+  // Zuerst die Nummer eintippen. Keine Vorschlagsliste vorher.
+  const eingabe = await dialogFelder({
+    titel: "Problem melden",
+    text: "Um welchen Auftrag geht es?",
+    felder: [{ name: "nummer", label: "HOCO Nr.", pflicht: true,
+               platzhalter: "Nummer eingeben" }],
+    bestaetigen: "Weiter",
+  });
+  if (!eingabe) return;
 
-  const auftrag = offen.find((j) => j.id === wahl);
+  const suche = (eingabe.nummer || "").trim().toLowerCase();
+  const treffer = offen.filter((j) => (j.job_number || "").toLowerCase().includes(suche));
+
+  if (!treffer.length) {
+    await nachfragen({ titel: "Nicht gefunden",
+      text: 'Zu "' + eingabe.nummer + '" ist kein offener Auftrag eingeplant.',
+      bestaetigen: "Verstanden" });
+    return;
+  }
+
+  let auftrag = treffer[0];
+
+  // Mehrere Treffer: dann darf gewählt werden
+  if (treffer.length > 1) {
+    const wahl = await auswahlDialog("Welcher davon?",
+      treffer.map((j) => ({
+        wert: j.id,
+        text: j.job_number + "   " + (j.maschine || "")
+          + (j.problem ? "   ⚠" : ""),
+      })));
+    if (!wahl) return;
+    auftrag = treffer.find((j) => j.id === wahl);
+  }
 
   const art = await auswahlDialog("Was fehlt oder stimmt nicht?",
     PROBLEM_ARTEN.map((t) => ({ wert: t, text: t }))
@@ -4316,7 +4342,7 @@ async function problemMelden(b) {
   }).eq("id", auftrag.id);
 
   if (error) meldung(fehlertext(error), "fehler");
-  else { meldung("Problem gemeldet."); seitePlanwand(b); }
+  else { meldung("Problem gemeldet für " + auftrag.job_number + "."); seitePlanwand(b); }
 }
 
 async function problemQuittieren(auftrag, b, danach) {
