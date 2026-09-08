@@ -1560,7 +1560,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--marke); }
 }
 
 /* ---------- Benutzerliste mit Bildern ---------- */
-.bl-person { display: flex; align-items: center; gap: 10px; }
+.bl-person { display: flex; align-items: center; gap: 10px; min-height: 34px; }
 .bl-person .kopf__bild { width: 30px; height: 30px; }
 .parkzeile__name { display: flex; align-items: center; gap: 10px; }
 .parkzeile__name .kopf__bild { width: 28px; height: 28px; }
@@ -1598,6 +1598,13 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--marke); }
 .tabelle--benutzer .auswahl { width: 100%; }
 .tabelle--benutzer .gebfeld { width: 100%; }
 .tabelle--benutzer .bu-bearb input { width: 20px; height: 20px; }
+
+/* ---------- Tabellenzeilen sauber ausrichten ---------- */
+.tabelle { border-collapse: collapse; }
+.tabelle--benutzer td, .tabelle--benutzer th {
+  vertical-align: middle; padding-top: 8px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--linie); }
+.tabelle--benutzer tr:last-child td { border-bottom: none; }
 </style>
 </head>
 <body>
@@ -1641,7 +1648,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "21.2.0";
+const APP_VERSION = "21.3.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -6753,12 +6760,12 @@ async function personenlisteLaden(b) {
 
   ziel.innerHTML = leute.length
     ? '<table class="tabelle"><tbody>' + leute.map((m) =>
-        '<tr><td class="bl-person">'
+        '<tr><td><div class="bl-person">'
         + (m.bild_url
             ? '<img class="kopf__bild" src="' + esc(m.bild_url) + '" alt="">'
             : '<span class="kopf__bild kopf__bild--leer">'
               + esc((m.name || "?").charAt(0).toUpperCase()) + '</span>')
-        + '<span>' + esc(m.name) + '</span></td>'
+        + '<span>' + esc(m.name) + '</span></div></td>'
         + '<td class="klein">' + (m.geburtstag ? esc(langDatum(m.geburtstag)) : "–") + '</td>'
         + '<td class="rechts nowrap">'
         + '<button class="linkknopf" data-pe="' + esc(m.id) + '">Bearbeiten</button>'
@@ -6881,14 +6888,14 @@ async function benutzerlisteLaden(b, bin) {
     + leute.map((u) => {
         const selbst = u.id === (profil && profil.id);
         return '<tr class="' + (u.is_active ? "" : "zeile--inaktiv") + '">'
-          + '<td class="bl-person">'
+          + '<td><div class="bl-person">'
           + (u.bild_url
               ? '<img class="kopf__bild" src="' + esc(u.bild_url) + '" alt="">'
               : '<span class="kopf__bild kopf__bild--leer">'
                 + esc(((u.full_name || u.email) || "?").charAt(0).toUpperCase())
                 + '</span>')
           + '<span>' + esc(u.full_name || u.email)
-          + (selbst ? ' <span class="marke">du</span>' : "") + '</span></td>'
+          + (selbst ? ' <span class="marke">du</span>' : "") + '</span></div></td>'
           + '<td class="bu-rolle">' + (bin && !selbst
               ? '<select class="auswahl" data-rolle="' + esc(u.id) + '">'
                 + Object.keys(ROLLEN).map((w) => '<option value="' + w + '"'
