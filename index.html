@@ -1373,11 +1373,15 @@ body.kopiermodus .pw-balken { cursor: copy; outline: 1px dashed var(--signalgelb
 .gebzeile:last-child { border-bottom: none; }
 .gebtorte { font-size: 1.5rem; }
 
-.parkzeile { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-             padding: 10px 0; border-bottom: 1px solid var(--linie); }
+.parkzeile { display: grid; grid-template-columns: 1fr auto; align-items: start;
+             gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--linie); }
 .parkzeile__name { min-width: 150px; font-weight: 600; }
-.parkzeile__wahl { display: flex; gap: 12px; flex-wrap: wrap; }
-.parkchip { display: flex; align-items: center; gap: 6px; font-size: .9rem; cursor: pointer; }
+.parkzeile__wahl { display: flex; flex-direction: column; align-items: flex-start;
+                   gap: 6px; min-width: 190px; }
+.parkchip { display: flex; align-items: center; gap: 8px; font-size: .9rem;
+             cursor: pointer; padding: 4px 8px; border-radius: var(--radius);
+             width: 100%; }
+.parkchip:hover { background: var(--marke-hell); }
 .parkchip input { width: 18px; height: 18px; }
 
 .gcode { background: #16191c; color: #e6eaef; padding: 14px 16px;
@@ -1575,6 +1579,25 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--marke); }
 }
 
 .gebfeld { min-height: 34px; padding: 4px 8px; font-size: .85rem; width: 150px; }
+
+@media (max-width: 620px) {
+  .parkzeile { grid-template-columns: 1fr; }
+  .parkzeile__wahl { min-width: 0; }
+}
+
+/* ---------- Benutzertabelle: gleiche Spalten in jeder Zeile ---------- */
+.tabellenrolle { overflow-x: auto; }
+.tabelle--benutzer { table-layout: fixed; min-width: 720px; }
+.tabelle--benutzer .bl-person { width: auto; }
+.tabelle--benutzer th:nth-child(1) { width: auto; }
+.tabelle--benutzer th:nth-child(2), .tabelle--benutzer .bu-rolle { width: 190px; }
+.tabelle--benutzer th:nth-child(3), .tabelle--benutzer .bu-bearb { width: 110px; }
+.tabelle--benutzer th:nth-child(4), .tabelle--benutzer .bu-geb { width: 175px; }
+.tabelle--benutzer th:nth-child(5), .tabelle--benutzer .bu-status { width: 130px; }
+.tabelle--benutzer td { vertical-align: middle; }
+.tabelle--benutzer .auswahl { width: 100%; }
+.tabelle--benutzer .gebfeld { width: 100%; }
+.tabelle--benutzer .bu-bearb input { width: 20px; height: 20px; }
 </style>
 </head>
 <body>
@@ -1618,7 +1641,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "21.0.0";
+const APP_VERSION = "21.2.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -6850,9 +6873,10 @@ async function benutzerlisteLaden(b, bin) {
     if (!r.error) parks = r.data || [];
   } catch (f) { /* ohne Parks geht es auch */ }
 
-  ziel.innerHTML = '<table class="tabelle"><thead><tr>'
-    + '<th>Name</th><th>Rolle</th><th>Bearbeiten</th>'
-    + '<th>Geburtstag</th><th>Status</th>'
+  ziel.innerHTML = '<div class="tabellenrolle">'
+    + '<table class="tabelle tabelle--benutzer"><thead><tr>'
+    + '<th>Name</th><th>Rolle</th><th class="mitte">Bearbeiten</th>'
+    + '<th>Geburtstag</th><th class="rechts">Status</th>'
     + '</tr></thead><tbody>'
     + leute.map((u) => {
         const selbst = u.id === (profil && profil.id);
@@ -6865,28 +6889,28 @@ async function benutzerlisteLaden(b, bin) {
                 + '</span>')
           + '<span>' + esc(u.full_name || u.email)
           + (selbst ? ' <span class="marke">du</span>' : "") + '</span></td>'
-          + '<td>' + (bin && !selbst
+          + '<td class="bu-rolle">' + (bin && !selbst
               ? '<select class="auswahl" data-rolle="' + esc(u.id) + '">'
                 + Object.keys(ROLLEN).map((w) => '<option value="' + w + '"'
                     + (u.role === w ? " selected" : "") + '>' + ROLLEN[w] + '</option>').join("")
                 + '</select>'
               : esc(ROLLEN[u.role] || u.role)) + '</td>'
-          + '<td>' + (bin && !selbst && u.role !== "admin"
+          + '<td class="bu-bearb mitte">' + (bin && !selbst && u.role !== "admin"
               ? '<input type="checkbox" data-bearb="' + esc(u.id) + '"'
                 + (u.darf_bearbeiten ? " checked" : "") + '>'
               : (u.role === "admin" ? "immer" : (u.darf_bearbeiten ? "ja" : "nein"))) + '</td>'
-          + '<td>' + (bin
+          + '<td class="bu-geb">' + (bin
               ? '<input type="date" class="gebfeld" data-geb="' + esc(u.id) + '" value="'
                 + esc(u.geburtstag || "") + '">'
               : (u.geburtstag ? esc(langDatum(u.geburtstag)) : "–")) + '</td>'
-          + '<td>' + (bin && !selbst
+          + '<td class="bu-status rechts">' + (bin && !selbst
               ? '<button class="linkknopf" data-aktiv="' + esc(u.id) + '" data-wert="'
                 + (u.is_active ? "0" : "1") + '">'
                 + (u.is_active ? "Deaktivieren" : "Aktivieren") + '</button>'
               : (u.is_active ? "aktiv" : "inaktiv")) + '</td>'
           + '</tr>';
       }).join("")
-    + '</tbody></table>'
+    + '</tbody></table></div>'
 
     + (bin && parks.length
       ? '<h3 class="untertitel">Zugriff auf Maschinenparks</h3>'
