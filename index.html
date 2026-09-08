@@ -1554,6 +1554,27 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--marke); }
   .tabelle--bestellungen .bz-aktionen { text-align: left; }
   .tabelle--bestellungen .bz-aktionen .linkknopf { margin: 0 16px 0 0; }
 }
+
+/* ---------- Benutzerliste mit Bildern ---------- */
+.bl-person { display: flex; align-items: center; gap: 10px; }
+.bl-person .kopf__bild { width: 30px; height: 30px; }
+.parkzeile__name { display: flex; align-items: center; gap: 10px; }
+.parkzeile__name .kopf__bild { width: 28px; height: 28px; }
+
+/* ---------- Kopfzeile und Menü bleiben stehen ---------- */
+.kopf { position: fixed; top: 0; left: 0; right: 0; z-index: 30; }
+.rahmen { padding-top: var(--kopfhoehe); }
+@media (min-width: 780px) {
+  .nav { position: fixed; top: var(--kopfhoehe); left: 0;
+         width: 208px; height: calc(100dvh - var(--kopfhoehe));
+         overflow-y: auto; z-index: 20; }
+  body.nav--schmal .nav { width: 62px; }
+  .rahmen { grid-template-columns: 208px 1fr; }
+  body.nav--schmal .rahmen { grid-template-columns: 62px 1fr; }
+  .inhalt { grid-column: 2; }
+}
+
+.gebfeld { min-height: 34px; padding: 4px 8px; font-size: .85rem; width: 150px; }
 </style>
 </head>
 <body>
@@ -1597,7 +1618,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "20.1.0";
+const APP_VERSION = "21.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -2362,6 +2383,18 @@ async function zeichneGeburtstage() {
         .not("geburtstag", "is", null).eq("is_active", true), 8000, "Geburtstage");
     if (error) throw error;
     leute = data || [];
+
+    // Personen ohne Login zählen genauso
+    try {
+      const r = await zeitlimit(db.from("people").select("name, geburtstag, bild_url")
+        .not("geburtstag", "is", null), 8000, "Personen");
+      if (!r.error) {
+        (r.data || []).forEach((m) => leute.push({
+          full_name: m.name, email: m.name,
+          geburtstag: m.geburtstag, bild_url: m.bild_url,
+        }));
+      }
+    } catch (f2) { /* Tabelle gibt es vielleicht noch nicht */ }
   } catch (f) {
     // Fehlt die Spalte in der Datenbank, sagen wir das offen,
     // statt den Bereich still verschwinden zu lassen.
@@ -5432,59 +5465,90 @@ const gcode = {
 };
 
 // Zeichnung: zeigt, was das Programm macht
+// Feste Zeichnung, nur die Zahlen ändern sich.
+// Links das Rohteil im Schnitt, oben die Mittellinie, dazu die
+// Startstellung des Drehstahls.
 function bildGcode(g) {
   const dm = parseFloat(g.dm) || 20;
   const fase = parseFloat(g.fase) || 1;
   const winkel = parseFloat(g.winkel) || 45;
   const rad = g.radienAn ? (parseFloat(g.radius) || 0) : 0;
+  const z0 = parseFloat(g.zStart) || 0;
   const stirn = g.richtung === "stirn";
 
-  // Massstab für die Zeichnung
-  const hoehe = 150;
-  const mitte = 175;
-  const skala = Math.min(3.2, 110 / Math.max(4, dm / 2));
-  const r = (dm / 2) * skala;
-  const b = fase * skala;
-  const t = b / Math.tan(bogenGrad(winkel));
+  const z = (x) => (Math.round(x * 100) / 100).toLocaleString("de-CH");
 
-  const oben = mitte - r;
-  const xStart = 90;
+  // Feste Geometrie in der Zeichnung, unabhängig von den Werten
+  const links = 120, rechts = 400, mitte = 200;
+  const oben = 120;                 // Aussendurchmesser
+  const fb = 26;                    // Fasenbreite in der Zeichnung
+  const ft = 26;                    // Fasentiefe in der Zeichnung
 
-  // Kontur: Stirnfläche links, Fase, dann Zylinder nach rechts
   const kontur = stirn
-    ? 'M' + xStart + ',' + mitte
-      + ' L' + xStart + ',' + (oben + b)
-      + ' L' + (xStart + t) + ',' + oben
-      + ' L' + (xStart + 190) + ',' + oben
-    : 'M' + (xStart + 190) + ',' + oben
-      + ' L' + (xStart + t) + ',' + oben
-      + ' L' + xStart + ',' + (oben + b)
-      + ' L' + xStart + ',' + mitte;
+    ? 'M' + links + ',' + mitte
+      + ' L' + links + ',' + (oben + fb)
+      + ' L' + (links + ft) + ',' + oben
+      + ' L' + rechts + ',' + oben
+      + ' L' + rechts + ',' + mitte + ' Z'
+    : 'M' + links + ',' + mitte
+      + ' L' + links + ',' + oben
+      + ' L' + (rechts - ft) + ',' + oben
+      + ' L' + rechts + ',' + (oben + fb)
+      + ' L' + rechts + ',' + mitte + ' Z';
 
-  return '<svg viewBox="0 0 340 220" class="zeichnung" role="img"'
-    + ' aria-label="Drehteil mit Fase">'
+  const fasenLinie = stirn
+    ? '<line x1="' + links + '" y1="' + (oben + fb) + '" x2="' + (links + ft)
+      + '" y2="' + oben + '" stroke="var(--gefahr)" stroke-width="3"/>'
+    : '<line x1="' + (rechts - ft) + '" y1="' + oben + '" x2="' + rechts
+      + '" y2="' + (oben + fb) + '" stroke="var(--gefahr)" stroke-width="3"/>';
+
+  // Startstellung des Werkzeugs: über dem Material, vor der Stirnfläche
+  const wx = stirn ? links - 34 : rechts + 34;
+  const wy = oben - 46;
+
+  return '<svg viewBox="0 0 520 260" class="zeichnung" role="img"'
+    + ' aria-label="Drehteil mit Fase und Startstellung des Werkzeugs">'
+
     // Mittellinie
-    + '<line x1="40" y1="' + mitte + '" x2="320" y2="' + mitte + '"'
-    + ' stroke="var(--linie-stark)" stroke-width="1" stroke-dasharray="8 4 2 4"/>'
+    + '<line x1="60" y1="' + mitte + '" x2="470" y2="' + mitte + '"'
+    + ' stroke="var(--linie-stark)" stroke-width="1" stroke-dasharray="10 4 2 4"/>'
+    + '<text x="474" y="' + (mitte + 4) + '" class="zbeschriftung">Mitte</text>'
+
     // Werkstück
-    + '<path d="' + kontur + ' L' + (xStart + 190) + ',' + mitte + ' Z"'
-    + ' fill="var(--marke-hell)" stroke="var(--marke)" stroke-width="2.5"/>'
-    // Fase hervorheben
-    + '<line x1="' + xStart + '" y1="' + (oben + b) + '" x2="' + (xStart + t) + '" y2="' + oben + '"'
-    + ' stroke="var(--gefahr)" stroke-width="3"/>'
-    // Masse
-    + '<line x1="' + (xStart - 26) + '" y1="' + oben + '" x2="' + (xStart - 26) + '" y2="' + mitte + '"'
+    + '<path d="' + kontur + '" fill="var(--marke-hell)"'
+    + ' stroke="var(--marke)" stroke-width="2.5"/>'
+    + fasenLinie
+
+    // Durchmesser links
+    + '<line x1="88" y1="' + oben + '" x2="88" y2="' + mitte + '"'
     + ' stroke="var(--tinte)" stroke-width="1"/>'
-    + '<text x="' + (xStart - 30) + '" y="' + (oben + r / 2) + '" class="zbeschriftung"'
-    + ' text-anchor="end">⌀' + dm + '</text>'
-    + '<text x="' + (xStart + t / 2 + 6) + '" y="' + (oben - 8) + '" class="zbeschriftung">'
-    + fase + ' × ' + winkel + '°</text>'
-    + (rad > 0
-        ? '<text x="' + (xStart + t + 30) + '" y="' + (oben - 8) + '" class="zbeschriftung">'
-          + 'R' + rad + '</text>'
-        : "")
-    + '<text x="' + xStart + '" y="' + (mitte + 22) + '" class="zbeschriftung"'
-    + ' text-anchor="middle">Z' + (parseFloat(g.zStart) || 0) + '</text>'
+    + '<line x1="82" y1="' + oben + '" x2="94" y2="' + oben + '"'
+    + ' stroke="var(--tinte)" stroke-width="1"/>'
+    + '<line x1="82" y1="' + mitte + '" x2="94" y2="' + mitte + '"'
+    + ' stroke="var(--tinte)" stroke-width="1"/>'
+    + '<text x="78" y="' + (oben + 34) + '" class="zbeschriftung" text-anchor="end">⌀'
+    + z(dm) + '</text>'
+
+    // Fasenmass oben
+    + '<text x="' + (links + ft + 14) + '" y="' + (oben - 12) + '" class="zbeschriftung">'
+    + z(fase) + ' × ' + z(winkel) + '°' + (rad > 0 ? '   R' + z(rad) : "") + '</text>'
+
+    // Z-Angabe
+    + '<text x="' + links + '" y="' + (mitte + 26) + '" class="zbeschriftung"'
+    + ' text-anchor="middle">Z' + z(z0) + '</text>'
+
+    // Werkzeug in Startstellung
+    + '<polygon points="' + wx + ',' + wy + ' ' + (wx - 14) + ',' + (wy - 24)
+    + ' ' + (wx + 14) + ',' + (wy - 24) + '" fill="var(--gedaempft)"/>'
+    + '<line x1="' + wx + '" y1="' + wy + '" x2="' + wx + '" y2="' + (oben - 6) + '"'
+    + ' stroke="var(--gedaempft)" stroke-width="1" stroke-dasharray="4 3"/>'
+    + '<text x="' + (wx + (stirn ? -20 : 20)) + '" y="' + (wy - 32) + '"'
+    + ' class="zbeschriftung" text-anchor="' + (stirn ? "end" : "start") + '">Start</text>'
+
+    // Bewegungsrichtung
+    + '<text x="260" y="242" class="zbeschriftung" text-anchor="middle">'
+    + (stirn ? "von der Stirnfläche auf den Durchmesser"
+             : "vom Durchmesser auf die Stirnfläche") + '</text>'
     + '</svg>';
 }
 
@@ -6570,6 +6634,15 @@ async function seiteEinstellungen(b) {
         + '<p><strong>' + esc(ROLLEN[ich.role] || ich.role || "") + '</strong></p>'
         + '</section>')
 
+    + (bin
+      ? '<section class="karte"><div class="karte__kopf"><h2>Personen ohne Login</h2>'
+        + '<button class="linkknopf" id="pe-neu">+ Person</button></div>'
+        + '<p class="hinweis">Für Kollegen, die die App nicht benutzen, deren '
+        + 'Geburtstag aber auf der Startseite erscheinen soll.</p>'
+        + '<div id="personenliste"><div class="laedt">Wird geladen …</div></div>'
+        + '</section>'
+      : "")
+
     + '<section class="karte"><h2>Über die App</h2>'
     + '<p class="klein">Version ' + esc(APP_VERSION) + ' · angemeldet als '
     + esc(ich.email || "") + '</p></section>';
@@ -6632,6 +6705,127 @@ async function seiteEinstellungen(b) {
 
   // ---------- Benutzerliste, nachgeladen ----------
   if (bin) benutzerlisteLaden(b, bin);
+  if (bin) {
+    personenlisteLaden(b);
+    const pneu = document.getElementById("pe-neu");
+    if (pneu) pneu.onclick = () => personDialog(null, b);
+  }
+}
+
+// Personen ohne Login: nur Name, Bild und Geburtstag
+async function personenlisteLaden(b) {
+  const ziel = document.getElementById("personenliste");
+  if (!ziel) return;
+
+  let leute = [];
+  try {
+    const r = await zeitlimit(db.from("people").select("*").order("name"), 8000, "Personen");
+    if (r.error) throw r.error;
+    leute = r.data || [];
+  } catch (f) {
+    ziel.innerHTML = '<p class="hinweis">Noch nicht verfügbar: '
+      + esc(fehlertext(f)) + '</p>';
+    return;
+  }
+
+  ziel.innerHTML = leute.length
+    ? '<table class="tabelle"><tbody>' + leute.map((m) =>
+        '<tr><td class="bl-person">'
+        + (m.bild_url
+            ? '<img class="kopf__bild" src="' + esc(m.bild_url) + '" alt="">'
+            : '<span class="kopf__bild kopf__bild--leer">'
+              + esc((m.name || "?").charAt(0).toUpperCase()) + '</span>')
+        + '<span>' + esc(m.name) + '</span></td>'
+        + '<td class="klein">' + (m.geburtstag ? esc(langDatum(m.geburtstag)) : "–") + '</td>'
+        + '<td class="rechts nowrap">'
+        + '<button class="linkknopf" data-pe="' + esc(m.id) + '">Bearbeiten</button>'
+        + '<button class="linkknopf linkknopf--gefahr" data-peweg="' + esc(m.id)
+        + '" data-name="' + esc(m.name) + '">Löschen</button></td></tr>').join("")
+      + '</tbody></table>'
+    : '<p class="hinweis">Noch niemand eingetragen.</p>';
+
+  ziel.querySelectorAll("[data-pe]").forEach((el) => {
+    el.onclick = () => personDialog(leute.find((x) => x.id === el.dataset.pe), b);
+  });
+
+  ziel.querySelectorAll("[data-peweg]").forEach((el) => {
+    el.onclick = async () => {
+      const ok = await nachfragen({ titel: "Person löschen",
+        text: el.dataset.name + " wird aus der Liste entfernt.",
+        bestaetigen: "Löschen", gefahr: true });
+      if (!ok) return;
+      const { error } = await db.from("people").delete().eq("id", el.dataset.peweg);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Gelöscht."); personenlisteLaden(b); }
+    };
+  });
+}
+
+async function personDialog(person, b) {
+  const huelle = document.createElement("div");
+  huelle.className = "dialog-huelle";
+  huelle.innerHTML = '<div class="dialog">'
+    + '<h2>' + (person ? "Person bearbeiten" : "Neue Person") + '</h2>'
+    + '<div class="kontokopf">'
+    + (person && person.bild_url
+        ? '<img class="profilbild-gross" id="pd-vorschau" src="' + esc(person.bild_url) + '" alt="">'
+        : '<span class="profilbild-gross kopf__bild--leer" id="pd-vorschau">'
+          + esc(((person && person.name) || "?").charAt(0).toUpperCase()) + '</span>')
+    + '<label class="knopf bildknopf">Bild wählen'
+    + '<input type="file" id="pd-datei" accept="image/*" hidden></label>'
+    + '</div>'
+    + '<label class="feld"><span>Name</span>'
+    + '<input type="text" id="pd-name" value="' + esc(person ? person.name : "") + '"></label>'
+    + '<label class="feld"><span>Geburtstag</span>'
+    + '<input type="date" id="pd-geb" value="'
+    + esc(person ? (person.geburtstag || "") : "") + '"></label>'
+    + '<div class="dialog__knoepfe">'
+    + '<button class="knopf knopf--still" id="pd-nein">Abbrechen</button>'
+    + '<button class="knopf knopf--haupt" id="pd-ja">Speichern</button>'
+    + '</div></div>';
+  document.body.appendChild(huelle);
+
+  const $ = (k) => huelle.querySelector("#" + k);
+  const zu = () => huelle.remove();
+  $("pd-nein").onclick = zu;
+  dialogSchliessen(huelle, zu);
+
+  let bildAdresse = person ? person.bild_url : null;
+
+  $("pd-datei").onchange = async (e) => {
+    const f = (e.target.files || [])[0];
+    if (!f) return;
+    try {
+      const klein = await bildZuschneiden(f, 400);
+      if (!klein) return;
+      const name = "person/" + Date.now() + ".jpg";
+      const r = await db.storage.from("profilbilder").upload(name, klein,
+        { contentType: "image/jpeg" });
+      if (r.error) throw r.error;
+      bildAdresse = db.storage.from("profilbilder").getPublicUrl(name).data.publicUrl;
+      const v = $("pd-vorschau");
+      const bild = document.createElement("img");
+      bild.className = "profilbild-gross";
+      bild.id = "pd-vorschau";
+      bild.src = bildAdresse;
+      v.replaceWith(bild);
+      meldung("Bild übernommen.");
+    } catch (f2) { meldung(fehlertext(f2), "fehler"); }
+  };
+
+  $("pd-ja").onclick = async () => {
+    const name = ($("pd-name").value || "").trim();
+    if (!name) { meldung("Bitte einen Namen eintragen.", "warn"); return; }
+
+    const daten = { name: name, geburtstag: $("pd-geb").value || null, bild_url: bildAdresse };
+    const { error } = person
+      ? await db.from("people").update(daten).eq("id", person.id)
+      : await db.from("people").insert(daten);
+
+    zu();
+    if (error) meldung(fehlertext(error), "fehler");
+    else { meldung("Gespeichert."); personenlisteLaden(b); }
+  };
 }
 
 async function benutzerlisteLaden(b, bin) {
@@ -6657,13 +6851,20 @@ async function benutzerlisteLaden(b, bin) {
   } catch (f) { /* ohne Parks geht es auch */ }
 
   ziel.innerHTML = '<table class="tabelle"><thead><tr>'
-    + '<th>Name</th><th>Rolle</th><th>Bearbeiten</th><th>Status</th>'
+    + '<th>Name</th><th>Rolle</th><th>Bearbeiten</th>'
+    + '<th>Geburtstag</th><th>Status</th>'
     + '</tr></thead><tbody>'
     + leute.map((u) => {
         const selbst = u.id === (profil && profil.id);
         return '<tr class="' + (u.is_active ? "" : "zeile--inaktiv") + '">'
-          + '<td>' + esc(u.full_name || u.email)
-          + (selbst ? ' <span class="marke">du</span>' : "") + '</td>'
+          + '<td class="bl-person">'
+          + (u.bild_url
+              ? '<img class="kopf__bild" src="' + esc(u.bild_url) + '" alt="">'
+              : '<span class="kopf__bild kopf__bild--leer">'
+                + esc(((u.full_name || u.email) || "?").charAt(0).toUpperCase())
+                + '</span>')
+          + '<span>' + esc(u.full_name || u.email)
+          + (selbst ? ' <span class="marke">du</span>' : "") + '</span></td>'
           + '<td>' + (bin && !selbst
               ? '<select class="auswahl" data-rolle="' + esc(u.id) + '">'
                 + Object.keys(ROLLEN).map((w) => '<option value="' + w + '"'
@@ -6674,6 +6875,10 @@ async function benutzerlisteLaden(b, bin) {
               ? '<input type="checkbox" data-bearb="' + esc(u.id) + '"'
                 + (u.darf_bearbeiten ? " checked" : "") + '>'
               : (u.role === "admin" ? "immer" : (u.darf_bearbeiten ? "ja" : "nein"))) + '</td>'
+          + '<td>' + (bin
+              ? '<input type="date" class="gebfeld" data-geb="' + esc(u.id) + '" value="'
+                + esc(u.geburtstag || "") + '">'
+              : (u.geburtstag ? esc(langDatum(u.geburtstag)) : "–")) + '</td>'
           + '<td>' + (bin && !selbst
               ? '<button class="linkknopf" data-aktiv="' + esc(u.id) + '" data-wert="'
                 + (u.is_active ? "0" : "1") + '">'
@@ -6689,7 +6894,13 @@ async function benutzerlisteLaden(b, bin) {
         + 'Parks mit "lang" im Namen, Kurzdreher solche mit "kurz".</p>'
         + leute.filter((u) => u.role !== "admin" && u.role !== "planwand").map((u) =>
             '<div class="parkzeile"><div class="parkzeile__name">'
-            + esc(u.full_name || u.email) + '</div><div class="parkzeile__wahl">'
+            + (u.bild_url
+                ? '<img class="kopf__bild" src="' + esc(u.bild_url) + '" alt="">'
+                : '<span class="kopf__bild kopf__bild--leer">'
+                  + esc(((u.full_name || u.email) || "?").charAt(0).toUpperCase())
+                  + '</span>')
+            + '<span>' + esc(u.full_name || u.email) + '</span>'
+            + '</div><div class="parkzeile__wahl">'
             + parks.map((pk) => '<label class="parkchip">'
                 + '<input type="checkbox" data-pu="' + esc(u.id) + '" data-pp="' + esc(pk.id) + '"'
                 + ((u.parks || []).indexOf(pk.id) !== -1 ? " checked" : "") + '>'
@@ -6710,6 +6921,15 @@ async function benutzerlisteLaden(b, bin) {
         .eq("id", el.dataset.rolle);
       if (error) { meldung(fehlertext(error), "fehler"); el.value = vorher; }
       else { meldung("Rolle geändert."); benutzerlisteLaden(b, bin); }
+    };
+  });
+
+  ziel.querySelectorAll("[data-geb]").forEach((el) => {
+    el.onchange = async () => {
+      const { error } = await db.from("profiles")
+        .update({ geburtstag: el.value || null }).eq("id", el.dataset.geb);
+      if (error) meldung(fehlertext(error), "fehler");
+      else meldung("Geburtstag gespeichert.");
     };
   });
 
