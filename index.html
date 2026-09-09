@@ -1605,6 +1605,20 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--marke); }
   vertical-align: middle; padding-top: 8px; padding-bottom: 8px;
   border-bottom: 1px solid var(--linie); }
 .tabelle--benutzer tr:last-child td { border-bottom: none; }
+
+/* ---------- Angewählte Umschalter deutlich markieren ---------- */
+.moduswahl__knopf.aktiv, .parkwahl__knopf.aktiv, .wahlknopf.aktiv,
+.reiter__knopf.aktiv, .unterreiter__knopf.aktiv {
+  box-shadow: inset 0 0 0 2px var(--marke);
+}
+body.dunkel .moduswahl__knopf.aktiv, body.dunkel .parkwahl__knopf.aktiv,
+body.dunkel .wahlknopf.aktiv, body.dunkel .reiter__knopf.aktiv,
+body.dunkel .unterreiter__knopf.aktiv {
+  box-shadow: inset 0 0 0 2px #6ba4ff;
+  border-color: #6ba4ff;
+}
+body.dunkel .moduswahl__knopf.aktiv, body.dunkel .parkwahl__knopf.aktiv,
+body.dunkel .wahlknopf.aktiv { background: #24344a; }
 </style>
 </head>
 <body>
@@ -1648,7 +1662,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "21.3.0";
+const APP_VERSION = "22.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -2509,6 +2523,7 @@ async function zeichneNotizen() {
           + (t.due_date
             ? '<span class="notiz__frist' + (t.due_date < heute ? " notiz__frist--spaet" : "") + '">'
               + kurzDatum(t.due_date) + '</span>' : "")
+          + '<button class="linkknopf" data-notizbearb="' + esc(t.id) + '">Bearbeiten</button>'
           + (istAdmin() ? '<button class="linkknopf linkknopf--gefahr" data-nweg="'
               + esc(t.id) + '">Löschen</button>' : "")
           + '</label>').join("") + '</div>'
@@ -2580,11 +2595,19 @@ async function zeichneNotizen() {
         text: "Ist diese Aufgabe wirklich abgeschlossen?",
         bestaetigen: "Ja, erledigt" });
       if (!ok) return;
+      const id = el.dataset.erledigt;
       const { error } = await db.from("todos").update({
         is_done: true, done_at: new Date().toISOString(), done_by: profil.id
-      }).eq("id", el.dataset.erledigt);
+      }).eq("id", id);
       if (error) { meldung(fehlertext(error), "fehler"); }
-      else { meldung("Erledigt."); zeichneNotizen(); }
+      else {
+        merkeSchritt("Notiz abhaken", async () => {
+          await db.from("todos").update({ is_done: false, done_at: null, done_by: null })
+            .eq("id", id);
+          zeichneNotizen();
+        });
+        meldung("Erledigt."); zeichneNotizen();
+      }
     };
   });
 }
@@ -3475,9 +3498,10 @@ function darfWirklichBearbeiten() {
 }
 
 // Darf gerade auf der Planwand geändert werden?
+// Ohne Umschalter: wer das Recht hat, darf direkt bearbeiten.
 function darfPlanen() {
-  if (istAdmin()) return true;
-  return darfWirklichBearbeiten() && plan.adminModus === true;
+  return istAdmin() || meineRolle() === "planwand"
+    || (profil && profil.darf_bearbeiten === true);
 }
 
 const FERIEN_ZEILEN = 7;
@@ -4638,7 +4662,8 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     + (auftrag && auftrag.target_quantity !== null && auftrag.target_quantity !== undefined
         ? auftrag.target_quantity : "") + '" placeholder="wie viele Stück"></label>'
 
-    + '<div class="feld"><span class="feldlabel">Zustand</span>'
+    + '<div class="feld"><span class="feldlabel">Zustand'
+    + (darf ? "" : ' <span class="klein">– darfst du ändern</span>') + '</span>'
     + '<div class="wahlgitter">'
     + Object.keys(PLANSTATUS).map((k) => '<button type="button" class="wahlknopf'
         + (planZustand === k ? " aktiv" : "") + '" data-plstatus="' + k + '">'
@@ -4686,7 +4711,7 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
         ? '<button class="knopf knopf--gefahr" id="pl-loeschen">Auftrag löschen</button>'
           + '<button class="knopf knopf--still" id="pl-weg">Aus der Planung nehmen</button>' : "")
     + '<button class="knopf knopf--still" id="pl-nein">Schliessen</button>'
-    + (darf ? '<button class="knopf knopf--haupt" id="pl-ja">Speichern</button>' : "")
+    + '<button class="knopf knopf--haupt" id="pl-ja">Speichern</button>'
     + '</div></div>';
   document.body.appendChild(huelle);
 
@@ -4765,6 +4790,15 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
 
   const speichern = $("pl-ja");
   if (speichern) speichern.onclick = async () => {
+    // Wer nicht planen darf, kann trotzdem den Zustand setzen
+    if (!darf && auftrag) {
+      const { error } = await db.from("jobs")
+        .update({ plan_status: planZustand }).eq("id", auftrag.id);
+      zu();
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Zustand geändert."); seitePlanwand(b); }
+      return;
+    }
     const menge = $("pl-menge").value;
     const daten = {
       planned_from: $("pl-von").value || null,
@@ -5182,6 +5216,36 @@ function betrachter(adresse, titel, istPdf) {
 //  gibt es nicht mehr.
 // =================================================================
 
+// Bezeichnung aus der Liste wählen oder eine neue anlegen
+async function bezeichnungWaehlen(liste, aktuell) {
+  const wahl = await auswahlSuchen("Bezeichnung wählen",
+    (liste || []).map((z) => ({ wert: z.name, text: z.name }))
+      .concat([{ wert: "__neu", text: "+ Neue Bezeichnung anlegen" }]));
+  if (!wahl) return null;
+
+  if (wahl !== "__neu") return wahl;
+
+  const w = await dialogFelder({ titel: "Neue Bezeichnung",
+    felder: [{ name: "name", label: "Bezeichnung", pflicht: true,
+               wert: aktuell || "" }], bestaetigen: "Anlegen" });
+  if (!w) return null;
+
+  const { error } = await db.from("designations").insert({ name: w.name });
+  if (error && !String(error.message || "").includes("duplicate")) {
+    meldung(fehlertext(error), "fehler");
+    return null;
+  }
+  meldung("Bezeichnung angelegt.");
+  return w.name;
+}
+
+async function ladeBezeichnungen() {
+  const { data, error } = await zeitlimit(
+    db.from("designations").select("*").order("name"), 8000, "Bezeichnungen");
+  if (error) throw error;
+  return data || [];
+}
+
 async function ladeLieferanten() {
   const { data, error } = await zeitlimit(
     db.from("suppliers").select("*").eq("is_active", true).order("name"),
@@ -5287,11 +5351,19 @@ async function seiteEinkauf(b) {
       const ok = await nachfragen({ titel: "Eingekauft?",
         text: "Hast du das wirklich schon geholt?", bestaetigen: "Ja, habe ich" });
       if (!ok) return;
+      const id = el.dataset.ekfertig;
       const { error } = await db.from("shopping_items").update({
         is_done: true, done_at: new Date().toISOString(), done_by: profil.id
-      }).eq("id", el.dataset.ekfertig);
+      }).eq("id", id);
       if (error) meldung(fehlertext(error), "fehler");
-      else { meldung("Abgehakt."); seiteEinkauf(b); }
+      else {
+        merkeSchritt("Einkauf abhaken", async () => {
+          await db.from("shopping_items")
+            .update({ is_done: false, done_at: null, done_by: null }).eq("id", id);
+          seiteEinkauf(b);
+        });
+        meldung("Abgehakt."); seiteEinkauf(b);
+      }
     };
   });
 
@@ -5907,6 +5979,7 @@ function rechnerWinkel(ziel) {
 const best = {
   ansicht: "offen",
   artikelSuche: "",
+  artikelBez: "",
   lieferantId: null,
 };
 
@@ -5989,7 +6062,8 @@ async function bestOffen(ziel, b) {
       + '<td class="bz-menge stark">' + zahlText(z.quantity) + '</td>'
       + (darfSchreiben()
           ? '<td class="bz-aktionen">'
-            + '<button class="linkknopf" data-bearb-best="' + esc(z.id) + '">Bearbeiten</button>'
+            + '<button class="linkknopf" data-bkopie="' + esc(z.id) + '">Kopieren</button>'
+      + '<button class="linkknopf" data-bearb-best="' + esc(z.id) + '">Bearbeiten</button>'
             + '<button class="linkknopf" data-bstatus="' + esc(z.id) + '">Status</button>'
             + '<button class="linkknopf linkknopf--gefahr" data-bweg="' + esc(z.id)
             + '" data-nr="' + esc(a2.article_number || "") + '">Löschen</button>'
@@ -6034,6 +6108,23 @@ async function bestOffen(ziel, b) {
   const neu = document.getElementById("b-neu");
   if (neu) neu.onclick = () => positionDialog(b);
 
+  ziel.querySelectorAll("[data-bkopie]").forEach((el) => {
+    el.onclick = async () => {
+      const z = liste.find((x) => x.id === el.dataset.bkopie);
+      if (!z) return;
+      const a2 = z.articles || {};
+      const text = [a2.article_number || "", a2.name || "",
+        zahlText(z.quantity) + " " + (a2.unit || "Stück"),
+        (z.suppliers && z.suppliers.name) || ""].filter(Boolean).join("   ");
+      try {
+        await navigator.clipboard.writeText(text);
+        meldung("In die Zwischenablage gelegt.");
+      } catch (f) {
+        meldung("Kopieren nicht möglich: " + text, "warn");
+      }
+    };
+  });
+
   ziel.querySelectorAll("[data-bearb-best]").forEach((el) => {
     el.onclick = async () => {
       const z = liste.find((x) => x.id === el.dataset.bearbBest);
@@ -6065,9 +6156,17 @@ async function bestOffen(ziel, b) {
           text: "Letzte Rückfrage. Danach ist die Position weg.",
           bestaetigen: "Endgültig löschen", gefahr: true });
       if (!ok) return;
+      const sicherung = await db.from("order_items").select("*")
+        .eq("id", el.dataset.bweg).single();
       const { error } = await db.from("order_items").delete().eq("id", el.dataset.bweg);
       if (error) meldung(fehlertext(error), "fehler");
-      else { meldung("Position gelöscht."); seiteBestellungen(b); }
+      else {
+        if (sicherung.data) merkeSchritt("Löschen einer Bestellposition", async () => {
+          await db.from("order_items").insert(sicherung.data);
+          seiteBestellungen(b);
+        });
+        meldung("Position gelöscht."); seiteBestellungen(b);
+      }
     };
   });
 
@@ -6144,19 +6243,24 @@ async function lieferungEinlagern(z, b) {
 
 // Legt einen Artikel mit den nötigsten Angaben an und gibt ihn zurück.
 async function artikelSchnellAnlegen(vorgabe) {
-  let lieferanten = [];
+  let lieferanten = [], bezeichnungen = [];
   try { lieferanten = await ladeLieferanten(); } catch (f) { /* geht auch ohne */ }
+  try { bezeichnungen = await ladeBezeichnungen(); } catch (f) { /* geht auch ohne */ }
 
   const w = await dialogFelder({
     titel: "Neuen Artikel anlegen",
     felder: [
       { name: "nummer", label: "Artikelnummer", pflicht: true, wert: vorgabe || "" },
-      { name: "name", label: "Bezeichnung", pflicht: true },
       { name: "einheit", label: "Einheit", wert: "Stück" },
     ],
     bestaetigen: "Weiter",
   });
   if (!w) return null;
+
+  // Bezeichnung aus der gepflegten Liste wählen
+  const bez = await bezeichnungWaehlen(bezeichnungen);
+  if (bez === null) return null;
+  w.name = bez;
 
   let lieferantId = null;
   const wahl = await auswahlDialog("Lieferant wählen",
@@ -6397,7 +6501,9 @@ async function bestHistorie(ziel, b) {
 async function bestArtikel(ziel, b) {
   ziel.innerHTML = '<div class="suchleiste">'
     + '<input type="search" id="ar-suche" placeholder="Artikelnummer, Name oder Lieferant"'
-    + ' value="' + esc(best.artikelSuche || "") + '" autocomplete="off"></div>'
+    + ' value="' + esc(best.artikelSuche || "") + '" autocomplete="off">'
+    + '<select id="ar-bez" class="auswahl"><option value="">Alle Bezeichnungen</option>'
+    + '</select></div>'
     + (darfSchreiben()
         ? '<button class="knopf knopf--haupt knopf--breit" id="ar-neu">+ Neuer Artikel</button>'
         : "")
@@ -6410,6 +6516,20 @@ async function bestArtikel(ziel, b) {
     clearTimeout(taste);
     taste = setTimeout(() => artikelListe(b), 300);
   };
+
+  // Bezeichnungen für den Filter nachladen
+  (async () => {
+    try {
+      const liste = await ladeBezeichnungen();
+      const feldB = document.getElementById("ar-bez");
+      if (!feldB) return;
+      feldB.innerHTML = '<option value="">Alle Bezeichnungen</option>'
+        + liste.map((z) => '<option value="' + esc(z.name) + '"'
+            + (best.artikelBez === z.name ? " selected" : "") + '>'
+            + esc(z.name) + '</option>').join("");
+      feldB.onchange = () => { best.artikelBez = feldB.value; artikelListe(b); };
+    } catch (f) { /* Filter ist Beiwerk */ }
+  })();
 
   const neu = document.getElementById("ar-neu");
   if (neu) neu.onclick = async () => {
@@ -6425,7 +6545,10 @@ async function artikelListe(b) {
   if (!kasten) return;
 
   let liste;
-  try { liste = await sucheArtikel(best.artikelSuche || ""); }
+  try {
+    liste = await sucheArtikel(best.artikelSuche || "");
+    if (best.artikelBez) liste = liste.filter((a) => a.name === best.artikelBez);
+  }
   catch (f) {
     kasten.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
     return;
@@ -6477,7 +6600,9 @@ async function artikelListe(b) {
           bestaetigen: "Endgültig löschen", gefahr: true });
       if (!ok) return;
 
-      const { error } = await db.from("articles").delete().eq("id", el.dataset.arweg);
+      const r = await db.from("articles").delete().eq("id", el.dataset.arweg).select();
+      const error = r.error || ((r.data || []).length === 0
+        ? new Error("Dafür fehlen dir die Rechte.") : null);
       if (error) {
         const aus = await nachfragen({ titel: "Löschen nicht möglich",
           text: fehlertext(error) + " Soll der Artikel stattdessen ausgeblendet werden?",
@@ -6497,19 +6622,24 @@ async function artikelListe(b) {
 async function artikelBearbeiten(artikel, b) {
   if (!artikel) return;
 
-  let lieferanten = [];
+  let lieferanten = [], bezeichnungen = [];
   try { lieferanten = await ladeLieferanten(); } catch (f) { /* geht auch ohne */ }
+  try { bezeichnungen = await ladeBezeichnungen(); } catch (f) { /* geht auch ohne */ }
 
   const w = await dialogFelder({
     titel: "Artikel bearbeiten",
     felder: [
       { name: "nummer", label: "Artikelnummer", pflicht: true, wert: artikel.article_number },
-      { name: "name", label: "Bezeichnung", pflicht: true, wert: artikel.name },
+
       { name: "einheit", label: "Einheit", wert: artikel.unit || "Stück" },
     ],
     bestaetigen: "Weiter",
   });
   if (!w) return;
+
+  const bez = await bezeichnungWaehlen(bezeichnungen, artikel.name);
+  if (bez === null) return;
+  w.name = bez;
 
   let lieferantId = artikel.supplier_id || null;
   if (lieferanten.length) {
@@ -8479,10 +8609,6 @@ function zeichneGeruest() {
     + '<header class="kopf">'
     + '<button class="kopf__klapp" id="nav-klapp" title="Menü ein- oder ausklappen">☰</button>'
     + '<img class="kopf__logo" src="./logo.png" alt="Hofer + Co.">'
-    + (darfBearbeitenKnopf()
-        ? '<button class="kopf__admin' + (plan.adminModus ? " aktiv" : "") + '" id="kopf-admin"'
-          + ' title="Bearbeiten ein- oder ausschalten">Bearbeiten</button>'
-        : "")
     + '<button class="kopf__rueck" id="rueck-knopf" hidden'
     + ' title="Rückgängig">↶</button>'
     + '<span class="kopf__luecke"></span>'
@@ -8504,29 +8630,6 @@ function zeichneGeruest() {
   const rueck = document.getElementById("rueck-knopf");
   if (rueck) rueck.onclick = schrittZurueck;
   knopfRueckgaengigZeigen();
-
-  const adminKnopf = document.getElementById("kopf-admin");
-  if (adminKnopf && istAdmin()) {
-    adminKnopf.classList.add("aktiv");
-    adminKnopf.title = "Als Administrator ist Bearbeiten immer eingeschaltet";
-  }
-
-  if (adminKnopf) adminKnopf.onclick = () => {
-    if (istAdmin()) {
-      meldung("Als Administrator darfst du ohnehin alles ändern.");
-      return;
-    }
-    if (!darfUeberhauptBearbeiten()) {
-      meldung("Dafür fehlt dir die Berechtigung. Ein Administrator kann sie "
-        + "in den Einstellungen vergeben.", "warn");
-      return;
-    }
-    plan.adminModus = !plan.adminModus;
-    einstellungSetzen("pwadmin", plan.adminModus);
-    adminKnopf.classList.toggle("aktiv", plan.adminModus);
-    meldung(plan.adminModus ? "Bearbeiten eingeschaltet." : "Bearbeiten ausgeschaltet.");
-    if (aktuellerPfad && aktuellerPfad() === "planwand") zeichneSeite();
-  };
 
   const klapp = document.getElementById("nav-klapp");
   if (klapp) klapp.onclick = () => {
