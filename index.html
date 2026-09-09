@@ -1621,7 +1621,9 @@ body.dunkel .moduswahl__knopf.aktiv, body.dunkel .parkwahl__knopf.aktiv,
 body.dunkel .wahlknopf.aktiv { background: #24344a; }
 
 .kopiersymbol { background: none; border: none; color: var(--gedaempft);
-                cursor: pointer; font-size: .95rem; padding: 0 6px; line-height: 1; }
+                cursor: pointer; padding: 0 6px; line-height: 0;
+                opacity: .55; vertical-align: middle; }
+.kopiersymbol:hover { opacity: 1; }
 .kopiersymbol:hover { color: var(--marke); }
 
 /* ---------- Balken mit drei Zeilen ---------- */
@@ -1652,6 +1654,37 @@ body.dunkel .wahlknopf.aktiv { background: #24344a; }
             padding: 6px 12px; border-radius: 999px; font-size: .85rem;
             font-weight: 600; }
 .pw-balken--treffer { outline: 3px solid var(--signalgelb); outline-offset: 2px; }
+
+/* ---------- Zoomregler ---------- */
+.pw-zoom { display: flex; align-items: center; gap: 10px; }
+.pw-zoom input[type="range"] { width: 190px; accent-color: var(--marke); }
+#pw-zoomwert { width: 74px; min-height: 34px; padding: 4px 8px; text-align: center;
+               font-variant-numeric: tabular-nums; }
+
+/* ---------- Zeitregler ---------- */
+.pw-zeitregler { position: relative; margin: 14px 0 6px; }
+.pw-zeitregler input[type="range"] { width: 100%; accent-color: var(--marke); }
+.pw-zeitmarke { position: absolute; top: -2px; width: 2px; height: 20px;
+                background: var(--gefahr); pointer-events: none; }
+.pw-zeitmarke::after { content: "heute"; position: absolute; top: -14px; left: -14px;
+                       font-size: .62rem; color: var(--gefahr); font-weight: 650; }
+.pw-zeitinfo { display: flex; justify-content: space-between; align-items: center;
+               font-size: .74rem; color: var(--gedaempft);
+               font-variant-numeric: tabular-nums; }
+
+/* ---------- Auftragsfenster im Querformat ---------- */
+@media (min-width: 900px) {
+  .dialog--breit { max-width: 940px; }
+  .dialog--breit .dialogspalten { display: grid; grid-template-columns: 1fr 1fr;
+                                  gap: 0 26px; align-items: start; }
+  .dialog--breit .dialogspalten .feld { margin-bottom: 14px; }
+  .dialog--breit .dialog__knoepfe { grid-column: 1 / -1; }
+}
+.dialog--breit .dialog__block { border: 1px solid var(--linie);
+                                border-radius: var(--radius); padding: 12px 14px;
+                                margin-bottom: 14px; }
+.dialog--breit .dialog__blocktitel { font-weight: 650; font-size: .82rem;
+                                     color: var(--gedaempft); margin-bottom: 8px; }
 </style>
 </head>
 <body>
@@ -1695,7 +1728,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "23.0.0";
+const APP_VERSION = "23.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -3115,6 +3148,28 @@ function parkAuswahlBinden(b) {
 //  ERFASSEN
 // =================================================================
 
+// Suchfeld anmelden. Muss nach dem Aufbau der Seite passieren,
+// sonst gibt es das Feld noch gar nicht.
+function sucheBinden(b) {
+  const feld = document.getElementById("p-suche");
+  if (!feld) return;
+
+  let taste = null;
+  feld.oninput = () => {
+    clearTimeout(taste);
+    taste = setTimeout(() => {
+      prod.suche = feld.value;
+      seiteProduktion(b);
+    }, 350);
+  };
+
+  // Nach dem Neuaufbau den Zeiger wieder ans Ende setzen
+  if (prod.suche) {
+    feld.focus();
+    feld.setSelectionRange(feld.value.length, feld.value.length);
+  }
+}
+
 async function ansichtErfassen(ziel, b) {
   const suchtext = (prod.suche || "").trim().toLowerCase();
 
@@ -3131,6 +3186,9 @@ async function ansichtErfassen(ziel, b) {
 
   if (!maschinen.length) {
     ziel.innerHTML = parkAuswahl()
+      + '<div class="suchleiste"><input type="search" id="p-suche"'
+      + ' placeholder="HOCO Nr., Maschine oder Maschinennummer" value="'
+      + esc(prod.suche || "") + '" autocomplete="off"></div>'
       + '<div class="karte karte--hinweis"><p>'
       + (suchtext
           ? 'Nichts gefunden zu "' + esc(prod.suche) + '". Gesucht wird in '
@@ -3138,16 +3196,7 @@ async function ansichtErfassen(ziel, b) {
           : 'In diesem Maschinenpark ist noch keine Maschine angelegt.')
       + '</p></div>';
     parkAuswahlBinden(b);
-
-  const suchfeld = document.getElementById("p-suche");
-  if (suchfeld) {
-    let taste = null;
-    suchfeld.oninput = () => {
-      clearTimeout(taste);
-      taste = setTimeout(() => { prod.suche = suchfeld.value; seiteProduktion(b); }, 350);
-    };
-  }
-
+    sucheBinden(b);
     return;
   }
 
@@ -3172,6 +3221,7 @@ async function ansichtErfassen(ziel, b) {
     + '<div id="raster"><div class="laedt">Zahlen werden geladen …</div></div>';
 
   parkAuswahlBinden(b);
+  sucheBinden(b);
 
   document.getElementById("zeitraum").textContent = istWoche
     ? "Woche " + kurzDatum(von) + " – " + kurzDatum(bis)
@@ -3590,7 +3640,7 @@ async function seitePlanwand(b) {
   // Die Spaltenbreite ergibt sich daraus, damit immer alles in die
   // Breite passt und nichts seitlich weggeschoben wird.
   if (!plan.tageWunsch) plan.tageWunsch = Number(einstellungWert("pwtage", 15)) || 15;
-  plan.tage = Math.max(5, Math.min(120, plan.tageWunsch));
+  plan.tage = Math.max(5, Math.min(150, plan.tageWunsch));
 
   const gesamt = Math.max(280, b.clientWidth || window.innerWidth) - 8;
   // Die Namensspalte darf höchstens ein Fünftel einnehmen
@@ -3639,10 +3689,21 @@ async function ansichtPlanwand(ziel, b) {
     + '<button class="linkknopf" id="pw-heute">Heute</button></div>'
     + '<button class="knopf knopf--klein" id="pw-vor">›</button>'
     + '<div class="pw-zoom">'
-    + '<button class="knopf knopf--klein" id="pw-raus" title="mehr Tage zeigen">−</button>'
-    + '<span class="klein" id="pw-zoomwert"></span>'
-    + '<button class="knopf knopf--klein" id="pw-rein" title="weniger Tage zeigen">+</button>'
+    + '<span class="klein">Tage</span>'
+    + '<input type="range" id="pw-regler" min="5" max="150" step="1" value="'
+    + (plan.tageWunsch || 15) + '">'
+    + '<input type="number" id="pw-zoomwert" min="5" max="150" value="'
+    + (plan.tageWunsch || 15) + '">'
     + '</div></div>'
+
+    + '<div class="pw-zeitregler">'
+    + '<input type="range" id="pw-zeit" min="0" max="200" step="1" value="100">'
+    + '<div class="pw-zeitmarke" id="pw-zeitmarke"></div>'
+    + '<div class="pw-zeitinfo"><span id="pw-zeitvon"></span>'
+    + '<span class="klein">Zeitraum schieben</span>'
+    + '<span id="pw-zeitbis"></span></div>'
+    + '</div>'
+
     + '<div class="suchleiste">'
     + '<button class="knopf" id="pw-suche-los">Suchen</button>'
     + (plan.letzteSuche
@@ -3665,16 +3726,6 @@ async function ansichtPlanwand(ziel, b) {
     plan.start = naechsterArbeitstag(plusTage(plan.start, -7)); seitePlanwand(b); };
   document.getElementById("pw-vor").onclick = () => {
     plan.start = naechsterArbeitstag(plusTage(plan.start, 7)); seitePlanwand(b); };
-  document.getElementById("pw-rein").onclick = () => {
-    plan.tageWunsch = Math.max(5, plan.tageWunsch - 5);
-    einstellungSetzenWert("pwtage", plan.tageWunsch);
-    seitePlanwand(b);
-  };
-  document.getElementById("pw-raus").onclick = () => {
-    plan.tageWunsch = Math.min(120, plan.tageWunsch + 5);
-    einstellungSetzenWert("pwtage", plan.tageWunsch);
-    seitePlanwand(b);
-  };
 
   document.getElementById("pw-heute").onclick = () => {
     plan.start = naechsterArbeitstag(wochenStart(isoDatum(new Date()))); seitePlanwand(b); };
@@ -3697,539 +3748,59 @@ async function ansichtPlanwand(ziel, b) {
     };
   }
 
-  const zoomAnzeige = document.getElementById("pw-zoomwert");
-  if (zoomAnzeige) zoomAnzeige.textContent = plan.tage + " Tage";
-
-  // Die Suche öffnet ein Fenster und springt danach zum Treffer.
-  const suchKnopf = document.getElementById("pw-suche-los");
-  if (suchKnopf) suchKnopf.onclick = () => sucheDialog(b);
-
-  const weiter = document.getElementById("pw-suche-weiter");
-  if (weiter) weiter.onclick = () => zumAuftragSpringen(plan.letzteSuche, b, true);
-
-  try {
-    plan.auftraege = await ladePlanAuftraege();
-  } catch (f) {
-    document.getElementById("pw-inhalt").innerHTML =
-      '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
-    return;
-  }
-
-  try {
-    plan.ferien = (await ladeFerien()).map((f) => {
-      f.genehmigt_von_name = f.profiles ? f.profiles.full_name : null;
-      return f;
-    });
-  }
-  catch (f) { plan.ferien = []; console.warn("Ferien:", f.message); }
-
-  try {
-    zeichnePlanwand(b);
-  } catch (f) {
-    ziel.innerHTML = '<div class="karte karte--fehler"><p>'
-      + esc(f && f.message ? f.message : String(f)) + '</p></div>';
-    console.error("Planwand zeichnen:", f);
-  }
-}
-
-// Sucht den Auftrag und schiebt die Wand dorthin. Bei mehreren
-// Treffern erst die Auswahl.
-// Fenster für die freie Suche
-async function sucheDialog(b) {
-  const w = await dialogFelder({
-    titel: "Auf der Planwand suchen",
-    text: "Gesucht wird in allem: Nummer, Maschine, Notiz, Material, "
-        + "Menge, Farbe, Zustand und Datum.",
-    felder: [{ name: "text", label: "Suchbegriff", pflicht: true,
-               wert: plan.letzteSuche || "",
-               platzhalter: "zum Beispiel 10844, Index oder Messing" }],
-    bestaetigen: "Suchen",
-  });
-  if (!w) return;
-  plan.trefferNr = 0;
-  await zumAuftragSpringen(w.text, b, false);
-}
-
-// Alle Angaben eines Auftrags als ein durchsuchbarer Text
-function auftragText(j) {
-  return [
-    j.job_number, j.maschine, j.maschine_nr, j.park, j.plan_note,
-    j.material_dm, j.material_toleranz, j.material_menge, j.material_liefertermin,
-    j.target_quantity, j.stand, j.color, j.plan_status, j.problem, j.planned_from,
-  ].map((x) => String(x === null || x === undefined ? "" : x).toLowerCase()).join(" ");
-}
-
-async function zumAuftragSpringen(text, b, weiter) {
-  const t = (text || "").trim().toLowerCase();
-  if (!t) return;
-
-  const treffer = (plan.auftraege || []).filter((j) => auftragText(j).includes(t));
-
-  plan.letzteSuche = text.trim();
-  plan.trefferAnzahl = treffer.length;
-
-  if (!treffer.length) {
-    meldung('Nichts gefunden zu "' + text + '".', "warn");
-    return;
-  }
-
-  if (!weiter) plan.trefferNr = 0;
-  const ziel = treffer[plan.trefferNr % treffer.length];
-  plan.trefferNr = (plan.trefferNr + 1) % treffer.length;
-
-  meldung(treffer.length === 1
-    ? "Ein Treffer: " + ziel.job_number
-    : "Treffer " + (((plan.trefferNr + treffer.length - 1) % treffer.length) + 1)
-      + " von " + treffer.length + ": " + ziel.job_number
-      + ". Auf › tippen springt weiter.");
-
-  // Zeitraum so verschieben, dass der Auftrag sichtbar ist
-  if (ziel.planned_from) {
-    plan.start = naechsterArbeitstag(plusTage(ziel.planned_from, -2));
-    await seitePlanwand(b);
-  }
-
-  setTimeout(() => {
-    const el = document.querySelector('[data-auftrag="' + CSS.escape(ziel.id) + '"]');
-    if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
-    el.classList.add("pw-balken--treffer");
-    setTimeout(() => el.classList.remove("pw-balken--treffer"), 2500);
-  }, 200);
-}
-
-function zeichnePlanwand(b) {
-  const tage = arbeitstage(plan.start, plan.tage);
-  plan.sichtbareTage = tage;
-
-  // Wo steht der heutige Tag in der sichtbaren Reihe?
-  const heuteSpalte = tage.indexOf(isoDatum(new Date()));
-  const heute = isoDatum(new Date());
-
-  document.getElementById("pw-titel").textContent =
-    kurzDatum(tage[0]) + " – " + kurzDatum(tage[tage.length - 1]);
-
-  // Zeile mit den Kalenderwochen, jede Woche über ihre Tage gespannt
-  const wochen = [];
-  tage.forEach((t) => {
-    const w = kalenderwoche(t);
-    const letzte = wochen[wochen.length - 1];
-    if (letzte && letzte.kw === w) letzte.anzahl++;
-    else wochen.push({ kw: w, anzahl: 1 });
-  });
-
-  const kwZeile = '<div class="pw-zeile pw-zeile--kw">'
-    + '<div class="pw-name pw-name--kopf">Woche</div>'
-    + '<div class="pw-kw-spuren">'
-    + wochen.map((w) => '<div class="pw-kw" style="--spann:' + w.anzahl + '">KW '
-        + w.kw + '</div>').join("")
-    + '</div></div>';
-
-  const kopf = '<div class="pw-zeile pw-zeile--kopf">'
-    + '<div class="pw-name pw-name--kopf">Maschine</div>'
-    + tage.map((t) => {
-        const wt = WT_KURZ[(ausIso(t).getDay() + 6) % 7];
-        const we = wt === "Sa" || wt === "So";
-        return '<div class="pw-tag' + (t === heute ? " pw-tag--heute" : "")
-          + (we ? " pw-tag--we" : "") + '">'
-          + '<span class="pw-tag__wt">' + (plan.sehrKnapp ? wt.charAt(0) : wt) + '</span>'
-          + (plan.knapp ? "" : '<span class="pw-tag__datum">' + kurzDatum(t) + '</span>')
-          + '</div>';
-      }).join("")
-    + '</div>';
-
-  const zeilen = prod.parks.map((park) => {
-    const maschinen = prod.maschinen.filter((m) => m.park_id === park.id);
-    if (!maschinen.length) return "";
-
-    return '<div class="pw-park">' + esc(park.name) + '</div>'
-      + maschinen.map((m) => {
-          const zellen = tage.map((t) => '<div class="pw-zelle'
-            + (t === heute ? " pw-zelle--heute" : "") + '" data-zelle="' + esc(m.id)
-            + '|' + t + '"></div>').join("");
-
-          // Balken für diese Maschine im sichtbaren Zeitraum
-          const balken = plan.auftraege
-            .filter((j) => j.machine_id === m.id && j.planned_from)
-            .map((j) => {
-              // Alle Arbeitstage, die dieser Auftrag belegt
-              const belegt = arbeitstage(j.planned_from, j.planned_days || 1);
-              const sichtbar = belegt.filter((t) => tage.indexOf(t) !== -1);
-              if (!sichtbar.length) return "";
-
-              const von = tage.indexOf(sichtbar[0]);
-              const dauer = sichtbar.length;
-              const angeschnitten = belegt[0] !== sichtbar[0];
-              return planBalken(j, von, dauer, angeschnitten);
-            }).join("");
-
-          return '<div class="pw-zeile" data-maschine="' + esc(m.id) + '">'
-            + '<div class="pw-name">'
-            + (plan.sehrKnapp && m.machine_number ? esc(m.machine_number) : esc(m.name))
-            + (m.machine_number ? '<span>' + esc(m.machine_number) + '</span>' : "")
-            + '</div>'
-            + '<div class="pw-spuren">' + zellen
-            + '<div class="pw-balken-schicht">' + balken + '</div></div></div>';
-        }).join("");
-  }).join("");
-
-  // Sieben schmale Zeilen für die Ferien der Mitarbeiter.
-  // Sie stehen immer da, auch wenn niemand eingetragen ist.
-  const ferienZeilen = '<div class="pw-park pw-park--ferien">Ferien</div>'
-    + Array.from({ length: FERIEN_ZEILEN }, (unused, i2) => {
-        const zeile = i2 + 1;
-        const zellen = tage.map((t) => '<div class="pw-zelle pw-zelle--fein'
-          + (t === heute ? " pw-zelle--heute" : "") + '" data-fzelle="' + zeile + '|' + t
-          + '"></div>').join("");
-
-        const balken = (plan.ferien || [])
-          .filter((f2) => f2.zeile === zeile)
-          .map((f2) => {
-            const belegt = arbeitstage(f2.von, f2.tage || 1);
-            const sichtbar = belegt.filter((t) => tage.indexOf(t) !== -1);
-            if (!sichtbar.length) return "";
-            const von = tage.indexOf(sichtbar[0]);
-            const feAngeschnitten = belegt[0] !== sichtbar[0];
-            return '<div class="pw-ferien'
-              + (f2.genehmigt === false ? " pw-ferien--anfrage" : "") + '"'
-              + ' data-ferien="' + esc(f2.id) + '"'
-              + ' data-von="' + von + '" data-dauer="' + sichtbar.length + '"'
-              + ' style="--von:' + von + ';--dauer:' + sichtbar.length + '">'
-              + '<span class="pw-ferien__name">'
-              + (f2.genehmigt === false ? "? " : "") + esc(f2.person) + '</span>'
-              + (darfPlanen() && !feAngeschnitten
-                  ? '<span class="pw-griff pw-griff--links" data-fgriff="links"></span>' : "")
-              + (darfPlanen()
-                  ? '<span class="pw-griff pw-griff--rechts" data-fgriff="rechts"></span>' : "")
-              + '</div>';
-          }).join("");
-
-        return '<div class="pw-zeile pw-zeile--fein">'
-          + '<div class="pw-name pw-name--fein">' + (i2 === 0 ? "Wer ist weg" : "") + '</div>'
-          + '<div class="pw-spuren pw-spuren--fein">' + zellen
-          + '<div class="pw-balken-schicht">' + balken + '</div></div></div>';
-      }).join("");
-
-  document.getElementById("pw-inhalt").innerHTML =
-    '<div class="pw-rolle"><div class="pw-tafel" style="--pw-tage:' + plan.tage
-    + ';--pw-s:' + (plan.skala || 1)
-    + ';--pw-spalte:' + (plan.spalte || 40) + 'px'
-    + ';--pw-name:' + (plan.namensbreite || 108) + 'px">'
-    + '<div class="pw-kopfblock">' + kwZeile + kopf + '</div>'
-    + zeilen + ferienZeilen
-    + (heuteSpalte >= 0
-        ? '<div class="pw-heutelinie" style="--heute:' + heuteSpalte + '"></div>' : "")
-    + '</div></div>'
-    + '<div class="pw-legende">'
-    + Object.keys(PLANSTATUS).map((k) => '<span>' + PLANSTATUS[k].zeichen + ' '
-        + PLANSTATUS[k].name + '</span>').join("")
-    + '</div>'
-    + '<p class="hinweis">Balken antippen öffnet Notiz, Menge und Zeichnung. '
-    + (darfPlanen() ? 'Lange gedrückt halten und ziehen verschiebt ihn. ' : "")
-    + 'Fertige Aufträge werden dunkelgrau. '
-    + (darfPlanen() ? 'In den Ferienzeilen unten auf einen freien Tag tippen, '
-        + 'um jemanden einzutragen.' : "")
-    + '</p>';
-
-  balkenVerhalten(b);
-  griffVerhalten(b);
-  zellenVerhalten(b);
-  ferienGriffe(b);
-  ferienVerhalten(b);
-}
-
-function planBalken(j, spalte, dauer, angeschnitten) {
-  const st = j.plan_status || "geplant";
-  const fertig = st === "fertig";
-  const f = farbeVon(j.color);
-
-  const hg = fertig ? "#4a5158" : f.hex;
-  const vg = fertig ? "#ffffff" : f.schrift;
-  const rand = (!fertig && j.color === "weiss") ? "border:1px solid var(--linie-stark);" : "";
-
-  // Fortschritt in Schritten von fünf Prozent
-  let anteil = null;
-  if (j.target_quantity && j.target_quantity > 0) {
-    const roh = (j.stand || 0) / j.target_quantity * 100;
-    anteil = Math.max(0, Math.min(100, Math.round(roh / 5) * 5));
-  } else if (fertig) {
-    anteil = 100;
-  }
-
-  // Zeile 2: Stückzahlen
-  let zeileMenge = "";
-  if (j.target_quantity) {
-    zeileMenge = (st === "laeuft" || (j.stand || 0) > 0)
-      ? zahlText(j.stand || 0) + " / " + zahlText(j.target_quantity)
-      : zahlText(j.target_quantity) + " Stück";
-  }
-
-  // Zeile 3: Material
-  const materialTeile = [];
-  if (j.material_dm) {
-    materialTeile.push("⌀" + j.material_dm
-      + (j.material_toleranz ? " " + j.material_toleranz : ""));
-  }
-  if (j.material_menge) materialTeile.push(j.material_menge);
-  if (j.material_liefertermin) materialTeile.push("ab " + kurzDatum(j.material_liefertermin));
-  const zeileMaterial = materialTeile.join(" · ");
-
-  return '<div class="pw-balken' + (fertig ? " pw-balken--fertig" : "")
-    + (angeschnitten ? " pw-balken--offen" : "") + '"'
-    + ' data-auftrag="' + esc(j.id) + '"'
-    + ' data-von="' + spalte + '" data-dauer="' + Math.max(1, dauer) + '"'
-    + ' data-angeschnitten="' + (angeschnitten ? "1" : "0") + '"'
-    + ' style="--von:' + spalte + ';--dauer:' + Math.max(1, dauer)
-    + ';background:' + hg + ';color:' + vg + ';' + rand + '">'
-
-    + (anteil !== null
-        ? '<div class="pw-fortschritt" style="width:' + anteil + '%"></div>' : "")
-
-    + '<div class="pw-balken__inhalt">'
-
-    // Zeile 1: Nummer, Zustand und Hinweise
-    + '<div class="pw-zeile1">'
-    + '<span class="pw-balken__status">'
-    + (PLANSTATUS[st] || PLANSTATUS.geplant).zeichen + '</span>'
-    + '<span class="pw-balken__nr">' + esc(j.job_number) + '</span>'
-    + (j.problem ? '<span class="pw-balken__warnung" title="'
-        + esc(j.problem) + '">⚠</span>' : "")
-    + (!j.fa_erstellt ? '<span class="pw-balken__fehlt" title="FA fehlt">FA</span>' : "")
-    + (!j.material_ok ? '<span class="pw-balken__fehlt" title="Material fehlt">M</span>' : "")
-    + (j.plan_note ? '<span class="pw-balken__zeichen" title="Notiz">✎</span>' : "")
-    + (j.drawing_url ? '<span class="pw-balken__zeichen">PDF</span>' : "")
-    + '</div>'
-
-    // Zeile 2: Stückzahlen
-    + '<div class="pw-zeile2">' + esc(zeileMenge) + '</div>'
-
-    // Zeile 3: Material
-    + '<div class="pw-zeile3">' + esc(zeileMaterial) + '</div>'
-
-    + '</div>'
-    + (darfPlanen() && !angeschnitten
-        ? '<span class="pw-griff pw-griff--links" data-griff="links"></span>' : "")
-    + (darfPlanen()
-        ? '<span class="pw-griff pw-griff--rechts" data-griff="rechts"></span>' : "")
-    + '</div>';
-}
-
-// ---------- Antippen und Verschieben ----------
-
-function ferienVerhalten(b) {
-  const tafel = document.querySelector(".pw-tafel");
-  // Auch die Produktion darf hier arbeiten: sie stellt Anfragen,
-  // die der Administrator danach bestätigt.
-  if (!tafel || !(darfPlanen() || darfSchreiben())) return;
-
-  // Leere Stelle antippen: neuen Eintrag anlegen
-  tafel.querySelectorAll("[data-fzelle]").forEach((zelle) => {
-    zelle.onclick = async () => {
-      const teile = zelle.dataset.fzelle.split("|");
-      await ferienDialog(null, Number(teile[0]), teile[1], b);
-    };
-  });
-
-  // Ferienbalken: kurzer Tipp bearbeitet, langes Drücken verschiebt
-  tafel.querySelectorAll("[data-ferien]").forEach((el) => {
-    let halten = null, zieht = false, schatten = null, gestartet = false;
-
-    const aufraeumen = () => {
-      clearTimeout(halten);
-      if (schatten) { schatten.remove(); schatten = null; }
-      el.classList.remove("pw-balken--zieht");
-      el.style.pointerEvents = "";
-      tafel.querySelectorAll(".pw-zelle--ziel").forEach((z) => z.classList.remove("pw-zelle--ziel"));
-      zieht = false; gestartet = false;
-    };
-
-    // Ferien dürfen nur in Ferienzeilen landen, nicht auf Maschinen
-    const zielFerien = (x, y) => {
-      const treffer = document.elementFromPoint(x, y);
-      if (!treffer) return null;
-      const zelle = treffer.closest("[data-fzelle]");
-      return zelle ? zelle.dataset.fzelle : null;
-    };
-
-    el.addEventListener("pointerdown", (e) => {
-      gestartet = true;
-      const sx = e.clientX, sy = e.clientY;
-      halten = setTimeout(() => {
-        zieht = true;
-        el.classList.add("pw-balken--zieht");
-        el.style.pointerEvents = "none";
-        if (navigator.vibrate) navigator.vibrate(30);
-        schatten = document.createElement("div");
-        schatten.className = "pw-schatten";
-        schatten.textContent = el.textContent;
-        document.body.appendChild(schatten);
-        schatten.style.left = sx + "px";
-        schatten.style.top = sy + "px";
-      }, 400);
-      try { el.setPointerCapture(e.pointerId); } catch (f2) { /* egal */ }
-    });
-
-    el.addEventListener("pointermove", (e) => {
-      if (!gestartet || !zieht) return;
-      e.preventDefault();
-      if (schatten) { schatten.style.left = e.clientX + "px"; schatten.style.top = e.clientY + "px"; }
-      tafel.querySelectorAll(".pw-zelle--ziel").forEach((z) => z.classList.remove("pw-zelle--ziel"));
-      const ziel = zielFerien(e.clientX, e.clientY);
-      if (ziel) {
-        const z = tafel.querySelector('[data-fzelle="' + CSS.escape(ziel) + '"]');
-        if (z) z.classList.add("pw-zelle--ziel");
-      }
-    });
-
-    el.addEventListener("pointerup", async (e) => {
-      if (!gestartet) return;
-      const warZiehen = zieht;
-      const ziel = warZiehen ? zielFerien(e.clientX, e.clientY) : null;
-      aufraeumen();
-
-      const f2 = (plan.ferien || []).find((x) => x.id === el.dataset.ferien);
-      if (!f2) return;
-
-      if (!warZiehen) { ferienDialog(f2, f2.zeile, f2.von, b); return; }
-      if (!ziel) { meldung("Ferien lassen sich nur in die Ferienzeilen schieben.", "warn"); return; }
-
-      const teile = ziel.split("|");
-      const altZ = f2.zeile, altVon = f2.von;
-      const { error } = await db.from("vacations")
-        .update({ zeile: Number(teile[0]), von: teile[1] }).eq("id", f2.id);
-      if (error) meldung(fehlertext(error), "fehler");
-      else {
-        merkeSchritt("Ferien von " + f2.person, async () => {
-          await db.from("vacations").update({ zeile: altZ, von: altVon }).eq("id", f2.id);
-          seitePlanwand(b);
-        });
-        meldung("Verschoben."); seitePlanwand(b);
-      }
-    });
-
-    el.addEventListener("pointercancel", aufraeumen);
-  });
-}
-
-// Erste Ferienzeile, in der ab diesem Tag noch Platz ist
-// Zählt die Arbeitstage von einem Tag bis zu einem anderen, beide inklusive
-function arbeitstageZwischen(von, bis) {
-  if (!von || !bis || bis < von) return 1;
-  let anzahl = 0;
-  let d = naechsterArbeitstag(von);
-  while (d <= bis && anzahl < 400) {
-    anzahl++;
-    d = naechsterArbeitstag(plusTage(d, 1));
-  }
-  return Math.max(1, anzahl);
-}
-
-// Letzter Arbeitstag eines Zeitraums
-function letzterArbeitstag(von, tage) {
-  const liste = arbeitstage(von, Math.max(1, tage));
-  return liste[liste.length - 1];
-}
-
-function freieFerienZeile(von, tage, ausser) {
-  for (let z = 1; z <= FERIEN_ZEILEN; z++) {
-    const belegt = arbeitstage(von, tage);
-    const kollision = (plan.ferien || []).some((f2) => {
-      if (f2.zeile !== z) return false;
-      if (ausser && f2.id === ausser) return false;
-      const seine = arbeitstage(f2.von, f2.tage || 1);
-      return seine.some((t) => belegt.indexOf(t) !== -1);
-    });
-    if (!kollision) return z;
-  }
-  return FERIEN_ZEILEN;
-}
-
-async function ferienDialog(eintrag, zeile, datum, b) {
-  const start = eintrag ? eintrag.von
-    : (datum || naechsterArbeitstag(isoDatum(new Date())));
-  const bisVorgabe = eintrag
-    ? letzterArbeitstag(eintrag.von, eintrag.tage || 1) : start;
-
-  const istAnfrage = eintrag && eintrag.genehmigt === false;
-
-  const huelle = document.createElement("div");
-  huelle.className = "dialog-huelle";
-  huelle.innerHTML = '<div class="dialog">'
-    + '<h2>' + (eintrag ? "Ferien" : (darfPlanen() ? "Ferien eintragen" : "Ferien anfragen"))
-    + '</h2>'
-
-    + (eintrag
-      ? '<div class="' + (istAnfrage ? "problemkasten" : "karte--ergebnis meldungszahl") + '">'
-        + (istAnfrage
-          ? '<div class="problemkasten__kopf">Noch nicht bestätigt</div>'
-            + '<div class="klein">Diese Ferien sind angefragt und warten auf den '
-            + 'Administrator.</div>'
-          : '<div class="ergebnis__titel">Bestätigt</div>'
-            + '<div>' + esc(eintrag.genehmigt_von_name || "Administrator")
-            + (eintrag.genehmigt_am ? ' · ' + esc(datumZeitKurz(eintrag.genehmigt_am)) : "")
-            + '</div>')
-        + '</div>'
-      : "")
-
-    + '<label class="feld"><span>Wer</span>'
-    + '<input id="fd-person" type="text" placeholder="Name" value="'
-    + esc(eintrag ? eintrag.person : ((profil && profil.full_name) || "")) + '"></label>'
-    + '<div class="zeitraumwahl">'
-    + '<label class="feld"><span>Erster Tag</span>'
-    + '<input id="fd-von" type="date" value="' + esc(start) + '"></label>'
-    + '<label class="feld"><span>Letzter Tag</span>'
-    + '<input id="fd-bis" type="date" value="' + esc(bisVorgabe) + '"></label>'
-    + '</div>'
-    + '<label class="feld"><span>Notiz</span>'
-    + '<input id="fd-notiz" type="text" placeholder="kann leer bleiben" value="'
-    + esc(eintrag ? (eintrag.note || "") : "") + '"></label>'
-
-    + '<div class="dialog__knoepfe">'
-    + (eintrag ? '<button class="knopf knopf--gefahr" id="fd-weg">Ferien löschen</button>' : "")
-    + (istAnfrage && darfPlanen()
-        ? '<button class="knopf knopf--haupt" id="fd-ok">Bestätigen</button>' : "")
-    + '<button class="knopf knopf--still" id="fd-nein">Abbrechen</button>'
-    + '<button class="knopf ' + (istAnfrage && darfPlanen() ? "knopf--still" : "knopf--haupt")
-    + '" id="fd-ja">Speichern</button>'
-    + '</div></div>';
-  document.body.appendChild(huelle);
-
-  const $ = (k) => huelle.querySelector("#" + k);
-  const zu = () => huelle.remove();
-  $("fd-nein").onclick = zu;
-  dialogSchliessen(huelle, zu);
-  $("fd-person").focus();
-
-  $("fd-ja").onclick = async () => {
-    const person = ($("fd-person").value || "").trim();
-    if (!person) { meldung("Bitte einen Namen eintragen.", "warn"); return; }
-
-    const von = $("fd-von").value || start;
-    const bis = $("fd-bis").value || von;
-    if (bis < von) { meldung("Der letzte Tag liegt vor dem ersten.", "warn"); return; }
-
-    const tage = arbeitstageZwischen(von, bis);
-    const daten = {
-      person: person,
-      zeile: zeile || freieFerienZeile(von, tage, eintrag ? eintrag.id : null),
-      von: von, tage: tage,
-      note: ($("fd-notiz").value || "").trim() || null,
-    };
-
-    // Wer nicht planen darf, stellt eine Anfrage
-    if (!eintrag) daten.genehmigt = darfPlanen();
-
-    const { error } = eintrag
-      ? await db.from("vacations").update(daten).eq("id", eintrag.id)
-      : await db.from("vacations").insert(daten);
-
-    zu();
-    if (error) meldung(fehlertext(error), "fehler");
-    else {
-      meldung(!eintrag && !darfPlanen() ? "Anfrage gestellt." : "Gespeichert.");
-      seitePlanwand(b);
+  // Zeitregler: ein halbes Jahr zurück bis ein halbes Jahr vor
+  const zeitregler = document.getElementById("pw-zeit");
+  if (zeitregler) {
+    const heuteIso = isoDatum(new Date());
+    const nullpunkt = arbeitstagePlus(wochenStart(heuteIso), -100);
+
+    // Position des aktuellen Starts auf der Skala
+    let stelle = 100;
+    for (let i = 0; i <= 200; i++) {
+      if (arbeitstagePlus(nullpunkt, i) >= plan.start) { stelle = i; break; }
     }
+    zeitregler.value = stelle;
+
+    const marke = document.getElementById("pw-zeitmarke");
+    if (marke) marke.style.left = (100 / 200 * 100) + "%";
+
+    const beschriften = () => {
+      const von = arbeitstagePlus(nullpunkt, Number(zeitregler.value));
+      const bis = arbeitstagePlus(von, Math.max(0, plan.tage - 1));
+      const v = document.getElementById("pw-zeitvon");
+      const bi = document.getElementById("pw-zeitbis");
+      if (v) v.textContent = kurzDatum(von);
+      if (bi) bi.textContent = kurzDatum(bis);
+    };
+    beschriften();
+
+    zeitregler.oninput = beschriften;
+    zeitregler.onchange = () => {
+      plan.start = arbeitstagePlus(nullpunkt, Number(zeitregler.value));
+      seitePlanwand(b);
+    };
+  }
+
+  const regler = document.getElementById("pw-regler");
+  const zahlfeld = document.getElementById("pw-zoomwert");
+
+  const zoomSetzen = (wert) => {
+    const n = Math.max(5, Math.min(150, Math.round(Number(wert) || 15)));
+    plan.tageWunsch = n;
+    einstellungSetzenWert("pwtage", n);
+    seitePlanwand(b);
   };
+
+  if (regler) {
+    regler.oninput = () => { if (zahlfeld) zahlfeld.value = regler.value; };
+    regler.onchange = () => zoomSetzen(regler.value);
+  }
+  if (zahlfeld) {
+    zahlfeld.onchange = () => zoomSetzen(zahlfeld.value);
+    zahlfeld.onkeydown = (e) => {
+      if (e.key === "Enter") { e.preventDefault(); zoomSetzen(zahlfeld.value); }
+    };
+  }
 
   const ok = $("fd-ok");
   if (ok) ok.onclick = async () => {
@@ -4709,7 +4280,7 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
 
   const huelle = document.createElement("div");
   huelle.className = "dialog-huelle";
-  huelle.innerHTML = '<div class="dialog">'
+  huelle.innerHTML = '<div class="dialog dialog--breit">'
     + '<h2>' + (auftrag ? esc(auftrag.job_number)
         : (vorlage ? "Kopie anlegen" : "Auftrag einplanen")) + '</h2>'
     + (vorlage
@@ -4751,6 +4322,8 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     + '<span class="feldhinweis">Von, Bis und Dauer hängen zusammen. '
     + 'Änderst du eines, passen sich die anderen an.</span></label>'
 
+    + '<div class="dialogspalten">'
+    + '<div class="dialogspalte">'
     + '<div class="dialog__block"><div class="dialog__blocktitel">Material</div>'
     + '<div class="zeitraumwahl">'
     + '<label class="feld"><span>Aussendurchmesser in mm</span>'
@@ -4836,6 +4409,7 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
           + '</div>'
         : "")
 
+    + '</div></div>'
     + '<div class="dialog__knoepfe">'
     + (auftrag && darf
         ? '<button class="knopf knopf--gefahr" id="pl-loeschen">Auftrag löschen</button>'
@@ -6186,8 +5760,14 @@ async function bestOffen(ziel, b) {
     const spaet = z.needed_by && z.needed_by < heute;
     return '<tr><td class="bz-artikel">'
       + '<strong>' + esc(a2.article_number || "?") + '</strong> ' + esc(a2.name || "")
-      + '<button class="kopiersymbol" data-bkopie="' + esc(a2.name || "")
-      + '" title="Bezeichnung kopieren">⧉</button>'
+      + '<button class="kopiersymbol" data-bkopie="' + esc(a2.article_number || "")
+      + '" title="Artikelnummer kopieren">'
+      + '<svg viewBox="0 0 24 24" width="13" height="13" fill="none"'
+      + ' stroke="currentColor" stroke-width="2" stroke-linecap="round"'
+      + ' stroke-linejoin="round">'
+      + '<rect x="9" y="9" width="12" height="12" rx="2"/>'
+      + '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>'
+      + '</svg></button>'
       + '<div class="klein">'
       + (z.needed_by ? '<span class="' + (spaet ? "minus stark" : "") + '">bis '
           + kurzDatum(z.needed_by) + '</span>' : "")
