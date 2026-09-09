@@ -1728,7 +1728,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "23.2.0";
+const APP_VERSION = "23.2.1";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -3675,7 +3675,8 @@ async function seitePlanwand(b) {
     const ziel = document.getElementById("pw-seite");
     if (ziel) ziel.innerHTML = '<div class="karte karte--fehler">'
       + '<h2>Die Planwand konnte nicht aufgebaut werden</h2>'
-      + '<p>' + esc(f && f.message ? f.message : String(f)) + '</p></div>';
+      + '<p>' + esc(f && f.message ? f.message : String(f)) + '</p>'
+      + '<p class="klein">Version ' + esc(APP_VERSION) + '</p></div>';
     console.error("Planwand:", f);
   }
 }
