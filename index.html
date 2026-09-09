@@ -1662,7 +1662,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "22.0.0";
+const APP_VERSION = "22.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -3081,16 +3081,26 @@ function parkAuswahlBinden(b) {
 
 async function ansichtErfassen(ziel, b) {
   const suchtext = (prod.suche || "").trim().toLowerCase();
+
+  // Bei einer Suche zählt der Park nicht mehr, sonst findet man
+  // eine HOCO Nr. nicht, die auf der anderen Seite läuft.
   const maschinen = prod.maschinen.filter((m) => {
-    if (m.park_id !== prod.parkId) return false;
-    if (!suchtext) return true;
+    if (!suchtext) return m.park_id === prod.parkId;
+
+    const auftrag = prod.auftraege ? prod.auftraege[m.id] : null;
     return (m.name || "").toLowerCase().includes(suchtext)
-      || (m.machine_number || "").toLowerCase().includes(suchtext);
+      || (m.machine_number || "").toLowerCase().includes(suchtext)
+      || (auftrag && (auftrag.job_number || "").toLowerCase().includes(suchtext));
   });
 
   if (!maschinen.length) {
     ziel.innerHTML = parkAuswahl()
-      + '<div class="karte karte--hinweis"><p>In diesem Maschinenpark ist noch keine Maschine angelegt.</p></div>';
+      + '<div class="karte karte--hinweis"><p>'
+      + (suchtext
+          ? 'Nichts gefunden zu "' + esc(prod.suche) + '". Gesucht wird in '
+            + 'Maschinenname, Maschinennummer und HOCO Nr.'
+          : 'In diesem Maschinenpark ist noch keine Maschine angelegt.')
+      + '</p></div>';
     parkAuswahlBinden(b);
 
   const suchfeld = document.getElementById("p-suche");
@@ -3121,7 +3131,7 @@ async function ansichtErfassen(ziel, b) {
     + '<button class="moduswahl__knopf' + (istWoche ? " aktiv" : "") + '" data-modus="woche">Woche</button>'
     + '</div>'
     + '<div class="suchleiste"><input type="search" id="p-suche"'
-    + ' placeholder="Maschine oder Nummer suchen" value="' + esc(prod.suche || "") + '"'
+    + ' placeholder="HOCO Nr., Maschine oder Maschinennummer" value="' + esc(prod.suche || "") + '"'
     + ' autocomplete="off"></div>'
     + '<div id="raster"><div class="laedt">Zahlen werden geladen …</div></div>';
 
@@ -3407,6 +3417,7 @@ const plan = {
   suche: "",
   skala: 1,
   kopierModus: false,
+  pinOk: false,
   adminModus: false,
   spalte: 0,
   spalte: 0,
@@ -3500,8 +3511,10 @@ function darfWirklichBearbeiten() {
 // Darf gerade auf der Planwand geändert werden?
 // Ohne Umschalter: wer das Recht hat, darf direkt bearbeiten.
 function darfPlanen() {
-  return istAdmin() || meineRolle() === "planwand"
-    || (profil && profil.darf_bearbeiten === true);
+  if (istAdmin()) return true;
+  if (profil && profil.darf_bearbeiten === true) return true;
+  // Die Rolle Planwand braucht den Pin
+  return meineRolle() === "planwand" && plan.pinOk === true;
 }
 
 const FERIEN_ZEILEN = 7;
@@ -6803,6 +6816,15 @@ async function seiteEinstellungen(b) {
         + '</section>'
       : "")
 
+    + (bin
+      ? '<section class="karte"><h2>Pin für die Planwand</h2>'
+        + '<p class="hinweis">Wer die Rolle Planwand hat, schaltet damit das '
+        + 'Bearbeiten frei. Gilt für alle.</p>'
+        + '<label class="feld"><span>Pin</span>'
+        + '<input type="text" id="pin-feld" inputmode="numeric" placeholder="0000"></label>'
+        + '<button class="knopf" id="pin-speichern">Pin speichern</button></section>'
+      : "")
+
     + '<section class="karte"><h2>Über die App</h2>'
     + '<p class="klein">Version ' + esc(APP_VERSION) + ' · angemeldet als '
     + esc(ich.email || "") + '</p></section>';
@@ -6862,6 +6884,27 @@ async function seiteEinstellungen(b) {
       seiteEinstellungen(b);
     } catch (f2) { meldung(fehlertext(f2), "fehler"); }
   };
+
+  // ---------- Pin ----------
+  const pinFeld = document.getElementById("pin-feld");
+  if (pinFeld) {
+    (async () => {
+      try {
+        const r = await zeitlimit(db.from("app_config").select("wert")
+          .eq("schluessel", "planwand_pin").maybeSingle(), 8000, "Pin");
+        if (!r.error && r.data) pinFeld.value = r.data.wert || "";
+      } catch (f) { /* Tabelle gibt es vielleicht noch nicht */ }
+    })();
+
+    document.getElementById("pin-speichern").onclick = async () => {
+      const wert = (pinFeld.value || "").trim();
+      if (!wert) { meldung("Bitte einen Pin eingeben.", "warn"); return; }
+      const { error } = await db.from("app_config")
+        .upsert({ schluessel: "planwand_pin", wert: wert });
+      if (error) meldung(fehlertext(error), "fehler");
+      else meldung("Pin gespeichert.");
+    };
+  }
 
   // ---------- Benutzerliste, nachgeladen ----------
   if (bin) benutzerlisteLaden(b, bin);
@@ -8609,6 +8652,10 @@ function zeichneGeruest() {
     + '<header class="kopf">'
     + '<button class="kopf__klapp" id="nav-klapp" title="Menü ein- oder ausklappen">☰</button>'
     + '<img class="kopf__logo" src="./logo.png" alt="Hofer + Co.">'
+    + (meineRolle() === "planwand"
+        ? '<button class="kopf__admin' + (plan.pinOk ? " aktiv" : "") + '" id="kopf-admin"'
+          + ' title="Bearbeiten freischalten">Bearbeiten</button>'
+        : "")
     + '<button class="kopf__rueck" id="rueck-knopf" hidden'
     + ' title="Rückgängig">↶</button>'
     + '<span class="kopf__luecke"></span>'
@@ -8626,6 +8673,41 @@ function zeichneGeruest() {
         + '<span class="nav__text">' + esc(s.titel) + '</span></a>').join("")
     + '</nav><main class="inhalt" id="inhalt"></main></div>'
     + '<div class="versionsecke">v' + esc(APP_VERSION) + '</div>';
+
+  const adminKnopf = document.getElementById("kopf-admin");
+  if (adminKnopf) adminKnopf.onclick = async () => {
+    if (plan.pinOk) {
+      plan.pinOk = false;
+      adminKnopf.classList.remove("aktiv");
+      meldung("Bearbeiten gesperrt.");
+      zeichneSeite();
+      return;
+    }
+
+    const w = await dialogFelder({
+      titel: "Bearbeiten freischalten",
+      text: "Bitte den Pin eingeben.",
+      felder: [{ name: "pin", label: "Pin", typ: "password", pflicht: true }],
+      bestaetigen: "Freischalten" });
+    if (!w) return;
+
+    let richtig = "0000";
+    try {
+      const r = await zeitlimit(db.from("app_config").select("wert")
+        .eq("schluessel", "planwand_pin").maybeSingle(), 8000, "Pin");
+      if (!r.error && r.data && r.data.wert) richtig = r.data.wert;
+    } catch (f) { /* dann gilt der Standardpin */ }
+
+    if (String(w.pin).trim() !== String(richtig).trim()) {
+      meldung("Falscher Pin.", "fehler");
+      return;
+    }
+
+    plan.pinOk = true;
+    adminKnopf.classList.add("aktiv");
+    meldung("Bearbeiten freigeschaltet.");
+    zeichneSeite();
+  };
 
   const rueck = document.getElementById("rueck-knopf");
   if (rueck) rueck.onclick = schrittZurueck;
