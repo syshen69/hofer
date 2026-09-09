@@ -1619,6 +1619,39 @@ body.dunkel .unterreiter__knopf.aktiv {
 }
 body.dunkel .moduswahl__knopf.aktiv, body.dunkel .parkwahl__knopf.aktiv,
 body.dunkel .wahlknopf.aktiv { background: #24344a; }
+
+.kopiersymbol { background: none; border: none; color: var(--gedaempft);
+                cursor: pointer; font-size: .95rem; padding: 0 6px; line-height: 1; }
+.kopiersymbol:hover { color: var(--marke); }
+
+/* ---------- Balken mit drei Zeilen ---------- */
+.pw-spuren { min-height: calc(58px * var(--pw-s, 1)); }
+.pw-balken { padding: calc(3px * var(--pw-s, 1)) calc(6px * var(--pw-s, 1));
+             align-items: stretch; }
+.pw-balken__inhalt { display: flex; flex-direction: column; justify-content: center;
+                     gap: 1px; width: 100%; overflow: hidden; }
+.pw-zeile1 { display: flex; align-items: center; gap: calc(4px * var(--pw-s, 1));
+             font-size: calc(0.7rem * var(--pw-s, 1)); font-weight: 650;
+             white-space: nowrap; overflow: hidden; }
+.pw-zeile2 { font-size: calc(0.64rem * var(--pw-s, 1)); opacity: .95;
+             font-variant-numeric: tabular-nums;
+             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pw-zeile3 { font-size: calc(0.6rem * var(--pw-s, 1)); opacity: .85;
+             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pw-balken__nr { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
+
+.suchchip { display: inline-flex; align-items: center; gap: 6px;
+            background: var(--marke-hell); color: var(--marke);
+            padding: 6px 10px; border-radius: 999px; font-size: .85rem;
+            font-weight: 600; }
+.pw-balken--treffer { outline: 3px solid var(--signalgelb); outline-offset: 2px;
+                      z-index: 4; }
+
+.suchchip { display: inline-flex; align-items: center; gap: 8px;
+            background: var(--marke-hell); color: var(--marke);
+            padding: 6px 12px; border-radius: 999px; font-size: .85rem;
+            font-weight: 600; }
+.pw-balken--treffer { outline: 3px solid var(--signalgelb); outline-offset: 2px; }
 </style>
 </head>
 <body>
@@ -1662,7 +1695,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "22.1.0";
+const APP_VERSION = "23.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -2859,6 +2892,9 @@ async function doppeltNachfragen(erste, zweite) {
 const prod = {
   ansicht: "erfassen",
   suche: "",
+  trefferNr: 0,
+  letzteSuche: "",
+  trefferAnzahl: 0,
   parkId: null,
   tag: null,
   modus: null,
@@ -3461,7 +3497,15 @@ function naechsterArbeitstag(datum) {
 // Zählt n Arbeitstage weiter, Wochenenden übersprungen.
 function arbeitstagePlus(datum, n) {
   let d = naechsterArbeitstag(datum);
-  for (let i = 0; i < n; i++) { d = naechsterArbeitstag(plusTage(d, 1)); }
+  if (n >= 0) {
+    for (let i = 0; i < n; i++) { d = naechsterArbeitstag(plusTage(d, 1)); }
+    return d;
+  }
+  // Negative Werte gehen rückwärts, Wochenenden werden übersprungen
+  for (let i = 0; i < -n; i++) {
+    d = plusTage(d, -1);
+    while ([0, 6].indexOf(ausIso(d).getDay()) !== -1) d = plusTage(d, -1);
+  }
   return d;
 }
 
@@ -3600,9 +3644,12 @@ async function ansichtPlanwand(ziel, b) {
     + '<button class="knopf knopf--klein" id="pw-rein" title="weniger Tage zeigen">+</button>'
     + '</div></div>'
     + '<div class="suchleiste">'
-    + '<input type="search" id="pw-suche" placeholder="HOCO Nr. eingeben und Enter"'
-    + ' autocomplete="off">'
     + '<button class="knopf" id="pw-suche-los">Suchen</button>'
+    + (plan.letzteSuche
+        ? '<span class="suchchip">' + esc(plan.letzteSuche)
+          + ' · ' + (plan.trefferAnzahl || 0) + ' Treffer'
+          + '<button class="chipweg" id="pw-suche-weiter" title="weiter">›</button></span>'
+        : '<span class="klein">Sucht in allem: Nummer, Maschine, Material, Notiz</span>')
     + '</div>'
     + (darfPlanen()
         ? '<div class="pw-aktionen">'
@@ -3653,15 +3700,12 @@ async function ansichtPlanwand(ziel, b) {
   const zoomAnzeige = document.getElementById("pw-zoomwert");
   if (zoomAnzeige) zoomAnzeige.textContent = plan.tage + " Tage";
 
-  // Die Suche filtert nicht mehr, sie springt zum Auftrag.
-  const suchfeld = document.getElementById("pw-suche");
-  suchfeld.onkeydown = (e) => {
-    if (e.key !== "Enter") return;
-    e.preventDefault();
-    zumAuftragSpringen(suchfeld.value, b);
-  };
+  // Die Suche öffnet ein Fenster und springt danach zum Treffer.
   const suchKnopf = document.getElementById("pw-suche-los");
-  if (suchKnopf) suchKnopf.onclick = () => zumAuftragSpringen(suchfeld.value, b);
+  if (suchKnopf) suchKnopf.onclick = () => sucheDialog(b);
+
+  const weiter = document.getElementById("pw-suche-weiter");
+  if (weiter) weiter.onclick = () => zumAuftragSpringen(plan.letzteSuche, b, true);
 
   try {
     plan.auftraege = await ladePlanAuftraege();
@@ -3690,31 +3734,54 @@ async function ansichtPlanwand(ziel, b) {
 
 // Sucht den Auftrag und schiebt die Wand dorthin. Bei mehreren
 // Treffern erst die Auswahl.
-async function zumAuftragSpringen(text, b) {
+// Fenster für die freie Suche
+async function sucheDialog(b) {
+  const w = await dialogFelder({
+    titel: "Auf der Planwand suchen",
+    text: "Gesucht wird in allem: Nummer, Maschine, Notiz, Material, "
+        + "Menge, Farbe, Zustand und Datum.",
+    felder: [{ name: "text", label: "Suchbegriff", pflicht: true,
+               wert: plan.letzteSuche || "",
+               platzhalter: "zum Beispiel 10844, Index oder Messing" }],
+    bestaetigen: "Suchen",
+  });
+  if (!w) return;
+  plan.trefferNr = 0;
+  await zumAuftragSpringen(w.text, b, false);
+}
+
+// Alle Angaben eines Auftrags als ein durchsuchbarer Text
+function auftragText(j) {
+  return [
+    j.job_number, j.maschine, j.maschine_nr, j.park, j.plan_note,
+    j.material_dm, j.material_toleranz, j.material_menge, j.material_liefertermin,
+    j.target_quantity, j.stand, j.color, j.plan_status, j.problem, j.planned_from,
+  ].map((x) => String(x === null || x === undefined ? "" : x).toLowerCase()).join(" ");
+}
+
+async function zumAuftragSpringen(text, b, weiter) {
   const t = (text || "").trim().toLowerCase();
   if (!t) return;
 
-  const treffer = (plan.auftraege || []).filter((j) =>
-    (j.job_number || "").toLowerCase().includes(t)
-    || (j.plan_note || "").toLowerCase().includes(t));
+  const treffer = (plan.auftraege || []).filter((j) => auftragText(j).includes(t));
+
+  plan.letzteSuche = text.trim();
+  plan.trefferAnzahl = treffer.length;
 
   if (!treffer.length) {
-    meldung("Kein Auftrag mit " + text + " gefunden.", "warn");
+    meldung('Nichts gefunden zu "' + text + '".', "warn");
     return;
   }
 
-  let ziel = treffer[0];
-  if (treffer.length > 1) {
-    const wahl = await auswahlSuchen("Mehrere Treffer",
-      treffer.map((j) => ({
-        wert: j.id,
-        text: j.job_number + "   " + j.maschine
-          + (j.planned_from ? "   ab " + kurzDatum(j.planned_from) : ""),
-        such: (j.job_number || "") + " " + (j.maschine || ""),
-      })));
-    if (!wahl) return;
-    ziel = treffer.find((j) => j.id === wahl);
-  }
+  if (!weiter) plan.trefferNr = 0;
+  const ziel = treffer[plan.trefferNr % treffer.length];
+  plan.trefferNr = (plan.trefferNr + 1) % treffer.length;
+
+  meldung(treffer.length === 1
+    ? "Ein Treffer: " + ziel.job_number
+    : "Treffer " + (((plan.trefferNr + treffer.length - 1) % treffer.length) + 1)
+      + " von " + treffer.length + ": " + ziel.job_number
+      + ". Auf › tippen springt weiter.");
 
   // Zeitraum so verschieben, dass der Auftrag sichtbar ist
   if (ziel.planned_from) {
@@ -3722,14 +3789,13 @@ async function zumAuftragSpringen(text, b) {
     await seitePlanwand(b);
   }
 
-  // Balken hervorheben und ins Bild holen
   setTimeout(() => {
     const el = document.querySelector('[data-auftrag="' + CSS.escape(ziel.id) + '"]');
-    if (!el) { meldung("Der Auftrag liegt ausserhalb des Zeitraums.", "warn"); return; }
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
     el.classList.add("pw-balken--treffer");
-    el.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
-    setTimeout(() => el.classList.remove("pw-balken--treffer"), 2600);
-  }, 120);
+    setTimeout(() => el.classList.remove("pw-balken--treffer"), 2500);
+  }, 200);
 }
 
 function zeichnePlanwand(b) {
@@ -3877,7 +3943,6 @@ function planBalken(j, spalte, dauer, angeschnitten) {
   const fertig = st === "fertig";
   const f = farbeVon(j.color);
 
-  // Fertige Aufträge werden immer dunkelgrau, egal welche Farbe gewählt war.
   const hg = fertig ? "#4a5158" : f.hex;
   const vg = fertig ? "#ffffff" : f.schrift;
   const rand = (!fertig && j.color === "weiss") ? "border:1px solid var(--linie-stark);" : "";
@@ -3891,13 +3956,23 @@ function planBalken(j, spalte, dauer, angeschnitten) {
     anteil = 100;
   }
 
-  // Stückzahl im Balken. Läuft er noch nicht, steht nur die Zielmenge da.
-  let mengeText = "";
+  // Zeile 2: Stückzahlen
+  let zeileMenge = "";
   if (j.target_quantity) {
-    mengeText = (st === "laeuft" || (j.stand || 0) > 0)
-      ? zahlText(j.stand || 0) + "/" + zahlText(j.target_quantity)
-      : zahlText(j.target_quantity);
+    zeileMenge = (st === "laeuft" || (j.stand || 0) > 0)
+      ? zahlText(j.stand || 0) + " / " + zahlText(j.target_quantity)
+      : zahlText(j.target_quantity) + " Stück";
   }
+
+  // Zeile 3: Material
+  const materialTeile = [];
+  if (j.material_dm) {
+    materialTeile.push("⌀" + j.material_dm
+      + (j.material_toleranz ? " " + j.material_toleranz : ""));
+  }
+  if (j.material_menge) materialTeile.push(j.material_menge);
+  if (j.material_liefertermin) materialTeile.push("ab " + kurzDatum(j.material_liefertermin));
+  const zeileMaterial = materialTeile.join(" · ");
 
   return '<div class="pw-balken' + (fertig ? " pw-balken--fertig" : "")
     + (angeschnitten ? " pw-balken--offen" : "") + '"'
@@ -3906,20 +3981,31 @@ function planBalken(j, spalte, dauer, angeschnitten) {
     + ' data-angeschnitten="' + (angeschnitten ? "1" : "0") + '"'
     + ' style="--von:' + spalte + ';--dauer:' + Math.max(1, dauer)
     + ';background:' + hg + ';color:' + vg + ';' + rand + '">'
+
     + (anteil !== null
         ? '<div class="pw-fortschritt" style="width:' + anteil + '%"></div>' : "")
+
     + '<div class="pw-balken__inhalt">'
-    + (j.problem ? '<span class="pw-balken__warnung" title="' + esc(j.problem) + '">⚠</span>' : "")
+
+    // Zeile 1: Nummer, Zustand und Hinweise
+    + '<div class="pw-zeile1">'
+    + '<span class="pw-balken__status">'
+    + (PLANSTATUS[st] || PLANSTATUS.geplant).zeichen + '</span>'
+    + '<span class="pw-balken__nr">' + esc(j.job_number) + '</span>'
+    + (j.problem ? '<span class="pw-balken__warnung" title="'
+        + esc(j.problem) + '">⚠</span>' : "")
     + (!j.fa_erstellt ? '<span class="pw-balken__fehlt" title="FA fehlt">FA</span>' : "")
     + (!j.material_ok ? '<span class="pw-balken__fehlt" title="Material fehlt">M</span>' : "")
-    + '<span class="pw-balken__status">' + (PLANSTATUS[st] || PLANSTATUS.geplant).zeichen + '</span>'
-    + '<span class="pw-balken__nr">' + esc(j.job_number) + '</span>'
-    + (j.material_dm
-        ? '<span class="pw-balken__dm">⌀' + j.material_dm
-          + (j.material_toleranz ? " " + esc(j.material_toleranz) : "") + '</span>' : "")
-    + (mengeText ? '<span class="pw-balken__prozent">' + mengeText + '</span>' : "")
-    + (j.plan_note ? '<span class="pw-balken__zeichen">✎</span>' : "")
+    + (j.plan_note ? '<span class="pw-balken__zeichen" title="Notiz">✎</span>' : "")
     + (j.drawing_url ? '<span class="pw-balken__zeichen">PDF</span>' : "")
+    + '</div>'
+
+    // Zeile 2: Stückzahlen
+    + '<div class="pw-zeile2">' + esc(zeileMenge) + '</div>'
+
+    // Zeile 3: Material
+    + '<div class="pw-zeile3">' + esc(zeileMaterial) + '</div>'
+
     + '</div>'
     + (darfPlanen() && !angeschnitten
         ? '<span class="pw-griff pw-griff--links" data-griff="links"></span>' : "")
@@ -4436,13 +4522,44 @@ function balkenVerhalten(b) {
       if (maschineId === auftrag.machine_id && datum === auftrag.planned_from) return;
 
       const vorherM = auftrag.machine_id, vorherD = auftrag.planned_from;
+
+      // Entsteht auf der alten Maschine eine Lücke, fragen wir nach
+      let nachruecken = false;
+      const dahinter = (plan.auftraege || []).filter((x) =>
+        x.id !== auftrag.id && x.machine_id === vorherM
+        && x.planned_from && vorherD && x.planned_from > vorherD
+        && x.plan_status !== "fertig");
+
+      if (dahinter.length) {
+        const wahl = await auswahlDialog("Was soll mit der Lücke passieren?", [
+          { wert: "luecke", text: "Lücke lassen" },
+          { wert: "nach", text: "Die " + dahinter.length
+            + " folgenden Aufträge nachrücken lassen" },
+        ]);
+        if (!wahl) return;
+        nachruecken = wahl === "nach";
+      }
       const { error } = await db.from("jobs")
         .update({ machine_id: maschineId, planned_from: datum })
         .eq("id", auftrag.id);
 
       if (error) meldung(fehlertext(error), "fehler");
       else {
+        // Nachrücken: alle folgenden um die frei gewordenen Tage vorziehen
+        const vorher = [];
+        if (nachruecken) {
+          const tage = auftrag.planned_days || 1;
+          for (const x of dahinter) {
+            vorher.push({ id: x.id, von: x.planned_from });
+            const neu = arbeitstagePlus(x.planned_from, -tage);
+            await db.from("jobs").update({ planned_from: neu }).eq("id", x.id);
+          }
+        }
+
         merkeSchritt("Verschieben von " + auftrag.job_number, async () => {
+          for (const v of vorher) {
+            await db.from("jobs").update({ planned_from: v.von }).eq("id", v.id);
+          }
           await db.from("jobs")
             .update({ machine_id: vorherM, planned_from: vorherD })
             .eq("id", auftrag.id);
@@ -6024,7 +6141,8 @@ async function seiteBestellungen(b) {
   b.innerHTML = '<h1 class="seitentitel">Bestellungen</h1>'
     + '<div class="reiter">'
     + [["offen", "Offen"], ["historie", "Historie"],
-       ["artikel", "Artikel"], ["lieferanten", "Lieferanten"]]
+       ["artikel", "Artikel"], ["bezeichnungen", "Bezeichnungen"],
+       ["lieferanten", "Lieferanten"]]
       .map(([w, t]) => '<button class="reiter__knopf' + (best.ansicht === w ? " aktiv" : "")
         + '" data-best="' + w + '">' + t + '</button>').join("")
     + '</div>'
@@ -6037,6 +6155,8 @@ async function seiteBestellungen(b) {
 
   const ziel = document.getElementById("best-inhalt");
   if (best.ansicht === "artikel") return bestArtikel(ziel, b);
+  if (best.ansicht === "bezeichnungen") return bestBezeichnungen(ziel, b);
+  if (best.ansicht === "bezeichnungen") return bestBezeichnungen(ziel, b);
   if (best.ansicht === "lieferanten") return bestLieferanten(ziel, b);
   if (best.ansicht === "historie") return bestHistorie(ziel, b);
   return bestOffen(ziel, b);
@@ -6066,6 +6186,8 @@ async function bestOffen(ziel, b) {
     const spaet = z.needed_by && z.needed_by < heute;
     return '<tr><td class="bz-artikel">'
       + '<strong>' + esc(a2.article_number || "?") + '</strong> ' + esc(a2.name || "")
+      + '<button class="kopiersymbol" data-bkopie="' + esc(a2.name || "")
+      + '" title="Bezeichnung kopieren">⧉</button>'
       + '<div class="klein">'
       + (z.needed_by ? '<span class="' + (spaet ? "minus stark" : "") + '">bis '
           + kurzDatum(z.needed_by) + '</span>' : "")
@@ -6075,8 +6197,7 @@ async function bestOffen(ziel, b) {
       + '<td class="bz-menge stark">' + zahlText(z.quantity) + '</td>'
       + (darfSchreiben()
           ? '<td class="bz-aktionen">'
-            + '<button class="linkknopf" data-bkopie="' + esc(z.id) + '">Kopieren</button>'
-      + '<button class="linkknopf" data-bearb-best="' + esc(z.id) + '">Bearbeiten</button>'
+            + '<button class="linkknopf" data-bearb-best="' + esc(z.id) + '">Bearbeiten</button>'
             + '<button class="linkknopf" data-bstatus="' + esc(z.id) + '">Status</button>'
             + '<button class="linkknopf linkknopf--gefahr" data-bweg="' + esc(z.id)
             + '" data-nr="' + esc(a2.article_number || "") + '">Löschen</button>'
@@ -6123,15 +6244,11 @@ async function bestOffen(ziel, b) {
 
   ziel.querySelectorAll("[data-bkopie]").forEach((el) => {
     el.onclick = async () => {
-      const z = liste.find((x) => x.id === el.dataset.bkopie);
-      if (!z) return;
-      const a2 = z.articles || {};
-      const text = [a2.article_number || "", a2.name || "",
-        zahlText(z.quantity) + " " + (a2.unit || "Stück"),
-        (z.suppliers && z.suppliers.name) || ""].filter(Boolean).join("   ");
+      const text = el.dataset.bkopie || "";
+      if (!text) { meldung("Nichts zu kopieren.", "warn"); return; }
       try {
         await navigator.clipboard.writeText(text);
-        meldung("In die Zwischenablage gelegt.");
+        meldung("Kopiert: " + text);
       } catch (f) {
         meldung("Kopieren nicht möglich: " + text, "warn");
       }
@@ -6639,39 +6756,215 @@ async function artikelBearbeiten(artikel, b) {
   try { lieferanten = await ladeLieferanten(); } catch (f) { /* geht auch ohne */ }
   try { bezeichnungen = await ladeBezeichnungen(); } catch (f) { /* geht auch ohne */ }
 
-  const w = await dialogFelder({
-    titel: "Artikel bearbeiten",
-    felder: [
-      { name: "nummer", label: "Artikelnummer", pflicht: true, wert: artikel.article_number },
+  const huelle = document.createElement("div");
+  huelle.className = "dialog-huelle";
+  huelle.innerHTML = '<div class="dialog">'
+    + '<h2>Artikel bearbeiten</h2>'
 
-      { name: "einheit", label: "Einheit", wert: artikel.unit || "Stück" },
-    ],
-    bestaetigen: "Weiter",
+    + '<label class="feld"><span>Artikelnummer</span>'
+    + '<input type="text" id="ab-nr" autocapitalize="characters" value="'
+    + esc(artikel.article_number || "") + '"></label>'
+
+    + '<label class="feld"><span>Bezeichnung</span>'
+    + '<select id="ab-bez">'
+    + bezeichnungen.map((z) => '<option value="' + esc(z.name) + '"'
+        + (z.name === artikel.name ? " selected" : "") + '>' + esc(z.name) + '</option>').join("")
+    + (bezeichnungen.some((z) => z.name === artikel.name) || !artikel.name
+        ? "" : '<option value="' + esc(artikel.name) + '" selected>'
+               + esc(artikel.name) + '  (nicht in der Liste)</option>')
+    + '<option value="__neu">+ Neue Bezeichnung anlegen</option>'
+    + '</select></label>'
+
+    + '<div class="zeitraumwahl">'
+    + '<label class="feld"><span>Einheit</span>'
+    + '<input type="text" id="ab-einheit" value="' + esc(artikel.unit || "Stück") + '"></label>'
+    + '<label class="feld"><span>Lieferant</span>'
+    + '<select id="ab-lief">'
+    + '<option value="">– kein Lieferant –</option>'
+    + lieferanten.map((l) => '<option value="' + esc(l.id) + '"'
+        + (l.id === artikel.supplier_id ? " selected" : "") + '>' + esc(l.name)
+        + '</option>').join("")
+    + '<option value="__neu">+ Neuer Lieferant …</option>'
+    + '</select></label>'
+    + '</div>'
+
+    + '<div class="dialog__knoepfe">'
+    + '<button class="knopf knopf--gefahr" id="ab-weg">Löschen</button>'
+    + '<button class="knopf knopf--still" id="ab-nein">Abbrechen</button>'
+    + '<button class="knopf knopf--haupt" id="ab-ja">Speichern</button>'
+    + '</div></div>';
+  document.body.appendChild(huelle);
+
+  const $ = (k) => huelle.querySelector("#" + k);
+  const zu = () => huelle.remove();
+  $("ab-nein").onclick = zu;
+  dialogSchliessen(huelle, zu);
+  $("ab-nr").focus();
+
+  // Neue Bezeichnung direkt hier anlegen
+  const bezFeld = $("ab-bez");
+  bezFeld.onchange = async () => {
+    if (bezFeld.value !== "__neu") return;
+    bezFeld.value = artikel.name || "";
+    const w = await dialogFelder({ titel: "Neue Bezeichnung",
+      felder: [{ name: "name", label: "Bezeichnung", pflicht: true }],
+      bestaetigen: "Anlegen" });
+    if (!w) return;
+    const { error } = await db.from("designations").insert({ name: w.name });
+    if (error && !String(error.message || "").includes("duplicate")) {
+      meldung(fehlertext(error), "fehler");
+      return;
+    }
+    const opt = document.createElement("option");
+    opt.value = w.name; opt.textContent = w.name; opt.selected = true;
+    bezFeld.insertBefore(opt, bezFeld.lastElementChild);
+    meldung("Bezeichnung angelegt.");
+  };
+
+  // Neuen Lieferanten direkt hier anlegen
+  const liefFeld = $("ab-lief");
+  liefFeld.onchange = async () => {
+    if (liefFeld.value !== "__neu") return;
+    liefFeld.value = artikel.supplier_id || "";
+    const w = await dialogFelder({ titel: "Neuer Lieferant",
+      felder: [
+        { name: "name", label: "Name", pflicht: true },
+        { name: "website", label: "Website", platzhalter: "www.beispiel.ch" }],
+      bestaetigen: "Anlegen" });
+    if (!w) return;
+    let seite = (w.website || "").trim();
+    if (seite && !/^https?:\/\//i.test(seite)) seite = "https://" + seite;
+    const r = await db.from("suppliers")
+      .insert({ name: w.name, website: seite || null }).select().single();
+    if (r.error) { meldung(fehlertext(r.error), "fehler"); return; }
+    const opt = document.createElement("option");
+    opt.value = r.data.id; opt.textContent = r.data.name; opt.selected = true;
+    liefFeld.insertBefore(opt, liefFeld.lastElementChild);
+    meldung("Lieferant angelegt.");
+  };
+
+  $("ab-ja").onclick = async () => {
+    const nummer = ($("ab-nr").value || "").trim();
+    const name = bezFeld.value === "__neu" ? (artikel.name || "") : bezFeld.value;
+    if (!nummer || !name) {
+      meldung("Artikelnummer und Bezeichnung werden benötigt.", "warn");
+      return;
+    }
+
+    const { error } = await db.from("articles").update({
+      article_number: nummer,
+      name: name,
+      unit: ($("ab-einheit").value || "").trim() || "Stück",
+      supplier_id: liefFeld.value && liefFeld.value !== "__neu" ? liefFeld.value : null,
+    }).eq("id", artikel.id);
+
+    zu();
+    if (error) meldung(fehlertext(error), "fehler");
+    else { meldung("Gespeichert."); artikelListe(b); }
+  };
+
+  $("ab-weg").onclick = async () => {
+    const ok = await doppeltNachfragen(
+      { titel: "Artikel löschen",
+        text: 'Soll "' + artikel.article_number + '" wirklich gelöscht werden?',
+        bestaetigen: "Weiter zum Löschen", gefahr: true },
+      { titel: "Wirklich endgültig löschen?",
+        text: "Letzte Rückfrage. Danach ist der Artikel weg.",
+        bestaetigen: "Endgültig löschen", gefahr: true });
+    if (!ok) return;
+
+    const r = await db.from("articles").delete().eq("id", artikel.id).select();
+    const fehlt = r.error || ((r.data || []).length === 0
+      ? new Error("Dafür fehlen dir die Rechte, oder der Artikel wird noch verwendet.")
+      : null);
+
+    if (fehlt) { meldung(fehlertext(fehlt), "fehler"); return; }
+    zu();
+    meldung("Artikel gelöscht.");
+    artikelListe(b);
+  };
+}
+
+// ---------- Bezeichnungen ----------
+
+async function bestBezeichnungen(ziel, b) {
+  ziel.innerHTML = (darfSchreiben()
+      ? '<button class="knopf knopf--haupt knopf--breit" id="bz-neu">'
+        + '+ Neue Bezeichnung</button>' : "")
+    + '<div id="bz-liste"><div class="laedt">Wird geladen …</div></div>';
+
+  const neu = document.getElementById("bz-neu");
+  if (neu) neu.onclick = () => bezeichnungDialog(null, b);
+
+  bezeichnungsListe(b);
+}
+
+async function bezeichnungsListe(b) {
+  const kasten = document.getElementById("bz-liste");
+  if (!kasten) return;
+
+  let liste;
+  try { liste = await ladeBezeichnungen(); }
+  catch (f) {
+    kasten.innerHTML = '<div class="karte karte--fehler"><p>'
+      + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  kasten.innerHTML = '<section class="karte">'
+    + '<h2>Bezeichnungen <span class="marke">' + liste.length + '</span></h2>'
+    + '<p class="hinweis">Diese Liste erscheint beim Anlegen und Bearbeiten '
+    + 'von Artikeln. So heisst dasselbe Werkzeug überall gleich.</p>'
+    + (liste.length
+      ? '<table class="tabelle"><tbody>' + liste.map((z) =>
+          '<tr><td class="stark">' + esc(z.name) + '</td>'
+          + (darfSchreiben()
+            ? '<td class="rechts nowrap">'
+              + '<button class="linkknopf" data-bzb="' + esc(z.id) + '">Bearbeiten</button>'
+              + '<button class="linkknopf linkknopf--gefahr" data-bzw="' + esc(z.id)
+              + '" data-name="' + esc(z.name) + '">Löschen</button></td>'
+            : "")
+          + '</tr>').join("") + '</tbody></table>'
+      : '<p class="hinweis">Noch keine Bezeichnung angelegt.</p>')
+    + '</section>';
+
+  kasten.querySelectorAll("[data-bzb]").forEach((el) => {
+    el.onclick = () => bezeichnungDialog(liste.find((x) => x.id === el.dataset.bzb), b);
+  });
+
+  kasten.querySelectorAll("[data-bzw]").forEach((el) => {
+    el.onclick = async () => {
+      const ok = await nachfragen({ titel: "Bezeichnung löschen",
+        text: '"' + el.dataset.name + '" wird aus der Liste entfernt. '
+            + "Artikel, die sie tragen, behalten ihren Namen.",
+        bestaetigen: "Löschen", gefahr: true });
+      if (!ok) return;
+      const { error } = await db.from("designations").delete().eq("id", el.dataset.bzw);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Gelöscht."); bezeichnungsListe(b); }
+    };
+  });
+}
+
+async function bezeichnungDialog(eintrag, b) {
+  const w = await dialogFelder({
+    titel: eintrag ? "Bezeichnung ändern" : "Neue Bezeichnung",
+    felder: [{ name: "name", label: "Bezeichnung", pflicht: true,
+               wert: eintrag ? eintrag.name : "" }],
+    bestaetigen: "Speichern",
   });
   if (!w) return;
 
-  const bez = await bezeichnungWaehlen(bezeichnungen, artikel.name);
-  if (bez === null) return;
-  w.name = bez;
-
-  let lieferantId = artikel.supplier_id || null;
-  if (lieferanten.length) {
-    const wahl = await auswahlDialog("Lieferant",
-      lieferanten.map((l) => ({ wert: l.id, text: l.name }))
-        .concat([{ wert: "", text: "– kein Lieferant –" }]));
-    if (wahl !== null) lieferantId = wahl || null;
-  }
-
-  const { error } = await db.from("articles").update({
-    article_number: w.nummer, name: w.name,
-    unit: w.einheit || "Stück", supplier_id: lieferantId,
-  }).eq("id", artikel.id);
+  const { error } = eintrag
+    ? await db.from("designations").update({ name: w.name }).eq("id", eintrag.id)
+    : await db.from("designations").insert({ name: w.name });
 
   if (error) meldung(fehlertext(error), "fehler");
-  else { meldung("Gespeichert."); artikelListe(b); }
+  else { meldung("Gespeichert."); bezeichnungsListe(b); }
 }
 
 // ---------- Lieferanten ----------
+
 
 async function bestLieferanten(ziel, b) {
   let liste;
