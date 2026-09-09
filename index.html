@@ -1728,7 +1728,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "23.2.1";
+const APP_VERSION = "23.3.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -3801,6 +3801,37 @@ async function ansichtPlanwand(ziel, b) {
     zahlfeld.onkeydown = (e) => {
       if (e.key === "Enter") { e.preventDefault(); zoomSetzen(zahlfeld.value); }
     };
+  }
+
+  // Aufträge und Ferien laden, danach zeichnen
+  try {
+    plan.auftraege = await ladePlanAuftraege();
+  } catch (f) {
+    document.getElementById("pw-inhalt").innerHTML =
+      '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p>'
+      + '<p class="klein">Version ' + esc(APP_VERSION) + '</p></div>';
+    return;
+  }
+
+  try {
+    plan.ferien = (await ladeFerien()).map((f) => {
+      f.genehmigt_von_name = f.profiles ? f.profiles.full_name : null;
+      return f;
+    });
+  } catch (f) {
+    plan.ferien = [];
+    console.warn("Ferien:", f.message);
+  }
+
+  try {
+    zeichnePlanwand(b);
+  } catch (f) {
+    document.getElementById("pw-inhalt").innerHTML =
+      '<div class="karte karte--fehler">'
+      + '<h2>Die Planwand konnte nicht gezeichnet werden</h2>'
+      + '<p>' + esc(f && f.message ? f.message : String(f)) + '</p>'
+      + '<p class="klein">Version ' + esc(APP_VERSION) + '</p></div>';
+    console.error("Planwand zeichnen:", f);
   }
 
 }
