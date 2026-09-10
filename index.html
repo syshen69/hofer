@@ -369,7 +369,9 @@ a:focus-visible {
   text-align: center;
 }
 .login__logo { width: 100%; max-width: 300px; height: auto; }
-.login__bild { width: calc(100% + 48px); margin: -28px -24px 0; display: block;
+.login__bild { width: calc(100% + 48px); margin: -28px -24px 0;
+               aspect-ratio: 1200 / 520;
+               background: url("./login.png") center / cover no-repeat, var(--marke);
                border-radius: var(--radius) var(--radius) 0 0; }
 .login__untertitel {
   margin-top: 10px;
@@ -1813,6 +1815,28 @@ pre, .gcode { max-width: 100%; overflow-x: auto; }
                        width: 38px; height: 38px; font-size: 1.15rem; cursor: pointer;
                        flex: none; }
 .kopf__einstellungen:hover { background: rgba(255,255,255,.12); }
+
+@media (max-width: 720px) {
+  .reiter { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch;
+            scrollbar-width: none; margin-left: -4px; padding-left: 4px;
+            margin-right: -4px; padding-right: 4px; }
+  .reiter::-webkit-scrollbar { display: none; }
+  .reiter__knopf { flex: none; white-space: nowrap; }
+}
+
+.dialog--einstellungen { position: relative; }
+.einstellungenkopf { align-items: center; }
+.dialog__schliessen-inline { width: 38px; height: 38px; border-radius: 50%;
+                             border: 1px solid var(--linie-stark); background: var(--flaeche);
+                             color: var(--gedaempft); cursor: pointer; font-size: 1rem;
+                             flex: none; }
+.dialog__schliessen-inline:hover { background: var(--marke-hell); color: var(--marke); }
+
+@media (max-width: 720px) {
+  #bo-suche, #bh-suche, #bz-suche, #lf-suche, #ar-suche {
+    min-height: 48px; font-size: 1.05rem; padding: 10px 14px;
+  }
+}
 </style>
 </head>
 <body>
@@ -1856,7 +1880,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "28.1.0";
+const APP_VERSION = "28.2.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -7657,16 +7681,25 @@ function einstellungenOeffnen() {
   const huelle = document.createElement("div");
   huelle.className = "dialog-huelle";
   huelle.innerHTML = '<div class="dialog dialog--breit dialog--einstellungen">'
-    + '<button class="dialog__schliessen" id="es-zu" title="Schliessen">✕</button>'
     + '<div id="es-inhalt"></div></div>';
   document.body.appendChild(huelle);
   plan.imDialog = true;
 
   const zu = () => { plan.imDialog = false; huelle.remove(); };
-  huelle.querySelector("#es-zu").onclick = zu;
   dialogSchliessen(huelle, zu);
 
   seiteEinstellungen(huelle.querySelector("#es-inhalt"));
+
+  // X neben den Abmelden-Knopf setzen, statt schwebend darüber
+  const kopfzeile = huelle.querySelector(".einstellungenkopf");
+  if (kopfzeile) {
+    const x = document.createElement("button");
+    x.className = "dialog__schliessen-inline";
+    x.title = "Schliessen";
+    x.textContent = "✕";
+    x.onclick = zu;
+    kopfzeile.appendChild(x);
+  }
 }
 
 async function seiteEinstellungen(b) {
@@ -9803,6 +9836,7 @@ function zeichneGeruest() {
       if (!ok) return;
       await db.auth.signOut();
       profil = null;
+      document.querySelectorAll(".dialog-huelle").forEach((el) => el.remove());
       location.hash = "";
       zeigeLogin();
     };
