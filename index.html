@@ -1782,6 +1782,22 @@ pre, .gcode { max-width: 100%; overflow-x: auto; }
 
 /* ---------- Suchfeld in der Produktion grösser ---------- */
 #p-suche { min-height: 48px; font-size: 1.05rem; padding: 10px 14px; }
+
+.einstellungenkopf { display: flex; align-items: center; justify-content: space-between;
+                     gap: 14px; margin-bottom: 4px; flex-wrap: wrap; }
+.einstellungenkopf .seitentitel { margin: 0; }
+.kopf__einstellungen { display: grid; place-items: center; width: 38px; height: 38px;
+                       border-radius: var(--radius); color: var(--tinte);
+                       text-decoration: none; font-size: 1.15rem; }
+.kopf__einstellungen:hover { background: rgba(255,255,255,.12); }
+
+.namensfeld-liste { min-height: 34px; padding: 5px 8px; font: inherit; width: 160px; }
+
+@media (max-width: 720px) {
+  #as-suche { min-height: 50px; font-size: 1.1rem; padding: 12px 16px; }
+  #as-liste .knopf { min-height: 48px; font-size: .95rem; padding: 10px 14px; }
+  #as-liste .hinweis { font-size: .95rem; }
+}
 </style>
 </head>
 <body>
@@ -1825,7 +1841,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "26.0.0";
+const APP_VERSION = "28.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -3256,7 +3272,8 @@ async function seiteProduktion(b) {
 
   b.innerHTML = '<h1 class="seitentitel">Produktion</h1>'
     + '<div class="reiter">'
-    + [["erfassen", "Erfassen"], ["uebersicht", "Übersicht"], ["maschinen", "Maschinen"]]
+    + (isMobil() ? [["erfassen", "Erfassen"], ["uebersicht", "Übersicht"]]
+        : [["erfassen", "Erfassen"], ["uebersicht", "Übersicht"], ["maschinen", "Maschinen"]])
         .map(([w, t]) => '<button class="reiter__knopf' + (prod.ansicht === w ? " aktiv" : "")
           + '" data-ansicht="' + w + '">' + t + '</button>').join("")
     + '</div>'
@@ -3278,6 +3295,7 @@ async function seiteProduktion(b) {
     return;
   }
 
+  if (prod.ansicht === "maschinen" && isMobil()) prod.ansicht = "erfassen";
   if (prod.ansicht === "maschinen") return ansichtMaschinen(ziel, b);
 
   if (!prod.parks.length) {
@@ -3403,22 +3421,37 @@ async function ansichtErfassen(ziel, b) {
     el.onclick = () => { prod.modus = el.dataset.modus; seiteProduktion(b); };
   });
 
-  let staende;
-  try {
-    staende = await ladeZaehlerstaende(von, bis, maschinen.map((m) => m.id));
-  } catch (f) {
-    document.getElementById("raster").innerHTML =
-      '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
-    return;
-  }
+  // Nach jeder gespeicherten Zahl wird nur das Raster neu geladen,
+  // nicht die ganze Seite. Steuerung und Suchfeld bleiben stehen,
+  // die Bildlaufposition geht nicht verloren.
+  const rasterKasten = document.getElementById("raster");
 
-  const raster = document.getElementById("raster");
-  raster.innerHTML = istWoche
-    ? wochenRaster(maschinen, von, tageProWoche, staende)
-    : tagesRaster(maschinen, prod.tag, staende);
+  const rasterLaden = async () => {
+    let staende;
+    try {
+      staende = await ladeZaehlerstaende(von, bis, maschinen.map((m) => m.id));
+    } catch (f) {
+      rasterKasten.innerHTML =
+        '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+      return;
+    }
 
-  eingabenBinden(raster, staende, b);
-  auftragsKnoepfeBinden(raster, b);
+    const rolle = rasterKasten.querySelector(".rasterrolle");
+    const x = rolle ? rolle.scrollLeft : 0;
+    const y = rolle ? rolle.scrollTop : 0;
+
+    rasterKasten.innerHTML = istWoche
+      ? wochenRaster(maschinen, von, tageProWoche, staende)
+      : tagesRaster(maschinen, prod.tag, staende);
+
+    const neu = rasterKasten.querySelector(".rasterrolle");
+    if (neu) { neu.scrollLeft = x; neu.scrollTop = y; }
+
+    eingabenBinden(rasterKasten, staende, b, rasterLaden);
+    auftragsKnoepfeBinden(rasterKasten, b);
+  };
+
+  await rasterLaden();
 }
 
 function auftragsZeile(maschine) {
@@ -3518,7 +3551,7 @@ function aktuellerStand(maschineId, staende) {
   return 0;
 }
 
-function eingabenBinden(raster, staende, b) {
+function eingabenBinden(raster, staende, b, neuLaden) {
   raster.querySelectorAll(".menge").forEach((el) => {
     el.addEventListener("focus", () => el.select());
     el.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); el.blur(); } });
@@ -3546,12 +3579,14 @@ function eingabenBinden(raster, staende, b) {
           } else {
             await speichereStand(mId, dat, vorherWert, aId);
           }
-          seiteProduktion(b);
+          if (neuLaden) neuLaden(); else seiteProduktion(b);
         });
         el.classList.remove("menge--speichert");
         el.classList.add("menge--gespeichert");
         setTimeout(() => el.classList.remove("menge--gespeichert"), 900);
-        seiteProduktion(b);   // neu berechnen, damit die Leistungen stimmen
+        // Nur das Raster neu berechnen, damit die Leistungen stimmen —
+        // nicht die ganze Seite, das kostet die Bildlaufposition.
+        if (neuLaden) await neuLaden(); else seiteProduktion(b);
       } catch (f) {
         el.classList.remove("menge--speichert");
         el.classList.add("menge--fehler");
@@ -3755,27 +3790,29 @@ function farbeVon(wert) {
 }
 
 // Auf der Planwand darf jeder alles sehen. Geändert wird erst,
-// wenn ein Administrator den Bearbeiten-Modus einschaltet.
-// Wer den Bearbeiten-Schalter überhaupt bekommt
-// Wer bekommt den Bearbeiten-Knopf überhaupt zu sehen?
-// Administratoren nicht: sie dürfen ohnehin immer.
-// Den Knopf sieht jeder. Ob er tatsächlich etwas bewirkt,
-// entscheidet die Rolle beim Einschalten.
-// Den Knopf sieht jeder. Ob er wirklich etwas bewirkt, entscheidet
-// die Rolle beziehungsweise das zugeteilte Recht.
-function darfBearbeitenKnopf() { return true; }
+// Auf dem Handy ist die Planwand reine Ansicht, unabhängig von der
+// Rolle. Bearbeitet wird am Computer.
+function isMobil() {
+  return window.matchMedia("(max-width: 720px)").matches;
+}
+
+// Wer bekommt den Bearbeiten-Knopf überhaupt zu sehen? Administratoren
+// nicht: sie dürfen ohnehin immer. Auf dem Handy sieht ihn niemand.
+function darfBearbeitenKnopf() {
+  return !isMobil();
+}
 
 function darfWirklichBearbeiten() {
+  if (isMobil()) return false;
   return istAdmin() || meineRolle() === "planwand"
     || (profil && profil.darf_bearbeiten === true);
 }
 
 // Darf gerade auf der Planwand geändert werden?
-// Ohne Umschalter: wer das Recht hat, darf direkt bearbeiten.
 function darfPlanen() {
+  if (isMobil()) return false;
   if (istAdmin()) return true;
   if (profil && profil.darf_bearbeiten === true) return true;
-  // Die Rolle Planwand braucht den Pin
   return meineRolle() === "planwand" && plan.pinOk === true;
 }
 
@@ -3834,11 +3871,29 @@ async function planAbgleich(b) {
 
 function planSyncStarten(b) {
   planSyncStoppen();
-  plan.syncTakt = setInterval(() => planAbgleich(b), 15000);
+
+  if (db && typeof db.channel === "function") {
+    let entpreller = null;
+    const kanal = db.channel("plansync-" + Date.now())
+      .on("postgres_changes", { event: "*", schema: "public", table: "jobs" }, () => {
+        clearTimeout(entpreller);
+        entpreller = setTimeout(() => planAbgleich(b), 500);
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "vacations" }, () => {
+        clearTimeout(entpreller);
+        entpreller = setTimeout(() => planAbgleich(b), 500);
+      })
+      .subscribe();
+    plan.syncKanal = kanal;
+  }
+
+  // Zeittakt als Netz, falls Realtime einmal ausfällt
+  plan.syncTakt = setInterval(() => planAbgleich(b), 45000);
 }
 
 function planSyncStoppen() {
   if (plan.syncTakt) { clearInterval(plan.syncTakt); plan.syncTakt = null; }
+  if (plan.syncKanal) { db.removeChannel(plan.syncKanal); plan.syncKanal = null; }
 }
 
 function masseBerechnen(b) {
@@ -5072,6 +5127,8 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     + '<span>Material vorhanden oder bestellt</span></label>'
     + '</div>'
 
+    + '</div>'
+    + '<div class="dialogspalte">'
     + '<label class="feld"><span>Fertigungsmenge</span>'
     + '<div class="mengefeld">'
     + '<input id="pl-menge" inputmode="decimal" type="number" min="0" step="1" value="'
@@ -5122,7 +5179,8 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
           + '</div>'
         : "")
 
-    + '</div></div>'
+    + '</div>'
+    + '</div>'
     + '<div class="dialog__knoepfe">'
     + (auftrag && darf
         ? '<button class="knopf knopf--gefahr" id="pl-loeschen">Auftrag löschen</button>'
@@ -6403,6 +6461,10 @@ const best = {
   artikelSuche: "",
   artikelBez: "",
   lieferantId: null,
+  offenSuche: "",
+  historieSuche: "",
+  bezSuche: "",
+  liefSuche: "",
 };
 
 const BESTELLSTATUS = {
@@ -6504,11 +6566,24 @@ async function bestOffen(ziel, b) {
       + '</tr>';
   };
 
-  ziel.innerHTML = (darfSchreiben()
+  const sucht = (best.offenSuche || "").trim().toLowerCase();
+  const gefiltert = !sucht ? liste : liste.filter((z) => {
+    const a2 = z.articles || {};
+    const text = [
+      a2.article_number, a2.name, (z.suppliers && z.suppliers.name),
+      z.note, z.ziel_text, (z.profiles && (z.profiles.full_name || z.profiles.email)),
+    ].map((x) => String(x || "").toLowerCase()).join(" ");
+    return text.includes(sucht);
+  });
+
+  ziel.innerHTML = '<div class="suchleiste">'
+    + '<input type="search" id="bo-suche" placeholder="Suchen: Artikel, Lieferant, Notiz, wer …"'
+    + ' value="' + esc(best.offenSuche) + '" autocomplete="off"></div>'
+    + (darfSchreiben()
       ? '<button class="knopf knopf--haupt knopf--breit" id="b-neu">+ Neue Position</button>' : "")
 
     + bloecke.map((bl) => {
-        const eigene = liste.filter((z) => z.status === bl.status);
+        const eigene = gefiltert.filter((z) => z.status === bl.status);
         if (!eigene.length) return "";
 
         // innerhalb des Blocks nach Lieferant gruppieren
@@ -6535,8 +6610,24 @@ async function bestOffen(ziel, b) {
               + '</tbody></table></section>').join("");
       }).join("")
 
-    + (liste.length ? "" :
-        '<div class="karte karte--hinweis"><p>Keine offenen Bestellpositionen.</p></div>');
+    + (gefiltert.length ? "" :
+        '<div class="karte karte--hinweis"><p>'
+        + (sucht ? 'Nichts gefunden zu "' + esc(best.offenSuche) + '".'
+                : "Keine offenen Bestellpositionen.")
+        + '</p></div>');
+
+  const suchfeldOffen = document.getElementById("bo-suche");
+  if (suchfeldOffen) {
+    let taste = null;
+    suchfeldOffen.oninput = () => {
+      clearTimeout(taste);
+      taste = setTimeout(() => { best.offenSuche = suchfeldOffen.value; bestOffen(ziel, b); }, 300);
+    };
+    if (best.offenSuche) {
+      suchfeldOffen.focus();
+      suchfeldOffen.setSelectionRange(suchfeldOffen.value.length, suchfeldOffen.value.length);
+    }
+  }
 
   const neu = document.getElementById("b-neu");
   if (neu) neu.onclick = () => positionDialog(b);
@@ -7032,9 +7123,23 @@ async function bestHistorie(ziel, b) {
   }
 
   // Nur abgeschlossene Positionen, offene stehen im Reiter Offen
-  const fertige = (liste || []).filter((z) => z.status === "geliefert");
+  let fertige = (liste || []).filter((z) => z.status === "geliefert");
 
-  ziel.innerHTML = '<section class="karte">'
+  const suchtHist = (best.historieSuche || "").trim().toLowerCase();
+  if (suchtHist) {
+    fertige = fertige.filter((z) => {
+      const a = z.articles || {};
+      const text = [a.article_number, a.name, (z.suppliers && z.suppliers.name),
+        (z.profiles && (z.profiles.full_name || z.profiles.email)), z.ziel_text]
+        .map((x) => String(x || "").toLowerCase()).join(" ");
+      return text.includes(suchtHist);
+    });
+  }
+
+  ziel.innerHTML = '<div class="suchleiste">'
+    + '<input type="search" id="bh-suche" placeholder="Suchen: Artikel, Lieferant, wer …"'
+    + ' value="' + esc(best.historieSuche) + '" autocomplete="off"></div>'
+    + '<section class="karte">'
     + '<h2>Abgeschlossene Bestellungen'
     + (fertige.length ? ' <span class="marke">' + fertige.length + '</span>' : "") + '</h2>'
     + (fertige.length
@@ -7055,8 +7160,26 @@ async function bestHistorie(ziel, b) {
               + '</td></tr>';
           }).join("")
         + '</tbody></table>'
-      : '<p class="hinweis">Noch nichts abgeschlossen.</p>')
+      : '<p class="hinweis">'
+        + (suchtHist ? 'Nichts gefunden zu "' + esc(best.historieSuche) + '".'
+                    : "Noch nichts abgeschlossen.")
+        + '</p>')
     + '</section>';
+
+  const suchfeldHist = document.getElementById("bh-suche");
+  if (suchfeldHist) {
+    let taste = null;
+    suchfeldHist.oninput = () => {
+      clearTimeout(taste);
+      taste = setTimeout(() => {
+        best.historieSuche = suchfeldHist.value; bestHistorie(ziel, b);
+      }, 300);
+    };
+    if (best.historieSuche) {
+      suchfeldHist.focus();
+      suchfeldHist.setSelectionRange(suchfeldHist.value.length, suchfeldHist.value.length);
+    }
+  }
 }
 
 // ---------- Artikel ----------
@@ -7340,6 +7463,9 @@ async function bezeichnungsListe(b) {
     return;
   }
 
+  const suchtBz = (best.bezSuche || "").trim().toLowerCase();
+  if (suchtBz) liste = liste.filter((z) => z.name.toLowerCase().includes(suchtBz));
+
   kasten.innerHTML = '<section class="karte">'
     + '<h2>Bezeichnungen <span class="marke">' + liste.length + '</span></h2>'
     + '<p class="hinweis">Diese Liste erscheint beim Anlegen und Bearbeiten '
@@ -7354,7 +7480,10 @@ async function bezeichnungsListe(b) {
               + '" data-name="' + esc(z.name) + '">Löschen</button></td>'
             : "")
           + '</tr>').join("") + '</tbody></table>'
-      : '<p class="hinweis">Noch keine Bezeichnung angelegt.</p>')
+      : '<p class="hinweis">'
+        + (suchtBz ? 'Nichts gefunden zu "' + esc(best.bezSuche) + '".'
+                  : "Noch keine Bezeichnung angelegt.")
+        + '</p>')
     + '</section>';
 
   kasten.querySelectorAll("[data-bzb]").forEach((el) => {
@@ -7403,11 +7532,18 @@ async function bestLieferanten(ziel, b) {
     return;
   }
 
-  ziel.innerHTML = (darfSchreiben()
+  const suchtLf = (best.liefSuche || "").trim().toLowerCase();
+  const gefiltertLf = !suchtLf ? liste
+    : liste.filter((l) => l.name.toLowerCase().includes(suchtLf));
+
+  ziel.innerHTML = '<div class="suchleiste">'
+    + '<input type="search" id="lf-suche" placeholder="Lieferant suchen"'
+    + ' value="' + esc(best.liefSuche) + '" autocomplete="off"></div>'
+    + (darfSchreiben()
       ? '<button class="knopf knopf--haupt knopf--breit" id="lf-neu">+ Neuer Lieferant</button>' : "")
-    + '<section class="karte"><h2>Lieferanten <span class="marke">' + liste.length + '</span></h2>'
-    + (liste.length
-      ? '<table class="tabelle"><tbody>' + liste.map((l) =>
+    + '<section class="karte"><h2>Lieferanten <span class="marke">' + gefiltertLf.length + '</span></h2>'
+    + (gefiltertLf.length
+      ? '<table class="tabelle"><tbody>' + gefiltertLf.map((l) =>
           '<tr><td class="stark">'
           + (l.website
               ? '<a class="lieferantlink" href="' + esc(l.website) + '"'
@@ -7418,14 +7554,30 @@ async function bestLieferanten(ziel, b) {
               + '<button class="linkknopf linkknopf--gefahr" data-lfweg="' + esc(l.id)
               + '" data-name="' + esc(l.name) + '">Löschen</button></td>' : "")
           + '</tr>').join("") + '</tbody></table>'
-      : '<p class="hinweis">Noch keine Lieferanten angelegt.</p>')
+      : '<p class="hinweis">'
+        + (suchtLf ? 'Nichts gefunden zu "' + esc(best.liefSuche) + '".'
+                  : "Noch keine Lieferanten angelegt.")
+        + '</p>')
     + '</section>';
+
+  const suchfeldLf = document.getElementById("lf-suche");
+  if (suchfeldLf) {
+    let tasteLf = null;
+    suchfeldLf.oninput = () => {
+      clearTimeout(tasteLf);
+      tasteLf = setTimeout(() => { best.liefSuche = suchfeldLf.value; bestLieferanten(ziel, b); }, 300);
+    };
+    if (best.liefSuche) {
+      suchfeldLf.focus();
+      suchfeldLf.setSelectionRange(suchfeldLf.value.length, suchfeldLf.value.length);
+    }
+  }
 
   const neu = document.getElementById("lf-neu");
   if (neu) neu.onclick = () => lieferantDialog(null, b);
 
   ziel.querySelectorAll("[data-lf]").forEach((el) => {
-    el.onclick = () => lieferantDialog(liste.find((x) => x.id === el.dataset.lf), b);
+    el.onclick = () => lieferantDialog(gefiltertLf.find((x) => x.id === el.dataset.lf), b);
   });
 
   ziel.querySelectorAll("[data-lfweg]").forEach((el) => {
@@ -7488,7 +7640,10 @@ async function seiteEinstellungen(b) {
 
   // Die Seite wird sofort aufgebaut. Die Benutzerliste kommt danach,
   // damit hier nie mehr etwas hängen bleibt.
-  b.innerHTML = '<h1 class="seitentitel">Einstellungen</h1>'
+  b.innerHTML = '<div class="einstellungenkopf">'
+    + '<h1 class="seitentitel">Einstellungen</h1>'
+    + '<button class="knopf knopf--gefahr" id="ab">Abmelden</button>'
+    + '</div>'
 
     + '<section class="karte"><h2>Mein Konto</h2>'
     + '<div class="kontokopf">'
@@ -7613,6 +7768,8 @@ async function seiteEinstellungen(b) {
       seiteEinstellungen(b);
     } catch (f2) { meldung(fehlertext(f2), "fehler"); }
   };
+
+  if (window.abmeldenBinden) window.abmeldenBinden();
 
   // ---------- Pin ----------
   const pinFeld = document.getElementById("pin-feld");
@@ -7797,8 +7954,12 @@ async function benutzerlisteLaden(b, bin) {
               : '<span class="kopf__bild kopf__bild--leer">'
                 + esc(((u.full_name || u.email) || "?").charAt(0).toUpperCase())
                 + '</span>')
-          + '<span>' + esc(u.full_name || u.email)
-          + (selbst ? ' <span class="marke">du</span>' : "") + '</span></div></td>'
+          + (bin
+              ? '<input type="text" class="namensfeld-liste" data-name="' + esc(u.id)
+                + '" value="' + esc(u.full_name || "") + '" placeholder="'
+                + esc(u.email || "") + '">'
+              : '<span>' + esc(u.full_name || u.email) + '</span>')
+          + (selbst ? ' <span class="marke">du</span>' : "") + '</div></td>' 
           + '<td class="bu-rolle">' + (bin && !selbst
               ? '<select class="auswahl" data-rolle="' + esc(u.id) + '">'
                 + Object.keys(ROLLEN).map((w) => '<option value="' + w + '"'
@@ -7855,6 +8016,16 @@ async function benutzerlisteLaden(b, bin) {
         .eq("id", el.dataset.rolle);
       if (error) { meldung(fehlertext(error), "fehler"); el.value = vorher; }
       else { meldung("Rolle geändert."); benutzerlisteLaden(b, bin); }
+    };
+  });
+
+  ziel.querySelectorAll("[data-name]").forEach((el) => {
+    el.onchange = async () => {
+      const name = (el.value || "").trim();
+      const { error } = await db.from("profiles")
+        .update({ full_name: name || null }).eq("id", el.dataset.name);
+      if (error) meldung(fehlertext(error), "fehler");
+      else meldung("Name gespeichert.");
     };
   });
 
@@ -9359,7 +9530,6 @@ const SEITEN = [
   { pfad: "bestellungen", titel: "Bestellungen", zeichen: SYM.bestellungen, zeige: seiteBestellungen },
   { pfad: "einkauf",      titel: "Einkauf",      zeichen: SYM.einkauf, zeige: seiteEinkauf },
   { pfad: "rechner",      titel: "Rechner",      zeichen: SYM.rechner, zeige: seiteRechner },
-  { pfad: "spass",        titel: "Timeout",       zeichen: SYM.spass, zeige: seiteSpass },
   { pfad: "einstellungen", titel: "Einstellungen", zeichen: SYM.einstellungen, zeige: seiteEinstellungen },
 ];
 
@@ -9370,10 +9540,11 @@ const SEITEN = [
 //  Fenster offen ist.
 // =================================================================
 
-const sync = { takt: null, pfad: null, stempel: null };
+const sync = { takt: null, pfad: null, stempel: null, kanal: null };
 
 function syncStoppen() {
   if (sync.takt) { clearInterval(sync.takt); sync.takt = null; }
+  if (sync.kanal) { db.removeChannel(sync.kanal); sync.kanal = null; }
   sync.stempel = null;
 }
 
@@ -9417,6 +9588,44 @@ async function seitenStempel(pfad) {
   return teile.join("|");
 }
 
+// Welche Tabellen für eine Seite wichtig sind, für die Realtime-Anmeldung
+function syncTabellen(pfad) {
+  if (pfad === "dashboard") return ["jobs", "todos", "shopping_items", "order_items", "profiles"];
+  if (pfad === "produktion") return ["production_records", "jobs", "machines"];
+  if (pfad === "bestellungen") return ["order_items", "articles", "suppliers", "designations"];
+  if (pfad === "einkauf") return ["shopping_items"];
+  if (pfad === "einstellungen") return ["profiles", "people"];
+  return [];
+}
+
+// Prüft, ob sich etwas geändert hat, und zeichnet nur dann neu.
+// Wird sowohl vom Zeittakt als auch von Realtime aufgerufen.
+async function syncPruefen() {
+  if (document.hidden) return;
+  if (document.querySelector(".dialog-huelle")) return;
+
+  const a = document.activeElement;
+  if (a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA"
+            || a.tagName === "SELECT" || a.isContentEditable)) return;
+
+  const bereich = document.getElementById("inhalt");
+  if (!bereich) { syncStoppen(); return; }
+
+  const jetzt = await seitenStempel(sync.pfad);
+  if (jetzt === null) return;
+
+  if (sync.stempel === null) { sync.stempel = jetzt; return; }
+  if (jetzt === sync.stempel) return;
+  sync.stempel = jetzt;
+
+  const seite = SEITEN.find((x) => x.pfad === sync.pfad);
+  if (!seite) return;
+
+  const y = window.scrollY;
+  seite.zeige(bereich);
+  setTimeout(() => window.scrollTo(0, y), 60);
+}
+
 function syncStarten(pfad) {
   syncStoppen();
   sync.pfad = pfad;
@@ -9424,36 +9633,26 @@ function syncStarten(pfad) {
   // Die Planwand hat ihren eigenen Abgleich
   if (pfad === "planwand") return;
 
-  // Ausgangswert merken, ohne zu zeichnen
   seitenStempel(pfad).then((w) => { sync.stempel = w; });
 
-  sync.takt = setInterval(async () => {
-    if (document.hidden) return;
-    if (document.querySelector(".dialog-huelle")) return;
+  // Realtime: sofortige Nachricht der Datenbank bei einer Änderung.
+  // Mehrere Änderungen kurz hintereinander werden gesammelt.
+  const tabellen = syncTabellen(pfad);
+  if (tabellen.length && db && typeof db.channel === "function") {
+    let kanal = db.channel("sync-" + pfad + "-" + Date.now());
+    let entpreller = null;
+    tabellen.forEach((t) => {
+      kanal = kanal.on("postgres_changes", { event: "*", schema: "public", table: t }, () => {
+        clearTimeout(entpreller);
+        entpreller = setTimeout(syncPruefen, 500);
+      });
+    });
+    kanal.subscribe();
+    sync.kanal = kanal;
+  }
 
-    const a = document.activeElement;
-    if (a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA"
-              || a.tagName === "SELECT" || a.isContentEditable)) return;
-
-    const bereich = document.getElementById("inhalt");
-    if (!bereich) { syncStoppen(); return; }
-
-    const jetzt = await seitenStempel(sync.pfad);
-    if (jetzt === null) return;
-
-    // Nichts geändert: die Seite bleibt einfach stehen
-    if (sync.stempel === null) { sync.stempel = jetzt; return; }
-    if (jetzt === sync.stempel) return;
-
-    sync.stempel = jetzt;
-
-    const seite = SEITEN.find((x) => x.pfad === sync.pfad);
-    if (!seite) return;
-
-    const y = window.scrollY;
-    seite.zeige(bereich);
-    setTimeout(() => window.scrollTo(0, y), 60);
-  }, 20000);
+  // Langsamer Zeittakt als Netz, falls Realtime einmal ausfällt
+  sync.takt = setInterval(syncPruefen, 45000);
 }
 
 function zeichneSeite() {
@@ -9547,15 +9746,21 @@ function zeichneGeruest() {
   if (einstellungWert("navschmal", "0") === "1") document.body.classList.add("nav--schmal");
 
 
-  document.getElementById("ab").addEventListener("click", async () => {
-    const ok = await nachfragen({ titel: "Abmelden",
-      text: "Du musst dich danach neu anmelden.", bestaetigen: "Abmelden" });
-    if (!ok) return;
-    await db.auth.signOut();
-    profil = null;
-    location.hash = "";
-    zeigeLogin();
-  });
+  // Der Abmelden-Knopf sitzt jetzt in den Einstellungen, nicht mehr
+  // in der Kopfzeile. Diese Funktion bindet ihn, wo immer er auftaucht.
+  window.abmeldenBinden = () => {
+    const knopf = document.getElementById("ab");
+    if (!knopf) return;
+    knopf.onclick = async () => {
+      const ok = await nachfragen({ titel: "Abmelden",
+        text: "Du musst dich danach neu anmelden.", bestaetigen: "Abmelden" });
+      if (!ok) return;
+      await db.auth.signOut();
+      profil = null;
+      location.hash = "";
+      zeigeLogin();
+    };
+  };
 
   if (!location.hash) location.hash = "#/dashboard";
   zeichneSeite();
