@@ -1685,6 +1685,45 @@ body.dunkel .wahlknopf.aktiv { background: #24344a; }
                                 margin-bottom: 14px; }
 .dialog--breit .dialog__blocktitel { font-weight: 650; font-size: .82rem;
                                      color: var(--gedaempft); margin-bottom: 8px; }
+
+/* ---------- Handy: nichts abschneiden, nicht seitlich wischen ---------- */
+@media (max-width: 720px) {
+  /* Zoom- und Zeitregler brechen um statt seitlich hinauszulaufen */
+  .pw-zoom { flex-wrap: wrap; width: 100%; }
+  .pw-zoom input[type="range"] { flex: 1 1 140px; width: auto; min-width: 120px; }
+  #pw-zoomwert { width: 64px; }
+  .steuerung { flex-wrap: wrap; gap: 8px; }
+  .steuerung > * { min-width: 0; }
+  .pw-aktionen { flex-direction: column; }
+  .pw-aktionen .knopf { flex: 1 1 auto; width: 100%; }
+  .suchleiste { flex-wrap: wrap; }
+  .suchleiste input { min-width: 0; flex: 1 1 160px; }
+
+  /* Benutzertabelle stapelt statt zu scrollen */
+  .tabellenrolle { overflow-x: visible; }
+  .tabelle--benutzer { min-width: 0; table-layout: auto; display: block; }
+  .tabelle--benutzer thead { display: none; }
+  .tabelle--benutzer tbody, .tabelle--benutzer tr, .tabelle--benutzer td { display: block; }
+  .tabelle--benutzer tr { padding: 12px 0; border-bottom: 1px solid var(--linie); }
+  .tabelle--benutzer td { width: auto !important; border: none; padding: 3px 0;
+                          text-align: left !important; }
+  .tabelle--benutzer .gebfeld, .tabelle--benutzer .auswahl { width: 100%; }
+  .tabelle--benutzer .bu-geb::before { content: "Geburtstag: "; color: var(--gedaempft);
+                                       font-size: .8rem; }
+  .tabelle--benutzer .bu-bearb::before { content: "Bearbeiten: "; color: var(--gedaempft);
+                                         font-size: .8rem; }
+
+  /* Alle übrigen Tabellen umbrechen lassen statt abschneiden */
+  .tabelle { table-layout: auto; }
+  .tabelle td, .tabelle th { word-break: break-word; }
+  .karte { overflow-x: hidden; }
+  .parkzeile { grid-template-columns: 1fr; }
+
+  /* Dialoge bekommen den ganzen Bildschirm */
+  .dialog { max-height: 92dvh; }
+  .dialog--breit { max-width: 100%; }
+  .zeitraumwahl { grid-template-columns: 1fr; }
+}
 </style>
 </head>
 <body>
@@ -1728,7 +1767,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "24.1.0";
+const APP_VERSION = "25.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -5487,7 +5526,7 @@ async function ladeLieferanten() {
 
 async function sucheArtikel(text) {
   const t = (text || "").trim();
-  let abfrage = db.from("artikel_uebersicht").select("*").eq("is_active", true);
+  let abfrage = db.from("artikel_uebersicht").select("*");
   if (t) {
     abfrage = abfrage.or("article_number.ilike.%" + t + "%,name.ilike.%" + t
       + "%,supplier_name.ilike.%" + t + "%");
@@ -6536,7 +6575,39 @@ async function artikelSchnellAnlegen(vorgabe) {
     unit: "Stück", supplier_id: lieferantId,
   }).select().single();
 
-  if (error) { meldung(fehlertext(error), "fehler"); return null; }
+  if (error) {
+    const m = String(error.message || "").toLowerCase();
+    if (m.includes("duplicate") || m.includes("unique")) {
+      // Der Artikel gibt es schon, taucht aber vielleicht nicht in der
+      // Liste auf, weil er ausgeblendet ist. Also holen und anbieten.
+      const alt = await db.from("articles").select("*")
+        .eq("article_number", w.nummer).maybeSingle();
+
+      if (alt.data) {
+        const ok = await nachfragen({
+          titel: "Artikel gibt es bereits",
+          text: alt.data.article_number + " · " + (alt.data.name || "")
+              + (alt.data.is_active === false
+                  ? " — er ist zurzeit ausgeblendet, deshalb siehst du ihn nicht in der Liste."
+                  : "")
+              + " Soll dieser Artikel verwendet werden?",
+          bestaetigen: "Diesen verwenden" });
+
+        if (!ok) return null;
+
+        if (alt.data.is_active === false) {
+          await db.from("articles").update({ is_active: true }).eq("id", alt.data.id);
+        }
+
+        const lief2 = lieferanten.find((l) => l.id === alt.data.supplier_id);
+        return { id: alt.data.id, article_number: alt.data.article_number,
+                 name: alt.data.name, supplier_id: alt.data.supplier_id,
+                 supplier_name: lief2 ? lief2.name : null, unit: "Stück" };
+      }
+    }
+    meldung(fehlertext(error), "fehler");
+    return null;
+  }
   meldung("Artikel angelegt.");
 
   const lief = lieferanten.find((l) => l.id === lieferantId);
@@ -6890,8 +6961,10 @@ async function artikelListe(b) {
       ? '<table class="tabelle"><thead><tr><th>Nummer</th><th>Bezeichnung</th>'
         + '<th>Lieferant</th>' + (darfSchreiben() ? '<th></th>' : "")
         + '</tr></thead><tbody>'
-        + liste.map((a) => '<tr>'
-            + '<td class="stark">' + esc(a.article_number) + '</td>'
+        + liste.map((a) => '<tr' + (a.is_active === false ? ' class="zeile--inaktiv"' : "") + '>'
+            + '<td class="stark">' + esc(a.article_number)
+            + (a.is_active === false ? ' <span class="klein">ausgeblendet</span>' : "")
+            + '</td>'
             + '<td>' + esc(a.name)
             + (a.unit && a.unit !== "Stück" ? '<div class="klein">' + esc(a.unit) + '</div>' : "")
             + '</td>'
@@ -6931,16 +7004,12 @@ async function artikelListe(b) {
       if (!ok) return;
 
       const r = await db.from("articles").delete().eq("id", el.dataset.arweg).select();
-      const error = r.error || ((r.data || []).length === 0
-        ? new Error("Dafür fehlen dir die Rechte.") : null);
-      if (error) {
-        const aus = await nachfragen({ titel: "Löschen nicht möglich",
-          text: fehlertext(error) + " Soll der Artikel stattdessen ausgeblendet werden?",
-          bestaetigen: "Ausblenden" });
-        if (!aus) return;
-        const r = await db.from("articles").update({ is_active: false }).eq("id", el.dataset.arweg);
-        if (r.error) { meldung(fehlertext(r.error), "fehler"); return; }
-        meldung("Ausgeblendet.");
+
+      if (r.error) {
+        meldung("Der Artikel lässt sich nicht löschen, weil er noch in "
+          + "Bestellungen vorkommt. Lösche zuerst diese Positionen.", "fehler");
+      } else if ((r.data || []).length === 0) {
+        meldung("Dafür fehlen dir die Rechte.", "fehler");
       } else {
         meldung("Artikel gelöscht.");
       }
@@ -9124,6 +9193,60 @@ const SEITEN = [
   { pfad: "einstellungen", titel: "Einstellungen", zeichen: SYM.einstellungen, zeige: seiteEinstellungen },
 ];
 
+// =================================================================
+//  LAUFENDER ABGLEICH
+//  Jede Seite wird im Hintergrund aufgefrischt, ohne dass die
+//  Seite neu lädt. Läuft nur, wenn gerade niemand tippt und kein
+//  Fenster offen ist.
+// =================================================================
+
+const sync = { takt: null, pfad: null };
+
+function syncStoppen() {
+  if (sync.takt) { clearInterval(sync.takt); sync.takt = null; }
+}
+
+function syncStarten(pfad) {
+  syncStoppen();
+  sync.pfad = pfad;
+
+  // Die Planwand hat ihren eigenen Abgleich, der die Zeitstellung behält
+  if (pfad === "planwand") return;
+
+  sync.takt = setInterval(() => {
+    if (document.hidden) return;
+    if (document.querySelector(".dialog-huelle")) return;
+
+    // Nicht dazwischenfunken, während jemand etwas eintippt
+    const a = document.activeElement;
+    if (a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA"
+              || a.tagName === "SELECT" || a.isContentEditable)) return;
+
+    const bereich = document.getElementById("inhalt");
+    if (!bereich) { syncStoppen(); return; }
+
+    const seite = SEITEN.find((x) => x.pfad === sync.pfad);
+    if (!seite) return;
+
+    // Scrollstellung merken und danach wieder herstellen
+    const y = window.scrollY;
+    const innen = [];
+    document.querySelectorAll(".tabellenrolle, .pw-rolle, .rolle").forEach((el) => {
+      innen.push([el.className, el.scrollLeft, el.scrollTop]);
+    });
+
+    seite.zeige(bereich);
+
+    setTimeout(() => {
+      window.scrollTo(0, y);
+      innen.forEach(([klasse, x, yy]) => {
+        const el = document.querySelector("." + klasse.split(" ")[0]);
+        if (el) { el.scrollLeft = x; el.scrollTop = yy; }
+      });
+    }, 60);
+  }, 15000);
+}
+
 function zeichneSeite() {
   const roh = location.hash.replace(/^#\/?/, "").split("/")[0];
   const pfad = SEITEN.some((s) => s.pfad === roh) ? roh : "dashboard";
@@ -9134,6 +9257,7 @@ function zeichneSeite() {
   window.scrollTo(0, 0);
   const bereich = document.getElementById("inhalt");
   if (pfad !== "planwand" && typeof planSyncStoppen === "function") planSyncStoppen();
+  syncStarten(pfad);
   bereich.classList.toggle("inhalt--breit", pfad === "planwand");
   seite.zeige(bereich);
 }
