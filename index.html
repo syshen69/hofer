@@ -1902,7 +1902,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "30.4.0";
+const APP_VERSION = "30.5.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -3339,6 +3339,9 @@ async function seiteProduktion(b) {
           + '" data-ansicht="' + w + '">' + t + '</button>').join("")
     + '</div>'
     + (darfSchreiben() ? "" : nurLesenHinweis("Du kannst hier alles ansehen, aber nichts ändern."))
+    + (isMobil()
+        ? nurLesenHinweis("Maschinen verwalten geht nur am Desktop, nicht auf dem Handy.")
+        : "")
     + '<div id="prod-inhalt"><div class="laedt">Wird geladen …</div></div>';
 
   b.querySelectorAll("[data-ansicht]").forEach((el) => {
