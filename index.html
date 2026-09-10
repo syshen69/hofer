@@ -359,6 +359,7 @@ a:focus-visible {
   background: var(--flaeche);
   border-radius: var(--radius);
   padding: 28px 24px 26px;
+  overflow: hidden;   /* das Bild bleibt sauber im runden Rahmen */
 }
 
 .login__marke {
@@ -1798,6 +1799,20 @@ pre, .gcode { max-width: 100%; overflow-x: auto; }
   #as-liste .knopf { min-height: 48px; font-size: .95rem; padding: 10px 14px; }
   #as-liste .hinweis { font-size: .95rem; }
 }
+
+.dialog--einstellungen { position: relative; max-width: 760px;
+                         max-height: 88dvh; overflow-y: auto; }
+.dialog__schliessen { position: absolute; top: 14px; right: 14px;
+                      width: 34px; height: 34px; border-radius: 50%;
+                      border: 1px solid var(--linie-stark); background: var(--flaeche);
+                      color: var(--gedaempft); cursor: pointer; font-size: 1rem; z-index: 2; }
+.dialog__schliessen:hover { background: var(--marke-hell); color: var(--marke); }
+.kopf__logolink { display: flex; align-items: center; }
+.kopf__einstellungen { background: none; border: 1px solid var(--linie-stark);
+                       color: var(--tinte); border-radius: var(--radius);
+                       width: 38px; height: 38px; font-size: 1.15rem; cursor: pointer;
+                       flex: none; }
+.kopf__einstellungen:hover { background: rgba(255,255,255,.12); }
 </style>
 </head>
 <body>
@@ -1841,7 +1856,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "28.0.0";
+const APP_VERSION = "28.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -7634,6 +7649,26 @@ async function lieferantDialog(lieferant, b) {
   else { meldung("Gespeichert."); seiteBestellungen(b); }
 }
 
+// Öffnet die Einstellungen als Fenster, ohne die Seite dahinter zu
+// verlassen. Egal auf welchem Reiter man gerade ist.
+function einstellungenOeffnen() {
+  if (document.querySelector(".dialog--einstellungen")) return;
+
+  const huelle = document.createElement("div");
+  huelle.className = "dialog-huelle";
+  huelle.innerHTML = '<div class="dialog dialog--breit dialog--einstellungen">'
+    + '<button class="dialog__schliessen" id="es-zu" title="Schliessen">✕</button>'
+    + '<div id="es-inhalt"></div></div>';
+  document.body.appendChild(huelle);
+  plan.imDialog = true;
+
+  const zu = () => { plan.imDialog = false; huelle.remove(); };
+  huelle.querySelector("#es-zu").onclick = zu;
+  dialogSchliessen(huelle, zu);
+
+  seiteEinstellungen(huelle.querySelector("#es-inhalt"));
+}
+
 async function seiteEinstellungen(b) {
   const ich = profil || {};
   const bin = istAdmin();
@@ -9530,7 +9565,6 @@ const SEITEN = [
   { pfad: "bestellungen", titel: "Bestellungen", zeichen: SYM.bestellungen, zeige: seiteBestellungen },
   { pfad: "einkauf",      titel: "Einkauf",      zeichen: SYM.einkauf, zeige: seiteEinkauf },
   { pfad: "rechner",      titel: "Rechner",      zeichen: SYM.rechner, zeige: seiteRechner },
-  { pfad: "einstellungen", titel: "Einstellungen", zeichen: SYM.einstellungen, zeige: seiteEinstellungen },
 ];
 
 // =================================================================
@@ -9657,6 +9691,14 @@ function syncStarten(pfad) {
 
 function zeichneSeite() {
   const roh = location.hash.replace(/^#\/?/, "").split("/")[0];
+
+  // Alte Verweise auf #/einstellungen öffnen jetzt das Fenster
+  if (roh === "einstellungen") {
+    location.hash = "";
+    einstellungenOeffnen();
+    return;
+  }
+
   const pfad = SEITEN.some((s) => s.pfad === roh) ? roh : "dashboard";
   const seite = SEITEN.find((s) => s.pfad === pfad);
   document.querySelectorAll("[data-nav]").forEach((el) => {
@@ -9675,7 +9717,8 @@ function zeichneGeruest() {
   WURZEL.innerHTML = ''
     + '<header class="kopf">'
     + '<button class="kopf__klapp" id="nav-klapp" title="Menü ein- oder ausklappen">☰</button>'
-    + '<img class="kopf__logo" src="./logo.png" alt="Hofer + Co.">'
+    + '<a class="kopf__logolink" href="https://www.hoferco.ch/" target="_blank" rel="noopener">'
+    + '<img class="kopf__logo" src="./logo.png" alt="Hofer + Co."></a>' 
     + (meineRolle() === "planwand"
         ? '<button class="kopf__admin' + (plan.pinOk ? " aktiv" : "") + '" id="kopf-admin"'
           + ' title="Bearbeiten freischalten">Bearbeiten</button>'
@@ -9689,7 +9732,7 @@ function zeichneGeruest() {
           + esc(((profil && (profil.full_name || profil.email)) || "?").charAt(0).toUpperCase())
           + '</span>')
     + '<span class="kopf__benutzer" data-benutzername>' + esc(anzeige) + '</span>'
-    + '<button class="kopf__abmelden" id="ab">Abmelden</button>'
+    + '<button class="kopf__einstellungen" id="kopf-einstellungen" title="Einstellungen">⚙</button>' 
     + '</header>'
     + '<div class="rahmen"><nav class="nav" aria-label="Hauptnavigation">'
     + SEITEN.map((s) => '<a class="nav__punkt" data-nav="' + s.pfad + '" href="#/' + s.pfad + '">'
@@ -9736,6 +9779,9 @@ function zeichneGeruest() {
   const rueck = document.getElementById("rueck-knopf");
   if (rueck) rueck.onclick = schrittZurueck;
   knopfRueckgaengigZeigen();
+
+  const einstKnopf = document.getElementById("kopf-einstellungen");
+  if (einstKnopf) einstKnopf.onclick = () => einstellungenOeffnen();
 
   const klapp = document.getElementById("nav-klapp");
   if (klapp) klapp.onclick = () => {
