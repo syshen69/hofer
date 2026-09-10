@@ -1728,7 +1728,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "24.0.0";
+const APP_VERSION = "24.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -5478,10 +5478,11 @@ async function ladeBezeichnungen() {
 
 async function ladeLieferanten() {
   const { data, error } = await zeitlimit(
-    db.from("suppliers").select("*").eq("is_active", true).order("name"),
-    10000, "Lieferanten");
+    db.from("suppliers").select("*").order("name"), 10000, "Lieferanten");
   if (error) throw error;
-  return data || [];
+  // Steht nichts drin, gilt der Lieferant als aktiv. Sonst
+  // verschwinden alte Einträge stillschweigend aus der Auswahl.
+  return (data || []).filter((l) => l.is_active !== false);
 }
 
 async function sucheArtikel(text) {
@@ -6488,7 +6489,6 @@ async function artikelSchnellAnlegen(vorgabe) {
     titel: "Neuen Artikel anlegen",
     felder: [
       { name: "nummer", label: "Artikelnummer", pflicht: true, wert: vorgabe || "" },
-      { name: "einheit", label: "Einheit", wert: "Stück" },
     ],
     bestaetigen: "Weiter",
   });
@@ -6500,10 +6500,15 @@ async function artikelSchnellAnlegen(vorgabe) {
   w.name = bez;
 
   let lieferantId = null;
-  const wahl = await auswahlDialog("Lieferant wählen",
-    lieferanten.map((l) => ({ wert: l.id, text: l.name }))
-      .concat([{ wert: "__neu", text: "+ Neuen Lieferanten anlegen" },
-               { wert: "", text: "– kein Lieferant –" }]));
+  const auswahlListe = lieferanten.map((l) => ({ wert: l.id, text: l.name, such: l.name }))
+    .concat([{ wert: "__neu", text: "+ Neuen Lieferanten anlegen", such: "neu" },
+             { wert: "__keiner", text: "– kein Lieferant –", such: "kein" }]);
+
+  const wahl = auswahlListe.length > 12
+    ? await auswahlSuchen("Lieferant wählen", auswahlListe)
+    : await auswahlDialog("Lieferant wählen", auswahlListe);
+
+  if (wahl === null) return null;
 
   if (wahl === "__neu") {
     const nw = await dialogFelder({ titel: "Neuer Lieferant",
@@ -6520,13 +6525,15 @@ async function artikelSchnellAnlegen(vorgabe) {
       if (r.error) meldung(fehlertext(r.error), "fehler");
       else { lieferantId = r.data.id; lieferanten.push(r.data); meldung("Lieferant angelegt."); }
     }
+  } else if (wahl === "__keiner") {
+    lieferantId = null;
   } else {
     lieferantId = wahl || null;
   }
 
   const { data, error } = await db.from("articles").insert({
     article_number: w.nummer, name: w.name,
-    unit: w.einheit || "Stück", supplier_id: lieferantId,
+    unit: "Stück", supplier_id: lieferantId,
   }).select().single();
 
   if (error) { meldung(fehlertext(error), "fehler"); return null; }
@@ -6968,9 +6975,6 @@ async function artikelBearbeiten(artikel, b) {
     + '<option value="__neu">+ Neue Bezeichnung anlegen</option>'
     + '</select></label>'
 
-    + '<div class="zeitraumwahl">'
-    + '<label class="feld"><span>Einheit</span>'
-    + '<input type="text" id="ab-einheit" value="' + esc(artikel.unit || "Stück") + '"></label>'
     + '<label class="feld"><span>Lieferant</span>'
     + '<select id="ab-lief">'
     + '<option value="">– kein Lieferant –</option>'
@@ -6979,7 +6983,6 @@ async function artikelBearbeiten(artikel, b) {
         + '</option>').join("")
     + '<option value="__neu">+ Neuer Lieferant …</option>'
     + '</select></label>'
-    + '</div>'
 
     + '<div class="dialog__knoepfe">'
     + '<button class="knopf knopf--gefahr" id="ab-weg">Löschen</button>'
@@ -7048,7 +7051,7 @@ async function artikelBearbeiten(artikel, b) {
     const { error } = await db.from("articles").update({
       article_number: nummer,
       name: name,
-      unit: ($("ab-einheit").value || "").trim() || "Stück",
+      unit: "Stück",
       supplier_id: liefFeld.value && liefFeld.value !== "__neu" ? liefFeld.value : null,
     }).eq("id", artikel.id);
 
