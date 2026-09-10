@@ -1728,7 +1728,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "23.3.0";
+const APP_VERSION = "24.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -2996,6 +2996,14 @@ const WOCHENTAGE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "
 const WT_KURZ = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 
 function wochentagName(text) { return WOCHENTAGE[(ausIso(text).getDay() + 6) % 7]; }
+// Zeichen für die Zielart einer Lieferung
+function zielZeichen(art) {
+  if (art === "maschine") return "⚙";
+  if (art === "person") return "◉";
+  if (art === "andere") return "→";
+  return "▤";
+}
+
 function zahlText(n) { return Number(n || 0).toLocaleString("de-CH"); }
 
 function leistungText(n) {
@@ -3503,6 +3511,8 @@ const plan = {
   suche: "",
   skala: 1,
   kopierModus: false,
+  syncTakt: null,
+  imDialog: false,
   pinOk: false,
   adminModus: false,
   spalte: 0,
@@ -3630,33 +3640,76 @@ async function ladePlanAuftraege() {
   return data || [];
 }
 
+// Rechnet Spaltenbreite, Namensbreite und Schriftgrösse aus.
+// Getrennt, damit sich die Wand neu zeichnen lässt, ohne alles
+// aus der Datenbank zu holen.
+// Holt im Hintergrund neue Daten und zeichnet nur dann neu,
+// wenn sich wirklich etwas geändert hat. Der Zeitraum und die
+// Scrollstellung bleiben dabei erhalten.
+async function planAbgleich(b) {
+  if (!document.getElementById("pw-inhalt")) { planSyncStoppen(); return; }
+  if (plan.imDialog) return;
+
+  try {
+    const neueAuftraege = await ladePlanAuftraege();
+    let neueFerien = [];
+    try {
+      neueFerien = (await ladeFerien()).map((f) => {
+        f.genehmigt_von_name = f.profiles ? f.profiles.full_name : null;
+        return f;
+      });
+    } catch (f) { neueFerien = plan.ferien || []; }
+
+    const alt = JSON.stringify([plan.auftraege, plan.ferien]);
+    const neu = JSON.stringify([neueAuftraege, neueFerien]);
+    if (alt === neu) return;
+
+    plan.auftraege = neueAuftraege;
+    plan.ferien = neueFerien;
+    neuZeichnen(b);
+  } catch (f) {
+    // Netz kurz weg? Dann beim nächsten Durchgang wieder.
+    console.warn("Abgleich:", f.message);
+  }
+}
+
+function planSyncStarten(b) {
+  planSyncStoppen();
+  plan.syncTakt = setInterval(() => planAbgleich(b), 15000);
+}
+
+function planSyncStoppen() {
+  if (plan.syncTakt) { clearInterval(plan.syncTakt); plan.syncTakt = null; }
+}
+
+function masseBerechnen(b) {
+  if (!plan.tageWunsch) plan.tageWunsch = Number(einstellungWert("pwtage", 15)) || 15;
+  plan.tage = Math.max(5, Math.min(150, plan.tageWunsch));
+
+  const breite = (b && b.clientWidth) || window.innerWidth;
+  const gesamt = Math.max(280, breite) - 8;
+
+  let namensbreite = Math.min(108, Math.floor(gesamt / 5));
+  plan.spalte = Math.max(9, (gesamt - namensbreite) / plan.tage);
+
+  if (plan.spalte < 22) {
+    namensbreite = Math.min(namensbreite, 64);
+    plan.spalte = Math.max(9, (gesamt - namensbreite) / plan.tage);
+  }
+
+  plan.namensbreite = namensbreite;
+  plan.skala = Math.max(0.5, Math.min(1.1, plan.spalte / 40));
+  plan.knapp = plan.spalte < 30;
+  plan.sehrKnapp = plan.spalte < 18;
+}
+
 async function seitePlanwand(b) {
   if (plan.adminModus === false && einstellung("pwadmin")) plan.adminModus = true;
   // Diese Seite darf die ganze Fensterbreite nutzen.
   b.classList.add("inhalt--breit");
 
   // So viele Arbeitstage, wie nebeneinander Platz haben.
-  // Der Zoom bestimmt, wie viele Arbeitstage sichtbar sind.
-  // Die Spaltenbreite ergibt sich daraus, damit immer alles in die
-  // Breite passt und nichts seitlich weggeschoben wird.
-  if (!plan.tageWunsch) plan.tageWunsch = Number(einstellungWert("pwtage", 15)) || 15;
-  plan.tage = Math.max(5, Math.min(150, plan.tageWunsch));
-
-  const gesamt = Math.max(280, b.clientWidth || window.innerWidth) - 8;
-  // Die Namensspalte darf höchstens ein Fünftel einnehmen
-  let namensbreite = Math.min(108, Math.floor(gesamt / 5));
-  plan.spalte = Math.max(5, (gesamt - namensbreite) / plan.tage);
-
-  // Sehr eng: Namensspalte schrumpfen, damit die Tage Platz behalten
-  if (plan.spalte < 22) {
-    namensbreite = Math.min(namensbreite, 64);
-    plan.spalte = Math.max(5, (gesamt - namensbreite) / plan.tage);
-  }
-
-  plan.namensbreite = namensbreite;
-  plan.skala = Math.max(0.5, Math.min(1.1, plan.spalte / 40));
-  plan.knapp = plan.spalte < 30;      // nur noch Wochentag oben
-  plan.sehrKnapp = plan.spalte < 18;  // links nur noch die Nummer
+  masseBerechnen(b);
 
   b.innerHTML = '<h1 class="seitentitel">Planwand</h1>'
     + '<div id="pw-seite"><div class="laedt">Wird geladen …</div></div>';
@@ -3775,10 +3828,12 @@ async function ansichtPlanwand(ziel, b) {
     };
     beschriften();
 
-    zeitregler.oninput = beschriften;
-    zeitregler.onchange = () => {
+    // Live mitzeichnen: die Aufträge sind schon geladen, es braucht
+    // keinen neuen Zugriff auf die Datenbank.
+    zeitregler.oninput = () => {
+      beschriften();
       plan.start = arbeitstagePlus(nullpunkt, Number(zeitregler.value));
-      seitePlanwand(b);
+      neuZeichnen(b);
     };
   }
 
@@ -3789,12 +3844,15 @@ async function ansichtPlanwand(ziel, b) {
     const n = Math.max(5, Math.min(150, Math.round(Number(wert) || 15)));
     plan.tageWunsch = n;
     einstellungSetzenWert("pwtage", n);
-    seitePlanwand(b);
+    masseBerechnen(b);
+    neuZeichnen(b);
   };
 
   if (regler) {
-    regler.oninput = () => { if (zahlfeld) zahlfeld.value = regler.value; };
-    regler.onchange = () => zoomSetzen(regler.value);
+    regler.oninput = () => {
+      if (zahlfeld) zahlfeld.value = regler.value;
+      zoomSetzen(regler.value);
+    };
   }
   if (zahlfeld) {
     zahlfeld.onchange = () => zoomSetzen(zahlfeld.value);
@@ -3825,6 +3883,7 @@ async function ansichtPlanwand(ziel, b) {
 
   try {
     zeichnePlanwand(b);
+    planSyncStarten(b);
   } catch (f) {
     document.getElementById("pw-inhalt").innerHTML =
       '<div class="karte karte--fehler">'
@@ -4091,9 +4150,10 @@ async function ferienDialog(eintrag, zeile, datum, b) {
     + '" id="fd-ja">Speichern</button>'
     + '</div></div>';
   document.body.appendChild(huelle);
+  plan.imDialog = true;
 
   const $ = (k) => huelle.querySelector("#" + k);
-  const zu = () => huelle.remove();
+  const zu = () => { plan.imDialog = false; huelle.remove(); };
   $("fd-nein").onclick = zu;
   dialogSchliessen(huelle, zu);
   $("fd-person").focus();
@@ -4154,6 +4214,18 @@ async function ferienDialog(eintrag, zeile, datum, b) {
 }
 
 // ---------- Die Planwand zeichnen ----------
+
+// Zeichnet neu und behält die Scrollstellung bei
+function neuZeichnen(b) {
+  const rolle = document.querySelector(".pw-rolle");
+  const x = rolle ? rolle.scrollLeft : 0;
+  const y = rolle ? rolle.scrollTop : 0;
+
+  zeichnePlanwand(b);
+
+  const neu = document.querySelector(".pw-rolle");
+  if (neu) { neu.scrollLeft = x; neu.scrollTop = y; }
+}
 
 function zeichnePlanwand(b) {
   const tage = arbeitstage(plan.start, plan.tage);
@@ -4871,9 +4943,10 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     + '<button class="knopf knopf--haupt" id="pl-ja">Speichern</button>'
     + '</div></div>';
   document.body.appendChild(huelle);
+  plan.imDialog = true;
 
   const $ = (k) => huelle.querySelector("#" + k);
-  const zu = () => huelle.remove();
+  const zu = () => { plan.imDialog = false; huelle.remove(); };
   $("pl-nein").onclick = zu;
   dialogSchliessen(huelle, zu);
 
@@ -6225,6 +6298,7 @@ async function bestOffen(ziel, b) {
       + (z.needed_by ? '<span class="' + (spaet ? "minus stark" : "") + '">bis '
           + kurzDatum(z.needed_by) + '</span>' : "")
       + (z.note ? ' · ' + esc(z.note) : "")
+      + (z.ziel_text ? ' · ' + zielZeichen(z.ziel_art) + ' ' + esc(z.ziel_text) : "")
       + ' · von ' + esc((z.profiles && (z.profiles.full_name || z.profiles.email)) || "unbekannt")
       + '</div></td>'
       + '<td class="bz-menge stark">' + zahlText(z.quantity) + '</td>'
@@ -6534,6 +6608,17 @@ async function positionDialog(b) {
     + '<input id="pd-menge" type="number" min="1" step="1" value="1"></label>'
     + '<label class="feld"><span>Bis wann</span><input id="pd-frist" type="date"></label>'
     + '</div>'
+    + '<div class="feld"><span class="feldlabel">Wohin nach dem Eintreffen</span>'
+    + '<div class="moduswahl" id="pd-zielwahl">'
+    + '<button type="button" class="moduswahl__knopf aktiv" data-ziel="lager">Lager</button>'
+    + '<button type="button" class="moduswahl__knopf" data-ziel="maschine">Maschine</button>'
+    + '<button type="button" class="moduswahl__knopf" data-ziel="person">Person</button>'
+    + '<button type="button" class="moduswahl__knopf" data-ziel="andere">Anderes</button>'
+    + '</div>'
+    + '<select id="pd-zielauswahl" class="auswahl" hidden></select>'
+    + '<input type="text" id="pd-zielfrei" hidden placeholder="Wohin genau?">'
+    + '</div>'
+
     + '<label class="feld"><span>Notiz</span>'
     + '<textarea id="pd-notiz" rows="2" placeholder="kann leer bleiben"></textarea></label>'
     + '</div>'
@@ -6544,6 +6629,65 @@ async function positionDialog(b) {
   document.body.appendChild(huelle);
 
   const $ = (kennung) => huelle.querySelector("#" + kennung);
+
+  // Ziel der Lieferung
+  let zielArt = "lager";
+  const zielAuswahl = $("pd-zielauswahl");
+  const zielFrei = $("pd-zielfrei");
+
+  const zielFuellen = async () => {
+    zielAuswahl.hidden = true;
+    zielFrei.hidden = true;
+
+    if (zielArt === "maschine") {
+      zielAuswahl.hidden = false;
+      zielAuswahl.innerHTML = '<option value="">Maschine wählen</option>'
+        + (prod.maschinen || []).map((m) => '<option value="' + esc(m.name)
+            + (m.machine_number ? " " + esc(m.machine_number) : "") + '">'
+            + esc(m.name) + (m.machine_number ? " · " + esc(m.machine_number) : "")
+            + '</option>').join("");
+
+      if (!(prod.maschinen || []).length) {
+        try {
+          prod.maschinen = await ladeMaschinen(false);
+          zielFuellen();
+        } catch (f) { /* dann bleibt die Liste leer */ }
+      }
+      return;
+    }
+
+    if (zielArt === "person") {
+      zielAuswahl.hidden = false;
+      zielAuswahl.innerHTML = '<option value="">Wird geladen …</option>';
+      try {
+        const a = await db.from("profiles").select("full_name, email")
+          .eq("is_active", true).order("full_name");
+        const namen = (a.data || []).map((u) => u.full_name || u.email);
+        try {
+          const c = await db.from("people").select("name").order("name");
+          (c.data || []).forEach((m) => namen.push(m.name));
+        } catch (f) { /* Tabelle gibt es vielleicht nicht */ }
+
+        zielAuswahl.innerHTML = '<option value="">Person wählen</option>'
+          + namen.sort().map((n) => '<option value="' + esc(n) + '">'
+              + esc(n) + '</option>').join("");
+      } catch (f) {
+        zielAuswahl.innerHTML = '<option value="">Konnte nicht geladen werden</option>';
+      }
+      return;
+    }
+
+    if (zielArt === "andere") { zielFrei.hidden = false; zielFrei.focus(); }
+  };
+
+  huelle.querySelectorAll("[data-ziel]").forEach((k) => {
+    k.onclick = () => {
+      zielArt = k.dataset.ziel;
+      huelle.querySelectorAll("[data-ziel]").forEach((x) =>
+        x.classList.toggle("aktiv", x === k));
+      zielFuellen();
+    };
+  });
 
   let gewaehlt = null;
   const zu = () => huelle.remove();
@@ -6611,12 +6755,25 @@ async function positionDialog(b) {
     const menge = Math.round(Number($("pd-menge").value));
     if (!Number.isFinite(menge) || menge < 1) { meldung("Menge muss mindestens 1 sein.", "warn"); return; }
 
+    // Ziel zusammensetzen
+    let zielText = "";
+    if (zielArt === "lager") zielText = "Lager";
+    else if (zielArt === "andere") zielText = (zielFrei.value || "").trim();
+    else zielText = zielAuswahl.value || "";
+
+    if (zielArt !== "lager" && !zielText) {
+      meldung("Bitte noch angeben, wohin die Lieferung soll.", "warn");
+      return;
+    }
+
     const { error } = await db.from("order_items").insert({
       article_id: gewaehlt.id,
       supplier_id: gewaehlt.supplier_id || null,
       quantity: menge,
       needed_by: $("pd-frist").value || null,
       note: ($("pd-notiz").value || "").trim() || null,
+      ziel_art: zielArt,
+      ziel_text: zielText,
     });
 
     if (error) meldung(fehlertext(error), "fehler");
@@ -6652,6 +6809,9 @@ async function bestHistorie(ziel, b) {
               + '<td class="mitte stark">' + zahlText(z.quantity) + '</td>'
               + '<td class="klein">'
               + esc((z.profiles && (z.profiles.full_name || z.profiles.email)) || "–")
+              + (z.ziel_text
+                  ? '<div>' + zielZeichen(z.ziel_art) + ' ' + esc(z.ziel_text) + '</div>'
+                  : "")
               + '</td></tr>';
           }).join("")
         + '</tbody></table>'
@@ -6827,9 +6987,10 @@ async function artikelBearbeiten(artikel, b) {
     + '<button class="knopf knopf--haupt" id="ab-ja">Speichern</button>'
     + '</div></div>';
   document.body.appendChild(huelle);
+  plan.imDialog = true;
 
   const $ = (k) => huelle.querySelector("#" + k);
-  const zu = () => huelle.remove();
+  const zu = () => { plan.imDialog = false; huelle.remove(); };
   $("ab-nein").onclick = zu;
   dialogSchliessen(huelle, zu);
   $("ab-nr").focus();
@@ -7313,9 +7474,10 @@ async function personDialog(person, b) {
     + '<button class="knopf knopf--haupt" id="pd-ja">Speichern</button>'
     + '</div></div>';
   document.body.appendChild(huelle);
+  plan.imDialog = true;
 
   const $ = (k) => huelle.querySelector("#" + k);
-  const zu = () => huelle.remove();
+  const zu = () => { plan.imDialog = false; huelle.remove(); };
   $("pd-nein").onclick = zu;
   dialogSchliessen(huelle, zu);
 
@@ -8968,6 +9130,7 @@ function zeichneSeite() {
   });
   window.scrollTo(0, 0);
   const bereich = document.getElementById("inhalt");
+  if (pfad !== "planwand" && typeof planSyncStoppen === "function") planSyncStoppen();
   bereich.classList.toggle("inhalt--breit", pfad === "planwand");
   seite.zeige(bereich);
 }
