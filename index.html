@@ -1724,6 +1724,36 @@ body.dunkel .wahlknopf.aktiv { background: #24344a; }
   .dialog--breit { max-width: 100%; }
   .zeitraumwahl { grid-template-columns: 1fr; }
 }
+
+/* ---------- Nichts läuft seitlich hinaus ---------- */
+html, body { max-width: 100%; overflow-x: hidden; }
+.inhalt, .karte, .rahmen { max-width: 100%; min-width: 0; }
+.karte { overflow-x: hidden; }
+img, svg, canvas, video { max-width: 100%; }
+pre, .gcode { max-width: 100%; overflow-x: auto; }
+
+@media (max-width: 720px) {
+  /* Kein seitliches Wischen ausser in der Planwand-Tafel */
+  .tabellenrolle { overflow-x: visible; }
+
+  /* Bestellungen: gestapelt statt breite Tabelle */
+  .tabelle--bestellungen { min-width: 0; }
+
+  /* Geburtstagsfeld schmal genug, damit die Zeile aufgeht */
+  .gebfeld { width: 100%; max-width: 165px; font-size: .8rem; padding: 4px 6px; }
+  .tabelle--benutzer .gebfeld { max-width: 100%; }
+
+  /* Alle Tabellen dürfen umbrechen */
+  .tabelle { width: 100%; table-layout: auto; }
+  .tabelle td, .tabelle th { word-break: break-word; white-space: normal; }
+  .nowrap { white-space: normal !important; }
+
+  /* Nur die Planwand-Tafel darf waagrecht scrollen */
+  .pw-rolle { overflow-x: auto; }
+}
+
+/* Am Rechner bleibt das Geburtstagsfeld kompakt */
+.gebfeld { max-width: 165px; }
 </style>
 </head>
 <body>
@@ -1767,7 +1797,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "25.0.0";
+const APP_VERSION = "25.2.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -1965,7 +1995,15 @@ function zeitlimit(versprechen, ms, name) {
   ]);
 }
 
+// Nach einer eigenen Änderung merkt sich der Abgleich den neuen Stand,
+// damit die Seite nicht gleich nochmal aufgebaut wird.
+function stempelAuffrischen() {
+  if (!sync.pfad) return;
+  seitenStempel(sync.pfad).then((w) => { sync.stempel = w; });
+}
+
 function meldung(text, art) {
+  stempelAuffrischen();
   let box = document.querySelector(".toast-bereich");
   if (!box) {
     box = document.createElement("div");
@@ -6993,27 +7031,23 @@ async function artikelListe(b) {
 
   kasten.querySelectorAll("[data-arweg]").forEach((el) => {
     el.onclick = async () => {
-      const ok = await doppeltNachfragen(
-        { titel: "Artikel löschen",
-          text: 'Soll "' + el.dataset.nr + '" wirklich gelöscht werden? '
-              + "Wenn er in Bestellungen vorkommt, lehnt die Datenbank das ab.",
-          bestaetigen: "Weiter zum Löschen", gefahr: true },
-        { titel: "Wirklich endgültig löschen?",
-          text: "Letzte Rückfrage. Danach ist der Artikel weg.",
-          bestaetigen: "Endgültig löschen", gefahr: true });
+      const ok = await nachfragen({
+        titel: "Artikel löschen",
+        text: '"' + el.dataset.nr + '" wird gelöscht. Bestellpositionen, die '
+            + "daran hängen, verschwinden mit.",
+        bestaetigen: "Löschen", gefahr: true });
       if (!ok) return;
 
+      // Erst die Abhängigkeiten, dann den Artikel. So klappt es immer.
+      await db.from("order_items").delete().eq("article_id", el.dataset.arweg);
       const r = await db.from("articles").delete().eq("id", el.dataset.arweg).select();
 
-      if (r.error) {
-        meldung("Der Artikel lässt sich nicht löschen, weil er noch in "
-          + "Bestellungen vorkommt. Lösche zuerst diese Positionen.", "fehler");
-      } else if ((r.data || []).length === 0) {
-        meldung("Dafür fehlen dir die Rechte.", "fehler");
-      } else {
-        meldung("Artikel gelöscht.");
-      }
-      artikelListe(b);
+      if (r.error) meldung(fehlertext(r.error), "fehler");
+      else if ((r.data || []).length === 0)
+        meldung("Nichts gelöscht. Vermutlich fehlen die Rechte in der Datenbank.", "fehler");
+      else meldung("Artikel gelöscht.");
+
+      seiteBestellungen(b);
     };
   });
 }
@@ -7117,37 +7151,38 @@ async function artikelBearbeiten(artikel, b) {
       return;
     }
 
-    const { error } = await db.from("articles").update({
+    const r = await db.from("articles").update({
       article_number: nummer,
       name: name,
       unit: "Stück",
       supplier_id: liefFeld.value && liefFeld.value !== "__neu" ? liefFeld.value : null,
-    }).eq("id", artikel.id);
+    }).eq("id", artikel.id).select();
 
     zu();
-    if (error) meldung(fehlertext(error), "fehler");
-    else { meldung("Gespeichert."); artikelListe(b); }
+    if (r.error) meldung(fehlertext(r.error), "fehler");
+    else if ((r.data || []).length === 0)
+      meldung("Nichts geändert. Vermutlich fehlen die Rechte in der Datenbank.", "fehler");
+    else { meldung("Gespeichert."); seiteBestellungen(b); }
   };
 
   $("ab-weg").onclick = async () => {
-    const ok = await doppeltNachfragen(
-      { titel: "Artikel löschen",
-        text: 'Soll "' + artikel.article_number + '" wirklich gelöscht werden?',
-        bestaetigen: "Weiter zum Löschen", gefahr: true },
-      { titel: "Wirklich endgültig löschen?",
-        text: "Letzte Rückfrage. Danach ist der Artikel weg.",
-        bestaetigen: "Endgültig löschen", gefahr: true });
+    const ok = await nachfragen({
+      titel: "Artikel löschen",
+      text: '"' + artikel.article_number + '" wird gelöscht. Bestellpositionen, '
+          + "die daran hängen, verschwinden mit.",
+      bestaetigen: "Löschen", gefahr: true });
     if (!ok) return;
 
+    await db.from("order_items").delete().eq("article_id", artikel.id);
     const r = await db.from("articles").delete().eq("id", artikel.id).select();
-    const fehlt = r.error || ((r.data || []).length === 0
-      ? new Error("Dafür fehlen dir die Rechte, oder der Artikel wird noch verwendet.")
-      : null);
 
-    if (fehlt) { meldung(fehlertext(fehlt), "fehler"); return; }
     zu();
-    meldung("Artikel gelöscht.");
-    artikelListe(b);
+    if (r.error) meldung(fehlertext(r.error), "fehler");
+    else if ((r.data || []).length === 0)
+      meldung("Nichts gelöscht. Vermutlich fehlen die Rechte in der Datenbank.", "fehler");
+    else meldung("Artikel gelöscht.");
+
+    seiteBestellungen(b);
   };
 }
 
@@ -7267,19 +7302,26 @@ async function bestLieferanten(ziel, b) {
 
   ziel.querySelectorAll("[data-lfweg]").forEach((el) => {
     el.onclick = async () => {
-      const ok = await doppeltNachfragen(
-        { titel: "Lieferant löschen",
-          text: 'Soll "' + el.dataset.name + '" wirklich gelöscht werden? '
-              + "Wenn Artikel oder Bestellungen darauf verweisen, lehnt die Datenbank das ab.",
-          bestaetigen: "Weiter zum Löschen", gefahr: true },
-        { titel: "Wirklich endgültig löschen?",
-          text: "Letzte Rückfrage. Danach ist der Lieferant weg.",
-          bestaetigen: "Endgültig löschen", gefahr: true });
+      const ok = await nachfragen({
+        titel: "Lieferant löschen",
+        text: '"' + el.dataset.name + '" wird gelöscht. Artikel und Bestellungen '
+            + "bleiben, sie haben danach keinen Lieferanten mehr.",
+        bestaetigen: "Löschen", gefahr: true });
       if (!ok) return;
 
-      const { error } = await db.from("suppliers").delete().eq("id", el.dataset.lfweg);
-      if (error) meldung(fehlertext(error), "fehler");
-      else { meldung("Lieferant gelöscht."); seiteBestellungen(b); }
+      // Verweise lösen, damit das Löschen nicht scheitert
+      await db.from("articles").update({ supplier_id: null })
+        .eq("supplier_id", el.dataset.lfweg);
+      await db.from("order_items").update({ supplier_id: null })
+        .eq("supplier_id", el.dataset.lfweg);
+
+      const r = await db.from("suppliers").delete().eq("id", el.dataset.lfweg).select();
+      if (r.error) meldung(fehlertext(r.error), "fehler");
+      else if ((r.data || []).length === 0)
+        meldung("Nichts gelöscht. Vermutlich fehlen die Rechte in der Datenbank.", "fehler");
+      else meldung("Lieferant gelöscht.");
+
+      seiteBestellungen(b);
     };
   });
 }
@@ -9200,24 +9242,67 @@ const SEITEN = [
 //  Fenster offen ist.
 // =================================================================
 
-const sync = { takt: null, pfad: null };
+const sync = { takt: null, pfad: null, stempel: null };
 
 function syncStoppen() {
   if (sync.takt) { clearInterval(sync.takt); sync.takt = null; }
+  sync.stempel = null;
+}
+
+// Kurzer Fingerabdruck der Daten, die eine Seite anzeigt.
+// Nur wenn er sich ändert, wird neu gezeichnet.
+async function seitenStempel(pfad) {
+  const teile = [];
+  const hole = async (tabelle, felder, aufbau) => {
+    try {
+      let a = db.from(tabelle).select(felder);
+      if (aufbau) a = aufbau(a);
+      const r = await a;
+      if (!r.error) teile.push(JSON.stringify(r.data));
+    } catch (f) { /* eine fehlende Tabelle darf nicht stören */ }
+  };
+
+  if (pfad === "dashboard") {
+    await hole("jobs", "id,problem,problem_at,fa_erstellt,material_ok,planned_from,plan_status");
+    await hole("todos", "id,text,is_done,due_date");
+    await hole("shopping_items", "id,text,is_done,prio");
+    await hole("order_items", "id,status,quantity,needed_by");
+    await hole("profiles", "id,geburtstag,full_name,bild_url");
+  } else if (pfad === "produktion") {
+    await hole("production_records", "id,machine_id,record_date,quantity");
+    await hole("jobs", "id,machine_id,job_number,ended_at,plan_status,target_quantity");
+    await hole("machines", "id,name,machine_number,sort_order,is_active");
+  } else if (pfad === "bestellungen") {
+    await hole("order_items", "id,status,quantity,needed_by,note,ziel_art,ziel_text,article_id");
+    await hole("articles", "id,article_number,name,supplier_id,is_active");
+    await hole("suppliers", "id,name,website,is_active");
+    await hole("designations", "id,name");
+  } else if (pfad === "einkauf") {
+    await hole("shopping_items", "id,text,menge,laden,prio,is_done");
+  } else if (pfad === "einstellungen") {
+    await hole("profiles", "id,full_name,role,is_active,geburtstag,darf_bearbeiten,parks,bild_url");
+    await hole("people", "id,name,geburtstag,bild_url");
+  } else {
+    return null;   // Rechner und Timeout haben keine gemeinsamen Daten
+  }
+
+  return teile.join("|");
 }
 
 function syncStarten(pfad) {
   syncStoppen();
   sync.pfad = pfad;
 
-  // Die Planwand hat ihren eigenen Abgleich, der die Zeitstellung behält
+  // Die Planwand hat ihren eigenen Abgleich
   if (pfad === "planwand") return;
 
-  sync.takt = setInterval(() => {
+  // Ausgangswert merken, ohne zu zeichnen
+  seitenStempel(pfad).then((w) => { sync.stempel = w; });
+
+  sync.takt = setInterval(async () => {
     if (document.hidden) return;
     if (document.querySelector(".dialog-huelle")) return;
 
-    // Nicht dazwischenfunken, während jemand etwas eintippt
     const a = document.activeElement;
     if (a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA"
               || a.tagName === "SELECT" || a.isContentEditable)) return;
@@ -9225,26 +9310,22 @@ function syncStarten(pfad) {
     const bereich = document.getElementById("inhalt");
     if (!bereich) { syncStoppen(); return; }
 
+    const jetzt = await seitenStempel(sync.pfad);
+    if (jetzt === null) return;
+
+    // Nichts geändert: die Seite bleibt einfach stehen
+    if (sync.stempel === null) { sync.stempel = jetzt; return; }
+    if (jetzt === sync.stempel) return;
+
+    sync.stempel = jetzt;
+
     const seite = SEITEN.find((x) => x.pfad === sync.pfad);
     if (!seite) return;
 
-    // Scrollstellung merken und danach wieder herstellen
     const y = window.scrollY;
-    const innen = [];
-    document.querySelectorAll(".tabellenrolle, .pw-rolle, .rolle").forEach((el) => {
-      innen.push([el.className, el.scrollLeft, el.scrollTop]);
-    });
-
     seite.zeige(bereich);
-
-    setTimeout(() => {
-      window.scrollTo(0, y);
-      innen.forEach(([klasse, x, yy]) => {
-        const el = document.querySelector("." + klasse.split(" ")[0]);
-        if (el) { el.scrollLeft = x; el.scrollTop = yy; }
-      });
-    }, 60);
-  }, 15000);
+    setTimeout(() => window.scrollTo(0, y), 60);
+  }, 12000);
 }
 
 function zeichneSeite() {
