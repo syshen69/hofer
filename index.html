@@ -591,6 +591,10 @@ a:focus-visible {
 /* ---------- Zeitraumwahl ---------- */
 .zeitraumwahl { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .zeitraumwahl .feld { margin-bottom: 0; }
+/* Unterschiedlich lange Beschriftungen (eine Zeile, zwei Zeilen)
+   sollen die Eingabefelder daneben nicht aus der Reihe bringen. */
+.zeitraumwahl .feld > span { min-height: 2.3em; display: flex;
+                             align-items: flex-end; margin-bottom: 5px; }
 .schnellwahl { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; }
 
 /* ---------- Verwaltung von Maschinen ---------- */
@@ -1898,7 +1902,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "30.2.0";
+const APP_VERSION = "30.3.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -3401,11 +3405,15 @@ function sucheBinden(b) {
     clearTimeout(taste);
     taste = setTimeout(() => {
       prod.suche = feld.value;
-      seiteProduktion(b);
+      // Nur den Inhalt neu zeichnen, nicht die ganze Seite. Parks,
+      // Maschinen und Aufträge sind schon geladen, ein neuer
+      // Datenbankzugriff ist dafür nicht nötig.
+      const ziel = document.getElementById("prod-inhalt");
+      if (ziel) ansichtErfassen(ziel, b);
     }, 350);
   };
 
-  // Nach dem Neuaufbau den Zeiger wieder ans Ende setzen
+  // Nach dem Neuzeichnen den Zeiger wieder ans Ende setzen
   if (prod.suche) {
     feld.focus();
     feld.setSelectionRange(feld.value.length, feld.value.length);
@@ -4056,7 +4064,9 @@ async function ansichtPlanwand(ziel, b) {
           + '<button class="knopf knopf--warnung" id="pw-problem">Problem melden</button>'
           + '<button class="knopf" id="pw-kopieren">Auftrag kopieren</button>'
           + '</div>'
-        : nurLesenHinweis("Du kannst die Planung ansehen. Ändern dürfen Planer und Administratoren."))
+        : (isMobil()
+            ? nurLesenHinweis("Bearbeitbar nur am Desktop, nicht auf dem Handy.")
+            : nurLesenHinweis("Du kannst die Planung ansehen. Ändern dürfen Planer und Administratoren.")))
     + '<div id="pw-inhalt"><div class="laedt">Planung wird geladen …</div></div>';
 
   document.getElementById("pw-zurueck").onclick = () => {
