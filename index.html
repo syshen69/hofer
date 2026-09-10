@@ -658,6 +658,7 @@ a:focus-visible {
            border-radius: var(--radius); font-size: .9rem; }
 .auftrag--leer { background: var(--grund); color: var(--gedaempft); }
 .auftrag__nr { font-weight: 650; letter-spacing: .02em; }
+.auftrag__nr--fehlt { color: var(--gefahr); }
 .auftrag__seit { font-size: .78rem; color: var(--gedaempft); }
 .auftrag .linkknopf { margin-left: auto; }
 
@@ -1886,7 +1887,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "29.4.0";
+const APP_VERSION = "30.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -3504,7 +3505,7 @@ function auftragsZeile(maschine) {
   const j = prod.auftraege[maschine.id];
   if (!j) {
     return '<div class="auftrag auftrag--leer">'
-      + '<span class="auftrag__nr">Kein Auftrag</span>'
+      + '<span class="auftrag__nr auftrag__nr--fehlt">Auftrag fehlt</span>'
       + (darfSchreiben() ? '<button class="linkknopf" data-auftrag-start="' + esc(maschine.id)
           + '">Auftrag wählen</button>' : "")
       + '</div>';
@@ -3524,10 +3525,18 @@ function auftragsZeile(maschine) {
 
 function standFeld(maschine, datum, eintrag) {
   const j = prod.auftraege[maschine.id];
-  if (!j) return '<div class="kein-feld">–</div>';
+  const heute = isoDatum(new Date());
+  const istVergangenheit = datum < heute;
+
+  // Ohne laufenden Auftrag lässt sich nur ein bereits vorhandener
+  // Eintrag aus der Vergangenheit noch korrigieren. Neu erfassen
+  // geht nur, wenn tatsächlich ein Auftrag läuft.
+  if (!j && !(istVergangenheit && eintrag)) return '<div class="kein-feld">–</div>';
+
+  const auftragId = j ? j.id : eintrag.job_id;
   return '<input class="menge" type="number" inputmode="numeric" min="0" step="1"'
     + ' data-maschine="' + esc(maschine.id) + '" data-datum="' + datum + '"'
-    + ' data-auftrag="' + esc(j.id) + '"'
+    + ' data-auftrag="' + esc(auftragId) + '"'
     + (darfSchreiben() ? "" : " disabled")
     + ' value="' + (eintrag ? eintrag.quantity : "") + '">';
 }
@@ -3778,6 +3787,7 @@ const PLANSTATUS = {
   geplant: { name: "Geplant",  zeichen: "○" },
   ruesten: { name: "Rüsten",   zeichen: "🔧" },
   laeuft:  { name: "Läuft",    zeichen: "▶" },
+  qs:      { name: "QS Check", zeichen: "🔍" },
   fertig:  { name: "Fertig",   zeichen: "✔" },
 };
 
@@ -5152,7 +5162,9 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
         + ((auftrag && (auftrag.material_toleranz || "") === t)
             || (!auftrag && v && (v.material_toleranz || "") === t) ? " selected" : "") + '>'
         + (t || "ohne Toleranz") + '</option>').join("")
-    + '</select></label>'
+    + '<option value="__eigen">eigene Angabe …</option>' 
+    + '</select>' 
+    + '<input id="pl-tol-eigen" type="text" placeholder="z. B. js13" hidden></label>' 
     + '</div>'
     + '<div class="zeitraumwahl">'
     + '<label class="feld"><span>Menge vorhanden oder bestellt</span>'
@@ -5160,7 +5172,7 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     + esc(auftrag ? (auftrag.material_menge || "") : (v ? (v.material_menge || "") : ""))
     + '" placeholder="z. B. 40 kg oder 6 Stangen"></label>'
     + '<label class="feld"><span>Liefertermin</span>'
-    + '<input id="pl-liefer" type="date" value="'
+    + '<input id="pl-liefer" type="text" placeholder="z. B. KW 44" value="' 
     + esc(auftrag ? (auftrag.material_liefertermin || "") : "") + '"></label>'
     + '</div></div>'
 
@@ -5180,7 +5192,6 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     + '<input id="pl-menge" inputmode="decimal" type="number" min="0" step="1" value="'
     + (auftrag && auftrag.target_quantity !== null && auftrag.target_quantity !== undefined
         ? auftrag.target_quantity : "") + '" placeholder="wie viele Stück">'
-    + '<button type="button" class="knopf knopf--klein" id="pl-numpad" title="Ziffernblock">#</button>'
     + '</div></label>'
 
     + '<div class="feld"><span class="feldlabel">Zustand'
@@ -5231,8 +5242,7 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     + '</div>'
     + '<div class="dialog__knoepfe">'
     + (auftrag && darf
-        ? '<button class="knopf knopf--gefahr" id="pl-loeschen">Auftrag löschen</button>'
-          + '<button class="knopf knopf--still" id="pl-weg">Aus der Planung nehmen</button>' : "")
+        ? '<button class="knopf knopf--gefahr" id="pl-loeschen">Auftrag löschen</button>' : "")
     + '<button class="knopf knopf--still" id="pl-nein">Schliessen</button>'
     + '<button class="knopf knopf--haupt" id="pl-ja">Speichern</button>'
     + '</div></div>';
@@ -5267,8 +5277,23 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
   };
   felderKoppeln();
 
-  const numpadKnopf = $("pl-numpad");
-  if (numpadKnopf) numpadKnopf.onclick = () => zahlNumpad($("pl-menge"));
+  // Toleranz: eigene Angabe ein- und ausblenden
+  const tolAuswahl = $("pl-tol");
+  const tolEigenFeld = $("pl-tol-eigen");
+  const bekannteTol = ["", "h6", "h7", "h8", "h9", "h10", "h11", "h12", "h13"];
+  const vorgabeTol = auftrag ? (auftrag.material_toleranz || "")
+    : (v ? (v.material_toleranz || "") : "");
+  if (vorgabeTol && !bekannteTol.includes(vorgabeTol)) {
+    tolAuswahl.value = "__eigen";
+    tolEigenFeld.value = vorgabeTol;
+    tolEigenFeld.hidden = false;
+  }
+  tolAuswahl.onchange = () => {
+    tolEigenFeld.hidden = tolAuswahl.value !== "__eigen";
+    if (!tolEigenFeld.hidden) tolEigenFeld.focus();
+  };
+
+
 
   const probWeg = huelle.querySelector("#pl-problemweg");
   if (probWeg) probWeg.onclick = async () => {
@@ -5338,7 +5363,8 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
       fa_erstellt: $("pl-fa").checked,
       material_ok: $("pl-material").checked,
       material_dm: $("pl-dm").value === "" ? null : Number($("pl-dm").value),
-      material_toleranz: $("pl-tol").value || null,
+      material_toleranz: ($("pl-tol").value === "__eigen"
+        ? ($("pl-tol-eigen").value || "").trim() : $("pl-tol").value) || null,
       material_menge: ($("pl-menge-mat").value || "").trim() || null,
       material_liefertermin: $("pl-liefer").value || null,
       machine_id: $("pl-maschine").value,
@@ -5389,18 +5415,6 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
       meldung("Auftrag gelöscht. Mit Strg+Z zurücknehmen.");
       planAktualisieren(b);
     }
-  };
-
-  const weg = $("pl-weg");
-  if (weg) weg.onclick = async () => {
-    const ok = await nachfragen({ titel: "Aus der Planung nehmen",
-      text: "Der Auftrag verschwindet von der Planwand. Er bleibt bestehen und "
-          + "kann später wieder eingeplant werden.",
-      bestaetigen: "Aus der Planung nehmen", gefahr: true });
-    if (!ok) return;
-    const { error } = await db.from("jobs").update({ planned_from: null }).eq("id", auftrag.id);
-    if (error) meldung(fehlertext(error), "fehler");
-    else { zu(); meldung("Aus der Planung genommen."); planAktualisieren(b); }
   };
 }
 
