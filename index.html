@@ -39,7 +39,7 @@
   --gefahr: #b3261e;
   --gut: #1f7a4d;
 
-  --kopfhoehe: 72px;
+  --kopfhoehe: 54px;
   --navhoehe: 62px;
   --radius: 4px;
 
@@ -78,15 +78,15 @@ html, body {
   z-index: 20;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   height: var(--kopfhoehe);
-  padding: 0 12px;
+  padding: 0 10px;
   background: var(--flaeche);
   color: var(--tinte);
   border-bottom: 2px solid var(--marke);
 }
 
-.kopf__logo { height: 50px; width: auto; display: block; }
+.kopf__logo { height: 30px; width: auto; display: block; }
 
 .kopf__benutzer {
   margin-left: auto;
@@ -1322,8 +1322,8 @@ a:focus-visible {
 
 /* ---------- Seitenleiste einklappen, nur am PC ---------- */
 .kopf__klapp { display: none; background: none; border: 1px solid var(--linie-stark);
-               color: var(--marke); border-radius: var(--radius); width: 38px; height: 38px;
-               font-size: 1.1rem; cursor: pointer; flex: none; margin-right: 4px; }
+               color: var(--marke); border-radius: var(--radius); width: 32px; height: 32px;
+               font-size: 1rem; cursor: pointer; flex: none; margin-right: 2px; }
 @media (min-width: 780px) {
   .kopf__klapp { display: block; }
   body.nav--schmal .rahmen { grid-template-columns: 62px 1fr; }
@@ -1365,7 +1365,7 @@ body.kopiermodus .pw-balken { cursor: copy; outline: 1px dashed var(--signalgelb
                 color: var(--marke); border-radius: var(--radius);
                 width: 38px; height: 38px; font-size: 1rem; cursor: pointer;
                 flex: none; margin-left: auto; }
-.kopf__bild { width: 34px; height: 34px; border-radius: 5px; object-fit: cover;
+.kopf__bild { width: 28px; height: 28px; border-radius: 5px; object-fit: cover;
               flex: none; border: 2px solid var(--linie-stark); }
 .kopf__bild--leer { display: grid; place-items: center; background: var(--marke);
                     color: #fff; font-weight: 650; font-size: .9rem; }
@@ -1418,8 +1418,8 @@ body.kopiermodus .pw-balken { cursor: copy; outline: 1px dashed var(--signalgelb
 .kopf__logo { margin-right: 4px; }
 .kopf__admin { background: none; border: 1px solid var(--marke);
                color: var(--marke); border-radius: var(--radius);
-               padding: 8px 14px; font: inherit; font-size: .82rem;
-               font-weight: 600; cursor: pointer; flex: none; margin-left: 18px; }
+               padding: 5px 12px; font: inherit; font-size: .78rem;
+               font-weight: 600; cursor: pointer; flex: none; margin-left: 12px; }
 .kopf__luecke { flex: 1 1 auto; }
 .kopf__benutzer { margin-left: 0; max-width: 220px; }
 .kopf__dunkel { display: none; }
@@ -1540,8 +1540,8 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--marke); }
 
 .kopf__rueck { background: none; border: 1px solid var(--linie-stark);
                color: var(--marke); border-radius: var(--radius);
-               width: 38px; height: 38px; font-size: 1.1rem; cursor: pointer;
-               flex: none; margin-left: 8px; }
+               width: 32px; height: 32px; font-size: 1rem; cursor: pointer;
+               flex: none; margin-left: 4px; }
 .kopf__rueck:hover { background: var(--marke-hell); }
 
 /* ---------- Bestellliste: saubere Spalten ---------- */
@@ -1687,6 +1687,17 @@ body.dunkel .wahlknopf.aktiv { background: #24344a; }
                                   gap: 0 26px; align-items: start; }
   .dialog--breit .dialogspalten .feld { margin-bottom: 14px; }
   .dialog--breit .dialog__knoepfe { grid-column: 1 / -1; }
+
+  /* Grid-Spalten dürfen schrumpfen, sonst sprengt langer Inhalt
+     (z. B. lange Platzhaltertexte) die Spaltenbreite und die
+     rechte Spalte läuft seitlich aus dem sichtbaren Bereich. */
+  .dialog--breit .dialogspalte { min-width: 0; }
+
+  /* Die linke Spalte beginnt mit einem umrandeten Block, der eigenen
+     Innenabstand hat. Die rechte Spalte hat das nicht — damit beide
+     Überschriften trotzdem auf gleicher Höhe stehen, bekommt ihr
+     erstes Feld denselben Versatz. */
+  .dialog--breit .dialogspalte > .feld:first-child { margin-top: 13px; }
 }
 .dialog--breit .dialog__block { border: 1px solid var(--linie);
                                 border-radius: var(--radius); padding: 12px 14px;
@@ -1798,7 +1809,7 @@ pre, .gcode { max-width: 100%; overflow-x: auto; }
                      gap: 14px; margin-bottom: 4px; flex-wrap: wrap; }
 .einstellungenkopf .seitentitel { margin: 0; flex: 1 1 auto; }
 .einstellungenkopf .knopf--gefahr { flex: none; }
-.kopf__einstellungen { display: grid; place-items: center; width: 38px; height: 38px;
+.kopf__einstellungen { display: grid; place-items: center; width: 32px; height: 32px;
                        border-radius: var(--radius); color: var(--tinte);
                        text-decoration: none; font-size: 1.15rem; }
 .kopf__einstellungen:hover { background: rgba(255,255,255,.12); }
@@ -1887,7 +1898,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "30.0.0";
+const APP_VERSION = "30.2.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -3525,15 +3536,17 @@ function auftragsZeile(maschine) {
 
 function standFeld(maschine, datum, eintrag) {
   const j = prod.auftraege[maschine.id];
+  // Zahlen erfassen geht nur, solange der Auftrag wirklich läuft —
+  // nicht schon bei Geplant, Rüsten oder QS Check.
+  const laeuftJetzt = j && j.plan_status === "laeuft";
   const heute = isoDatum(new Date());
   const istVergangenheit = datum < heute;
 
   // Ohne laufenden Auftrag lässt sich nur ein bereits vorhandener
-  // Eintrag aus der Vergangenheit noch korrigieren. Neu erfassen
-  // geht nur, wenn tatsächlich ein Auftrag läuft.
-  if (!j && !(istVergangenheit && eintrag)) return '<div class="kein-feld">–</div>';
+  // Eintrag aus der Vergangenheit noch korrigieren.
+  if (!laeuftJetzt && !(istVergangenheit && eintrag)) return '<div class="kein-feld">–</div>';
 
-  const auftragId = j ? j.id : eintrag.job_id;
+  const auftragId = laeuftJetzt ? j.id : eintrag.job_id;
   return '<input class="menge" type="number" inputmode="numeric" min="0" step="1"'
     + ' data-maschine="' + esc(maschine.id) + '" data-datum="' + datum + '"'
     + ' data-auftrag="' + esc(auftragId) + '"'
@@ -3786,8 +3799,8 @@ const PLANFARBEN = [
 const PLANSTATUS = {
   geplant: { name: "Geplant",  zeichen: "○" },
   ruesten: { name: "Rüsten",   zeichen: "🔧" },
-  laeuft:  { name: "Läuft",    zeichen: "▶" },
   qs:      { name: "QS Check", zeichen: "🔍" },
+  laeuft:  { name: "Läuft",    zeichen: "▶" },
   fertig:  { name: "Fertig",   zeichen: "✔" },
 };
 
