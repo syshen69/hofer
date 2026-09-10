@@ -1878,7 +1878,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "29.2.0";
+const APP_VERSION = "29.3.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -3309,8 +3309,8 @@ async function seiteProduktion(b) {
 
   b.innerHTML = '<h1 class="seitentitel">Produktion</h1>'
     + '<div class="reiter">'
-    + (isMobil() ? [["erfassen", "Erfassen"], ["uebersicht", "Übersicht"]]
-        : [["erfassen", "Erfassen"], ["uebersicht", "Übersicht"], ["maschinen", "Maschinen"]])
+    + (isMobil() ? [["erfassen", "Erfassen"]]
+        : [["erfassen", "Erfassen"], ["maschinen", "Maschinen"]])
         .map(([w, t]) => '<button class="reiter__knopf' + (prod.ansicht === w ? " aktiv" : "")
           + '" data-ansicht="' + w + '">' + t + '</button>').join("")
     + '</div>'
@@ -3334,6 +3334,8 @@ async function seiteProduktion(b) {
 
   if (prod.ansicht === "maschinen" && isMobil()) prod.ansicht = "erfassen";
   if (prod.ansicht === "maschinen") return ansichtMaschinen(ziel, b);
+  // Übersicht gibt es nicht mehr; alter Verweis fällt auf Erfassen zurück
+  if (prod.ansicht === "uebersicht") prod.ansicht = "erfassen";
 
   if (!prod.parks.length) {
     ziel.innerHTML = '<div class="karte karte--hinweis"><h2>Noch keine Maschinen</h2>'
@@ -3347,7 +3349,6 @@ async function seiteProduktion(b) {
 
   if (!prod.parkId || !prod.parks.some((p) => p.id === prod.parkId)) prod.parkId = prod.parks[0].id;
 
-  if (prod.ansicht === "uebersicht") return ansichtUebersicht(ziel, b);
   return ansichtErfassen(ziel, b);
 }
 
