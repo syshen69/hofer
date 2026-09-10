@@ -971,10 +971,14 @@ a:focus-visible {
            font-weight: 600; }
 
 /* ---------- Farbwahl auf der Planwand ---------- */
-.farbwahl { display: flex; flex-wrap: wrap; gap: 8px; }
-.farbknopf { width: 40px; height: 40px; border-radius: 50%;
-             border: 2px solid var(--linie-stark); cursor: pointer; padding: 0; }
-.farbknopf.aktiv { border: 3px solid var(--tinte); transform: scale(1.12); }
+.farbwahl { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px;
+             background: var(--grund); border-radius: var(--radius); }
+.farbknopf { position: relative; width: 30px; height: 30px; border-radius: 7px;
+             border: 1px solid rgba(0,0,0,.15); cursor: pointer; padding: 0; }
+.farbknopf.aktiv { box-shadow: 0 0 0 2px var(--flaeche), 0 0 0 4px var(--marke); }
+.farbknopf.aktiv::after { content: "✓"; position: absolute; inset: 0; display: grid;
+                          place-items: center; color: #fff; text-shadow: 0 0 3px rgba(0,0,0,.6);
+                          font-size: .8rem; font-weight: 700; }
 .pw-balken__status { flex: none; font-size: .75rem; }
 .pw-balken--fertig .pw-balken__nr { text-decoration: line-through; opacity: .85; }
 .pw-legende { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px;
@@ -1835,6 +1839,10 @@ pre, .gcode { max-width: 100%; overflow-x: auto; }
                              flex: none; line-height: 1; }
 .dialog__schliessen-inline:hover { background: var(--marke-hell); color: var(--marke); }
 
+
+.pdfreihe { display: flex; flex-wrap: wrap; gap: 10px; }
+.dialog--breit .dialogspalte > .feld,
+.dialog--breit .dialogspalte > .dialog__block { margin-bottom: 18px; }
 </style>
 </head>
 <body>
@@ -1878,7 +1886,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "29.3.0";
+const APP_VERSION = "29.4.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -5171,7 +5179,9 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     + '<div class="mengefeld">'
     + '<input id="pl-menge" inputmode="decimal" type="number" min="0" step="1" value="'
     + (auftrag && auftrag.target_quantity !== null && auftrag.target_quantity !== undefined
-        ? auftrag.target_quantity : "") + '" placeholder="wie viele Stück"></label>'
+        ? auftrag.target_quantity : "") + '" placeholder="wie viele Stück">'
+    + '<button type="button" class="knopf knopf--klein" id="pl-numpad" title="Ziffernblock">#</button>'
+    + '</div></label>'
 
     + '<div class="feld"><span class="feldlabel">Zustand'
     + (darf ? "" : ' <span class="klein">– darfst du ändern</span>') + '</span>'
