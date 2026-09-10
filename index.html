@@ -1878,7 +1878,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "29.0.0";
+const APP_VERSION = "29.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -5403,23 +5403,14 @@ async function ansichtUebersicht(ziel, b) {
   const von = wochenStart(prod.tag);
   const bis = plusTage(von, tageProWoche - 1);
 
-  ziel.innerHTML = '<div class="steuerung">'
-    + '<button class="knopf knopf--klein" id="u-zurueck">‹</button>'
-    + '<div class="steuerung__mitte"><div class="steuerung__titel">Woche '
-    + kurzDatum(von) + ' – ' + kurzDatum(bis) + '</div>'
-    + '<button class="linkknopf" id="u-heute">Heute</button></div>'
-    + '<button class="knopf knopf--klein" id="u-vor">›</button></div>'
+  ziel.innerHTML = parkAuswahl()
+    + '<p class="klein">Aktuelle Woche: ' + kurzDatum(von) + ' – ' + kurzDatum(bis) + '</p>'
     + '<div class="suchleiste"><input type="search" id="u-suche"'
     + ' placeholder="HOCO Nr., Maschine oder Maschinennummer" value="'
     + esc(prod.uebersichtSuche) + '" autocomplete="off"></div>'
     + '<div id="u-inhalt"><div class="laedt">Zahlen werden geladen …</div></div>';
 
-  document.getElementById("u-zurueck").onclick = () => {
-    prod.tag = plusTage(prod.tag, -7); seiteProduktion(b); };
-  document.getElementById("u-vor").onclick = () => {
-    prod.tag = plusTage(prod.tag, 7); seiteProduktion(b); };
-  document.getElementById("u-heute").onclick = () => {
-    prod.tag = isoDatum(new Date()); seiteProduktion(b); };
+  parkAuswahlBinden(b);
 
   const suchfeldU = document.getElementById("u-suche");
   let tasteU = null;
@@ -5456,7 +5447,10 @@ async function ansichtUebersicht(ziel, b) {
       || (auftrag && (auftrag.job_number || "").toLowerCase().includes(suchtU));
   };
 
-  const inhaltU = prod.parks.map((park) => {
+  // Ohne Suche nur der gewählte Park, bei einer Suche alle
+  const parksU = suchtU ? prod.parks : prod.parks.filter((p) => p.id === prod.parkId);
+
+  const inhaltU = parksU.map((park) => {
     const maschinen = prod.maschinen.filter((m) => m.park_id === park.id && passtU(m));
     if (!maschinen.length) return "";
 
