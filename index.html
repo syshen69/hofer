@@ -1754,6 +1754,34 @@ pre, .gcode { max-width: 100%; overflow-x: auto; }
 
 /* Am Rechner bleibt das Geburtstagsfeld kompakt */
 .gebfeld { max-width: 165px; }
+
+.mengefeld { display: flex; gap: 6px; align-items: stretch; }
+.mengefeld input { flex: 1; }
+.dialog--numpad { max-width: 300px; }
+.numpad-anzeige { text-align: right; font-size: 2rem; font-weight: 650;
+                  padding: 10px 14px; background: var(--grund);
+                  border-radius: var(--radius); margin-bottom: 14px;
+                  font-variant-numeric: tabular-nums; }
+.numpad-tasten { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+                margin-bottom: 16px; }
+.numpad-taste { aspect-ratio: 1.3; font-size: 1.3rem; font-weight: 600;
+               border: 1px solid var(--linie-stark); border-radius: var(--radius);
+               background: var(--flaeche); cursor: pointer; }
+.numpad-taste:active { background: var(--marke-hell); }
+
+/* ---------- Startseite: Bestellzeilen bleiben nebeneinander ---------- */
+.tabelle--db-bestellungen td { vertical-align: top; }
+.tabelle--db-bestellungen td:last-child { text-align: right;
+                                          white-space: nowrap; padding-left: 10px; }
+@media (max-width: 720px) {
+  .tabelle--db-bestellungen, .tabelle--db-bestellungen tbody { display: table; width: 100%; }
+  .tabelle--db-bestellungen tr { display: table-row; }
+  .tabelle--db-bestellungen td { display: table-cell; word-break: break-word;
+                                 white-space: normal; }
+}
+
+/* ---------- Suchfeld in der Produktion grösser ---------- */
+#p-suche { min-height: 48px; font-size: 1.05rem; padding: 10px 14px; }
 </style>
 </head>
 <body>
@@ -1797,7 +1825,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "25.2.0";
+const APP_VERSION = "26.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -1981,6 +2009,50 @@ document.addEventListener("keydown", (e) => {
     schrittZurueck();
   }
 });
+
+// Grosser Ziffernblock für ein Zahlenfeld. Nützlich am Tablet
+// oder wenn die Bildschirmtastatur stört.
+function zahlNumpad(feld) {
+  if (!feld) return;
+  const huelle = document.createElement("div");
+  huelle.className = "dialog-huelle";
+  huelle.innerHTML = '<div class="dialog dialog--numpad">'
+    + '<div class="numpad-anzeige" id="np-anzeige">' + esc(feld.value || "0") + '</div>'
+    + '<div class="numpad-tasten">'
+    + [7,8,9,4,5,6,1,2,3].map((z) => '<button class="numpad-taste" data-np="' + z
+        + '">' + z + '</button>').join("")
+    + '<button class="numpad-taste" data-npc="loeschen">⌫</button>'
+    + '<button class="numpad-taste" data-np="0">0</button>'
+    + '<button class="numpad-taste" data-npc="leeren">C</button>'
+    + '</div>'
+    + '<div class="dialog__knoepfe">'
+    + '<button class="knopf knopf--still" id="np-nein">Abbrechen</button>'
+    + '<button class="knopf knopf--haupt" id="np-ja">Übernehmen</button>'
+    + '</div></div>';
+  document.body.appendChild(huelle);
+
+  let wert = (feld.value || "").replace(/[^\d]/g, "");
+  const anzeige = huelle.querySelector("#np-anzeige");
+  const zeigen = () => { anzeige.textContent = wert || "0"; };
+
+  huelle.querySelectorAll("[data-np]").forEach((k) => {
+    k.onclick = () => { wert = (wert + k.dataset.np).replace(/^0+(?=\d)/, ""); zeigen(); };
+  });
+  huelle.querySelector('[data-npc="loeschen"]').onclick = () => {
+    wert = wert.slice(0, -1); zeigen();
+  };
+  huelle.querySelector('[data-npc="leeren"]').onclick = () => { wert = ""; zeigen(); };
+
+  const zu = () => huelle.remove();
+  huelle.querySelector("#np-nein").onclick = zu;
+  dialogSchliessen(huelle, zu);
+
+  huelle.querySelector("#np-ja").onclick = () => {
+    feld.value = wert;
+    feld.dispatchEvent(new Event("change", { bubbles: true }));
+    zu();
+  };
+}
 
 function esc(w) {
   if (w === null || w === undefined) return "";
@@ -2409,13 +2481,22 @@ async function seiteDashboard(b) {
       + (offeneListe.length ? ' <span class="marke">' + offeneListe.length + '</span>' : "")
       + '</h2>'
       + (offeneListe.length
-        ? '<table class="tabelle"><tbody>' + offeneListe.map((z) => {
+        ? '<table class="tabelle tabelle--db-bestellungen"><tbody>' + offeneListe.map((z) => {
             const a2 = z.articles || {};
             const spaet = z.needed_by && z.needed_by < heute;
             return '<tr><td><strong>' + esc(a2.article_number || "?") + '</strong> '
               + esc(a2.name || "")
               + '<div class="klein">'
-              + esc((z.suppliers && z.suppliers.name) || "ohne Lieferant")
+              + (() => {
+          const a2 = z.articles || {};
+          const jetzt = a2.suppliers ? a2.suppliers.name : null;
+          const damals = z.suppliers ? z.suppliers.name : null;
+          if (jetzt && damals && jetzt !== damals) {
+            return esc(jetzt) + ' <span class="klein">(bei Erfassung: '
+              + esc(damals) + ')</span>';
+          }
+          return esc(jetzt || damals || "ohne Lieferant");
+        })()
               + ' · <span class="statuschip statuschip--' + esc(z.status) + '">'
               + esc(BESTELLSTATUS[z.status] || z.status) + '</span>'
               + (z.needed_by ? ' <span class="' + (spaet ? "minus stark" : "") + '">bis '
@@ -3704,14 +3785,15 @@ async function ladeFerien() {
   const { data, error } = await zeitlimit(
     db.from("vacations")
       .select("*, profiles!vacations_genehmigt_von_fkey(full_name)")
-      .order("von"), 10000, "Ferien");
+      .order("von").order("id"), 10000, "Ferien");
   if (error) throw error;
   return data || [];
 }
 
 async function ladePlanAuftraege() {
   const { data, error } = await zeitlimit(
-    db.from("planwand").select("*").order("planned_from", { nullsFirst: false }),
+    db.from("planwand").select("*")
+      .order("planned_from", { nullsFirst: false }).order("id"),
     12000, "Planwand");
   if (error) throw error;
   return data || [];
@@ -3854,12 +3936,12 @@ async function ansichtPlanwand(ziel, b) {
     + '<div id="pw-inhalt"><div class="laedt">Planung wird geladen …</div></div>';
 
   document.getElementById("pw-zurueck").onclick = () => {
-    plan.start = naechsterArbeitstag(plusTage(plan.start, -7)); seitePlanwand(b); };
+    plan.start = naechsterArbeitstag(plusTage(plan.start, -7)); planAktualisieren(b); };
   document.getElementById("pw-vor").onclick = () => {
-    plan.start = naechsterArbeitstag(plusTage(plan.start, 7)); seitePlanwand(b); };
+    plan.start = naechsterArbeitstag(plusTage(plan.start, 7)); planAktualisieren(b); };
 
   document.getElementById("pw-heute").onclick = () => {
-    plan.start = naechsterArbeitstag(wochenStart(isoDatum(new Date()))); seitePlanwand(b); };
+    plan.start = naechsterArbeitstag(wochenStart(isoDatum(new Date()))); planAktualisieren(b); };
 
   const neu = document.getElementById("pw-neu");
   if (neu) neu.onclick = () => planAuftragDialog(null, b);
@@ -4029,7 +4111,7 @@ function griffVerhalten(b) {
       e.stopPropagation();
       balken.classList.remove("pw-balken--groesse");
 
-      if (vonJetzt === vonStart && dauerJetzt === dauerStart) { seitePlanwand(b); return; }
+      if (vonJetzt === vonStart && dauerJetzt === dauerStart) { planAktualisieren(b); return; }
 
       const auftrag = (plan.auftraege || []).find((j) => j.id === balken.dataset.auftrag);
       if (!auftrag) return;
@@ -4049,10 +4131,10 @@ function griffVerhalten(b) {
         merkeSchritt("Dauer von " + auftrag.job_number, async () => {
           await db.from("jobs")
             .update({ planned_days: altD, planned_from: altV }).eq("id", auftrag.id);
-          seitePlanwand(b);
+          planAktualisieren(b);
         });
         meldung(dauerJetzt + (dauerJetzt === 1 ? " Tag" : " Tage") + " eingeplant.");
-        seitePlanwand(b);
+        planAktualisieren(b);
       }
     });
 
@@ -4124,7 +4206,7 @@ function ferienGriffe(b) {
       aktiv = false;
       e.stopPropagation();
       balken.classList.remove("pw-balken--groesse");
-      if (vonJetzt === vonStart && dauerJetzt === dauerStart) { seitePlanwand(b); return; }
+      if (vonJetzt === vonStart && dauerJetzt === dauerStart) { planAktualisieren(b); return; }
 
       const f2 = (plan.ferien || []).find((x) => x.id === balken.dataset.ferien);
       if (!f2) return;
@@ -4137,7 +4219,7 @@ function ferienGriffe(b) {
 
       const { error } = await db.from("vacations").update(daten).eq("id", f2.id);
       if (error) meldung(fehlertext(error), "fehler");
-      else { meldung("Angepasst."); seitePlanwand(b); }
+      else { meldung("Angepasst."); planAktualisieren(b); }
     });
 
     griff.addEventListener("pointercancel", () => {
@@ -4260,7 +4342,7 @@ async function ferienDialog(eintrag, zeile, datum, b) {
     if (error) meldung(fehlertext(error), "fehler");
     else {
       meldung(!eintrag && !darfPlanen() ? "Anfrage gestellt." : "Gespeichert.");
-      seitePlanwand(b);
+      planAktualisieren(b);
     }
   };
 
@@ -4273,7 +4355,7 @@ async function ferienDialog(eintrag, zeile, datum, b) {
     }).eq("id", eintrag.id);
     zu();
     if (error) meldung(fehlertext(error), "fehler");
-    else { meldung("Ferien bestätigt."); seitePlanwand(b); }
+    else { meldung("Ferien bestätigt."); planAktualisieren(b); }
   };
 
   const weg = $("fd-weg");
@@ -4286,13 +4368,41 @@ async function ferienDialog(eintrag, zeile, datum, b) {
     const { error } = await db.from("vacations").delete().eq("id", eintrag.id);
     zu();
     if (error) meldung(fehlertext(error), "fehler");
-    else { meldung("Gelöscht."); seitePlanwand(b); }
+    else { meldung("Gelöscht."); planAktualisieren(b); }
   };
 }
 
 // ---------- Die Planwand zeichnen ----------
 
 // Zeichnet neu und behält die Scrollstellung bei
+// Lädt die Planwand-Daten neu und zeichnet, ohne dass Zeitraum,
+// Zoom oder Scrollstellung verlorengehen. Das ist der Ersatz für
+// ein komplettes seitePlanwand(b), das die Seite von vorn aufbaut.
+async function planAktualisieren(b) {
+  const rolle = document.querySelector(".pw-rolle");
+  const x = rolle ? rolle.scrollLeft : 0;
+  const y = rolle ? rolle.scrollTop : 0;
+
+  try {
+    plan.auftraege = await ladePlanAuftraege();
+  } catch (f) {
+    meldung(fehlertext(f), "fehler");
+    return;
+  }
+
+  try {
+    plan.ferien = (await ladeFerien()).map((f) => {
+      f.genehmigt_von_name = f.profiles ? f.profiles.full_name : null;
+      return f;
+    });
+  } catch (f) { /* Ferien sind Beiwerk */ }
+
+  zeichnePlanwand(b);
+
+  const neu = document.querySelector(".pw-rolle");
+  if (neu) { neu.scrollLeft = x; neu.scrollTop = y; }
+}
+
 function neuZeichnen(b) {
   const rolle = document.querySelector(".pw-rolle");
   const x = rolle ? rolle.scrollLeft : 0;
@@ -4595,9 +4705,9 @@ function ferienVerhalten(b) {
       else {
         merkeSchritt("Ferien von " + f2.person, async () => {
           await db.from("vacations").update({ zeile: altZ, von: altVon }).eq("id", f2.id);
-          seitePlanwand(b);
+          planAktualisieren(b);
         });
-        meldung("Verschoben."); seitePlanwand(b);
+        meldung("Verschoben."); planAktualisieren(b);
       }
     });
 
@@ -4736,9 +4846,9 @@ function balkenVerhalten(b) {
           await db.from("jobs")
             .update({ machine_id: vorherM, planned_from: vorherD })
             .eq("id", auftrag.id);
-          seitePlanwand(b);
+          planAktualisieren(b);
         });
-        meldung("Verschoben."); seitePlanwand(b);
+        meldung("Verschoben."); planAktualisieren(b);
       }
     });
 
@@ -4845,7 +4955,7 @@ async function problemMelden(b) {
   }).eq("id", auftrag.id);
 
   if (error) meldung(fehlertext(error), "fehler");
-  else { meldung("Problem gemeldet für " + auftrag.job_number + "."); seitePlanwand(b); }
+  else { meldung("Problem gemeldet für " + auftrag.job_number + "."); planAktualisieren(b); }
 }
 
 async function problemQuittieren(auftrag, b, danach) {
@@ -4864,7 +4974,7 @@ async function problemQuittieren(auftrag, b, danach) {
   }).eq("id", auftrag.id);
 
   if (error) meldung(fehlertext(error), "fehler");
-  else { meldung("Erledigt."); if (danach) danach(); else seitePlanwand(b); }
+  else { meldung("Erledigt."); if (danach) danach(); else planAktualisieren(b); }
 }
 
 // ---------- Auftrag planen und bearbeiten ----------
@@ -4913,7 +5023,7 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     + esc(auftrag ? (auftrag.planned_from || "")
         : (vorgabeDatum || isoDatum(new Date()))) + '"></label>'
     + '<label class="feld"><span>Dauer in Arbeitstagen</span>'
-    + '<input id="pl-tage" type="number" min="1" step="1" value="'
+    + '<input id="pl-tage" inputmode="decimal" type="number" min="1" step="1" value="'
     + (auftrag ? (auftrag.planned_days || 1) : (v ? (v.planned_days || 1) : 1))
     + '"></label>'
     + '</div>'
@@ -4929,7 +5039,7 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     + '<div class="dialog__block"><div class="dialog__blocktitel">Material</div>'
     + '<div class="zeitraumwahl">'
     + '<label class="feld"><span>Aussendurchmesser in mm</span>'
-    + '<input id="pl-dm" type="number" step="0.1" min="0" value="'
+    + '<input id="pl-dm" inputmode="decimal" type="number" step="0.1" min="0" value="'
     + esc(auftrag && auftrag.material_dm !== null && auftrag.material_dm !== undefined
         ? auftrag.material_dm
         : (v && v.material_dm !== null && v.material_dm !== undefined ? v.material_dm : ""))
@@ -4963,7 +5073,8 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     + '</div>'
 
     + '<label class="feld"><span>Fertigungsmenge</span>'
-    + '<input id="pl-menge" type="number" min="0" step="1" value="'
+    + '<div class="mengefeld">'
+    + '<input id="pl-menge" inputmode="decimal" type="number" min="0" step="1" value="'
     + (auftrag && auftrag.target_quantity !== null && auftrag.target_quantity !== undefined
         ? auftrag.target_quantity : "") + '" placeholder="wie viele Stück"></label>'
 
@@ -5050,6 +5161,9 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
   };
   felderKoppeln();
 
+  const numpadKnopf = $("pl-numpad");
+  if (numpadKnopf) numpadKnopf.onclick = () => zahlNumpad($("pl-menge"));
+
   const probWeg = huelle.querySelector("#pl-problemweg");
   if (probWeg) probWeg.onclick = async () => {
     zu();
@@ -5103,7 +5217,7 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
         .update({ plan_status: planZustand }).eq("id", auftrag.id);
       zu();
       if (error) meldung(fehlertext(error), "fehler");
-      else { meldung("Zustand geändert."); seitePlanwand(b); }
+      else { meldung("Zustand geändert."); planAktualisieren(b); }
       return;
     }
     const menge = $("pl-menge").value;
@@ -5137,7 +5251,7 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     }
 
     if (fehler) meldung(fehlertext(fehler), "fehler");
-    else { zu(); meldung("Gespeichert."); seitePlanwand(b); }
+    else { zu(); meldung("Gespeichert."); planAktualisieren(b); }
   };
 
   const loeschen = $("pl-loeschen");
@@ -5163,11 +5277,11 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
       if (sicherung.data) {
         merkeSchritt("Löschen von " + auftrag.job_number, async () => {
           await db.from("jobs").insert(sicherung.data);
-          seitePlanwand(b);
+          planAktualisieren(b);
         });
       }
       meldung("Auftrag gelöscht. Mit Strg+Z zurücknehmen.");
-      seitePlanwand(b);
+      planAktualisieren(b);
     }
   };
 
@@ -5180,7 +5294,7 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     if (!ok) return;
     const { error } = await db.from("jobs").update({ planned_from: null }).eq("id", auftrag.id);
     if (error) meldung(fehlertext(error), "fehler");
-    else { zu(); meldung("Aus der Planung genommen."); seitePlanwand(b); }
+    else { zu(); meldung("Aus der Planung genommen."); planAktualisieren(b); }
   };
 }
 
@@ -6303,7 +6417,7 @@ const OFFENE_STATUS = ["offen", "bestellt", "teilweise_geliefert"];
 
 async function ladeBestellungen(offen) {
   let a = db.from("order_items")
-    .select("*, articles(article_number, name, unit), suppliers(name, website), profiles!order_items_created_by_fkey(full_name, email)")
+    .select("*, articles(article_number, name, unit, supplier_id, suppliers(name, website)), suppliers(name, website), profiles!order_items_created_by_fkey(full_name, email)")
     .order("needed_by", { ascending: true, nullsFirst: false })
     .order("created_at");
   if (offen) a = a.in("status", OFFENE_STATUS);
@@ -6577,15 +6691,20 @@ async function artikelSchnellAnlegen(vorgabe) {
   w.name = bez;
 
   let lieferantId = null;
-  const auswahlListe = lieferanten.map((l) => ({ wert: l.id, text: l.name, such: l.name }))
-    .concat([{ wert: "__neu", text: "+ Neuen Lieferanten anlegen", such: "neu" },
-             { wert: "__keiner", text: "– kein Lieferant –", such: "kein" }]);
+  // Ein Lieferant ist Pflicht. Die Abfrage wiederholt sich,
+  // bis wirklich einer gewählt oder neu angelegt wurde.
+  let wahl = null;
+  while (!wahl) {
+    const auswahlListe = lieferanten.map((l) => ({ wert: l.id, text: l.name, such: l.name }))
+      .concat([{ wert: "__neu", text: "+ Neuen Lieferanten anlegen", such: "neu" }]);
 
-  const wahl = auswahlListe.length > 12
-    ? await auswahlSuchen("Lieferant wählen", auswahlListe)
-    : await auswahlDialog("Lieferant wählen", auswahlListe);
+    wahl = auswahlListe.length > 12
+      ? await auswahlSuchen("Lieferant wählen (Pflicht)", auswahlListe)
+      : await auswahlDialog("Lieferant wählen (Pflicht)", auswahlListe);
 
-  if (wahl === null) return null;
+    if (wahl === null) return null;   // ganz abgebrochen
+    if (!wahl) { wahl = null; continue; }   // leer gewählt, nochmal fragen
+  }
 
   if (wahl === "__neu") {
     const nw = await dialogFelder({ titel: "Neuer Lieferant",
@@ -6601,11 +6720,16 @@ async function artikelSchnellAnlegen(vorgabe) {
         .insert({ name: nw.name, website: seite || null }).select().single();
       if (r.error) meldung(fehlertext(r.error), "fehler");
       else { lieferantId = r.data.id; lieferanten.push(r.data); meldung("Lieferant angelegt."); }
+    } else {
+      return null;
     }
-  } else if (wahl === "__keiner") {
-    lieferantId = null;
   } else {
-    lieferantId = wahl || null;
+    lieferantId = wahl;
+  }
+
+  if (!lieferantId) {
+    meldung("Ohne Lieferant lässt sich der Artikel nicht anlegen.", "warn");
+    return null;
   }
 
   const { data, error } = await db.from("articles").insert({
@@ -7078,9 +7202,9 @@ async function artikelBearbeiten(artikel, b) {
     + '<option value="__neu">+ Neue Bezeichnung anlegen</option>'
     + '</select></label>'
 
-    + '<label class="feld"><span>Lieferant</span>'
+    + '<label class="feld"><span>Lieferant (Pflicht)</span>'
     + '<select id="ab-lief">'
-    + '<option value="">– kein Lieferant –</option>'
+    + (artikel.supplier_id ? "" : '<option value="">– bitte wählen –</option>')
     + lieferanten.map((l) => '<option value="' + esc(l.id) + '"'
         + (l.id === artikel.supplier_id ? " selected" : "") + '>' + esc(l.name)
         + '</option>').join("")
@@ -7150,12 +7274,16 @@ async function artikelBearbeiten(artikel, b) {
       meldung("Artikelnummer und Bezeichnung werden benötigt.", "warn");
       return;
     }
+    if (!liefFeld.value || liefFeld.value === "__neu") {
+      meldung("Bitte einen Lieferanten wählen.", "warn");
+      return;
+    }
 
     const r = await db.from("articles").update({
       article_number: nummer,
       name: name,
       unit: "Stück",
-      supplier_id: liefFeld.value && liefFeld.value !== "__neu" ? liefFeld.value : null,
+      supplier_id: liefFeld.value,
     }).eq("id", artikel.id).select();
 
     zu();
@@ -9253,11 +9381,11 @@ function syncStoppen() {
 // Nur wenn er sich ändert, wird neu gezeichnet.
 async function seitenStempel(pfad) {
   const teile = [];
-  const hole = async (tabelle, felder, aufbau) => {
+  const hole = async (tabelle, felder) => {
     try {
-      let a = db.from(tabelle).select(felder);
-      if (aufbau) a = aufbau(a);
-      const r = await a;
+      // Feste Sortierung ist Pflicht. Ohne sie kommen die Zeilen in
+      // wechselnder Reihenfolge, und der Abdruck ändert sich grundlos.
+      const r = await db.from(tabelle).select(felder).order("id");
       if (!r.error) teile.push(JSON.stringify(r.data));
     } catch (f) { /* eine fehlende Tabelle darf nicht stören */ }
   };
@@ -9325,7 +9453,7 @@ function syncStarten(pfad) {
     const y = window.scrollY;
     seite.zeige(bereich);
     setTimeout(() => window.scrollTo(0, y), 60);
-  }, 12000);
+  }, 20000);
 }
 
 function zeichneSeite() {
