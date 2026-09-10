@@ -1785,7 +1785,7 @@ pre, .gcode { max-width: 100%; overflow-x: auto; }
 }
 
 /* ---------- Suchfeld in der Produktion grösser ---------- */
-#p-suche, #as-suche, #bo-suche, #bh-suche, #bz-suche, #lf-suche, #ar-suche, #pw-suche {
+#p-suche, #u-suche, #as-suche, #bo-suche, #bh-suche, #bz-suche, #lf-suche, #ar-suche, #pw-suche {
   min-height: 48px; font-size: 1.05rem; padding: 10px 14px;
 }
 
@@ -1878,7 +1878,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "29.1.0";
+const APP_VERSION = "29.2.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -5404,13 +5404,20 @@ async function ansichtUebersicht(ziel, b) {
   const bis = plusTage(von, tageProWoche - 1);
 
   ziel.innerHTML = parkAuswahl()
-    + '<p class="klein">Aktuelle Woche: ' + kurzDatum(von) + ' – ' + kurzDatum(bis) + '</p>'
+    + '<div class="steuerung">'
+    + '<div class="steuerung__mitte"><div class="steuerung__titel">Woche '
+    + kurzDatum(von) + ' – ' + kurzDatum(bis) + '</div>'
+    + '<button class="linkknopf" id="u-heute">Heute</button></div>'
+    + '</div>'
     + '<div class="suchleiste"><input type="search" id="u-suche"'
     + ' placeholder="HOCO Nr., Maschine oder Maschinennummer" value="'
     + esc(prod.uebersichtSuche) + '" autocomplete="off"></div>'
     + '<div id="u-inhalt"><div class="laedt">Zahlen werden geladen …</div></div>';
 
   parkAuswahlBinden(b);
+
+  document.getElementById("u-heute").onclick = () => {
+    prod.tag = isoDatum(new Date()); seiteProduktion(b); };
 
   const suchfeldU = document.getElementById("u-suche");
   let tasteU = null;
