@@ -370,7 +370,7 @@ a:focus-visible {
 }
 .login__logo { width: 100%; max-width: 300px; height: auto; }
 .login__bild { width: calc(100% + 48px); margin: -28px -24px 0;
-               aspect-ratio: 1200 / 520;
+               aspect-ratio: 1200 / 620;
                background: url("./login.png") center / cover no-repeat, var(--marke);
                border-radius: var(--radius) var(--radius) 0 0; }
 .login__untertitel {
@@ -1590,10 +1590,10 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--marke); }
 
 /* ---------- Benutzertabelle: gleiche Spalten in jeder Zeile ---------- */
 .tabellenrolle { overflow-x: auto; }
-.tabelle--benutzer { table-layout: fixed; min-width: 720px; }
+.tabelle--benutzer { table-layout: fixed; min-width: 720px; width: 100%; }
 .tabelle--benutzer .bl-person { width: auto; }
 .tabelle--benutzer th:nth-child(1) { width: auto; }
-.tabelle--benutzer th:nth-child(2), .tabelle--benutzer .bu-rolle { width: 190px; }
+.tabelle--benutzer th:nth-child(2), .tabelle--benutzer .bu-rolle { width: 210px; }
 .tabelle--benutzer th:nth-child(3), .tabelle--benutzer .bu-bearb { width: 110px; }
 .tabelle--benutzer th:nth-child(4), .tabelle--benutzer .bu-geb { width: 175px; }
 .tabelle--benutzer th:nth-child(5), .tabelle--benutzer .bu-status { width: 130px; }
@@ -1784,7 +1784,9 @@ pre, .gcode { max-width: 100%; overflow-x: auto; }
 }
 
 /* ---------- Suchfeld in der Produktion grösser ---------- */
-#p-suche { min-height: 48px; font-size: 1.05rem; padding: 10px 14px; }
+#p-suche, #as-suche, #bo-suche, #bh-suche, #bz-suche, #lf-suche, #ar-suche, #pw-suche {
+  min-height: 48px; font-size: 1.05rem; padding: 10px 14px;
+}
 
 .einstellungenkopf { display: flex; align-items: center; justify-content: space-between;
                      gap: 14px; margin-bottom: 4px; flex-wrap: wrap; }
@@ -1797,13 +1799,12 @@ pre, .gcode { max-width: 100%; overflow-x: auto; }
 .namensfeld-liste { min-height: 34px; padding: 5px 8px; font: inherit; width: 160px; }
 
 @media (max-width: 720px) {
-  #as-suche { min-height: 50px; font-size: 1.1rem; padding: 12px 16px; }
   #as-liste .knopf { min-height: 48px; font-size: .95rem; padding: 10px 14px; }
   #as-liste .hinweis { font-size: .95rem; }
 }
 
-.dialog--einstellungen { position: relative; max-width: 760px;
-                         max-height: 88dvh; overflow-y: auto; }
+.dialog--einstellungen { position: relative; max-width: min(1180px, 94vw);
+                         width: 94vw; max-height: 90dvh; overflow-y: auto; }
 .dialog__schliessen { position: absolute; top: 14px; right: 14px;
                       width: 34px; height: 34px; border-radius: 50%;
                       border: 1px solid var(--linie-stark); background: var(--flaeche);
@@ -1832,11 +1833,6 @@ pre, .gcode { max-width: 100%; overflow-x: auto; }
                              flex: none; }
 .dialog__schliessen-inline:hover { background: var(--marke-hell); color: var(--marke); }
 
-@media (max-width: 720px) {
-  #bo-suche, #bh-suche, #bz-suche, #lf-suche, #ar-suche {
-    min-height: 48px; font-size: 1.05rem; padding: 10px 14px;
-  }
-}
 </style>
 </head>
 <body>
@@ -1880,7 +1876,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "28.2.0";
+const APP_VERSION = "28.3.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
