@@ -356,16 +356,21 @@ a:focus-visible {
 .login__karte {
   width: 100%;
   max-width: 380px;
-  background: var(--flaeche);
+  background: var(--marke);
+  color: #fff;
   border-radius: var(--radius);
   padding: 28px 24px 26px;
   overflow: hidden;   /* das Bild bleibt sauber im runden Rahmen */
 }
+.login__karte .feld > span { color: rgba(255,255,255,.82); }
+.login__karte .feldhinweis { color: rgba(255,255,255,.7); }
+.login__karte .linkknopf { color: #fff; text-decoration: underline; }
+.login__untertitel { color: rgba(255,255,255,.75) !important; }
 
 .login__marke {
   margin-bottom: 26px;
   padding-bottom: 14px;
-  border-bottom: 2px solid var(--marke);
+  border-bottom: 2px solid rgba(255,255,255,.3);
   text-align: center;
 }
 .login__logo { width: 100%; max-width: 300px; height: auto; }
@@ -921,15 +926,20 @@ a:focus-visible {
 /* Eigenes Scrollfenster: nur so kann die Datumszeile beim
    Herunterscrollen oben mitwandern. */
 /* Auf der Planwand scrollt nur noch die Tafel selbst — der Rest der
-   Seite (Kopfzeile, Regler) bleibt fest stehen. */
-body.pw-seite { overflow: hidden; height: 100dvh; }
-body.pw-seite .inhalt { height: calc(100dvh - var(--kopfhoehe)); overflow: hidden;
-                        display: flex; flex-direction: column; }
-body.pw-seite #pw-inhalt { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
-.pw-rolle { overflow: auto; flex: 1 1 auto; min-height: 0;
+   Seite (Kopfzeile, Regler) bleibt fest stehen. Nur am Desktop: die
+   Rechnung mit der unteren Handy-Navigation ist zu unzuverlässig,
+   dort bleibt es beim normalen Scrollen der ganzen Seite. */
+@media (min-width: 781px) {
+  body.pw-seite { overflow: hidden; height: 100dvh; }
+  body.pw-seite .inhalt { height: calc(100dvh - var(--kopfhoehe)); overflow: hidden;
+                          display: flex; flex-direction: column; }
+  body.pw-seite #pw-inhalt { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  body.pw-seite .pw-rolle { flex: 1 1 auto; min-height: 0; }
+  body.pw-seite .pw-legende { flex: none; margin-top: 6px; }
+}
+.pw-rolle { overflow: auto; max-height: calc(100vh - 260px);
             background: var(--flaeche);
             border: 1px solid var(--linie); border-radius: var(--radius); }
-body.pw-seite .pw-legende { flex: none; margin-top: 6px; }
 .pw-tafel { min-width: 640px; }
 .pw-zeile { display: grid; grid-template-columns: 108px 1fr; align-items: stretch;
             border-bottom: 1px solid var(--linie); }
@@ -1503,7 +1513,7 @@ body.dunkel .karte--raster, body.dunkel .raster .fest, body.dunkel .kennzahl,
 body.dunkel .pd-zeile, body.dunkel .spass-karte, body.dunkel .spass-zahl-feld,
 body.dunkel .wahlknopf, body.dunkel .parkwahl__knopf, body.dunkel .moduswahl__knopf,
 body.dunkel .reiter__knopf, body.dunkel .unterreiter__knopf, body.dunkel .knopf,
-body.dunkel .login__karte { background: var(--flaeche); }
+body.dunkel .login__karte { background: var(--marke); }
 
 body.dunkel .statuszeile, body.dunkel .meldungsnotiz, body.dunkel .raster .summe,
 body.dunkel .parkzeile, body.dunkel .spass-werte > div, body.dunkel .kontokopf,
@@ -1873,21 +1883,26 @@ pre, .gcode { max-width: 100%; overflow-x: auto; }
 .pw-balken__farbbuchstabe { margin-left: auto; flex: none; font-size: calc(0.62rem * var(--pw-s, 1));
                             font-weight: 700; opacity: .85; padding-left: 4px; }
 
-/* ---------- Chat: schwebender Knopf und Panel ---------- */
-.chat-knopf, .fahrzeug-knopf, .eier-knopf {
+/* ---------- Chat / Fahrzeug / Eier: schwebende Knöpfe ---------- */
+.chat-knopf, .fahrzeug-knopf, .eier-mitte {
   position: fixed; z-index: 40; width: 52px; height: 52px;
   border-radius: 12px; border: none; background: var(--marke); color: #fff;
   display: grid; place-items: center; cursor: pointer;
   box-shadow: 0 6px 18px rgba(0,0,0,.25); right: 18px; }
-.chat-knopf:hover, .fahrzeug-knopf:hover { background: var(--marke-dunkel, var(--marke)); }
+.eier-mitte { position: static; background: var(--flaeche); color: var(--tinte);
+             border: 1px solid var(--linie-stark); flex-direction: column; gap: 0;
+             font-size: 1.15rem; width: 52px; height: 52px; }
+.chat-knopf:hover, .fahrzeug-knopf:hover, .eier-mitte:hover { background: var(--marke-hell); }
 .chat-knopf { bottom: 18px; }
 .fahrzeug-knopf { bottom: 78px; font-size: 1.3rem; }
-.eier-knopf { bottom: 138px; font-size: 1.15rem; background: var(--flaeche);
-             color: var(--tinte); border: 1px solid var(--linie-stark);
-             flex-direction: column; gap: 0; }
+.eier-knopf { position: fixed; z-index: 40; right: 18px; bottom: 138px;
+             display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.eier-minus { width: 26px; height: 22px; border-radius: 7px; border: 1px solid var(--linie-stark);
+             background: var(--flaeche); color: var(--tinte); cursor: pointer;
+             font-size: 1rem; line-height: 1; }
 .eier-zahl { font-size: .62rem; font-weight: 700; margin-top: -2px; }
 @media (max-width: 780px) {
-  .chat-knopf, .fahrzeug-knopf, .eier-knopf { width: 48px; height: 48px; border-radius: 10px; }
+  .chat-knopf, .fahrzeug-knopf, .eier-mitte { width: 48px; height: 48px; border-radius: 10px; }
   .chat-knopf { bottom: calc(var(--navhoehe) + 14px); }
   .fahrzeug-knopf { bottom: calc(var(--navhoehe) + 70px); }
   .eier-knopf { bottom: calc(var(--navhoehe) + 126px); }
@@ -2031,7 +2046,13 @@ body.dunkel .pw-balken--laeuft { border-color: #ffffff; }
 .login__kachel-name { font-size: .68rem; text-align: center; line-height: 1.2; color: #fff;
                       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
                       max-width: 100%; }
-.login__gewaehlt { font-size: .95rem; margin-bottom: 14px; text-align: center; }
+.login__gewaehlt { font-size: 1.05rem; font-weight: 650; margin: 6px 0 16px;
+                  text-align: center; }
+.login__laedt { text-align: center; color: rgba(255,255,255,.75); padding: 20px 0;
+               font-size: .85rem; }
+.login__manuell { display: block; margin: 12px auto 0; text-align: center; }
+.login__anderekonto { display: block; margin: 10px auto 0; text-align: center;
+                     font-size: .78rem; opacity: .85; }
 
 /* Übergang: die angeklickte Kachel fliegt vergrössert in die Mitte */
 .login__flug { position: fixed; z-index: 200; border-radius: 10px; object-fit: cover;
@@ -2105,7 +2126,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "32.0.0";
+const APP_VERSION = "32.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -2517,8 +2538,8 @@ function zeigeLogin() {
     + '<img class="login__bild" src="./login.png" alt="Hofer + Co. Präzisionsdrehteile">'
     + '<div class="login__untertitel">' + esc(APP_UNTERTITEL) + '</div>'
     + '</div>'
-    + '<div id="lk-kacheln"></div>'
-    + '<form id="lf" novalidate>'
+    + '<div id="lk-kacheln"><div class="login__laedt">Wird geladen …</div></div>'
+    + '<form id="lf" novalidate hidden>'
     + '<div id="lk-gewaehlt" hidden></div>'
     + '<label class="feld" id="lk-namefeld"><span>Benutzername</span>'
     + '<input type="text" id="le" autocomplete="username" autocapitalize="none"'
@@ -2526,16 +2547,21 @@ function zeigeLogin() {
     + '<label class="feld"><span>Passwort</span>'
     + '<input type="password" id="lp" autocomplete="current-password" required></label>'
     + '<button type="submit" class="knopf knopf--haupt knopf--breit" id="lk">Anmelden</button>'
+    + '<button type="button" class="linkknopf login__anderekonto" id="lk-zurueck-unten" hidden>'
+    + 'anderes Konto</button>'
     + '</form></div></div>';
 
   const namensfeld = document.getElementById("le");
 
+  const form = document.getElementById("lf");
+
   // Kacheln mit allen Konten. Klappt nur, wenn login_kacheln in der
-  // Datenbank existiert — sonst bleibt einfach nur das Textfeld übrig.
+  // Datenbank existiert — sonst zeigt sich als Rückfalloption
+  // einfach das gewöhnliche Formular.
   (async () => {
     try {
       const { data, error } = await db.from("login_kacheln").select("*");
-      if (error || !data || !data.length) return;
+      if (error || !data || !data.length) throw error || new Error("leer");
 
       const kasten = document.getElementById("lk-kacheln");
       kasten.innerHTML = '<div class="login__kachelfeld" id="lk-feld">'
@@ -2549,17 +2575,19 @@ function zeigeLogin() {
             + '<span class="login__kachel-name">' + esc(u.full_name || u.email) + '</span>'
             + '</button>').join("")
         + '</div></div>'
-        + '<button type="button" class="linkknopf" id="lk-manuell">Anderes Konto eingeben</button>';
+        + '<button type="button" class="linkknopf login__manuell" id="lk-manuell">Anderes Konto eingeben</button>';
 
       document.getElementById("lk-namefeld").hidden = true;
 
       const passwortfeld = document.getElementById("lp").closest("label");
+      const zurueckUnten = document.getElementById("lk-zurueck-unten");
 
       const gewaehlt = (mail, name, bildEl) => {
         namensfeld.value = mail;
 
         // Die angeklickte Kachel fliegt vergrössert in die Mitte,
-        // der Rest blendet aus — dann bleibt nur noch das Passwortfeld.
+        // der Rest blendet aus — dann bleibt nur noch der Name,
+        // das Passwortfeld und ganz klein "anderes Konto" darunter.
         const feld = document.getElementById("lk-feld");
         const quelle = bildEl.getBoundingClientRect();
         const klon = bildEl.cloneNode(true);
@@ -2582,19 +2610,21 @@ function zeigeLogin() {
         setTimeout(() => {
           klon.remove();
           kasten.hidden = true;
-          document.getElementById("lk-manuell").hidden = true;
 
           const g = document.getElementById("lk-gewaehlt");
           g.hidden = false;
           g.className = "login__block--ein";
-          g.innerHTML = '<div class="login__gewaehlt">' + esc(name)
-            + ' <button type="button" class="linkknopf" id="lk-zurueck">nicht ich</button></div>';
-          document.getElementById("lk-zurueck").onclick = () => {
+          g.innerHTML = '<div class="login__gewaehlt">' + esc(name) + '</div>';
+
+          form.hidden = false;
+          zurueckUnten.hidden = false;
+          zurueckUnten.onclick = () => {
+            form.hidden = true;
             kasten.hidden = false;
             document.getElementById("lk-feld").classList.remove("login__kachelfeld--weg");
-            document.getElementById("lk-manuell").hidden = false;
             g.hidden = true;
             namensfeld.value = "";
+            document.getElementById("lp").value = "";
           };
 
           if (passwortfeld) passwortfeld.classList.add("login__block--ein");
@@ -2608,10 +2638,15 @@ function zeigeLogin() {
 
       document.getElementById("lk-manuell").onclick = () => {
         kasten.hidden = true;
+        form.hidden = false;
         document.getElementById("lk-namefeld").hidden = false;
         namensfeld.focus();
       };
-    } catch (f) { /* Kacheln sind Komfort, kein Muss */ }
+    } catch (f) {
+      // Keine Kacheln möglich — dann eben gleich das gewöhnliche Formular.
+      document.getElementById("lk-kacheln").innerHTML = "";
+      form.hidden = false;
+    }
   })();
 
   const knopf = document.getElementById("lk");
@@ -10384,6 +10419,14 @@ async function syncPruefen() {
   if (jetzt === sync.stempel) return;
   sync.stempel = jetzt;
 
+  // Produktion hat, wie die Planwand, einen eigenen leichten Weg:
+  // nur Aufträge und Zahlen neu laden, nicht die ganze Seite mit
+  // Reitern und Maschinen neu aufbauen.
+  if (sync.pfad === "produktion" && document.getElementById("prod-inhalt")) {
+    await prodAuftraegeAktualisieren(bereich);
+    return;
+  }
+
   const seite = SEITEN.find((x) => x.pfad === sync.pfad);
   if (!seite) return;
 
@@ -10435,24 +10478,26 @@ const chat = {
   takt: null,
 };
 
-// Einmal pro Sitzung: Knopf einbauen und auf Nachrichten lauschen
 // ---------- Eierzähler ----------
-// Ganz bewusst simpel: ein Knopf, eine Zahl, Pfeiltasten hoch/runter.
+// Bewusst simpel: eine Zahl, hoch und runter. Am Computer mit den
+// Pfeiltasten, auf dem Handy gibt es dafür keine — dort tippt man
+// auf die Zahl (plus eins) oder auf das kleine Minus (minus eins).
 const eier = { wert: 0 };
 
 async function eierEinbauen() {
   if (document.getElementById("eier-knopf")) return;
 
-  const knopf = document.createElement("button");
+  const knopf = document.createElement("div");
   knopf.id = "eier-knopf";
   knopf.className = "eier-knopf";
-  knopf.title = "Eier im Lager — anklicken, dann Pfeiltasten hoch/runter";
-  knopf.tabIndex = 0;
-  knopf.innerHTML = '🥚<span class="eier-zahl" id="eier-zahl">–</span>';
+  knopf.title = "Eier im Lager";
+  knopf.innerHTML = '<button type="button" class="eier-minus" id="eier-minus" title="Eins weniger">–</button>'
+    + '<button type="button" class="eier-mitte" id="eier-plus" tabindex="0"'
+    + ' title="Eins mehr — oder mit den Pfeiltasten">🥚<span class="eier-zahl" id="eier-zahl">–</span></button>';
   document.body.appendChild(knopf);
 
   try {
-    const r = await db.from("app_config").select("wert").eq("schluessel", "eier_anzahl").maybeSingle();
+    const r = await db.from("eier_zaehler").select("wert").eq("id", true).maybeSingle();
     eier.wert = (r.data && Number(r.data.wert)) || 0;
   } catch (f) { eier.wert = 0; }
   document.getElementById("eier-zahl").textContent = eier.wert;
@@ -10461,25 +10506,31 @@ async function eierEinbauen() {
   const speichern = () => {
     clearTimeout(taste);
     taste = setTimeout(() => {
-      db.from("app_config").upsert({ schluessel: "eier_anzahl", wert: String(eier.wert) });
-    }, 500);
+      db.from("eier_zaehler").upsert({ id: true, wert: eier.wert });
+    }, 400);
   };
+  const anzeigen = () => { document.getElementById("eier-zahl").textContent = eier.wert; };
 
-  knopf.addEventListener("keydown", (e) => {
+  const plusKnopf = document.getElementById("eier-plus");
+  const minusKnopf = document.getElementById("eier-minus");
+
+  plusKnopf.onclick = () => { eier.wert++; anzeigen(); speichern(); };
+  minusKnopf.onclick = () => { eier.wert = Math.max(0, eier.wert - 1); anzeigen(); speichern(); };
+
+  plusKnopf.addEventListener("keydown", (e) => {
     if (e.key === "ArrowUp") { e.preventDefault(); eier.wert++; }
     else if (e.key === "ArrowDown") { e.preventDefault(); eier.wert = Math.max(0, eier.wert - 1); }
     else return;
-    document.getElementById("eier-zahl").textContent = eier.wert;
-    speichern();
+    anzeigen(); speichern();
   });
 
   // Andere Geräte live mitbekommen
   if (db && typeof db.channel === "function") {
     db.channel("eier-" + Date.now())
-      .on("postgres_changes", { event: "*", schema: "public", table: "app_config" }, (n) => {
-        if (n.new && n.new.schluessel === "eier_anzahl" && document.activeElement !== knopf) {
+      .on("postgres_changes", { event: "*", schema: "public", table: "eier_zaehler" }, (n) => {
+        if (n.new && document.activeElement !== plusKnopf) {
           eier.wert = Number(n.new.wert) || 0;
-          document.getElementById("eier-zahl").textContent = eier.wert;
+          anzeigen();
         }
       })
       .subscribe();
