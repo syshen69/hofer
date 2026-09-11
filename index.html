@@ -1001,9 +1001,9 @@ a:focus-visible {
 
 /* ---------- Fortschritt im Planwand-Balken ---------- */
 .pw-balken { position: relative; }
-.pw-fortschritt { position: absolute; left: 0; top: 0; bottom: 0;
-                  background: rgba(255,255,255,.28); pointer-events: none;
-                  border-right: 2px solid rgba(255,255,255,.55); }
+.pw-rest { position: absolute; right: 0; top: 0; bottom: 0;
+           background: rgba(120,120,120,.55); pointer-events: none;
+           border-left: 2px solid rgba(255,255,255,.55); }
 .pw-balken__inhalt { position: relative; display: flex; align-items: center;
                      gap: 5px; width: 100%; overflow: hidden; }
 .pw-balken__prozent { font-size: .68rem; opacity: .9; flex: none;
@@ -1443,8 +1443,8 @@ body.dunkel .statuszeile--gefahr *, body.dunkel .statuszeile--gut,
 body.dunkel .statuszeile--gut *, body.dunkel .parkwahl__knopf.aktiv,
 body.dunkel .moduswahl__knopf.aktiv, body.dunkel .wahlknopf.aktiv,
 body.dunkel .kopf__admin.aktiv, body.dunkel .vorschlag,
-body.dunkel .spass-karte, body.dunkel .pw-balken,
-body.dunkel .pw-balken *, body.dunkel .pw-ferien, body.dunkel .pw-ferien *,
+body.dunkel .spass-karte,
+body.dunkel .pw-ferien, body.dunkel .pw-ferien *,
 body.dunkel .toast, body.dunkel .toast * { color: #10161d; }
 
 body.dunkel .toast, body.dunkel .toast * { color: #fff; }
@@ -1502,6 +1502,9 @@ body.dunkel .statuszeile, body.dunkel .meldungsnotiz, body.dunkel .raster .summe
 body.dunkel .parkzeile, body.dunkel .spass-werte > div, body.dunkel .kontokopf,
 body.dunkel input, body.dunkel select, body.dunkel textarea,
 body.dunkel option { background: #232a32; }
+body.dunkel input[type="date"]::-webkit-calendar-picker-indicator,
+body.dunkel input[type="datetime-local"]::-webkit-calendar-picker-indicator
+{ filter: invert(1); }
 
 /* Farbige Hinweisflächen bekommen dunkle Töne statt heller */
 body.dunkel .problemkasten, body.dunkel .warnbalken,
@@ -1929,8 +1932,23 @@ pre, .gcode { max-width: 100%; overflow-x: auto; }
                  justify-content: space-between; gap: 14px; }
 .pw-regler-reihe { display: flex; flex-wrap: wrap; gap: 22px; flex: 1 1 480px;
                    align-items: flex-start; }
-.pw-regler-reihe .pw-zeitregler { flex: 1 1 260px; margin: 0; min-width: 200px; }
+.pw-regler-reihe .pw-zeitregler { flex: 2 1 420px; margin: 0; min-width: 260px; }
 .pw-regler-reihe .pw-zoom { flex: 1 1 200px; margin: 0; }
+
+/* Etwas dickere Schieberegler auf der Planwand */
+.pw-zeitregler input[type="range"], .pw-zoom input[type="range"] { height: 20px; }
+.pw-zeitregler input[type="range"]::-webkit-slider-runnable-track,
+.pw-zoom input[type="range"]::-webkit-slider-runnable-track {
+  height: 7px; border-radius: 4px; }
+.pw-zeitregler input[type="range"]::-webkit-slider-thumb,
+.pw-zoom input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--marke); margin-top: -5.5px; cursor: pointer; }
+.pw-zeitregler input[type="range"]::-moz-range-track,
+.pw-zoom input[type="range"]::-moz-range-track { height: 7px; border-radius: 4px; }
+.pw-zeitregler input[type="range"]::-moz-range-thumb,
+.pw-zoom input[type="range"]::-moz-range-thumb {
+  width: 18px; height: 18px; border-radius: 50%; background: var(--marke); border: none; }
 .pw-eckknoepfe { display: flex; gap: 8px; flex: none; }
 @media (max-width: 780px) {
   .pw-kopfleiste { flex-direction: column; }
@@ -1980,7 +1998,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "31.1.0";
+const APP_VERSION = "31.2.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -3996,7 +4014,7 @@ function darfPlanen() {
   return meineRolle() === "planwand" && plan.pinOk === true;
 }
 
-const FERIEN_ZEILEN = 7;
+const FERIEN_ZEILEN = 5;
 
 async function ladeFerien() {
   const { data, error } = await zeitlimit(
@@ -4147,32 +4165,15 @@ async function ansichtPlanwand(ziel, b) {
     + (plan.tageWunsch || 15) + '">'
     + '</div>'
     + '</div>'
-    + (darfPlanen()
-        ? '<div class="pw-eckknoepfe">'
-          + '<button class="knopf knopf--klein knopf--warnung" id="pw-problem">Problem melden</button>'
-          + '<button class="knopf knopf--klein" id="pw-kopieren">Auftrag kopieren</button>'
-          + '</div>'
-        : (isMobil()
-            ? nurLesenHinweis("Bearbeitbar nur am Desktop, nicht auf dem Handy.")
-            : nurLesenHinweis("Du kannst die Planung ansehen. Ändern dürfen Planer und Administratoren.")))
+    + (darfPlanen() ? "" : (isMobil()
+        ? nurLesenHinweis("Bearbeitbar nur am Desktop, nicht auf dem Handy.")
+        : nurLesenHinweis("Du kannst die Planung ansehen. Ändern dürfen Planer und Administratoren.")))
     + '</div>'
     + '<div id="pw-inhalt"><div class="laedt">Planung wird geladen …</div></div>';
 
   // Auf einen leeren Kalendertag klicken legt einen neuen Auftrag an,
   // auf eine leere Ferienzeile klicken trägt Ferien ein — ein eigener
   // Knopf dafür ist deshalb nicht mehr nötig.
-
-  const prob = document.getElementById("pw-problem");
-  if (prob) prob.onclick = () => problemMelden(b);
-
-  const kop = document.getElementById("pw-kopieren");
-  if (kop) {
-    kop.textContent = plan.kopierModus ? "Kopieren abbrechen" : "Auftrag kopieren";
-    kop.onclick = () => {
-      if (plan.kopierModus) kopierModusBeenden(b);
-      else auftragKopieren(b);
-    };
-  }
 
   // Strg+F (oder Cmd+F) öffnet die Suche, statt einen eigenen
   // Knopf zu belegen. Nur während die Planwand offen ist.
@@ -4778,7 +4779,9 @@ function planBalken(j, spalte, dauer, angeschnitten) {
   const f = farbeVon(j.color);
 
   const hg = fertig ? "#4a5158" : f.hex;
-  const vg = fertig ? "#ffffff" : f.schrift;
+  // Immer schwarze Schrift, ausser bei Fertig — dort weiss.
+  // Gilt unabhaengig vom hellen oder dunklen Modus.
+  const vg = fertig ? "#ffffff" : "#000000";
   const laeuft = st === "laeuft";
   const rand = laeuft ? "border:2px solid #111417;"
     : ((!fertig && j.color === "weiss") ? "border:1px solid var(--linie-stark);" : "");
@@ -4819,7 +4822,7 @@ function planBalken(j, spalte, dauer, angeschnitten) {
     + ';background:' + hg + ';color:' + vg + ';' + rand + '">'
 
     + (anteil !== null
-        ? '<div class="pw-fortschritt" style="width:' + anteil + '%"></div>' : "")
+        ? '<div class="pw-rest" style="left:' + anteil + '%"></div>' : "")
 
     + '<div class="pw-balken__inhalt">'
     + '<div class="pw-zeile1">'
@@ -5117,48 +5120,51 @@ function kopierModusBeenden(b) {
   if (b) zeichnePlanwand(b);
 }
 
-async function problemMelden(b) {
-  const offen = (plan.auftraege || [])
-    .filter((j) => j.plan_status !== "fertig" && !j.ended_at);
+async function problemMelden(b, vorausgewaehlt) {
+  let auftrag = vorausgewaehlt || null;
 
-  if (!offen.length) {
-    await nachfragen({ titel: "Keine Aufträge",
-      text: "Es ist kein offener Auftrag eingeplant.", bestaetigen: "Verstanden" });
-    return;
-  }
+  if (!auftrag) {
+    const offen = (plan.auftraege || [])
+      .filter((j) => j.plan_status !== "fertig" && !j.ended_at);
 
-  // Zuerst die Nummer eintippen. Keine Vorschlagsliste vorher.
-  const eingabe = await dialogFelder({
-    titel: "Problem melden",
-    text: "Um welchen Auftrag geht es?",
-    felder: [{ name: "nummer", label: "HOCO Nr.", pflicht: true,
-               platzhalter: "Nummer eingeben" }],
-    bestaetigen: "Weiter",
-  });
-  if (!eingabe) return;
+    if (!offen.length) {
+      await nachfragen({ titel: "Keine Aufträge",
+        text: "Es ist kein offener Auftrag eingeplant.", bestaetigen: "Verstanden" });
+      return;
+    }
 
-  const suche = (eingabe.nummer || "").trim().toLowerCase();
-  const treffer = offen.filter((j) => (j.job_number || "").toLowerCase().includes(suche));
+    // Zuerst die Nummer eintippen. Keine Vorschlagsliste vorher.
+    const eingabe = await dialogFelder({
+      titel: "Problem melden",
+      text: "Um welchen Auftrag geht es?",
+      felder: [{ name: "nummer", label: "HOCO Nr.", pflicht: true,
+                 platzhalter: "Nummer eingeben" }],
+      bestaetigen: "Weiter",
+    });
+    if (!eingabe) return;
 
-  if (!treffer.length) {
-    await nachfragen({ titel: "Nicht gefunden",
-      text: 'Zu "' + eingabe.nummer + '" ist kein offener Auftrag eingeplant.',
-      bestaetigen: "Verstanden" });
-    return;
-  }
+    const suche = (eingabe.nummer || "").trim().toLowerCase();
+    const treffer = offen.filter((j) => (j.job_number || "").toLowerCase().includes(suche));
 
-  let auftrag = treffer[0];
+    if (!treffer.length) {
+      await nachfragen({ titel: "Nicht gefunden",
+        text: 'Zu "' + eingabe.nummer + '" ist kein offener Auftrag eingeplant.',
+        bestaetigen: "Verstanden" });
+      return;
+    }
 
-  // Mehrere Treffer: dann darf gewählt werden
-  if (treffer.length > 1) {
-    const wahl = await auswahlDialog("Welcher davon?",
-      treffer.map((j) => ({
-        wert: j.id,
-        text: j.job_number + "   " + (j.maschine || "")
-          + (j.problem ? "   ⚠" : ""),
-      })));
-    if (!wahl) return;
-    auftrag = treffer.find((j) => j.id === wahl);
+    auftrag = treffer[0];
+
+    if (treffer.length > 1) {
+      const wahl = await auswahlDialog("Welcher davon?",
+        treffer.map((j) => ({
+          wert: j.id,
+          text: j.job_number + "   " + (j.maschine || "")
+            + (j.problem ? "   ⚠" : ""),
+        })));
+      if (!wahl) return;
+      auftrag = treffer.find((j) => j.id === wahl);
+    }
   }
 
   const art = await auswahlDialog("Was fehlt oder stimmt nicht?",
@@ -5223,8 +5229,14 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
   const huelle = document.createElement("div");
   huelle.className = "dialog-huelle";
   huelle.innerHTML = '<div class="dialog dialog--breit">'
-    + '<h2>' + (auftrag ? esc(auftrag.job_number)
-        : (vorlage ? "Kopie anlegen" : "Auftrag einplanen")) + '</h2>'
+    + (auftrag ? '<div class="dialog__kopfzeile">'
+        + '<h2>' + esc(auftrag.job_number) + '</h2>'
+        + '<div class="dialog__kopfknoepfe">'
+        + '<button type="button" class="knopf knopf--klein knopf--warnung" id="pl-problem-eigen">'
+        + 'Problem melden</button>'
+        + '<button type="button" class="knopf knopf--klein" id="pl-kopieren-eigen">Kopieren</button>'
+        + '</div></div>'
+      : '<h2>' + (vorlage ? "Kopie anlegen" : "Auftrag einplanen") + '</h2>')
     + (vorlage
         ? '<p class="klein">Übernommen von ' + esc(vorlage.job_number)
           + '. HOCO Nr., Maschine, Stückzahl und Zeichnung bitte neu setzen.</p>' : "")
@@ -5400,6 +5412,19 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
   if (probWeg) probWeg.onclick = async () => {
     zu();
     await problemQuittieren(auftrag, b);
+  };
+
+  // Kopfknöpfe: dieser konkrete Auftrag, ohne erst suchen zu müssen
+  const problemEigen = huelle.querySelector("#pl-problem-eigen");
+  if (problemEigen) problemEigen.onclick = async () => {
+    zu();
+    await problemMelden(b, auftrag);
+  };
+
+  const kopierenEigen = huelle.querySelector("#pl-kopieren-eigen");
+  if (kopierenEigen) kopierenEigen.onclick = () => {
+    zu();
+    planAuftragDialog(null, b, null, null, auftrag);
   };
 
   const pdfKnopf = huelle.querySelector("[data-pdfzeigen]");
