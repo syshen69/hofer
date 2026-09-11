@@ -978,12 +978,11 @@ a:focus-visible {
 /* ---------- Farbwahl auf der Planwand ---------- */
 .farbwahl { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px;
              background: var(--grund); border-radius: var(--radius); }
-.farbknopf { position: relative; width: 30px; height: 30px; border-radius: 7px;
-             border: 1px solid rgba(0,0,0,.15); cursor: pointer; padding: 0; }
+.farbknopf { position: relative; width: 34px; height: 34px; border-radius: 7px;
+             border: 1px solid rgba(0,0,0,.15); cursor: pointer; padding: 0;
+             display: grid; place-items: center; font-size: .72rem; font-weight: 700;
+             letter-spacing: -.02em; line-height: 1; }
 .farbknopf.aktiv { box-shadow: 0 0 0 2px var(--flaeche), 0 0 0 4px var(--marke); }
-.farbknopf.aktiv::after { content: "✓"; position: absolute; inset: 0; display: grid;
-                          place-items: center; color: #fff; text-shadow: 0 0 3px rgba(0,0,0,.6);
-                          font-size: .8rem; font-weight: 700; }
 .pw-balken__status { flex: none; font-size: .75rem; }
 .pw-balken--fertig .pw-balken__nr { text-decoration: line-through; opacity: .85; }
 .pw-legende { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px;
@@ -1859,6 +1858,85 @@ pre, .gcode { max-width: 100%; overflow-x: auto; }
 .pdfreihe { display: flex; flex-wrap: wrap; gap: 10px; }
 .dialog--breit .dialogspalte > .feld,
 .dialog--breit .dialogspalte > .dialog__block { margin-bottom: 18px; }
+.artikel__beschreibung, .bz-beschreibung { color: var(--gedaempft); font-style: italic; }
+
+.pw-balken__farbbuchstabe { margin-left: auto; flex: none; font-size: calc(0.62rem * var(--pw-s, 1));
+                            font-weight: 700; opacity: .85; padding-left: 4px; }
+
+/* ---------- Chat: schwebender Knopf und Panel ---------- */
+.chat-knopf { position: fixed; z-index: 40; width: 52px; height: 52px;
+              border-radius: 12px; border: none; background: var(--marke); color: #fff;
+              display: grid; place-items: center; cursor: pointer;
+              box-shadow: 0 6px 18px rgba(0,0,0,.25);
+              right: 18px; bottom: 18px; }
+.chat-knopf:hover { background: var(--marke-dunkel, var(--marke)); }
+@media (max-width: 780px) {
+  .chat-knopf { bottom: calc(var(--navhoehe) + 14px); width: 48px; height: 48px;
+                border-radius: 10px; }
+}
+.chat-abzeichen { position: absolute; top: -6px; right: -6px; min-width: 20px;
+                  height: 20px; padding: 0 5px; border-radius: 10px; background: var(--gefahr);
+                  color: #fff; font-size: .68rem; font-weight: 700; display: grid; place-items: center; }
+
+.chat-panel { position: fixed; z-index: 41; width: 340px; max-width: calc(100vw - 32px);
+              height: 480px; max-height: calc(100dvh - 120px); background: var(--flaeche);
+              border-radius: var(--radius); box-shadow: 0 12px 32px rgba(0,0,0,.3);
+              display: flex; flex-direction: column; overflow: hidden;
+              right: 18px; bottom: 82px; border: 1px solid var(--linie); }
+@media (max-width: 780px) {
+  .chat-panel { bottom: calc(var(--navhoehe) + 70px); }
+}
+.chat-kopf { display: flex; align-items: center; justify-content: space-between;
+             gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--linie);
+             font-weight: 650; flex: none; }
+.chat-kopf__knoepfe { display: flex; align-items: center; gap: 10px; }
+.chat-x { background: none; border: none; font-size: 1.3rem; line-height: 1;
+          color: var(--gedaempft); cursor: pointer; padding: 0 2px; }
+.chat-liste { flex: 1; overflow-y: auto; padding: 6px; }
+.chat-eintrag { display: flex; align-items: center; gap: 10px; width: 100%;
+                text-align: left; background: none; border: none; cursor: pointer;
+                padding: 9px 8px; border-radius: var(--radius); }
+.chat-eintrag:hover { background: var(--marke-hell); }
+.chat-eintrag--ungelesen .chat-eintrag__name { font-weight: 700; }
+.chat-eintrag__symbol { width: 32px; height: 32px; border-radius: 50%; background: var(--marke);
+                        color: #fff; display: grid; place-items: center; font-weight: 700;
+                        flex: none; font-size: .85rem; }
+.chat-eintrag__inhalt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.chat-eintrag__name { font-size: .88rem; }
+.chat-eintrag__vorschau { font-size: .76rem; color: var(--gedaempft); overflow: hidden;
+                          text-overflow: ellipsis; white-space: nowrap; }
+.chat-punkt { width: 9px; height: 9px; border-radius: 50%; background: var(--gefahr); flex: none; }
+
+.chat-nachrichten { flex: 1; overflow-y: auto; padding: 10px 12px; display: flex;
+                    flex-direction: column; gap: 8px; }
+.chat-blase { max-width: 82%; background: var(--grund); border-radius: 12px;
+              padding: 7px 11px; align-self: flex-start; }
+.chat-blase--ich { align-self: flex-end; background: var(--marke); color: #fff; }
+.chat-blase__wer { font-size: .68rem; font-weight: 700; color: var(--marke); margin-bottom: 2px; }
+.chat-blase--ich .chat-blase__wer { color: rgba(255,255,255,.85); }
+.chat-blase__text { font-size: .88rem; white-space: pre-wrap; word-break: break-word; }
+.chat-blase__zeit { font-size: .64rem; opacity: .7; margin-top: 3px; text-align: right; }
+.chat-eingabe { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--linie); flex: none; }
+.chat-eingabe input { flex: 1; min-height: 40px; padding: 8px 12px; }
+
+.mehrfachliste { max-height: 320px; overflow-y: auto; display: flex; flex-direction: column;
+                 gap: 4px; margin: 10px 0; }
+
+/* ---------- Planwand: Kopfleiste mit beiden Reglern ---------- */
+.pw-kopfleiste { position: sticky; top: var(--kopfhoehe); z-index: 25;
+                 background: var(--grund); padding: 10px 0 12px;
+                 display: flex; flex-wrap: wrap; align-items: flex-start;
+                 justify-content: space-between; gap: 14px; }
+.pw-regler-reihe { display: flex; flex-wrap: wrap; gap: 22px; flex: 1 1 480px;
+                   align-items: flex-start; }
+.pw-regler-reihe .pw-zeitregler { flex: 1 1 260px; margin: 0; min-width: 200px; }
+.pw-regler-reihe .pw-zoom { flex: 1 1 200px; margin: 0; }
+.pw-eckknoepfe { display: flex; gap: 8px; flex: none; }
+@media (max-width: 780px) {
+  .pw-kopfleiste { flex-direction: column; }
+  .pw-eckknoepfe { width: 100%; }
+  .pw-eckknoepfe .knopf { flex: 1; }
+}
 </style>
 </head>
 <body>
@@ -1902,7 +1980,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "30.5.0";
+const APP_VERSION = "31.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -3816,16 +3894,16 @@ const plan = {
 
 // Farben für die Balken
 const PLANFARBEN = [
-  { wert: "blau",    name: "Blau",    hex: "#003884", schrift: "#fff" },
-  { wert: "gruen",   name: "Grün",    hex: "#1f7a4d", schrift: "#fff" },
-  { wert: "rot",     name: "Rot",     hex: "#b3261e", schrift: "#fff" },
-  { wert: "orange",  name: "Orange",  hex: "#c2650f", schrift: "#fff" },
-  { wert: "gelb",    name: "Gelb",    hex: "#f0b429", schrift: "#3a2c05" },
-  { wert: "violett", name: "Violett", hex: "#5b3a9e", schrift: "#fff" },
-  { wert: "tuerkis", name: "Türkis",  hex: "#0d7d8c", schrift: "#fff" },
-  { wert: "rosa",    name: "Rosa",    hex: "#d4638f", schrift: "#fff" },
-  { wert: "grau",    name: "Grau",    hex: "#7a838d", schrift: "#fff" },
-  { wert: "weiss",   name: "Weiss",   hex: "#ffffff", schrift: "#1d2430" },
+  { wert: "blau",    name: "Blau",    hex: "#003884", schrift: "#fff",    buchstabe: "E" },
+  { wert: "gruen",   name: "Grün",    hex: "#1f7a4d", schrift: "#fff",    buchstabe: "" },
+  { wert: "rot",     name: "Rot",     hex: "#b3261e", schrift: "#fff",    buchstabe: "R" },
+  { wert: "orange",  name: "Orange",  hex: "#c2650f", schrift: "#fff",    buchstabe: "M" },
+  { wert: "gelb",    name: "Gelb",    hex: "#f0b429", schrift: "#3a2c05", buchstabe: "E/N" },
+  { wert: "violett", name: "Violett", hex: "#5b3a9e", schrift: "#fff",    buchstabe: "" },
+  { wert: "tuerkis", name: "Türkis",  hex: "#0d7d8c", schrift: "#fff",    buchstabe: "" },
+  { wert: "rosa",    name: "Rosa",    hex: "#d4638f", schrift: "#fff",    buchstabe: "R" },
+  { wert: "grau",    name: "Grau",    hex: "#7a838d", schrift: "#fff",    buchstabe: "R" },
+  { wert: "weiss",   name: "Weiss",   hex: "#ffffff", schrift: "#1d2430", buchstabe: "A" },
 ];
 
 // Zustand eines Auftrags auf der Planwand
@@ -4027,8 +4105,7 @@ async function seitePlanwand(b) {
   // So viele Arbeitstage, wie nebeneinander Platz haben.
   masseBerechnen(b);
 
-  b.innerHTML = '<h1 class="seitentitel">Planwand</h1>'
-    + '<div id="pw-seite"><div class="laedt">Wird geladen …</div></div>';
+  b.innerHTML = '<div id="pw-seite"><div class="laedt">Wird geladen …</div></div>';
 
   try {
     prod.parks = await ladeParks(false);
@@ -4053,60 +4130,37 @@ async function seitePlanwand(b) {
 async function ansichtPlanwand(ziel, b) {
   if (!plan.start) plan.start = naechsterArbeitstag(wochenStart(isoDatum(new Date())));
 
-  ziel.innerHTML = '<div class="steuerung">'
-    + '<button class="knopf knopf--klein" id="pw-zurueck">‹</button>'
-    + '<div class="steuerung__mitte"><div class="steuerung__titel" id="pw-titel"></div>'
-    + '<button class="linkknopf" id="pw-heute">Heute</button></div>'
-    + '<button class="knopf knopf--klein" id="pw-vor">›</button>'
+  ziel.innerHTML = '<div class="pw-kopfleiste">'
+    + '<div class="pw-regler-reihe">'
+    + '<div class="pw-zeitregler">'
+    + '<input type="range" id="pw-zeit" min="0" max="200" step="1" value="100">'
+    + '<div class="pw-zeitmarke" id="pw-zeitmarke"></div>'
+    + '<div class="pw-zeitinfo"><span id="pw-zeitvon"></span>'
+    + '<span class="klein">Zeitraum</span>'
+    + '<span id="pw-zeitbis"></span></div>'
+    + '</div>'
     + '<div class="pw-zoom">'
     + '<span class="klein">Tage</span>'
     + '<input type="range" id="pw-regler" min="5" max="150" step="1" value="'
     + (plan.tageWunsch || 15) + '">'
     + '<input type="number" id="pw-zoomwert" min="5" max="150" value="'
     + (plan.tageWunsch || 15) + '">'
-    + '</div></div>'
-
-    + '<div class="pw-zeitregler">'
-    + '<input type="range" id="pw-zeit" min="0" max="200" step="1" value="100">'
-    + '<div class="pw-zeitmarke" id="pw-zeitmarke"></div>'
-    + '<div class="pw-zeitinfo"><span id="pw-zeitvon"></span>'
-    + '<span class="klein">Zeitraum schieben</span>'
-    + '<span id="pw-zeitbis"></span></div>'
     + '</div>'
-
-    + '<div class="suchleiste">'
-    + '<button class="knopf" id="pw-suche-los">Suchen</button>'
-    + (plan.letzteSuche
-        ? '<span class="suchchip">' + esc(plan.letzteSuche)
-          + ' · ' + (plan.trefferAnzahl || 0) + ' Treffer'
-          + '<button class="chipweg" id="pw-suche-weiter" title="weiter">›</button></span>'
-        : '<span class="klein">Sucht in allem: Nummer, Maschine, Material, Notiz</span>')
     + '</div>'
     + (darfPlanen()
-        ? '<div class="pw-aktionen">'
-          + '<button class="knopf knopf--haupt" id="pw-neu">+ Auftrag einplanen</button>'
-          + '<button class="knopf" id="pw-ferien">+ Ferien eintragen</button>'
-          + '<button class="knopf knopf--warnung" id="pw-problem">Problem melden</button>'
-          + '<button class="knopf" id="pw-kopieren">Auftrag kopieren</button>'
+        ? '<div class="pw-eckknoepfe">'
+          + '<button class="knopf knopf--klein knopf--warnung" id="pw-problem">Problem melden</button>'
+          + '<button class="knopf knopf--klein" id="pw-kopieren">Auftrag kopieren</button>'
           + '</div>'
         : (isMobil()
             ? nurLesenHinweis("Bearbeitbar nur am Desktop, nicht auf dem Handy.")
             : nurLesenHinweis("Du kannst die Planung ansehen. Ändern dürfen Planer und Administratoren.")))
+    + '</div>'
     + '<div id="pw-inhalt"><div class="laedt">Planung wird geladen …</div></div>';
 
-  document.getElementById("pw-zurueck").onclick = () => {
-    plan.start = naechsterArbeitstag(plusTage(plan.start, -7)); planAktualisieren(b); };
-  document.getElementById("pw-vor").onclick = () => {
-    plan.start = naechsterArbeitstag(plusTage(plan.start, 7)); planAktualisieren(b); };
-
-  document.getElementById("pw-heute").onclick = () => {
-    plan.start = naechsterArbeitstag(wochenStart(isoDatum(new Date()))); planAktualisieren(b); };
-
-  const neu = document.getElementById("pw-neu");
-  if (neu) neu.onclick = () => planAuftragDialog(null, b);
-
-  const fer = document.getElementById("pw-ferien");
-  if (fer) fer.onclick = () => ferienDialog(null, null, null, b);
+  // Auf einen leeren Kalendertag klicken legt einen neuen Auftrag an,
+  // auf eine leere Ferienzeile klicken trägt Ferien ein — ein eigener
+  // Knopf dafür ist deshalb nicht mehr nötig.
 
   const prob = document.getElementById("pw-problem");
   if (prob) prob.onclick = () => problemMelden(b);
@@ -4118,6 +4172,19 @@ async function ansichtPlanwand(ziel, b) {
       if (plan.kopierModus) kopierModusBeenden(b);
       else auftragKopieren(b);
     };
+  }
+
+  // Strg+F (oder Cmd+F) öffnet die Suche, statt einen eigenen
+  // Knopf zu belegen. Nur während die Planwand offen ist.
+  if (!plan._suchTaste) {
+    plan._suchTaste = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f"
+          && document.getElementById("pw-inhalt")) {
+        e.preventDefault();
+        sucheDialog(b);
+      }
+    };
+    document.addEventListener("keydown", plan._suchTaste);
   }
 
   // Zeitregler: ein halbes Jahr zurück bis ein halbes Jahr vor
@@ -4712,7 +4779,9 @@ function planBalken(j, spalte, dauer, angeschnitten) {
 
   const hg = fertig ? "#4a5158" : f.hex;
   const vg = fertig ? "#ffffff" : f.schrift;
-  const rand = (!fertig && j.color === "weiss") ? "border:1px solid var(--linie-stark);" : "";
+  const laeuft = st === "laeuft";
+  const rand = laeuft ? "border:2px solid #111417;"
+    : ((!fertig && j.color === "weiss") ? "border:1px solid var(--linie-stark);" : "");
 
   // Fortschritt in Schritten von fünf Prozent
   let anteil = null;
@@ -4763,6 +4832,8 @@ function planBalken(j, spalte, dauer, angeschnitten) {
     + (!j.material_ok ? '<span class="pw-balken__fehlt" title="Material fehlt">M</span>' : "")
     + (j.plan_note ? '<span class="pw-balken__zeichen" title="Notiz">✎</span>' : "")
     + (j.drawing_url ? '<span class="pw-balken__zeichen">PDF</span>' : "")
+    + (f.buchstabe ? '<span class="pw-balken__farbbuchstabe" title="' + esc(f.name) + '">'
+        + esc(f.buchstabe) + '</span>' : "")
     + '</div>'
     + '<div class="pw-zeile2">' + esc(zeileMenge) + '</div>'
     + '<div class="pw-zeile3">' + esc(zeileMaterial) + '</div>'
@@ -5252,7 +5323,8 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     + '<div class="farbwahl">'
     + PLANFARBEN.map((f) => '<button type="button" class="farbknopf'
         + (planFarbe === f.wert ? " aktiv" : "") + '" data-plfarbe="' + f.wert + '"'
-        + ' style="background:' + f.hex + '" title="' + f.name + '"></button>').join("")
+        + ' style="background:' + f.hex + ';color:' + f.schrift + '" title="' + f.name + '">'
+        + esc(f.buchstabe || "") + '</button>').join("")
     + '</div></div>'
 
     + '<label class="feld"><span>Notiz für die Maschine</span>'
@@ -6600,7 +6672,7 @@ const OFFENE_STATUS = ["offen", "bestellt", "teilweise_geliefert"];
 
 async function ladeBestellungen(offen) {
   let a = db.from("order_items")
-    .select("*, articles(article_number, name, unit, supplier_id, suppliers(name, website)), suppliers(name, website), profiles!order_items_created_by_fkey(full_name, email)")
+    .select("*, articles(article_number, name, unit, supplier_id, description, suppliers(name, website)), suppliers(name, website), profiles!order_items_created_by_fkey(full_name, email)")
     .order("needed_by", { ascending: true, nullsFirst: false })
     .order("created_at");
   if (offen) a = a.in("status", OFFENE_STATUS);
@@ -6669,6 +6741,8 @@ async function bestOffen(ziel, b) {
       + '<rect x="9" y="9" width="12" height="12" rx="2"/>'
       + '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>'
       + '</svg></button>'
+      + (a2.description ? '<div class="klein bz-beschreibung">' + esc(a2.description)
+          + '</div>' : "")
       + '<div class="klein">'
       + (z.needed_by ? '<span class="' + (spaet ? "minus stark" : "") + '">bis '
           + kurzDatum(z.needed_by) + '</span>' : "")
@@ -6770,6 +6844,21 @@ async function bestOffen(ziel, b) {
     el.onclick = async () => {
       const z = liste.find((x) => x.id === el.dataset.bearbBest);
       if (!z) return;
+
+      // Bestellposition oder der Artikel selbst (Name, Nummer,
+      // Lieferant, Beschreibung) — beides ändert sich überall,
+      // wo dieser Artikel auftaucht.
+      const wahl = await auswahlDialog("Was bearbeiten?", [
+        { wert: "position", text: "Diese Bestellung (Menge, Frist, Notiz)" },
+        { wert: "artikel", text: "Der Artikel selbst (Name, Nummer, Lieferant, Beschreibung)" },
+      ]);
+      if (!wahl) return;
+
+      if (wahl === "artikel") {
+        await artikelBearbeiten(z.articles ? { ...z.articles, id: z.article_id } : null, b);
+        return;
+      }
+
       const w = await dialogFelder({ titel: "Bestellung bearbeiten",
         felder: [
           { name: "menge", label: "Menge", typ: "number", wert: z.quantity, pflicht: true },
@@ -6892,6 +6981,8 @@ async function artikelSchnellAnlegen(vorgabe) {
     titel: "Neuen Artikel anlegen",
     felder: [
       { name: "nummer", label: "Artikelnummer", pflicht: true, wert: vorgabe || "" },
+      { name: "beschreibung", label: "Beschreibung", typ: "textarea",
+        platzhalter: "nur falls nötig, kann leer bleiben" },
     ],
     bestaetigen: "Weiter",
   });
@@ -6946,6 +7037,7 @@ async function artikelSchnellAnlegen(vorgabe) {
 
   const { data, error } = await db.from("articles").insert({
     article_number: w.nummer, name: w.name,
+    description: (w.beschreibung || "").trim() || null,
     unit: "Stück", supplier_id: lieferantId,
   }).select().single();
 
@@ -7370,6 +7462,8 @@ async function artikelListe(b) {
         + liste.map((a) => '<tr' + (a.is_active === false ? ' class="zeile--inaktiv"' : "") + '>'
             + '<td class="stark">' + esc(a.article_number)
             + (a.is_active === false ? ' <span class="klein">ausgeblendet</span>' : "")
+            + (a.description ? '<div class="klein artikel__beschreibung">'
+                + esc(a.description) + '</div>' : "")
             + '</td>'
             + '<td>' + esc(a.name)
             + (a.unit && a.unit !== "Stück" ? '<div class="klein">' + esc(a.unit) + '</div>' : "")
@@ -7455,6 +7549,10 @@ async function artikelBearbeiten(artikel, b) {
     + '<option value="__neu">+ Neuer Lieferant …</option>'
     + '</select></label>'
 
+    + '<label class="feld"><span>Beschreibung</span>'
+    + '<textarea id="ab-beschreibung" rows="2" placeholder="nur falls nötig, kann leer bleiben">'
+    + esc(artikel.description || "") + '</textarea></label>' 
+
     + '<div class="dialog__knoepfe">'
     + '<button class="knopf knopf--gefahr" id="ab-weg">Löschen</button>'
     + '<button class="knopf knopf--still" id="ab-nein">Abbrechen</button>'
@@ -7526,6 +7624,7 @@ async function artikelBearbeiten(artikel, b) {
     const r = await db.from("articles").update({
       article_number: nummer,
       name: name,
+      description: ($("ab-beschreibung").value || "").trim() || null,
       unit: "Stück",
       supplier_id: liefFeld.value,
     }).eq("id", artikel.id).select();
@@ -9818,6 +9917,366 @@ function syncStarten(pfad) {
   sync.takt = setInterval(syncPruefen, 45000);
 }
 
+// =================================================================
+//  CHAT
+//  Direktnachrichten und Gruppenchats. Läuft als schwebendes
+//  Fenster über der ganzen App, unabhängig vom Reiter.
+// =================================================================
+
+const chat = {
+  offen: false,
+  aktuell: null,      // Gespräch, das gerade angezeigt wird
+  gespraeche: [],
+  kanal: null,
+  takt: null,
+};
+
+// Einmal pro Sitzung: Knopf einbauen und auf Nachrichten lauschen
+function chatEinbauen() {
+  if (document.getElementById("chat-knopf")) return;
+
+  const knopf = document.createElement("button");
+  knopf.id = "chat-knopf";
+  knopf.className = "chat-knopf";
+  knopf.title = "Chat";
+  knopf.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none"'
+    + ' stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    + '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9'
+    + 'L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5'
+    + 'a8.48 8.48 0 0 1 8 8v.5z"/></svg>'
+    + '<span class="chat-abzeichen" id="chat-abzeichen" hidden>0</span>';
+  document.body.appendChild(knopf);
+  knopf.onclick = () => chatPanelUmschalten();
+
+  chatUngeleseneLaden();
+  chatRealtimeStarten();
+
+  // Netz als Sicherheit, falls Realtime einmal ausfällt
+  chat.takt = setInterval(chatUngeleseneLaden, 60000);
+}
+
+function chatRealtimeStarten() {
+  if (!db || typeof db.channel !== "function") return;
+  chat.kanal = db.channel("chat-global-" + Date.now())
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_nachrichten" },
+      (nachricht) => {
+        if (chat.offen && chat.aktuell
+            && nachricht.new && nachricht.new.gespraech_id === chat.aktuell.id) {
+          chatNachrichtenLaden(chat.aktuell.id);
+          chatAlsGelesenMarkieren(chat.aktuell.id);
+        } else {
+          chatUngeleseneLaden();
+        }
+      })
+    .subscribe();
+}
+
+// ---------- Ungelesen-Zähler ----------
+
+async function chatUngeleseneLaden() {
+  if (!profil) return;
+  try {
+    const liste = await chatGespraecheLaden();
+    chat.gespraeche = liste;
+    const anzahl = liste.filter((g) => g.ungelesen).length;
+    const abzeichen = document.getElementById("chat-abzeichen");
+    if (abzeichen) {
+      abzeichen.hidden = anzahl === 0;
+      abzeichen.textContent = anzahl > 9 ? "9+" : String(anzahl);
+    }
+
+    // Wenn die App vom Startbildschirm aus läuft, zeigt manches
+    // Handy die Zahl zusätzlich direkt auf dem App-Symbol an.
+    try {
+      if (anzahl > 0 && navigator.setAppBadge) navigator.setAppBadge(anzahl);
+      else if (navigator.clearAppBadge) navigator.clearAppBadge();
+    } catch (f) { /* nicht jedes Gerät kann das */ }
+    if (chat.offen && !chat.aktuell) chatListeZeichnen();
+  } catch (f) { /* Chat ist Beiwerk, Fehler dürfen die App nicht stören */ }
+}
+
+// ---------- Gespräche laden ----------
+
+async function chatGespraecheLaden() {
+  const { data: gespraeche, error } = await db.from("chat_gespraeche").select("*");
+  if (error) throw error;
+
+  const ergebnis = [];
+  for (const g of (gespraeche || [])) {
+    const { data: teil } = await db.from("chat_teilnehmer")
+      .select("user_id, profiles(full_name, email, bild_url)")
+      .eq("gespraech_id", g.id);
+    const { data: letzte } = await db.from("chat_nachrichten")
+      .select("text, created_at, sender_id")
+      .eq("gespraech_id", g.id).order("created_at", { ascending: false }).limit(1);
+    const { data: gelesen } = await db.from("chat_gelesen")
+      .select("zuletzt_am").eq("gespraech_id", g.id).eq("user_id", profil.id).maybeSingle();
+
+    const letzteNachricht = (letzte || [])[0] || null;
+    const ungelesen = !!(letzteNachricht && letzteNachricht.sender_id !== profil.id
+      && (!gelesen || new Date(letzteNachricht.created_at) > new Date(gelesen.zuletzt_am)));
+
+    ergebnis.push({
+      ...g,
+      teilnehmer: teil || [],
+      letzte: letzteNachricht,
+      ungelesen,
+    });
+  }
+
+  ergebnis.sort((a, b) => new Date((b.letzte && b.letzte.created_at) || b.created_at)
+    - new Date((a.letzte && a.letzte.created_at) || a.created_at));
+  return ergebnis;
+}
+
+function chatName(g) {
+  if (g.ist_gruppe) return g.name || "Gruppe";
+  const andere = (g.teilnehmer || []).find((t) => t.user_id !== profil.id);
+  return andere && andere.profiles ? (andere.profiles.full_name || andere.profiles.email) : "Chat";
+}
+
+// ---------- Das Panel ----------
+
+function chatPanelUmschalten() {
+  if (chat.offen) { chatPanelSchliessen(); return; }
+  chat.offen = true;
+  chat.aktuell = null;
+
+  const panel = document.createElement("div");
+  panel.id = "chat-panel";
+  panel.className = "chat-panel";
+  document.body.appendChild(panel);
+
+  chatListeZeichnen();
+}
+
+function chatPanelSchliessen() {
+  chat.offen = false;
+  chat.aktuell = null;
+  const panel = document.getElementById("chat-panel");
+  if (panel) panel.remove();
+}
+
+// ---------- Liste der Gespräche ----------
+
+async function chatListeZeichnen() {
+  const panel = document.getElementById("chat-panel");
+  if (!panel) return;
+
+  panel.innerHTML = '<div class="chat-kopf">'
+    + '<span>Chat</span>'
+    + '<div class="chat-kopf__knoepfe">'
+    + '<button class="linkknopf" id="chat-neu" title="Neue Nachricht">Nachricht</button>'
+    + '<button class="linkknopf" id="chat-gruppe" title="Neue Gruppe">Gruppe</button>'
+    + '<button class="chat-x" id="chat-zu" title="Schliessen">×</button>'
+    + '</div></div>'
+    + '<div class="chat-liste" id="chat-liste"><div class="laedt">Wird geladen …</div></div>';
+
+  document.getElementById("chat-zu").onclick = () => chatPanelSchliessen();
+  document.getElementById("chat-neu").onclick = () => chatNeueUnterhaltung(false);
+  document.getElementById("chat-gruppe").onclick = () => chatNeueUnterhaltung(true);
+
+  let liste;
+  try { liste = await chatGespraecheLaden(); chat.gespraeche = liste; }
+  catch (f) {
+    document.getElementById("chat-liste").innerHTML =
+      '<p class="hinweis">Chat ist noch nicht eingerichtet: ' + esc(fehlertext(f)) + '</p>';
+    return;
+  }
+
+  const kasten = document.getElementById("chat-liste");
+  if (!liste.length) {
+    kasten.innerHTML = '<p class="hinweis">Noch keine Unterhaltung. '
+      + 'Tipp oben auf "Nachricht" oder "Gruppe", um zu starten.</p>';
+    return;
+  }
+
+  kasten.innerHTML = liste.map((g) => {
+    const wer = chatName(g);
+    const vorschau = g.letzte ? g.letzte.text : "Noch keine Nachricht";
+    return '<button class="chat-eintrag' + (g.ungelesen ? " chat-eintrag--ungelesen" : "")
+      + '" data-gespraech="' + esc(g.id) + '">'
+      + '<span class="chat-eintrag__symbol">' + (g.ist_gruppe ? "◉" : esc(wer.charAt(0).toUpperCase()))
+      + '</span>'
+      + '<span class="chat-eintrag__inhalt">'
+      + '<span class="chat-eintrag__name">' + esc(wer) + '</span>'
+      + '<span class="chat-eintrag__vorschau">' + esc(vorschau.slice(0, 46)) + '</span>'
+      + '</span>'
+      + (g.ungelesen ? '<span class="chat-punkt"></span>' : "")
+      + '</button>';
+  }).join("");
+
+  kasten.querySelectorAll("[data-gespraech]").forEach((el) => {
+    el.onclick = () => chatUnterhaltungOeffnen(el.dataset.gespraech);
+  });
+}
+
+// ---------- Eine Unterhaltung ----------
+
+async function chatUnterhaltungOeffnen(id) {
+  const g = chat.gespraeche.find((x) => x.id === id);
+  chat.aktuell = g || { id: id };
+  await chatUnterhaltungZeichnen();
+  await chatNachrichtenLaden(id);
+  await chatAlsGelesenMarkieren(id);
+}
+
+async function chatUnterhaltungZeichnen() {
+  const panel = document.getElementById("chat-panel");
+  if (!panel) return;
+  const g = chat.aktuell;
+
+  panel.innerHTML = '<div class="chat-kopf">'
+    + '<button class="linkknopf" id="chat-zurueck" title="Zurück">‹ zurück</button>'
+    + '<span>' + esc(chatName(g)) + '</span>'
+    + '<button class="chat-x" id="chat-zu" title="Schliessen">×</button>'
+    + '</div>'
+    + '<div class="chat-nachrichten" id="chat-nachrichten"><div class="laedt">Wird geladen …</div></div>'
+    + '<div class="chat-eingabe">'
+    + '<input type="text" id="chat-text" placeholder="Nachricht …" autocomplete="off">'
+    + '<button class="knopf knopf--klein" id="chat-senden">Senden</button>'
+    + '</div>';
+
+  document.getElementById("chat-zu").onclick = () => chatPanelSchliessen();
+  document.getElementById("chat-zurueck").onclick = () => { chat.aktuell = null; chatListeZeichnen(); };
+
+  const feld = document.getElementById("chat-text");
+  const senden = async () => {
+    const text = (feld.value || "").trim();
+    if (!text) return;
+    feld.value = "";
+    const { error } = await db.from("chat_nachrichten")
+      .insert({ gespraech_id: chat.aktuell.id, sender_id: profil.id, text: text });
+    if (error) meldung(fehlertext(error), "fehler");
+    else await chatNachrichtenLaden(chat.aktuell.id);
+  };
+  document.getElementById("chat-senden").onclick = senden;
+  feld.onkeydown = (e) => { if (e.key === "Enter") senden(); };
+  feld.focus();
+}
+
+async function chatNachrichtenLaden(id) {
+  const kasten = document.getElementById("chat-nachrichten");
+  if (!kasten) return;
+
+  const { data, error } = await db.from("chat_nachrichten")
+    .select("*, profiles(full_name, email)")
+    .eq("gespraech_id", id).order("created_at").limit(200);
+  if (error) { kasten.innerHTML = '<p class="hinweis">' + esc(fehlertext(error)) + '</p>'; return; }
+
+  kasten.innerHTML = (data || []).map((n) => {
+    const ich = n.sender_id === profil.id;
+    return '<div class="chat-blase' + (ich ? " chat-blase--ich" : "") + '">'
+      + (!ich ? '<div class="chat-blase__wer">'
+          + esc((n.profiles && (n.profiles.full_name || n.profiles.email)) || "") + '</div>' : "")
+      + '<div class="chat-blase__text">' + esc(n.text) + '</div>'
+      + '<div class="chat-blase__zeit">' + esc(datumZeitKurz(n.created_at)) + '</div>'
+      + '</div>';
+  }).join("") || '<p class="hinweis">Noch keine Nachricht. Schreib die erste.</p>';
+
+  kasten.scrollTop = kasten.scrollHeight;
+}
+
+async function chatAlsGelesenMarkieren(id) {
+  try {
+    await db.from("chat_gelesen").upsert(
+      { gespraech_id: id, user_id: profil.id, zuletzt_am: new Date().toISOString() },
+      { onConflict: "gespraech_id,user_id" });
+    chatUngeleseneLaden();
+  } catch (f) { /* nicht kritisch */ }
+}
+
+// ---------- Neue Unterhaltung oder Gruppe ----------
+
+async function chatNutzerListe() {
+  const { data, error } = await db.from("profiles")
+    .select("id, full_name, email").eq("is_active", true).order("full_name");
+  if (error) throw error;
+  return (data || []).filter((u) => u.id !== profil.id);
+}
+
+async function chatNeueUnterhaltung(istGruppe) {
+  let nutzer;
+  try { nutzer = await chatNutzerListe(); }
+  catch (f) { meldung(fehlertext(f), "fehler"); return; }
+
+  if (!nutzer.length) {
+    meldung("Es gibt sonst niemanden mit Login.", "warn");
+    return;
+  }
+
+  if (!istGruppe) {
+    const wahl = await auswahlSuchen("Mit wem schreiben?",
+      nutzer.map((u) => ({ wert: u.id, text: u.full_name || u.email,
+        such: (u.full_name || "") + " " + u.email })));
+    if (!wahl) return;
+
+    const bestehend = chat.gespraeche.find((g) => !g.ist_gruppe
+      && (g.teilnehmer || []).some((t) => t.user_id === wahl));
+    if (bestehend) { chatUnterhaltungOeffnen(bestehend.id); return; }
+
+    const neu = await db.from("chat_gespraeche")
+      .insert({ ist_gruppe: false, created_by: profil.id }).select().single();
+    if (neu.error) { meldung(fehlertext(neu.error), "fehler"); return; }
+
+    await db.from("chat_teilnehmer").insert([
+      { gespraech_id: neu.data.id, user_id: profil.id },
+      { gespraech_id: neu.data.id, user_id: wahl },
+    ]);
+    await chatUngeleseneLaden();
+    chatUnterhaltungOeffnen(neu.data.id);
+    return;
+  }
+
+  const w = await dialogFelder({
+    titel: "Neue Gruppe",
+    felder: [{ name: "name", label: "Gruppenname", pflicht: true }],
+    bestaetigen: "Weiter",
+  });
+  if (!w) return;
+
+  const mitglieder = await auswahlMehrfach("Wer ist dabei?",
+    nutzer.map((u) => ({ wert: u.id, text: u.full_name || u.email })));
+  if (!mitglieder || !mitglieder.length) return;
+
+  const neu = await db.from("chat_gespraeche")
+    .insert({ ist_gruppe: true, name: w.name, created_by: profil.id }).select().single();
+  if (neu.error) { meldung(fehlertext(neu.error), "fehler"); return; }
+
+  const zeilen = [{ gespraech_id: neu.data.id, user_id: profil.id }]
+    .concat(mitglieder.map((m) => ({ gespraech_id: neu.data.id, user_id: m })));
+  await db.from("chat_teilnehmer").insert(zeilen);
+
+  await chatUngeleseneLaden();
+  chatUnterhaltungOeffnen(neu.data.id);
+}
+
+// Mehrfachauswahl mit Kästchen, für die Gruppenmitglieder
+function auswahlMehrfach(titel, optionen) {
+  return new Promise((fertig) => {
+    const h = document.createElement("div");
+    h.className = "dialog-huelle";
+    h.innerHTML = '<div class="dialog"><h2>' + esc(titel) + '</h2>'
+      + '<div class="mehrfachliste">'
+      + optionen.map((o) => '<label class="schalter"><input type="checkbox" value="'
+          + esc(o.wert) + '"><span>' + esc(o.text) + '</span></label>').join("")
+      + '</div>'
+      + '<div class="dialog__knoepfe">'
+      + '<button class="knopf knopf--still" data-nein>Abbrechen</button>'
+      + '<button class="knopf knopf--haupt" data-ja>Weiter</button></div></div>';
+    document.body.appendChild(h);
+
+    const zu = (v) => { h.remove(); fertig(v); };
+    h.querySelector("[data-nein]").onclick = () => zu(null);
+    dialogSchliessen(h, () => zu(null));
+    h.querySelector("[data-ja]").onclick = () => {
+      const werte = Array.from(h.querySelectorAll('input[type="checkbox"]:checked'))
+        .map((k) => k.value);
+      zu(werte);
+    };
+  });
+}
+
 function zeichneSeite() {
   const roh = location.hash.replace(/^#\/?/, "").split("/")[0];
 
@@ -9940,6 +10399,7 @@ function zeichneGeruest() {
 
   if (!location.hash) location.hash = "#/dashboard";
   zeichneSeite();
+  chatEinbauen();
 }
 
 window.addEventListener("hashchange", () => {
