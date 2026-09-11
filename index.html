@@ -920,9 +920,16 @@ a:focus-visible {
 /* ---------- Planwand ---------- */
 /* Eigenes Scrollfenster: nur so kann die Datumszeile beim
    Herunterscrollen oben mitwandern. */
-.pw-rolle { overflow: auto; max-height: calc(100vh - 210px);
+/* Auf der Planwand scrollt nur noch die Tafel selbst — der Rest der
+   Seite (Kopfzeile, Regler) bleibt fest stehen. */
+body.pw-seite { overflow: hidden; height: 100dvh; }
+body.pw-seite .inhalt { height: calc(100dvh - var(--kopfhoehe)); overflow: hidden;
+                        display: flex; flex-direction: column; }
+body.pw-seite #pw-inhalt { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.pw-rolle { overflow: auto; flex: 1 1 auto; min-height: 0;
             background: var(--flaeche);
             border: 1px solid var(--linie); border-radius: var(--radius); }
+body.pw-seite .pw-legende { flex: none; margin-top: 6px; }
 .pw-tafel { min-width: 640px; }
 .pw-zeile { display: grid; grid-template-columns: 108px 1fr; align-items: stretch;
             border-bottom: 1px solid var(--linie); }
@@ -1645,7 +1652,7 @@ body.dunkel .wahlknopf.aktiv { background: #24344a; }
 .pw-balken { padding: calc(3px * var(--pw-s, 1)) calc(6px * var(--pw-s, 1));
              align-items: stretch; }
 .pw-balken__inhalt { display: flex; flex-direction: column; justify-content: center;
-                     gap: 1px; width: 100%; overflow: hidden; }
+                     gap: 1px; flex: 1 1 auto; min-width: 0; overflow: hidden; }
 .pw-zeile1 { display: flex; align-items: center; gap: calc(4px * var(--pw-s, 1));
              font-size: calc(0.7rem * var(--pw-s, 1)); font-weight: 650;
              white-space: nowrap; overflow: hidden; }
@@ -1927,13 +1934,14 @@ pre, .gcode { max-width: 100%; overflow-x: auto; }
 
 /* ---------- Planwand: Kopfleiste mit beiden Reglern ---------- */
 .pw-kopfleiste { position: sticky; top: var(--kopfhoehe); z-index: 25;
-                 background: var(--grund); padding: 10px 0 12px;
-                 display: flex; flex-wrap: wrap; align-items: flex-start;
+                 background: var(--grund); padding: 6px 0 8px;
+                 display: flex; flex-wrap: wrap; align-items: center;
                  justify-content: space-between; gap: 14px; }
-.pw-regler-reihe { display: flex; flex-wrap: wrap; gap: 22px; flex: 1 1 480px;
-                   align-items: flex-start; }
-.pw-regler-reihe .pw-zeitregler { flex: 2 1 420px; margin: 0; min-width: 260px; }
-.pw-regler-reihe .pw-zoom { flex: 1 1 200px; margin: 0; }
+.pw-regler-reihe { display: flex; flex-wrap: wrap; gap: 22px; flex: 1 1 600px;
+                   align-items: center; }
+.pw-regler-reihe .pw-zeitregler { flex: 3 1 520px; margin: 0; min-width: 280px;
+                                  padding-top: 15px; }
+.pw-regler-reihe .pw-zoom { flex: 1 1 170px; margin: 0; }
 
 /* Etwas dickere Schieberegler auf der Planwand */
 .pw-zeitregler input[type="range"], .pw-zoom input[type="range"] { height: 20px; }
@@ -1955,6 +1963,63 @@ pre, .gcode { max-width: 100%; overflow-x: auto; }
   .pw-eckknoepfe { width: 100%; }
   .pw-eckknoepfe .knopf { flex: 1; }
 }
+
+.dialog__kopfzeile { position: relative; padding-right: 200px; margin-bottom: 4px; }
+.dialog__kopfzeile h2 { margin: 0; }
+.dialog__kopfknoepfe { position: absolute; top: 0; right: 0; display: flex; gap: 8px; }
+@media (max-width: 480px) {
+  .dialog__kopfzeile { padding-right: 0; }
+  .dialog__kopfknoepfe { position: static; margin-top: 10px; flex-wrap: wrap; }
+}
+
+.chat-anhang { display: grid; place-items: center; width: 40px; height: 40px;
+               border: 1px solid var(--linie-stark); border-radius: var(--radius);
+               cursor: pointer; flex: none; font-size: 1.1rem; }
+.chat-anhang:hover { background: var(--marke-hell); }
+.chat-blase__bild { max-width: 100%; border-radius: 8px; display: block;
+                    margin-bottom: 4px; cursor: pointer; }
+.chat-blase__datei { display: inline-block; margin-bottom: 4px; color: inherit;
+                     text-decoration: underline; font-size: .85rem; }
+
+/* ---------- Ränder der Auftragsbalken: dick genug, um sie zu sehen ---------- */
+.pw-balken--laeuft { border: 3px solid #111417; }
+body.dunkel .pw-balken--laeuft { border-color: #ffffff; }
+.pw-balken--weissrand { border: 2px solid var(--linie-stark); }
+
+/* ---------- Info-Fenster beim Darüberfahren ---------- */
+.pw-info { position: fixed; z-index: 45; width: 250px; max-width: calc(100vw - 16px);
+           background: var(--flaeche); border: 1px solid var(--linie-stark);
+           border-radius: var(--radius); box-shadow: 0 10px 26px rgba(0,0,0,.28);
+           padding: 10px 12px; pointer-events: none; }
+.pw-info__zustand { display: flex; align-items: center; gap: 8px; font-size: 1.5rem;
+                    margin-bottom: 6px; }
+.pw-info__zustand span { font-size: .8rem; font-weight: 650; color: var(--gedaempft); }
+.pw-info__zeile { font-size: .82rem; margin-bottom: 3px; line-height: 1.35; }
+.pw-info__zeile--stark { font-weight: 700; font-size: .92rem; }
+.pw-info__zeile--warn { color: #b3261e; font-weight: 650; }
+.pw-info__zeile--klein { color: var(--gedaempft); font-size: .74rem; margin-top: 4px; }
+
+/* ---------- Statussymbol gross neben den drei Zeilen ---------- */
+.pw-balken__aussen { display: flex; align-items: center; gap: calc(6px * var(--pw-s, 1));
+                     width: 100%; overflow: hidden; }
+.pw-balken__statusgross { flex: none; font-size: calc(1.8rem * var(--pw-s, 1));
+                          line-height: 1; }
+
+/* ---------- Anmeldung: Benutzerkacheln ---------- */
+.login__kacheln { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+                  gap: 10px; margin-bottom: 14px; max-height: 260px; overflow-y: auto; }
+.login__kachel { display: flex; flex-direction: column; align-items: center; gap: 5px;
+                 background: none; border: 1px solid transparent; border-radius: var(--radius);
+                 padding: 8px 4px; cursor: pointer; }
+.login__kachel:hover { background: var(--marke-hell); border-color: var(--linie-stark); }
+.login__kachel img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; }
+.login__kachel-buchstabe { width: 48px; height: 48px; border-radius: 50%; background: var(--marke);
+                          color: #fff; display: grid; place-items: center; font-weight: 700;
+                          font-size: 1.1rem; }
+.login__kachel-name { font-size: .72rem; text-align: center; line-height: 1.2;
+                      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                      max-width: 100%; }
+.login__gewaehlt { font-size: .88rem; margin-bottom: 14px; text-align: center; }
 </style>
 </head>
 <body>
@@ -1998,7 +2063,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "31.2.0";
+const APP_VERSION = "31.3.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -2410,8 +2475,10 @@ function zeigeLogin() {
     + '<img class="login__bild" src="./login.png" alt="Hofer + Co. Präzisionsdrehteile">'
     + '<div class="login__untertitel">' + esc(APP_UNTERTITEL) + '</div>'
     + '</div>'
+    + '<div id="lk-kacheln"></div>'
     + '<form id="lf" novalidate>'
-    + '<label class="feld"><span>Benutzername</span>'
+    + '<div id="lk-gewaehlt" hidden></div>'
+    + '<label class="feld" id="lk-namefeld"><span>Benutzername</span>'
     + '<input type="text" id="le" autocomplete="username" autocapitalize="none"'
     + ' spellcheck="false" required></label>'
     + '<label class="feld"><span>Passwort</span>'
@@ -2419,10 +2486,62 @@ function zeigeLogin() {
     + '<button type="submit" class="knopf knopf--haupt knopf--breit" id="lk">Anmelden</button>'
     + '</form></div></div>';
 
+  const namensfeld = document.getElementById("le");
+
+  // Kacheln mit allen Konten. Klappt nur, wenn login_kacheln in der
+  // Datenbank existiert — sonst bleibt einfach nur das Textfeld übrig.
+  (async () => {
+    try {
+      const { data, error } = await db.from("login_kacheln").select("*");
+      if (error || !data || !data.length) return;
+
+      const kasten = document.getElementById("lk-kacheln");
+      kasten.innerHTML = '<div class="login__kacheln">'
+        + data.map((u) => '<button type="button" class="login__kachel" data-mail="'
+            + esc(u.email) + '" data-name="' + esc(u.full_name || u.email) + '">'
+            + (u.bild_url
+                ? '<img src="' + esc(u.bild_url) + '" alt="">'
+                : '<span class="login__kachel-buchstabe">'
+                  + esc((u.full_name || u.email).charAt(0).toUpperCase()) + '</span>')
+            + '<span class="login__kachel-name">' + esc(u.full_name || u.email) + '</span>'
+            + '</button>').join("")
+        + '</div>'
+        + '<button type="button" class="linkknopf" id="lk-manuell">Anderes Konto eingeben</button>';
+
+      document.getElementById("lk-namefeld").hidden = true;
+
+      const gewaehlt = (mail, name) => {
+        namensfeld.value = mail;
+        kasten.hidden = true;
+        const g = document.getElementById("lk-gewaehlt");
+        g.hidden = false;
+        g.innerHTML = '<div class="login__gewaehlt">Angemeldet als <strong>'
+          + esc(name) + '</strong> <button type="button" class="linkknopf" id="lk-zurueck">'
+          + 'nicht ich</button></div>';
+        document.getElementById("lk-zurueck").onclick = () => {
+          kasten.hidden = false;
+          g.hidden = true;
+          namensfeld.value = "";
+        };
+        document.getElementById("lp").focus();
+      };
+
+      kasten.querySelectorAll("[data-mail]").forEach((k) => {
+        k.onclick = () => gewaehlt(k.dataset.mail, k.dataset.name);
+      });
+
+      document.getElementById("lk-manuell").onclick = () => {
+        kasten.hidden = true;
+        document.getElementById("lk-namefeld").hidden = false;
+        namensfeld.focus();
+      };
+    } catch (f) { /* Kacheln sind Komfort, kein Muss */ }
+  })();
+
   const knopf = document.getElementById("lk");
   document.getElementById("lf").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const eingabe = document.getElementById("le").value.trim().toLowerCase();
+    const eingabe = namensfeld.value.trim().toLowerCase();
     const pw = document.getElementById("lp").value;
     if (!eingabe || !pw) { meldung("Benutzername und Passwort eingeben.", "warn"); return; }
 
@@ -3366,8 +3485,15 @@ async function ladeLaufendeAuftraege() {
   const { data, error } = await zeitlimit(
     db.from("jobs").select("*").is("ended_at", null), 10000, "Aufträge");
   if (error) throw error;
+  // Stehen mehrere offene Aufträge auf derselben Maschine (einer
+  // läuft, ein anderer ist erst geplant), gewinnt immer der, der
+  // wirklich läuft — sonst hing die Stückzahl-Erfassung zufällig
+  // davon ab, welcher zuletzt aus der Datenbank kam.
   const karte = {};
-  (data || []).forEach((j) => { karte[j.machine_id] = j; });
+  (data || []).forEach((j) => {
+    const vorhanden = karte[j.machine_id];
+    if (!vorhanden || j.plan_status === "laeuft") karte[j.machine_id] = j;
+  });
   return karte;
 }
 
@@ -4165,6 +4291,10 @@ async function ansichtPlanwand(ziel, b) {
     + (plan.tageWunsch || 15) + '">'
     + '</div>'
     + '</div>'
+    + '<div class="pw-eckknoepfe">'
+    + '<button class="knopf knopf--klein" id="pw-suche-los">Suchen</button>'
+    + '</div>'
+    + '</div>'
     + (darfPlanen() ? "" : (isMobil()
         ? nurLesenHinweis("Bearbeitbar nur am Desktop, nicht auf dem Handy.")
         : nurLesenHinweis("Du kannst die Planung ansehen. Ändern dürfen Planer und Administratoren.")))
@@ -4174,6 +4304,9 @@ async function ansichtPlanwand(ziel, b) {
   // Auf einen leeren Kalendertag klicken legt einen neuen Auftrag an,
   // auf eine leere Ferienzeile klicken trägt Ferien ein — ein eigener
   // Knopf dafür ist deshalb nicht mehr nötig.
+
+  const sucheKnopf = document.getElementById("pw-suche-los");
+  if (sucheKnopf) sucheKnopf.onclick = () => sucheDialog(b);
 
   // Strg+F (oder Cmd+F) öffnet die Suche, statt einen eigenen
   // Knopf zu belegen. Nur während die Planwand offen ist.
@@ -4352,17 +4485,50 @@ function griffVerhalten(b) {
       }
 
       const altD = auftrag.planned_days, altV = auftrag.planned_from;
-      const { error } = await db.from("jobs").update(daten).eq("id", auftrag.id);
-      if (error) meldung(fehlertext(error), "fehler");
-      else {
-        merkeSchritt("Dauer von " + auftrag.job_number, async () => {
-          await db.from("jobs")
-            .update({ planned_days: altD, planned_from: altV }).eq("id", auftrag.id);
-          planAktualisieren(b);
-        });
-        meldung(dauerJetzt + (dauerJetzt === 1 ? " Tag" : " Tage") + " eingeplant.");
-        planAktualisieren(b);
+
+      // Wird der Balken kürzer, entsteht dahinter eine Lücke.
+      // Die nachfolgenden Aufträge dürfen bündig nachrücken.
+      let nachruecken = false;
+      let dahinter = [];
+      if (dauerJetzt < dauerStart && altV) {
+        const altesEnde = letzterArbeitstag(altV, altD);
+        dahinter = (plan.auftraege || []).filter((x) =>
+          x.id !== auftrag.id && x.machine_id === auftrag.machine_id
+          && x.planned_from && x.planned_from > altesEnde
+          && x.plan_status !== "fertig");
+
+        if (dahinter.length) {
+          nachruecken = await nachfragen({
+            titel: "Lücke schliessen?",
+            text: "Der Auftrag wird kürzer. Sollen die " + dahinter.length
+                + " nachfolgenden Aufträge auf dieser Maschine bündig nachrücken?",
+            bestaetigen: "Ja, nachrücken", abbrechen: "Nein, Lücke lassen" });
+        }
       }
+
+      const { error } = await db.from("jobs").update(daten).eq("id", auftrag.id);
+      if (error) { meldung(fehlertext(error), "fehler"); return; }
+
+      const vorherNachrueck = [];
+      if (nachruecken) {
+        const differenz = dauerStart - dauerJetzt;
+        for (const x of dahinter) {
+          vorherNachrueck.push({ id: x.id, von: x.planned_from });
+          const neu = arbeitstagePlus(x.planned_from, -differenz);
+          await db.from("jobs").update({ planned_from: neu }).eq("id", x.id);
+        }
+      }
+
+      merkeSchritt("Dauer von " + auftrag.job_number, async () => {
+        for (const v of vorherNachrueck) {
+          await db.from("jobs").update({ planned_from: v.von }).eq("id", v.id);
+        }
+        await db.from("jobs")
+          .update({ planned_days: altD, planned_from: altV }).eq("id", auftrag.id);
+        planAktualisieren(b);
+      });
+      meldung(dauerJetzt + (dauerJetzt === 1 ? " Tag" : " Tage") + " eingeplant.");
+      planAktualisieren(b);
     });
 
     griff.addEventListener("pointercancel", () => {
@@ -4373,6 +4539,144 @@ function griffVerhalten(b) {
 }
 
 // Leeren Tag bei einer Maschine antippen: dort gleich einen Auftrag anlegen
+// Info-Fenster beim Darüberfahren, für alle — auch ohne
+// Bearbeitungsrecht. Verschwindet, sobald die Maus weiterzieht.
+function balkenInfoVerhalten() {
+  const tafel = document.querySelector(".pw-tafel");
+  if (!tafel) return;
+  let fenster = null;
+
+  const weg = () => { if (fenster) { fenster.remove(); fenster = null; } };
+
+  tafel.querySelectorAll("[data-auftrag]").forEach((el) => {
+    el.addEventListener("mouseenter", () => {
+      const id = el.dataset.auftrag;
+      const j = (plan.auftraege || []).find((x) => x.id === id);
+      if (!j) return;
+      weg();
+
+      const zustand = PLANSTATUS[j.plan_status || "geplant"] || PLANSTATUS.geplant;
+      const material = [];
+      material.push(j.material_dm
+        ? "⌀" + j.material_dm + (j.material_toleranz ? " " + j.material_toleranz : "")
+        : "⌀ –");
+      material.push(j.material_menge || "Menge –");
+      material.push(j.material_liefertermin ? "bis " + j.material_liefertermin : "Termin –");
+
+      // Immer dieselben Zeilen, in derselben Reihenfolge — fehlt etwas,
+      // steht dort ein Strich, statt die Zeile ganz wegzulassen.
+      fenster = document.createElement("div");
+      fenster.className = "pw-info";
+      fenster.innerHTML = '<div class="pw-info__zustand">' + zustand.zeichen
+        + '<span>' + esc(zustand.name) + '</span></div>'
+        + '<div class="pw-info__zeile pw-info__zeile--stark">' + esc(j.job_number) + '</div>'
+        + '<div class="pw-info__zeile">' + esc(j.maschine || "–")
+        + (j.maschine_nr ? " · " + esc(j.maschine_nr) : "") + '</div>'
+        + '<div class="pw-info__zeile">'
+        + (j.target_quantity
+            ? zahlText(j.stand || 0) + ' / ' + zahlText(j.target_quantity) + ' Stück'
+            : "Keine Stückzahl hinterlegt") + '</div>'
+        + '<div class="pw-info__zeile">' + esc(material.join(" · ")) + '</div>'
+        + '<div class="pw-info__zeile">✎ ' + (j.plan_note ? esc(j.plan_note) : "keine Notiz") + '</div>'
+        + '<div class="pw-info__zeile' + (j.problem ? " pw-info__zeile--warn" : "") + '">'
+        + (j.problem ? "⚠ " + esc(j.problem) : "Kein Problem gemeldet") + '</div>'
+        + '<div class="pw-info__zeile pw-info__zeile--klein">'
+        + (j.fa_erstellt ? "FA erstellt" : "FA fehlt")
+        + " · " + (j.material_ok ? "Material vorhanden" : "Material fehlt") + '</div>';
+
+      document.body.appendChild(fenster);
+      const r = el.getBoundingClientRect();
+      const oben = r.top > 180;
+      fenster.style.left = Math.max(8, Math.min(window.innerWidth - 280, r.left)) + "px";
+      fenster.style.top = oben ? (r.top - fenster.offsetHeight - 8) + "px" : (r.bottom + 8) + "px";
+    });
+
+    el.addEventListener("mouseleave", weg);
+    el.addEventListener("mousedown", weg);
+  });
+}
+
+// Alles, was ein Auftrag an Angaben trägt, als ein Suchtext
+function auftragText(j) {
+  return [
+    j.job_number, j.maschine, j.maschine_nr, j.park,
+    j.plan_note, j.problem, j.color,
+    (PLANSTATUS[j.plan_status || "geplant"] || {}).name,
+    j.material_dm, j.material_toleranz, j.material_menge, j.material_liefertermin,
+    j.target_quantity, j.stand, j.planned_from,
+    j.fa_erstellt ? "FA erstellt" : "FA fehlt",
+    j.material_ok ? "Material vorhanden" : "Material fehlt",
+  ].map((x) => String(x === null || x === undefined ? "" : x).toLowerCase()).join(" ");
+}
+
+async function sucheDialog(b) {
+  const w = await dialogFelder({
+    titel: "Auf der Planwand suchen",
+    text: "Gesucht wird in allem: Nummer, Maschine, Notiz, Material, Menge, "
+        + "Farbe, Zustand, Problem, FA und Material vorhanden.",
+    felder: [{ name: "text", label: "Suchbegriff", pflicht: true,
+               wert: plan.letzteSuche || "",
+               platzhalter: "zum Beispiel 10844, Index oder Messing" }],
+    bestaetigen: "Suchen",
+  });
+  if (!w) return;
+  plan.trefferNr = 0;
+  await zumAuftragSpringen(w.text, b, false);
+}
+
+async function zumAuftragSpringen(text, b, weiter) {
+  const t = (text || "").trim().toLowerCase();
+  if (!t) return;
+
+  const treffer = (plan.auftraege || []).filter((j) => auftragText(j).includes(t));
+  plan.letzteSuche = text.trim();
+  plan.trefferAnzahl = treffer.length;
+
+  if (!treffer.length) {
+    meldung('Nichts gefunden zu "' + text + '".', "warn");
+    return;
+  }
+
+  if (!weiter) plan.trefferNr = 0;
+  const ziel = treffer[plan.trefferNr % treffer.length];
+  plan.trefferNr = (plan.trefferNr + 1) % treffer.length;
+
+  meldung(treffer.length === 1
+    ? "Ein Treffer: " + ziel.job_number
+    : "Treffer " + (((plan.trefferNr + treffer.length - 1) % treffer.length) + 1)
+      + " von " + treffer.length + ": " + ziel.job_number);
+
+  if (ziel.planned_from) {
+    plan.start = naechsterArbeitstag(plusTage(ziel.planned_from, -2));
+    await planAktualisieren(b);
+  }
+
+  setTimeout(() => {
+    const el = document.querySelector('[data-auftrag="' + CSS.escape(ziel.id) + '"]');
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+    el.classList.add("pw-balken--treffer");
+    setTimeout(() => el.classList.remove("pw-balken--treffer"), 2500);
+  }, 200);
+}
+
+// Ohne Bearbeitungsrecht öffnet ein Klick auf einen Auftrag direkt
+// die Zeichnung, statt das (dann ohnehin leere) Bearbeitungsfenster.
+function balkenAnsehenVerhalten() {
+  const tafel = document.querySelector(".pw-tafel");
+  if (!tafel) return;
+
+  tafel.querySelectorAll("[data-auftrag]").forEach((el) => {
+    el.style.cursor = "pointer";
+    el.onclick = () => {
+      const j = (plan.auftraege || []).find((x) => x.id === el.dataset.auftrag);
+      if (!j) return;
+      if (j.drawing_url) betrachter(j.drawing_url, "Zeichnung " + j.job_number, true);
+      else meldung("Zu " + j.job_number + " ist keine Zeichnung hinterlegt.", "warn");
+    };
+  });
+}
+
 function zellenVerhalten(b) {
   const tafel = document.querySelector(".pw-tafel");
   if (!tafel || !darfPlanen()) return;
@@ -4697,7 +5001,8 @@ function zeichnePlanwand(b) {
               if (!sichtbar.length) return "";
               const von = tage.indexOf(sichtbar[0]);
               const angeschnitten = belegt[0] !== sichtbar[0];
-              return planBalken(j, von, sichtbar.length, angeschnitten);
+              const vorlauf = belegt.indexOf(sichtbar[0]);
+              return planBalken(j, von, sichtbar.length, angeschnitten, vorlauf, belegt.length);
             }).join("");
 
           return '<div class="pw-zeile">'
@@ -4769,24 +5074,28 @@ function zeichnePlanwand(b) {
   zellenVerhalten(b);
   ferienVerhalten(b);
   ferienGriffe(b);
+  balkenInfoVerhalten();
+  if (!darfPlanen()) balkenAnsehenVerhalten();
 }
 
 // ---------- Ein einzelner Auftragsbalken ----------
 
-function planBalken(j, spalte, dauer, angeschnitten) {
+function planBalken(j, spalte, dauer, angeschnitten, vorlaufTage, dauerWahr) {
   const st = j.plan_status || "geplant";
   const fertig = st === "fertig";
   const f = farbeVon(j.color);
 
   const hg = fertig ? "#4a5158" : f.hex;
-  // Immer schwarze Schrift, ausser bei Fertig — dort weiss.
-  // Gilt unabhaengig vom hellen oder dunklen Modus.
-  const vg = fertig ? "#ffffff" : "#000000";
+  // Schwarz auf hellen Balkenfarben, Weiss auf dunklen — unabhaengig
+  // vom hellen oder dunklen Modus der App selbst. f.schrift ist pro
+  // Farbe genau dafuer hinterlegt.
+  const vg = fertig ? "#ffffff" : f.schrift;
   const laeuft = st === "laeuft";
-  const rand = laeuft ? "border:2px solid #111417;"
-    : ((!fertig && j.color === "weiss") ? "border:1px solid var(--linie-stark);" : "");
+  const randKlasse = laeuft ? " pw-balken--laeuft"
+    : ((!fertig && j.color === "weiss") ? " pw-balken--weissrand" : "");
 
-  // Fortschritt in Schritten von fünf Prozent
+  // Fortschritt in Schritten von fünf Prozent, bezogen auf den
+  // GANZEN Auftrag — nicht auf den Ausschnitt, den man gerade sieht.
   let anteil = null;
   if (j.target_quantity && j.target_quantity > 0) {
     const roh = (j.stand || 0) / j.target_quantity * 100;
@@ -4795,39 +5104,55 @@ function planBalken(j, spalte, dauer, angeschnitten) {
     anteil = 100;
   }
 
-  // Zeile 2: Stückzahlen
+  // Die Grenze des Füllstands liegt an einem festen Tag des ganzen
+  // Auftrags. Ist der Balken angeschnitten, wird nur der Anteil davon
+  // in den sichtbaren Ausschnitt umgerechnet — sonst würde sich die
+  // Grenze beim Scrollen oder Zoomen mitverschieben.
+  let restLinks = null;
+  if (anteil !== null) {
+    const gesamtTage = dauerWahr || dauer;
+    const vorlauf = vorlaufTage || 0;
+    const grenzTag = (anteil / 100) * gesamtTage;
+    restLinks = Math.max(0, Math.min(100, ((grenzTag - vorlauf) / dauer) * 100));
+  }
+
+  // Zeile 2: Stückzahlen, am Ende der Liefertermin fürs Material
   let zeileMenge = "";
   if (j.target_quantity) {
     zeileMenge = (st === "laeuft" || (j.stand || 0) > 0)
       ? zahlText(j.stand || 0) + " / " + zahlText(j.target_quantity)
       : zahlText(j.target_quantity) + " Stück";
   }
+  if (j.material_liefertermin) {
+    zeileMenge += (zeileMenge ? "  ·  " : "") + j.material_liefertermin;
+  }
 
-  // Zeile 3: Material
+  // Zeile 3: Material — Durchmesser, Toleranz, Menge
   const materialTeile = [];
   if (j.material_dm) {
     materialTeile.push("⌀" + j.material_dm
       + (j.material_toleranz ? " " + j.material_toleranz : ""));
   }
   if (j.material_menge) materialTeile.push(j.material_menge);
-  if (j.material_liefertermin) materialTeile.push("ab " + kurzDatum(j.material_liefertermin));
   const zeileMaterial = materialTeile.join(" · ");
 
   return '<div class="pw-balken' + (fertig ? " pw-balken--fertig" : "")
-    + (angeschnitten ? " pw-balken--offen" : "") + '"'
+    + (angeschnitten ? " pw-balken--offen" : "") + randKlasse + '"'
     + ' data-auftrag="' + esc(j.id) + '"'
     + ' data-von="' + spalte + '" data-dauer="' + Math.max(1, dauer) + '"'
     + ' data-angeschnitten="' + (angeschnitten ? "1" : "0") + '"'
     + ' style="--von:' + spalte + ';--dauer:' + Math.max(1, dauer)
-    + ';background:' + hg + ';color:' + vg + ';' + rand + '">'
+    + ';background:' + hg + ';color:' + vg + '">'
 
-    + (anteil !== null
-        ? '<div class="pw-rest" style="left:' + anteil + '%"></div>' : "")
+    + (restLinks !== null
+        ? '<div class="pw-rest" style="left:' + restLinks + '%"></div>' : "")
 
+    + '<div class="pw-balken__aussen">'
+    + '<span class="pw-balken__statusgross" title="'
+    + esc((PLANSTATUS[st] || PLANSTATUS.geplant).name) + '">'
+    + (PLANSTATUS[st] || PLANSTATUS.geplant).zeichen + '</span>'
     + '<div class="pw-balken__inhalt">'
     + '<div class="pw-zeile1">'
-    + '<span class="pw-balken__status">'
-    + (PLANSTATUS[st] || PLANSTATUS.geplant).zeichen + '</span>'
     + '<span class="pw-balken__nr">' + esc(j.job_number) + '</span>'
     + (j.problem ? '<span class="pw-balken__warnung" title="'
         + esc(j.problem) + '">⚠</span>' : "")
@@ -4835,12 +5160,11 @@ function planBalken(j, spalte, dauer, angeschnitten) {
     + (!j.material_ok ? '<span class="pw-balken__fehlt" title="Material fehlt">M</span>' : "")
     + (j.plan_note ? '<span class="pw-balken__zeichen" title="Notiz">✎</span>' : "")
     + (j.drawing_url ? '<span class="pw-balken__zeichen">PDF</span>' : "")
-    + (f.buchstabe ? '<span class="pw-balken__farbbuchstabe" title="' + esc(f.name) + '">'
-        + esc(f.buchstabe) + '</span>' : "")
     + '</div>'
     + '<div class="pw-zeile2">' + esc(zeileMenge) + '</div>'
     + '<div class="pw-zeile3">' + esc(zeileMaterial) + '</div>'
     + '</div>'
+    + '</div>' 
 
     + (darfPlanen() && !angeschnitten
         ? '<span class="pw-griff pw-griff--links" data-griff="links"></span>' : "")
@@ -5523,16 +5847,50 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
         bestaetigen: "Endgültig löschen", gefahr: true });
     if (!sicher) return;
 
+    // Entsteht eine Lücke, dürfen die nachfolgenden Aufträge
+    // bündig nachrücken.
+    let nachruecken = false;
+    let dahinter = [];
+    if (auftrag.planned_from) {
+      const eigenesEnde = letzterArbeitstag(auftrag.planned_from, auftrag.planned_days || 1);
+      dahinter = (plan.auftraege || []).filter((x) =>
+        x.id !== auftrag.id && x.machine_id === auftrag.machine_id
+        && x.planned_from && x.planned_from > eigenesEnde
+        && x.plan_status !== "fertig");
+
+      if (dahinter.length) {
+        nachruecken = await nachfragen({
+          titel: "Lücke schliessen?",
+          text: "Der Auftrag wird gelöscht. Sollen die " + dahinter.length
+              + " nachfolgenden Aufträge auf dieser Maschine bündig nachrücken?",
+          bestaetigen: "Ja, nachrücken" });
+      }
+    }
+
     // Für das Zurücknehmen den ganzen Datensatz sichern
     const sicherung = await db.from("jobs").select("*").eq("id", auftrag.id).single();
 
     await db.from("production_records").delete().eq("job_id", auftrag.id);
     const { error } = await db.from("jobs").delete().eq("id", auftrag.id);
+
+    const vorherNachrueck = [];
+    if (!error && nachruecken) {
+      const differenz = auftrag.planned_days || 1;
+      for (const x of dahinter) {
+        vorherNachrueck.push({ id: x.id, von: x.planned_from });
+        const neu = arbeitstagePlus(x.planned_from, -differenz);
+        await db.from("jobs").update({ planned_from: neu }).eq("id", x.id);
+      }
+    }
+
     zu();
     if (error) meldung(fehlertext(error), "fehler");
     else {
       if (sicherung.data) {
         merkeSchritt("Löschen von " + auftrag.job_number, async () => {
+          for (const v of vorherNachrueck) {
+            await db.from("jobs").update({ planned_from: v.von }).eq("id", v.id);
+          }
           await db.from("jobs").insert(sicherung.data);
           planAktualisieren(b);
         });
@@ -9980,6 +10338,17 @@ function chatEinbauen() {
   chat.takt = setInterval(chatUngeleseneLaden, 60000);
 }
 
+// Beim Abmelden alles sauber beenden, damit nach dem nächsten
+// Anmelden nicht zwei Verbindungen gleichzeitig laufen.
+function chatEinbautStoppen() {
+  if (chat.takt) { clearInterval(chat.takt); chat.takt = null; }
+  if (chat.kanal && db) { try { db.removeChannel(chat.kanal); } catch (f) { /* egal */ } chat.kanal = null; }
+  chatPanelSchliessen();
+  const knopf = document.getElementById("chat-knopf");
+  if (knopf) knopf.remove();
+  chat.gespraeche = [];
+}
+
 function chatRealtimeStarten() {
   if (!db || typeof db.channel !== "function") return;
   chat.kanal = db.channel("chat-global-" + Date.now())
@@ -10158,6 +10527,8 @@ async function chatUnterhaltungZeichnen() {
     + '</div>'
     + '<div class="chat-nachrichten" id="chat-nachrichten"><div class="laedt">Wird geladen …</div></div>'
     + '<div class="chat-eingabe">'
+    + '<label class="chat-anhang" title="Bild oder Datei senden">📎'
+    + '<input type="file" id="chat-datei" hidden></label>'
     + '<input type="text" id="chat-text" placeholder="Nachricht …" autocomplete="off">'
     + '<button class="knopf knopf--klein" id="chat-senden">Senden</button>'
     + '</div>';
@@ -10177,6 +10548,36 @@ async function chatUnterhaltungZeichnen() {
   };
   document.getElementById("chat-senden").onclick = senden;
   feld.onkeydown = (e) => { if (e.key === "Enter") senden(); };
+
+  document.getElementById("chat-datei").onchange = async (e) => {
+    const datei = (e.target.files || [])[0];
+    e.target.value = "";
+    if (!datei) return;
+    if (datei.size > 15 * 1024 * 1024) {
+      meldung("Die Datei ist grösser als 15 MB.", "warn");
+      return;
+    }
+
+    meldung("Wird gesendet …");
+    try {
+      const istBild = datei.type.startsWith("image/");
+      const inhalt = istBild ? await bildVerkleinern(datei, 1400).catch(() => datei) : datei;
+      const pfad = "chat/" + chat.aktuell.id + "/" + Date.now() + "-" + datei.name;
+      const hoch = await db.storage.from("chat").upload(pfad, inhalt || datei,
+        { contentType: datei.type || "application/octet-stream" });
+      if (hoch.error) throw hoch.error;
+      const url = db.storage.from("chat").getPublicUrl(pfad).data.publicUrl;
+
+      const { error } = await db.from("chat_nachrichten").insert({
+        gespraech_id: chat.aktuell.id, sender_id: profil.id,
+        text: (feld.value || "").trim(),
+        datei_url: url, datei_name: datei.name, datei_typ: datei.type || "",
+      });
+      feld.value = "";
+      if (error) throw error;
+      await chatNachrichtenLaden(chat.aktuell.id);
+    } catch (f) { meldung(fehlertext(f), "fehler"); }
+  };
   feld.focus();
 }
 
@@ -10191,13 +10592,25 @@ async function chatNachrichtenLaden(id) {
 
   kasten.innerHTML = (data || []).map((n) => {
     const ich = n.sender_id === profil.id;
+    const istBild = n.datei_url && (n.datei_typ || "").startsWith("image/");
     return '<div class="chat-blase' + (ich ? " chat-blase--ich" : "") + '">'
       + (!ich ? '<div class="chat-blase__wer">'
           + esc((n.profiles && (n.profiles.full_name || n.profiles.email)) || "") + '</div>' : "")
-      + '<div class="chat-blase__text">' + esc(n.text) + '</div>'
+      + (n.datei_url
+          ? (istBild
+              ? '<img class="chat-blase__bild" src="' + esc(n.datei_url)
+                + '" data-gross="' + esc(n.datei_url) + '" alt="' + esc(n.datei_name || "Bild") + '">'
+              : '<a class="chat-blase__datei" href="' + esc(n.datei_url)
+                + '" target="_blank" rel="noopener">📄 ' + esc(n.datei_name || "Datei") + '</a>')
+          : "")
+      + (n.text ? '<div class="chat-blase__text">' + esc(n.text) + '</div>' : "")
       + '<div class="chat-blase__zeit">' + esc(datumZeitKurz(n.created_at)) + '</div>'
       + '</div>';
   }).join("") || '<p class="hinweis">Noch keine Nachricht. Schreib die erste.</p>';
+
+  kasten.querySelectorAll("[data-gross]").forEach((bild) => {
+    bild.onclick = () => betrachter(bild.dataset.gross, "Bild", false);
+  });
 
   kasten.scrollTop = kasten.scrollHeight;
 }
@@ -10322,6 +10735,7 @@ function zeichneSeite() {
   if (pfad !== "planwand" && typeof planSyncStoppen === "function") planSyncStoppen();
   syncStarten(pfad);
   bereich.classList.toggle("inhalt--breit", pfad === "planwand");
+  document.body.classList.toggle("pw-seite", pfad === "planwand");
   seite.zeige(bereich);
 }
 
@@ -10405,6 +10819,15 @@ function zeichneGeruest() {
   if (einstellungWert("navschmal", "0") === "1") document.body.classList.add("nav--schmal");
 
 
+  async function jetztAbmelden() {
+    await db.auth.signOut();
+    profil = null;
+    document.querySelectorAll(".dialog-huelle").forEach((el) => el.remove());
+    chatEinbautStoppen();
+    location.hash = "";
+    zeigeLogin();
+  }
+
   // Der Abmelden-Knopf sitzt jetzt in den Einstellungen, nicht mehr
   // in der Kopfzeile. Diese Funktion bindet ihn, wo immer er auftaucht.
   window.abmeldenBinden = () => {
@@ -10414,13 +10837,24 @@ function zeichneGeruest() {
       const ok = await nachfragen({ titel: "Abmelden",
         text: "Du musst dich danach neu anmelden.", bestaetigen: "Abmelden" });
       if (!ok) return;
-      await db.auth.signOut();
-      profil = null;
-      document.querySelectorAll(".dialog-huelle").forEach((el) => el.remove());
-      location.hash = "";
-      zeigeLogin();
+      await jetztAbmelden();
     };
   };
+
+  // Nach fünf Minuten ohne jede Bewegung wird automatisch abgemeldet.
+  let untaetigTakt = null;
+  const untaetigZuruecksetzen = () => {
+    clearTimeout(untaetigTakt);
+    untaetigTakt = setTimeout(async () => {
+      if (!profil) return;
+      await jetztAbmelden();
+      meldung("Wegen Inaktivität automatisch abgemeldet.", "warn");
+    }, 5 * 60 * 1000);
+  };
+  ["mousemove", "mousedown", "keydown", "touchstart", "scroll", "wheel"].forEach((art) => {
+    document.addEventListener(art, untaetigZuruecksetzen, { passive: true });
+  });
+  untaetigZuruecksetzen();
 
   if (!location.hash) location.hash = "#/dashboard";
   zeichneSeite();
