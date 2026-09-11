@@ -1874,15 +1874,23 @@ pre, .gcode { max-width: 100%; overflow-x: auto; }
                             font-weight: 700; opacity: .85; padding-left: 4px; }
 
 /* ---------- Chat: schwebender Knopf und Panel ---------- */
-.chat-knopf { position: fixed; z-index: 40; width: 52px; height: 52px;
-              border-radius: 12px; border: none; background: var(--marke); color: #fff;
-              display: grid; place-items: center; cursor: pointer;
-              box-shadow: 0 6px 18px rgba(0,0,0,.25);
-              right: 18px; bottom: 18px; }
-.chat-knopf:hover { background: var(--marke-dunkel, var(--marke)); }
+.chat-knopf, .fahrzeug-knopf, .eier-knopf {
+  position: fixed; z-index: 40; width: 52px; height: 52px;
+  border-radius: 12px; border: none; background: var(--marke); color: #fff;
+  display: grid; place-items: center; cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0,0,0,.25); right: 18px; }
+.chat-knopf:hover, .fahrzeug-knopf:hover { background: var(--marke-dunkel, var(--marke)); }
+.chat-knopf { bottom: 18px; }
+.fahrzeug-knopf { bottom: 78px; font-size: 1.3rem; }
+.eier-knopf { bottom: 138px; font-size: 1.15rem; background: var(--flaeche);
+             color: var(--tinte); border: 1px solid var(--linie-stark);
+             flex-direction: column; gap: 0; }
+.eier-zahl { font-size: .62rem; font-weight: 700; margin-top: -2px; }
 @media (max-width: 780px) {
-  .chat-knopf { bottom: calc(var(--navhoehe) + 14px); width: 48px; height: 48px;
-                border-radius: 10px; }
+  .chat-knopf, .fahrzeug-knopf, .eier-knopf { width: 48px; height: 48px; border-radius: 10px; }
+  .chat-knopf { bottom: calc(var(--navhoehe) + 14px); }
+  .fahrzeug-knopf { bottom: calc(var(--navhoehe) + 70px); }
+  .eier-knopf { bottom: calc(var(--navhoehe) + 126px); }
 }
 .chat-abzeichen { position: absolute; top: -6px; right: -6px; min-width: 20px;
                   height: 20px; padding: 0 5px; border-radius: 10px; background: var(--gefahr);
@@ -2006,20 +2014,54 @@ body.dunkel .pw-balken--laeuft { border-color: #ffffff; }
                           line-height: 1; }
 
 /* ---------- Anmeldung: Benutzerkacheln ---------- */
-.login__kacheln { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
-                  gap: 10px; margin-bottom: 14px; max-height: 260px; overflow-y: auto; }
-.login__kachel { display: flex; flex-direction: column; align-items: center; gap: 5px;
-                 background: none; border: 1px solid transparent; border-radius: var(--radius);
-                 padding: 8px 4px; cursor: pointer; }
-.login__kachel:hover { background: var(--marke-hell); border-color: var(--linie-stark); }
-.login__kachel img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; }
-.login__kachel-buchstabe { width: 48px; height: 48px; border-radius: 50%; background: var(--marke);
-                          color: #fff; display: grid; place-items: center; font-weight: 700;
-                          font-size: 1.1rem; }
-.login__kachel-name { font-size: .72rem; text-align: center; line-height: 1.2;
+.login__kachelfeld { background: var(--marke); border-radius: var(--radius);
+                     padding: 14px; margin: 0 -24px 14px; }
+.login__kacheln { display: grid; grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+                  gap: 10px; }
+.login__kachel { display: flex; flex-direction: column; align-items: center; gap: 6px;
+                 background: none; border: none; border-radius: 10px;
+                 padding: 6px 4px; cursor: pointer; transition: transform .15s ease; }
+.login__kachel:hover { transform: scale(1.06); }
+.login__kachel img { width: 100%; aspect-ratio: 1; max-width: 76px; border-radius: 10px;
+                     object-fit: cover; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+.login__kachel-buchstabe { width: 100%; aspect-ratio: 1; max-width: 76px; border-radius: 10px;
+                          background: var(--flaeche); color: var(--marke);
+                          display: grid; place-items: center; font-weight: 700;
+                          font-size: 1.4rem; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+.login__kachel-name { font-size: .68rem; text-align: center; line-height: 1.2; color: #fff;
                       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
                       max-width: 100%; }
-.login__gewaehlt { font-size: .88rem; margin-bottom: 14px; text-align: center; }
+.login__gewaehlt { font-size: .95rem; margin-bottom: 14px; text-align: center; }
+
+/* Übergang: die angeklickte Kachel fliegt vergrössert in die Mitte */
+.login__flug { position: fixed; z-index: 200; border-radius: 10px; object-fit: cover;
+              box-shadow: 0 10px 30px rgba(0,0,0,.4);
+              transition: all .38s cubic-bezier(.2,.8,.2,1); pointer-events: none; }
+.login__kachelfeld--weg { animation: loginAusblenden .25s ease forwards; }
+@keyframes loginAusblenden { to { opacity: 0; transform: scale(.96); } }
+.login__block--ein { animation: loginEinblenden .3s ease; }
+@keyframes loginEinblenden { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* ---------- Fahrzeuge ---------- */
+.fahrzeug-panel { bottom: 82px; }
+@media (max-width: 780px) { .fahrzeug-panel { bottom: calc(var(--navhoehe) + 70px); } }
+.fahrzeug-reiter { padding: 0 10px; margin: 0; flex: none; }
+.fahrzeug-inhalt { flex: 1; overflow-y: auto; padding: 10px 12px; }
+.fz-karte { border: 1px solid var(--linie); border-radius: var(--radius);
+           padding: 9px 11px; margin-bottom: 8px; }
+.fz-karte__kopf { display: flex; align-items: center; justify-content: space-between;
+                  gap: 8px; font-size: .88rem; }
+.fz-ampel { font-size: .72rem; color: var(--gefahr); font-weight: 650; text-align: right; }
+.fz-ampel--frei { color: #1f7a4d; }
+.fz-karte__knoepfe { display: flex; gap: 12px; margin-top: 6px; }
+.fz-unterschrift { font-size: .78rem; font-weight: 700; color: var(--gedaempft);
+                   margin: 14px 0 6px; }
+.fz-eigene { font-size: .82rem; border-bottom: 1px solid var(--linie); padding: 8px 0; }
+
+/* ---------- Allgemeiner Übergang beim Reiterwechsel ---------- */
+@keyframes reiterEintritt { from { opacity: 0; transform: scale(.97) translateY(4px); }
+                            to { opacity: 1; transform: none; } }
+.reiter-eintritt { animation: reiterEintritt .2s ease; }
 </style>
 </head>
 <body>
@@ -2063,7 +2105,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "31.3.0";
+const APP_VERSION = "32.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -2496,7 +2538,8 @@ function zeigeLogin() {
       if (error || !data || !data.length) return;
 
       const kasten = document.getElementById("lk-kacheln");
-      kasten.innerHTML = '<div class="login__kacheln">'
+      kasten.innerHTML = '<div class="login__kachelfeld" id="lk-feld">'
+        + '<div class="login__kacheln">'
         + data.map((u) => '<button type="button" class="login__kachel" data-mail="'
             + esc(u.email) + '" data-name="' + esc(u.full_name || u.email) + '">'
             + (u.bild_url
@@ -2505,29 +2548,62 @@ function zeigeLogin() {
                   + esc((u.full_name || u.email).charAt(0).toUpperCase()) + '</span>')
             + '<span class="login__kachel-name">' + esc(u.full_name || u.email) + '</span>'
             + '</button>').join("")
-        + '</div>'
+        + '</div></div>'
         + '<button type="button" class="linkknopf" id="lk-manuell">Anderes Konto eingeben</button>';
 
       document.getElementById("lk-namefeld").hidden = true;
 
-      const gewaehlt = (mail, name) => {
+      const passwortfeld = document.getElementById("lp").closest("label");
+
+      const gewaehlt = (mail, name, bildEl) => {
         namensfeld.value = mail;
-        kasten.hidden = true;
-        const g = document.getElementById("lk-gewaehlt");
-        g.hidden = false;
-        g.innerHTML = '<div class="login__gewaehlt">Angemeldet als <strong>'
-          + esc(name) + '</strong> <button type="button" class="linkknopf" id="lk-zurueck">'
-          + 'nicht ich</button></div>';
-        document.getElementById("lk-zurueck").onclick = () => {
-          kasten.hidden = false;
-          g.hidden = true;
-          namensfeld.value = "";
-        };
-        document.getElementById("lp").focus();
+
+        // Die angeklickte Kachel fliegt vergrössert in die Mitte,
+        // der Rest blendet aus — dann bleibt nur noch das Passwortfeld.
+        const feld = document.getElementById("lk-feld");
+        const quelle = bildEl.getBoundingClientRect();
+        const klon = bildEl.cloneNode(true);
+        klon.className = "login__flug";
+        klon.style.left = quelle.left + "px";
+        klon.style.top = quelle.top + "px";
+        klon.style.width = quelle.width + "px";
+        klon.style.height = quelle.height + "px";
+        document.body.appendChild(klon);
+        feld.classList.add("login__kachelfeld--weg");
+
+        requestAnimationFrame(() => {
+          const zielGross = 88;
+          klon.style.left = (window.innerWidth / 2 - zielGross / 2) + "px";
+          klon.style.top = "70px";
+          klon.style.width = zielGross + "px";
+          klon.style.height = zielGross + "px";
+        });
+
+        setTimeout(() => {
+          klon.remove();
+          kasten.hidden = true;
+          document.getElementById("lk-manuell").hidden = true;
+
+          const g = document.getElementById("lk-gewaehlt");
+          g.hidden = false;
+          g.className = "login__block--ein";
+          g.innerHTML = '<div class="login__gewaehlt">' + esc(name)
+            + ' <button type="button" class="linkknopf" id="lk-zurueck">nicht ich</button></div>';
+          document.getElementById("lk-zurueck").onclick = () => {
+            kasten.hidden = false;
+            document.getElementById("lk-feld").classList.remove("login__kachelfeld--weg");
+            document.getElementById("lk-manuell").hidden = false;
+            g.hidden = true;
+            namensfeld.value = "";
+          };
+
+          if (passwortfeld) passwortfeld.classList.add("login__block--ein");
+          document.getElementById("lp").focus();
+        }, 380);
       };
 
       kasten.querySelectorAll("[data-mail]").forEach((k) => {
-        k.onclick = () => gewaehlt(k.dataset.mail, k.dataset.name);
+        k.onclick = () => gewaehlt(k.dataset.mail, k.dataset.name, k.querySelector("img, .login__kachel-buchstabe"));
       });
 
       document.getElementById("lk-manuell").onclick = () => {
@@ -3582,7 +3658,7 @@ async function seiteProduktion(b) {
   }
 
   if (prod.ansicht === "maschinen" && isMobil()) prod.ansicht = "erfassen";
-  if (prod.ansicht === "maschinen") return ansichtMaschinen(ziel, b);
+  if (prod.ansicht === "maschinen") { await ansichtMaschinen(ziel, b); reiterUebergang(ziel); return; }
   // Übersicht gibt es nicht mehr; alter Verweis fällt auf Erfassen zurück
   if (prod.ansicht === "uebersicht") prod.ansicht = "erfassen";
 
@@ -3598,7 +3674,8 @@ async function seiteProduktion(b) {
 
   if (!prod.parkId || !prod.parks.some((p) => p.id === prod.parkId)) prod.parkId = prod.parks[0].id;
 
-  return ansichtErfassen(ziel, b);
+  await ansichtErfassen(ziel, b);
+  reiterUebergang(ziel);
 }
 
 function parkAuswahl() {
@@ -3920,6 +3997,15 @@ function eingabenBinden(raster, staende, b, neuLaden) {
   });
 }
 
+// Nach Start/Beenden/Mengenänderung nur die Aufträge neu laden und
+// das Raster neu zeichnen — nicht die ganze Seite mit Parks, Reitern
+// und Maschinen erneut aufbauen.
+async function prodAuftraegeAktualisieren(b) {
+  try { prod.auftraege = await ladeLaufendeAuftraege(); } catch (f) { /* egal, alte Daten bleiben */ }
+  if (prod._neuFiltern) prod._neuFiltern();
+  else seiteProduktion(b);
+}
+
 function auftragsKnoepfeBinden(raster, b) {
   raster.querySelectorAll("[data-auftrag-start]").forEach((el) => {
     el.onclick = async () => {
@@ -3966,7 +4052,7 @@ function auftragsKnoepfeBinden(raster, b) {
       }).eq("id", auftrag.id);
 
       if (error) meldung(fehlertext(error), "fehler");
-      else { meldung("Auftrag " + auftrag.job_number + " gestartet."); seiteProduktion(b); }
+      else { meldung("Auftrag " + auftrag.job_number + " gestartet."); await prodAuftraegeAktualisieren(b); }
     };
   });
 
@@ -3986,7 +4072,7 @@ function auftragsKnoepfeBinden(raster, b) {
           ? 0 : (w.menge ? Math.max(0, Math.round(w.menge)) : null) })
         .eq("id", j.id);
       if (error) meldung(fehlertext(error), "fehler");
-      else { meldung("Gespeichert."); seiteProduktion(b); }
+      else { meldung("Gespeichert."); await prodAuftraegeAktualisieren(b); }
     };
   });
 
@@ -4007,7 +4093,7 @@ function auftragsKnoepfeBinden(raster, b) {
                   plan_status: "fertig" })
         .eq("id", el.dataset.auftragEnde);
       if (error) meldung(fehlertext(error), "fehler");
-      else { meldung("Auftrag beendet."); seiteProduktion(b); }
+      else { meldung("Auftrag beendet."); await prodAuftraegeAktualisieren(b); }
     };
   });
 }
@@ -4677,6 +4763,40 @@ function balkenAnsehenVerhalten() {
   });
 }
 
+// Den Zustand (Geplant/Rüsten/QS Check/Läuft/Fertig) darf jeder
+// ändern, unabhängig vom sonstigen Bearbeitungsrecht — direkt über
+// das grosse Symbol am Balken, ohne das ganze Fenster zu öffnen.
+function statusSchnellVerhalten(b) {
+  const tafel = document.querySelector(".pw-tafel");
+  if (!tafel) return;
+
+  tafel.querySelectorAll(".pw-balken__statusgross").forEach((symbol) => {
+    symbol.style.cursor = "pointer";
+    symbol.addEventListener("pointerdown", (e) => e.stopPropagation());
+    symbol.onclick = async (e) => {
+      e.stopPropagation();
+      const balken = symbol.closest("[data-auftrag]");
+      const j = balken && (plan.auftraege || []).find((x) => x.id === balken.dataset.auftrag);
+      if (!j) return;
+
+      const wahl = await auswahlDialog("Zustand ändern — " + j.job_number,
+        Object.keys(PLANSTATUS).map((k) => ({
+          wert: k, text: PLANSTATUS[k].zeichen + "  " + PLANSTATUS[k].name,
+        })));
+      if (!wahl || wahl === j.plan_status) return;
+
+      const daten = { plan_status: wahl };
+      if (wahl === "fertig" && !j.ended_at) {
+        daten.ended_at = new Date().toISOString();
+        daten.ended_by = profil.id;
+      }
+      const { error } = await db.from("jobs").update(daten).eq("id", j.id);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Zustand geändert."); planAktualisieren(b); }
+    };
+  });
+}
+
 function zellenVerhalten(b) {
   const tafel = document.querySelector(".pw-tafel");
   if (!tafel || !darfPlanen()) return;
@@ -5076,6 +5196,7 @@ function zeichnePlanwand(b) {
   ferienGriffe(b);
   balkenInfoVerhalten();
   if (!darfPlanen()) balkenAnsehenVerhalten();
+  statusSchnellVerhalten(b);
 }
 
 // ---------- Ein einzelner Auftragsbalken ----------
@@ -7084,12 +7205,12 @@ async function seiteBestellungen(b) {
   });
 
   const ziel = document.getElementById("best-inhalt");
-  if (best.ansicht === "artikel") return bestArtikel(ziel, b);
-  if (best.ansicht === "bezeichnungen") return bestBezeichnungen(ziel, b);
-  if (best.ansicht === "bezeichnungen") return bestBezeichnungen(ziel, b);
-  if (best.ansicht === "lieferanten") return bestLieferanten(ziel, b);
-  if (best.ansicht === "historie") return bestHistorie(ziel, b);
-  return bestOffen(ziel, b);
+  if (best.ansicht === "artikel") await bestArtikel(ziel, b);
+  else if (best.ansicht === "bezeichnungen") await bestBezeichnungen(ziel, b);
+  else if (best.ansicht === "lieferanten") await bestLieferanten(ziel, b);
+  else if (best.ansicht === "historie") await bestHistorie(ziel, b);
+  else await bestOffen(ziel, b);
+  reiterUebergang(ziel);
 }
 
 // ---------- Offene Positionen, nach Lieferant gruppiert ----------
@@ -10315,6 +10436,65 @@ const chat = {
 };
 
 // Einmal pro Sitzung: Knopf einbauen und auf Nachrichten lauschen
+// ---------- Eierzähler ----------
+// Ganz bewusst simpel: ein Knopf, eine Zahl, Pfeiltasten hoch/runter.
+const eier = { wert: 0 };
+
+async function eierEinbauen() {
+  if (document.getElementById("eier-knopf")) return;
+
+  const knopf = document.createElement("button");
+  knopf.id = "eier-knopf";
+  knopf.className = "eier-knopf";
+  knopf.title = "Eier im Lager — anklicken, dann Pfeiltasten hoch/runter";
+  knopf.tabIndex = 0;
+  knopf.innerHTML = '🥚<span class="eier-zahl" id="eier-zahl">–</span>';
+  document.body.appendChild(knopf);
+
+  try {
+    const r = await db.from("app_config").select("wert").eq("schluessel", "eier_anzahl").maybeSingle();
+    eier.wert = (r.data && Number(r.data.wert)) || 0;
+  } catch (f) { eier.wert = 0; }
+  document.getElementById("eier-zahl").textContent = eier.wert;
+
+  let taste = null;
+  const speichern = () => {
+    clearTimeout(taste);
+    taste = setTimeout(() => {
+      db.from("app_config").upsert({ schluessel: "eier_anzahl", wert: String(eier.wert) });
+    }, 500);
+  };
+
+  knopf.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowUp") { e.preventDefault(); eier.wert++; }
+    else if (e.key === "ArrowDown") { e.preventDefault(); eier.wert = Math.max(0, eier.wert - 1); }
+    else return;
+    document.getElementById("eier-zahl").textContent = eier.wert;
+    speichern();
+  });
+
+  // Andere Geräte live mitbekommen
+  if (db && typeof db.channel === "function") {
+    db.channel("eier-" + Date.now())
+      .on("postgres_changes", { event: "*", schema: "public", table: "app_config" }, (n) => {
+        if (n.new && n.new.schluessel === "eier_anzahl" && document.activeElement !== knopf) {
+          eier.wert = Number(n.new.wert) || 0;
+          document.getElementById("eier-zahl").textContent = eier.wert;
+        }
+      })
+      .subscribe();
+  }
+}
+
+// Kurzer Eintritts-Effekt beim Reiterwechsel — auf jeden Container
+// anwendbar, der gerade neu befuellt wurde.
+function reiterUebergang(el) {
+  if (!el) return;
+  el.classList.remove("reiter-eintritt");
+  void el.offsetWidth;
+  el.classList.add("reiter-eintritt");
+}
+
 function chatEinbauen() {
   if (document.getElementById("chat-knopf")) return;
 
@@ -10340,6 +10520,296 @@ function chatEinbauen() {
 
 // Beim Abmelden alles sauber beenden, damit nach dem nächsten
 // Anmelden nicht zwei Verbindungen gleichzeitig laufen.
+// =================================================================
+//  FAHRZEUGE
+//  Buchen, Historie, Probleme melden, Verwaltung — alles in
+//  diesem einen schwebenden Fenster.
+// =================================================================
+
+const fahrzeugZustand = { reiter: "buchen" };
+
+async function fahrzeugEinbauen() {
+  if (document.getElementById("fahrzeug-knopf")) return;
+
+  const knopf = document.createElement("button");
+  knopf.id = "fahrzeug-knopf";
+  knopf.className = "fahrzeug-knopf";
+  knopf.title = "Fahrzeuge";
+  knopf.textContent = "🚗";
+  document.body.appendChild(knopf);
+  knopf.onclick = () => fahrzeugPanelUmschalten();
+}
+
+function fahrzeugPanelUmschalten() {
+  const bestehend = document.getElementById("fahrzeug-panel");
+  if (bestehend) { bestehend.remove(); return; }
+
+  const panel = document.createElement("div");
+  panel.id = "fahrzeug-panel";
+  panel.className = "chat-panel fahrzeug-panel";
+  document.body.appendChild(panel);
+  fahrzeugZustand.reiter = "buchen";
+  fahrzeugZeichnen();
+}
+
+function fahrzeugPanelSchliessen() {
+  const p = document.getElementById("fahrzeug-panel");
+  if (p) p.remove();
+}
+
+async function fahrzeugZeichnen() {
+  const panel = document.getElementById("fahrzeug-panel");
+  if (!panel) return;
+  const bin = istAdmin();
+
+  panel.innerHTML = '<div class="chat-kopf">'
+    + '<span>Fahrzeuge</span>'
+    + '<button class="chat-x" id="fz-zu" title="Schliessen">×</button>'
+    + '</div>'
+    + '<div class="reiter fahrzeug-reiter">'
+    + [["buchen", "Buchen"], ["historie", "Historie"]]
+        .concat(bin ? [["verwaltung", "Verwaltung"]] : [])
+        .map(([w, t]) => '<button class="reiter__knopf'
+          + (fahrzeugZustand.reiter === w ? " aktiv" : "") + '" data-fzreiter="' + w + '">'
+          + t + '</button>').join("")
+    + '</div>'
+    + '<div class="fahrzeug-inhalt" id="fz-inhalt"><div class="laedt">Wird geladen …</div></div>';
+
+  document.getElementById("fz-zu").onclick = fahrzeugPanelSchliessen;
+  panel.querySelectorAll("[data-fzreiter]").forEach((el) => {
+    el.onclick = () => { fahrzeugZustand.reiter = el.dataset.fzreiter; fahrzeugZeichnen(); };
+  });
+
+  const ziel = document.getElementById("fz-inhalt");
+  if (fahrzeugZustand.reiter === "buchen") return fahrzeugAnsichtBuchen(ziel);
+  if (fahrzeugZustand.reiter === "historie") return fahrzeugAnsichtHistorie(ziel);
+  if (fahrzeugZustand.reiter === "verwaltung") return fahrzeugAnsichtVerwaltung(ziel);
+}
+
+async function fahrzeugeListe() {
+  const { data, error } = await db.from("fahrzeuge").select("*")
+    .eq("is_active", true).order("name");
+  if (error) throw error;
+  return data || [];
+}
+
+async function fahrzeugStatus(fahrzeugId) {
+  const jetzt = new Date().toISOString();
+  const [buchung, problem] = await Promise.all([
+    db.from("fahrzeug_buchungen").select("*, profiles(full_name, email)")
+      .eq("fahrzeug_id", fahrzeugId).eq("status", "genehmigt")
+      .lte("von", jetzt).gte("bis", jetzt).maybeSingle(),
+    db.from("fahrzeug_probleme").select("*")
+      .eq("fahrzeug_id", fahrzeugId).eq("behoben", false).maybeSingle(),
+  ]);
+  if (problem.data) return { frei: false, grund: "Problem: " + problem.data.grund };
+  if (buchung.data) {
+    const wer = buchung.data.profiles
+      ? (buchung.data.profiles.full_name || buchung.data.profiles.email) : "";
+    return { frei: false, grund: "Unterwegs mit " + wer };
+  }
+  return { frei: true, grund: "Verfügbar" };
+}
+
+// ---------- Buchen ----------
+
+async function fahrzeugAnsichtBuchen(ziel) {
+  let fahrzeuge, meine;
+  try {
+    fahrzeuge = await fahrzeugeListe();
+    const { data } = await db.from("fahrzeug_buchungen")
+      .select("*, fahrzeuge(name)").eq("user_id", profil.id)
+      .in("status", ["angefragt", "genehmigt"]).order("von");
+    meine = data || [];
+  } catch (f) {
+    ziel.innerHTML = '<p class="hinweis">' + esc(fehlertext(f)) + '</p>';
+    return;
+  }
+
+  if (!fahrzeuge.length) {
+    ziel.innerHTML = '<p class="hinweis">Noch keine Fahrzeuge eingerichtet.'
+      + (istAdmin() ? " Das geht im Reiter Verwaltung." : "") + '</p>';
+    return;
+  }
+
+  const staende = await Promise.all(fahrzeuge.map((f) => fahrzeugStatus(f.id)));
+
+  ziel.innerHTML = '<div class="fz-liste">'
+    + fahrzeuge.map((f, i) => '<div class="fz-karte">'
+        + '<div class="fz-karte__kopf"><strong>' + esc(f.name) + '</strong>'
+        + '<span class="fz-ampel' + (staende[i].frei ? " fz-ampel--frei" : "") + '">'
+        + esc(staende[i].grund) + '</span></div>'
+        + '<div class="fz-karte__knoepfe">'
+        + '<button class="linkknopf" data-fz-buchen="' + esc(f.id) + '">Anfragen</button>'
+        + '<button class="linkknopf linkknopf--gefahr" data-fz-problem="' + esc(f.id) + '">Problem melden</button>'
+        + '</div></div>').join("")
+    + '</div>'
+    + (meine.length
+        ? '<h3 class="fz-unterschrift">Meine Anfragen</h3>'
+          + meine.map((m) => '<div class="fz-eigene">'
+              + '<strong>' + esc(m.fahrzeuge ? m.fahrzeuge.name : "") + '</strong> · '
+              + esc(datumZeitKurz(m.von)) + ' – ' + esc(datumZeitKurz(m.bis))
+              + '<div class="klein">' + esc(m.grund || "") + ' · '
+              + (m.status === "angefragt" ? "wartet auf Bewilligung"
+                  : m.status === "genehmigt" ? "bewilligt" : "abgelehnt") + '</div>'
+              + '</div>').join("")
+        : "");
+
+  ziel.querySelectorAll("[data-fz-buchen]").forEach((el) => {
+    el.onclick = () => fahrzeugAnfrageDialog(el.dataset.fzBuchen,
+      fahrzeuge.find((f) => f.id === el.dataset.fzBuchen));
+  });
+  ziel.querySelectorAll("[data-fz-problem]").forEach((el) => {
+    el.onclick = () => fahrzeugProblemDialog(el.dataset.fzProblem,
+      fahrzeuge.find((f) => f.id === el.dataset.fzProblem));
+  });
+}
+
+async function fahrzeugAnfrageDialog(fahrzeugId, fahrzeug) {
+  const w = await dialogFelder({
+    titel: "Fahrzeug anfragen — " + (fahrzeug ? fahrzeug.name : ""),
+    felder: [
+      { name: "von", label: "Von", typ: "datetime-local", pflicht: true },
+      { name: "bis", label: "Bis", typ: "datetime-local", pflicht: true },
+      { name: "grund", label: "Wofür", pflicht: true, platzhalter: "z. B. Materialabholung" },
+    ],
+    bestaetigen: "Anfragen",
+  });
+  if (!w) return;
+  if (w.bis < w.von) { meldung("Bis liegt vor Von.", "warn"); return; }
+
+  const { error } = await db.from("fahrzeug_buchungen").insert({
+    fahrzeug_id: fahrzeugId, user_id: profil.id,
+    von: new Date(w.von).toISOString(), bis: new Date(w.bis).toISOString(),
+    grund: w.grund, status: "angefragt",
+  });
+  if (error) meldung(fehlertext(error), "fehler");
+  else { meldung("Angefragt. Ein Administrator muss noch bewilligen."); fahrzeugZeichnen(); }
+}
+
+async function fahrzeugProblemDialog(fahrzeugId, fahrzeug) {
+  const w = await dialogFelder({
+    titel: "Problem melden — " + (fahrzeug ? fahrzeug.name : ""),
+    text: "Das Fahrzeug gilt ab sofort als nicht verfügbar, bis ein Administrator es wieder freigibt.",
+    felder: [{ name: "grund", label: "Was ist los?", pflicht: true }],
+    bestaetigen: "Melden",
+  });
+  if (!w) return;
+
+  const { error } = await db.from("fahrzeug_probleme").insert({
+    fahrzeug_id: fahrzeugId, grund: w.grund, gemeldet_von: profil.id,
+  });
+  if (error) meldung(fehlertext(error), "fehler");
+  else { meldung("Gemeldet."); fahrzeugZeichnen(); }
+}
+
+// ---------- Historie ----------
+
+async function fahrzeugAnsichtHistorie(ziel) {
+  let liste;
+  try {
+    const { data, error } = await db.from("fahrzeug_buchungen")
+      .select("*, fahrzeuge(name), profiles(full_name, email)")
+      .order("von", { ascending: false }).limit(100);
+    if (error) throw error;
+    liste = data || [];
+  } catch (f) {
+    ziel.innerHTML = '<p class="hinweis">' + esc(fehlertext(f)) + '</p>';
+    return;
+  }
+
+  if (!liste.length) { ziel.innerHTML = '<p class="hinweis">Noch keine Buchungen.</p>'; return; }
+
+  ziel.innerHTML = liste.map((b2) => '<div class="fz-eigene">'
+    + '<strong>' + esc(b2.fahrzeuge ? b2.fahrzeuge.name : "") + '</strong> · '
+    + esc((b2.profiles && (b2.profiles.full_name || b2.profiles.email)) || "") + '<br>'
+    + esc(datumZeitKurz(b2.von)) + ' – ' + esc(datumZeitKurz(b2.bis))
+    + '<div class="klein">' + esc(b2.grund || "") + ' · '
+    + (b2.status === "angefragt" ? "wartet" : b2.status === "genehmigt" ? "bewilligt" : "abgelehnt")
+    + '</div></div>').join("");
+}
+
+// ---------- Verwaltung (nur Admin) ----------
+
+async function fahrzeugAnsichtVerwaltung(ziel) {
+  if (!istAdmin()) { ziel.innerHTML = ""; return; }
+
+  let anfragen, probleme, fahrzeuge;
+  try {
+    const [a, p2, f] = await Promise.all([
+      db.from("fahrzeug_buchungen").select("*, fahrzeuge(name), profiles(full_name, email)")
+        .eq("status", "angefragt").order("von"),
+      db.from("fahrzeug_probleme").select("*, fahrzeuge(name), profiles(full_name, email)")
+        .eq("behoben", false).order("gemeldet_am", { ascending: false }),
+      db.from("fahrzeuge").select("*").order("name"),
+    ]);
+    anfragen = a.data || []; probleme = p2.data || []; fahrzeuge = f.data || [];
+  } catch (f) {
+    ziel.innerHTML = '<p class="hinweis">' + esc(fehlertext(f)) + '</p>';
+    return;
+  }
+
+  ziel.innerHTML = '<h3 class="fz-unterschrift">Offene Anfragen'
+    + (anfragen.length ? ' <span class="marke">' + anfragen.length + '</span>' : "") + '</h3>'
+    + (anfragen.length ? anfragen.map((a) => '<div class="fz-eigene">'
+        + '<strong>' + esc(a.fahrzeuge ? a.fahrzeuge.name : "") + '</strong> · '
+        + esc((a.profiles && (a.profiles.full_name || a.profiles.email)) || "") + '<br>'
+        + esc(datumZeitKurz(a.von)) + ' – ' + esc(datumZeitKurz(a.bis))
+        + '<div class="klein">' + esc(a.grund || "") + '</div>'
+        + '<div class="fz-karte__knoepfe">'
+        + '<button class="knopf knopf--klein knopf--haupt" data-fz-ok="' + esc(a.id) + '">Bewilligen</button>'
+        + '<button class="knopf knopf--klein knopf--still" data-fz-ab="' + esc(a.id) + '">Ablehnen</button>'
+        + '</div></div>').join("") : '<p class="hinweis">Keine.</p>')
+
+    + '<h3 class="fz-unterschrift">Gemeldete Probleme'
+    + (probleme.length ? ' <span class="marke">' + probleme.length + '</span>' : "") + '</h3>'
+    + (probleme.length ? probleme.map((p2) => '<div class="fz-eigene">'
+        + '<strong>' + esc(p2.fahrzeuge ? p2.fahrzeuge.name : "") + '</strong><br>'
+        + esc(p2.grund) + '<div class="klein">gemeldet von '
+        + esc((p2.profiles && (p2.profiles.full_name || p2.profiles.email)) || "") + '</div>'
+        + '<button class="knopf knopf--klein" data-fz-behoben="' + esc(p2.id) + '">Als behoben markieren</button>'
+        + '</div>').join("") : '<p class="hinweis">Keine.</p>')
+
+    + '<h3 class="fz-unterschrift">Fahrzeuge</h3>'
+    + '<div class="fz-eigene">' + fahrzeuge.map((f) => esc(f.name)).join(", ") + '</div>'
+    + '<button class="knopf knopf--klein" id="fz-neu">+ Fahrzeug</button>';
+
+  ziel.querySelectorAll("[data-fz-ok]").forEach((el) => {
+    el.onclick = async () => {
+      await db.from("fahrzeug_buchungen").update({ status: "genehmigt",
+        entschieden_von: profil.id, entschieden_am: new Date().toISOString() })
+        .eq("id", el.dataset.fzOk);
+      meldung("Bewilligt."); fahrzeugZeichnen();
+    };
+  });
+  ziel.querySelectorAll("[data-fz-ab]").forEach((el) => {
+    el.onclick = async () => {
+      await db.from("fahrzeug_buchungen").update({ status: "abgelehnt",
+        entschieden_von: profil.id, entschieden_am: new Date().toISOString() })
+        .eq("id", el.dataset.fzAb);
+      meldung("Abgelehnt."); fahrzeugZeichnen();
+    };
+  });
+  ziel.querySelectorAll("[data-fz-behoben]").forEach((el) => {
+    el.onclick = async () => {
+      await db.from("fahrzeug_probleme").update({ behoben: true,
+        behoben_am: new Date().toISOString() }).eq("id", el.dataset.fzBehoben);
+      meldung("Als behoben markiert."); fahrzeugZeichnen();
+    };
+  });
+
+  const neuKnopf = document.getElementById("fz-neu");
+  if (neuKnopf) neuKnopf.onclick = async () => {
+    const w = await dialogFelder({ titel: "Neues Fahrzeug",
+      felder: [{ name: "name", label: "Name", pflicht: true, platzhalter: "z. B. VW Caddy" }],
+      bestaetigen: "Anlegen" });
+    if (!w) return;
+    const { error } = await db.from("fahrzeuge").insert({ name: w.name, is_active: true });
+    if (error) meldung(fehlertext(error), "fehler");
+    else { meldung("Fahrzeug angelegt."); fahrzeugZeichnen(); }
+  };
+}
+
 function chatEinbautStoppen() {
   if (chat.takt) { clearInterval(chat.takt); chat.takt = null; }
   if (chat.kanal && db) { try { db.removeChannel(chat.kanal); } catch (f) { /* egal */ } chat.kanal = null; }
@@ -10824,6 +11294,10 @@ function zeichneGeruest() {
     profil = null;
     document.querySelectorAll(".dialog-huelle").forEach((el) => el.remove());
     chatEinbautStoppen();
+    ["fahrzeug-knopf", "fahrzeug-panel", "eier-knopf"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.remove();
+    });
     location.hash = "";
     zeigeLogin();
   }
@@ -10859,6 +11333,8 @@ function zeichneGeruest() {
   if (!location.hash) location.hash = "#/dashboard";
   zeichneSeite();
   chatEinbauen();
+  eierEinbauen();
+  fahrzeugEinbauen();
 }
 
 window.addEventListener("hashchange", () => {
