@@ -2313,6 +2313,12 @@ body.dunkel .kopf__logo { filter: brightness(0) invert(1); }
                                            font-size: .8rem; }
   .tabelle--benutzer .bu-plant, .tabelle--benutzer .bu-kuerzel { text-align: left !important; }
 }
+
+/* ---------- Handy: ohne Zeitregler mehr Platz für den Zoom ---------- */
+@media (max-width: 780px) {
+  .pw-regler-reihe .pw-zoom { width: 100%; }
+  .pw-kopfleiste { gap: 8px !important; }
+}
 </style>
 </head>
 <body>
@@ -2356,7 +2362,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "36.2.0";
+const APP_VERSION = "36.3.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -4713,13 +4719,14 @@ async function ansichtPlanwand(ziel, b) {
 
   ziel.innerHTML = '<div class="pw-kopfleiste">'
     + '<div class="pw-regler-reihe">'
-    + '<div class="pw-zeitregler">'
-    + '<input type="range" id="pw-zeit" min="0" max="200" step="1" value="100">'
-    + '<div class="pw-zeitmarke" id="pw-zeitmarke"></div>'
-    + '<div class="pw-zeitinfo"><span id="pw-zeitvon"></span>'
-    + '<span class="klein">Zeitraum</span>'
-    + '<span id="pw-zeitbis"></span></div>'
-    + '</div>'
+    + (isMobil() ? ""
+        : '<div class="pw-zeitregler">'
+          + '<input type="range" id="pw-zeit" min="0" max="200" step="1" value="100">'
+          + '<div class="pw-zeitmarke" id="pw-zeitmarke"></div>'
+          + '<div class="pw-zeitinfo"><span id="pw-zeitvon"></span>'
+          + '<span class="klein">Zeitraum</span>'
+          + '<span id="pw-zeitbis"></span></div>'
+          + '</div>')
     + '<div class="pw-zoom">'
     + '<span class="klein">Tage</span>'
     + '<input type="range" id="pw-regler" min="5" max="200" step="1" value="'
@@ -4989,6 +4996,53 @@ function griffVerhalten(b) {
 // Leeren Tag bei einer Maschine antippen: dort gleich einen Auftrag anlegen
 // Info-Fenster beim Darüberfahren, für alle — auch ohne
 // Bearbeitungsrecht. Verschwindet, sobald die Maus weiterzieht.
+// Auf dem Handy gibt es keinen Zeitregler. Stattdessen schiebt man
+// die Tafel mit dem Finger: Wer am Rand ankommt, bekommt den
+// nächsten Abschnitt nachgeladen und bleibt dabei an derselben
+// Stelle stehen.
+function zeitWischen(b) {
+  if (!isMobil()) return;
+  const rolle = document.querySelector(".pw-rolle");
+  if (!rolle) return;
+
+  let laeuftGerade = false;
+
+  rolle.addEventListener("scroll", () => {
+    if (laeuftGerade || plan.imDialog) return;
+
+    const rand = 40;
+    const maximum = rolle.scrollWidth - rolle.clientWidth;
+    const schritt = Math.max(3, Math.round(plan.tage / 3));
+
+    if (rolle.scrollLeft <= rand) {
+      // Am linken Rand: weiter in die Vergangenheit
+      laeuftGerade = true;
+      plan.start = arbeitstagePlus(plan.start, -schritt);
+      planAktualisieren(b).then(() => {
+        const neu = document.querySelector(".pw-rolle");
+        if (neu) {
+          // Um genau die nachgeladenen Tage weiterrücken, damit es
+          // sich anfühlt, als wäre nichts passiert.
+          neu.scrollLeft = (neu.scrollWidth - neu.clientWidth) * (schritt / plan.tage) + rand;
+        }
+        setTimeout(() => { laeuftGerade = false; }, 250);
+      });
+    } else if (rolle.scrollLeft >= maximum - rand) {
+      // Am rechten Rand: weiter in die Zukunft
+      laeuftGerade = true;
+      plan.start = arbeitstagePlus(plan.start, schritt);
+      planAktualisieren(b).then(() => {
+        const neu = document.querySelector(".pw-rolle");
+        if (neu) {
+          neu.scrollLeft = Math.max(0,
+            (neu.scrollWidth - neu.clientWidth) * (1 - schritt / plan.tage) - rand);
+        }
+        setTimeout(() => { laeuftGerade = false; }, 250);
+      });
+    }
+  }, { passive: true });
+}
+
 function balkenInfoVerhalten() {
   const tafel = document.querySelector(".pw-tafel");
   if (!tafel) return;
@@ -5729,6 +5783,7 @@ function zeichnePlanwand(b) {
   ferienVerhalten(b);
   ferienGriffe(b);
   balkenInfoVerhalten();
+  zeitWischen(b);
   if (!darfPlanen()) balkenAnsehenVerhalten();
   statusSchnellVerhalten(b);
   sucheHervorheben();
