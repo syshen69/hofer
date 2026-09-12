@@ -2197,6 +2197,41 @@ body.pw-seite .pw-rolle { max-height: calc(100dvh - var(--kopfhoehe) - 150px);
 
 /* ---------- Logo im Dunkelmodus weiss ---------- */
 body.dunkel .kopf__logo { filter: brightness(0) invert(1); }
+
+/* ---------- Farben und Material in den Einstellungen ---------- */
+.farbzeilen { display: flex; flex-direction: column; gap: 6px; }
+.farbzeile { display: grid; grid-template-columns: 32px 96px 1fr 80px;
+            gap: 8px; align-items: center; }
+.farbzeile__punkt { width: 32px; height: 32px; border-radius: 7px;
+                   border: 1px solid rgba(0,0,0,.15); display: grid;
+                   place-items: center; font-size: .68rem; font-weight: 700; }
+.farbzeile__name { font-size: .82rem; color: var(--gedaempft); }
+.farbzeile input { min-height: 34px; padding: 4px 8px; font-size: .85rem; }
+@media (max-width: 560px) {
+  .farbzeile { grid-template-columns: 32px 1fr 70px; }
+  .farbzeile__name { display: none; }
+}
+
+/* ---------- Auftragsfenster kompakter, damit es ohne Scrollen passt ---------- */
+@media (min-width: 900px) {
+  .dialog--breit { max-width: 1080px; }
+  .dialog--breit .dialogspalten { gap: 0 22px; }
+  .dialog--breit .feld { margin-bottom: 10px; }
+  .dialog--breit .dialog__block { padding: 10px 12px; margin-bottom: 12px; }
+  .dialog--breit textarea { rows: 3; }
+  .dialog--breit #pl-notiz { min-height: 74px; }
+  .dialog--breit .farbwahl { padding: 7px; gap: 6px; }
+  .dialog--breit .farbknopf { width: 28px; height: 28px; font-size: .64rem; }
+  .dialog--breit .wahlgitter { gap: 6px; }
+  .dialog--breit .wahlknopf { padding: 7px 8px; min-height: 38px; font-size: .85rem; }
+}
+
+/* ---------- Eierknopf mittig und Fenster wie beim Fahrzeug ---------- */
+.eier-knopf { flex-direction: column; line-height: 1; }
+.eier-dialog { max-height: 88dvh; overflow-y: auto; }
+@media (max-width: 780px) {
+  .eier-dialog { max-height: 80dvh; }
+}
 </style>
 </head>
 <body>
@@ -2240,7 +2275,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "35.1.0";
+const APP_VERSION = "35.2.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -2709,23 +2744,20 @@ function zeigeLogin() {
   const anmeldenZeigen = (konto, bildEl) => {
     letzteKachel = bildEl || null;
 
-    // Zuerst das Ziel ausmessen: die Maske wird dafür kurz unsichtbar
-    // eingeblendet. Das verschiebt die Kacheln für einen Augenblick,
-    // deshalb wird die Startstelle ERST DANACH gemessen — sonst
-    // beginnt der Flug an der falschen Stelle und springt.
+    // Das Ziel muss genau so gemessen werden, wie es nachher steht:
+    // also OHNE die Kachelwand, denn die verschwindet ja. Sonst
+    // landet das Bild zu tief und springt am Ende nach oben.
     anmeldungAufbauen(konto);
+    auswahl.hidden = true;
     anmeldung.hidden = false;
     anmeldung.style.visibility = "hidden";
-    anmeldung.style.position = "absolute";
-    anmeldung.style.pointerEvents = "none";
     const zielBild = anmeldung.querySelector(".login__gross");
     const ziel = zielBild ? zielBild.getBoundingClientRect() : null;
     anmeldung.hidden = true;
     anmeldung.style.visibility = "";
-    anmeldung.style.position = "";
-    anmeldung.style.pointerEvents = "";
+    auswahl.hidden = false;
 
-    // Jetzt steht alles wieder wie vorher — hier stimmt die Messung.
+    // Kachelwand steht wieder — erst jetzt stimmt die Startstelle.
     const quelle = bildEl ? bildEl.getBoundingClientRect() : null;
 
     const fertigstellen = () => {
@@ -4339,18 +4371,37 @@ const plan = {
 };
 
 // Farben für die Balken
+// Die ganze Palette. Welche davon im Auftragsfenster erscheint,
+// entscheidet die Zuteilung in den Einstellungen — dort bekommt
+// jede genutzte Farbe ihr Material und ihr Kürzel.
 const PLANFARBEN = [
-  { wert: "blau",    name: "Blau",    hex: "#003884", schrift: "#fff",    buchstabe: "E" },
-  { wert: "gruen",   name: "Grün",    hex: "#1f7a4d", schrift: "#fff",    buchstabe: "" },
-  { wert: "rot",     name: "Rot",     hex: "#b3261e", schrift: "#fff",    buchstabe: "R" },
-  { wert: "orange",  name: "Orange",  hex: "#c2650f", schrift: "#fff",    buchstabe: "M" },
-  { wert: "gelb",    name: "Gelb",    hex: "#f0b429", schrift: "#3a2c05", buchstabe: "E/N" },
-  { wert: "violett", name: "Violett", hex: "#5b3a9e", schrift: "#fff",    buchstabe: "" },
-  { wert: "tuerkis", name: "Türkis",  hex: "#0d7d8c", schrift: "#fff",    buchstabe: "" },
-  { wert: "rosa",    name: "Rosa",    hex: "#d4638f", schrift: "#fff",    buchstabe: "R" },
-  { wert: "grau",    name: "Grau",    hex: "#7a838d", schrift: "#fff",    buchstabe: "R" },
-  { wert: "weiss",   name: "Weiss",   hex: "#ffffff", schrift: "#1d2430", buchstabe: "A" },
+  { wert: "blau",      name: "Blau",        hex: "#003884", schrift: "#fff" },
+  { wert: "hellblau",  name: "Hellblau",    hex: "#3d7fd1", schrift: "#fff" },
+  { wert: "marine",    name: "Marineblau",  hex: "#0b2350", schrift: "#fff" },
+  { wert: "tuerkis",   name: "Türkis",      hex: "#0d7d8c", schrift: "#fff" },
+  { wert: "cyan",      name: "Cyan",        hex: "#17a2b8", schrift: "#08343a" },
+  { wert: "gruen",     name: "Grün",        hex: "#1f7a4d", schrift: "#fff" },
+  { wert: "hellgruen", name: "Hellgrün",    hex: "#6fbf5b", schrift: "#17330f" },
+  { wert: "oliv",      name: "Oliv",        hex: "#6b7a2f", schrift: "#fff" },
+  { wert: "gelb",      name: "Gelb",        hex: "#f0b429", schrift: "#3a2c05" },
+  { wert: "senf",      name: "Senf",        hex: "#c9922a", schrift: "#fff" },
+  { wert: "orange",    name: "Orange",      hex: "#c2650f", schrift: "#fff" },
+  { wert: "hellorange",name: "Hellorange",  hex: "#f08b3c", schrift: "#3a1f05" },
+  { wert: "rot",       name: "Rot",         hex: "#b3261e", schrift: "#fff" },
+  { wert: "dunkelrot", name: "Dunkelrot",   hex: "#7a1712", schrift: "#fff" },
+  { wert: "rosa",      name: "Rosa",        hex: "#d4638f", schrift: "#fff" },
+  { wert: "violett",   name: "Violett",     hex: "#5b3a9e", schrift: "#fff" },
+  { wert: "flieder",   name: "Flieder",     hex: "#9b7cc9", schrift: "#231541" },
+  { wert: "braun",     name: "Braun",       hex: "#7a5230", schrift: "#fff" },
+  { wert: "beige",     name: "Beige",       hex: "#d8c49a", schrift: "#3a2e15" },
+  { wert: "grau",      name: "Grau",        hex: "#7a838d", schrift: "#fff" },
+  { wert: "anthrazit", name: "Anthrazit",   hex: "#3c444d", schrift: "#fff" },
+  { wert: "weiss",     name: "Weiss",       hex: "#ffffff", schrift: "#1d2430" },
 ];
+
+// Zuteilung Farbe → Material und Kürzel, aus den Einstellungen.
+// Wird beim Start geladen.
+let FARBZUTEILUNG = {};
 
 // Zustand eines Auftrags auf der Planwand
 const PLANSTATUS = {
@@ -4412,7 +4463,28 @@ function naechsterFreierTag(maschineId) {
 }
 
 function farbeVon(wert) {
-  return PLANFARBEN.find((f) => f.wert === wert) || PLANFARBEN[0];
+  const f = PLANFARBEN.find((x) => x.wert === wert) || PLANFARBEN[0];
+  const zu = FARBZUTEILUNG[f.wert];
+  // Material und Kürzel kommen aus der Zuteilung in den Einstellungen
+  return { ...f, material: zu ? zu.material : "", buchstabe: zu ? (zu.buchstabe || "") : "" };
+}
+
+// Nur Farben, denen ein Material zugeteilt wurde, stehen im
+// Auftragsfenster zur Auswahl.
+function farbenZurWahl() {
+  const genutzt = PLANFARBEN.filter((f) => FARBZUTEILUNG[f.wert]);
+  if (!genutzt.length) return PLANFARBEN;   // solange nichts zugeteilt ist
+  return genutzt.sort((a, b2) =>
+    (FARBZUTEILUNG[a.wert].sortierung || 0) - (FARBZUTEILUNG[b2.wert].sortierung || 0));
+}
+
+async function farbzuteilungLaden() {
+  try {
+    const { data, error } = await db.from("farb_material").select("*").order("sortierung");
+    if (error) throw error;
+    FARBZUTEILUNG = {};
+    (data || []).forEach((z) => { FARBZUTEILUNG[z.farbe] = z; });
+  } catch (f) { /* ohne Zuteilung bleibt die ganze Palette nutzbar */ }
 }
 
 // Auf der Planwand darf jeder alles sehen. Geändert wird erst,
@@ -6176,11 +6248,17 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
 
     + '<div class="feld"><span class="feldlabel">Farbe</span>'
     + '<div class="farbwahl">'
-    + PLANFARBEN.map((f) => '<button type="button" class="farbknopf'
-        + (planFarbe === f.wert ? " aktiv" : "") + '" data-plfarbe="' + f.wert + '"'
-        + ' style="background:' + f.hex + ';color:' + f.schrift + '" title="' + f.name + '">'
-        + esc(f.buchstabe || "") + '</button>').join("")
-    + '</div></div>'
+    + farbenZurWahl().map((f) => {
+        const zu = FARBZUTEILUNG[f.wert];
+        const titel = zu ? (zu.material + " (" + f.name + ")") : f.name;
+        return '<button type="button" class="farbknopf'
+          + (planFarbe === f.wert ? " aktiv" : "") + '" data-plfarbe="' + f.wert + '"'
+          + ' style="background:' + f.hex + ';color:' + f.schrift + '" title="' + esc(titel) + '">'
+          + esc(zu ? (zu.buchstabe || "") : "") + '</button>';
+      }).join("")
+    + '</div>'
+    + '<span class="feldhinweis" id="pl-farbmaterial"></span>'
+    + '</div>'
 
     + '<label class="feld"><span>Notiz für die Maschine</span>'
     + '<textarea id="pl-notiz" rows="5" placeholder="Rüsthinweise, Besonderheiten, Werkzeuge …"'
@@ -6285,11 +6363,20 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     };
   });
 
+  const farbHinweis = $("pl-farbmaterial");
+  const farbHinweisSetzen = () => {
+    if (!farbHinweis) return;
+    const zu = FARBZUTEILUNG[planFarbe];
+    farbHinweis.textContent = zu ? zu.material : "";
+  };
+  farbHinweisSetzen();
+
   huelle.querySelectorAll("[data-plfarbe]").forEach((el) => {
     el.onclick = () => {
       planFarbe = el.dataset.plfarbe;
       huelle.querySelectorAll("[data-plfarbe]").forEach((x) =>
         x.classList.toggle("aktiv", x.dataset.plfarbe === planFarbe));
+      farbHinweisSetzen();
     };
   });
 
@@ -8802,6 +8889,60 @@ function einstellungenOeffnen() {
   }
 }
 
+// Farben den Materialien zuordnen. Jede Farbe der Palette bekommt
+// ein Feld für das Material und eines für das Kürzel. Leeres
+// Material heisst: die Farbe erscheint nicht im Auftragsfenster.
+async function farbListeZeichnen() {
+  const kasten = document.getElementById("farbliste");
+  if (!kasten) return;
+
+  await farbzuteilungLaden();
+
+  kasten.innerHTML = '<div class="farbzeilen">'
+    + PLANFARBEN.map((f) => {
+        const zu = FARBZUTEILUNG[f.wert] || {};
+        return '<div class="farbzeile">'
+          + '<span class="farbzeile__punkt" style="background:' + f.hex
+          + ';color:' + f.schrift + '">' + esc(zu.buchstabe || "") + '</span>'
+          + '<span class="farbzeile__name">' + esc(f.name) + '</span>'
+          + '<input type="text" class="farbzeile__material" data-fmat="' + f.wert
+          + '" value="' + esc(zu.material || "") + '" placeholder="Material">'
+          + '<input type="text" class="farbzeile__kuerzel" data-fkuerzel="' + f.wert
+          + '" value="' + esc(zu.buchstabe || "") + '" placeholder="Kürzel">'
+          + '</div>';
+      }).join("")
+    + '</div>';
+
+  const speichern = async (farbe) => {
+    const matFeld = kasten.querySelector('[data-fmat="' + farbe + '"]');
+    const kueFeld = kasten.querySelector('[data-fkuerzel="' + farbe + '"]');
+    const material = (matFeld.value || "").trim();
+    const kuerzel = (kueFeld.value || "").trim();
+
+    if (!material) {
+      // Ohne Material verschwindet die Farbe aus der Auswahl
+      await db.from("farb_material").delete().eq("farbe", farbe);
+      meldung("Farbe wird nicht mehr angeboten.");
+    } else {
+      const nr = PLANFARBEN.findIndex((x) => x.wert === farbe);
+      const { error } = await db.from("farb_material").upsert({
+        farbe: farbe, material: material, buchstabe: kuerzel || null, sortierung: nr,
+      });
+      if (error) { meldung(fehlertext(error), "fehler"); return; }
+      meldung("Gespeichert.");
+    }
+    await farbzuteilungLaden();
+    farbListeZeichnen();
+  };
+
+  kasten.querySelectorAll("[data-fmat]").forEach((el) => {
+    el.onchange = () => speichern(el.dataset.fmat);
+  });
+  kasten.querySelectorAll("[data-fkuerzel]").forEach((el) => {
+    el.onchange = () => speichern(el.dataset.fkuerzel);
+  });
+}
+
 async function seiteEinstellungen(b) {
   const ich = profil || {};
   const bin = istAdmin();
@@ -8849,6 +8990,15 @@ async function seiteEinstellungen(b) {
     + '<span>Angemeldet bleiben — nicht nach fünf Minuten abmelden</span></label>'
     + '<p class="hinweis">Gilt nur auf diesem Gerät. Ohne Haken meldet sich die '
     + 'App nach fünf Minuten ohne Bedienung selbst ab.</p></section>'
+
+    + (bin
+      ? '<section class="karte"><h2>Farben und Material</h2>'
+        + '<p class="hinweis">Nur Farben mit einem Material erscheinen im '
+        + 'Auftragsfenster. Das Kürzel steht auf dem Balken — mehrere Angaben '
+        + 'mit Schrägstrich, zum Beispiel E/N.</p>'
+        + '<div id="farbliste"><div class="laedt">Wird geladen …</div></div>'
+        + '</section>'
+      : "")
 
     + (bin
       ? '<section class="karte"><h2>Benutzer</h2>'
@@ -8947,6 +9097,7 @@ async function seiteEinstellungen(b) {
   };
 
   if (window.abmeldenBinden) window.abmeldenBinden();
+  if (bin) farbListeZeichnen();
 
   // ---------- Pin ----------
   const pinFeld = document.getElementById("pin-feld");
@@ -10868,7 +11019,7 @@ async function eierEinbauen() {
   knopf.id = "eier-knopf";
   knopf.className = "eier-knopf";
   knopf.title = "Eier im Lager";
-  knopf.innerHTML = '\u{1F95A}<span class="eier-zahl" id="eier-zahl">–</span>';
+  knopf.innerHTML = "\u{1F95A}";
   document.body.appendChild(knopf);
   knopf.onclick = () => eierFensterUmschalten();
 
@@ -10909,9 +11060,6 @@ function eierSchachtelBild(gefuellt, klasse) {
 
 function eierAnzeigen() {
   const s2 = eierSchachteln();
-
-  const z = document.getElementById("eier-zahl");
-  if (z) z.textContent = s2.schachteln + "×6+" + s2.rest;
 
   const gross = document.getElementById("eier-grossbild");
   if (gross) gross.innerHTML = eierSchachtelBild(s2.rest, "eier-schachtel eier-schachtel--gross");
@@ -11949,7 +12097,7 @@ function zeichneGeruest() {
   untaetigZuruecksetzen();
 
   if (!location.hash) location.hash = "#/dashboard";
-  zeichneSeite();
+  farbzuteilungLaden().then(() => zeichneSeite());
   fahrzeugEinbauen();
   eierEinbauen();
 }
