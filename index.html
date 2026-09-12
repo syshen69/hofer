@@ -1502,7 +1502,11 @@ body.dunkel .pw-kopfblock, body.dunkel .pw-zeile--kopf, body.dunkel .pw-zeile--k
 body.dunkel .karte--raster, body.dunkel .raster .fest, body.dunkel .kennzahl,
 body.dunkel .pd-zeile, body.dunkel .spass-karte, body.dunkel .spass-zahl-feld,
 body.dunkel .wahlknopf, body.dunkel .parkwahl__knopf, body.dunkel .moduswahl__knopf,
-body.dunkel .reiter__knopf, body.dunkel .unterreiter__knopf, body.dunkel .knopf,
+body.dunkel .reiter__knopf, body.dunkel .unterreiter__knopf,
+body.dunkel .knopf { background: var(--flaeche); }
+
+/* Die Anmeldekarte bleibt bewusst blau — eigene Regel, damit sie
+   sich nicht an die Sammelregel darüber anhängt. */
 body.dunkel .login__karte { background: var(--marke); }
 
 body.dunkel .statuszeile, body.dunkel .meldungsnotiz, body.dunkel .raster .summe,
@@ -1693,8 +1697,13 @@ body.dunkel .wahlknopf.aktiv { background: #24344a; }
 .pw-zeitregler input[type="range"] { width: 100%; accent-color: var(--marke); }
 .pw-zeitmarke { position: absolute; top: -2px; width: 2px; height: 20px;
                 background: var(--gefahr); pointer-events: none; }
-.pw-zeitmarke::after { content: "heute"; position: absolute; top: -14px; left: -14px;
-                       font-size: .62rem; color: var(--gefahr); font-weight: 650; }
+/* Die Beschriftung sass halb ausserhalb und war abgeschnitten.
+   Jetzt mittig über dem Strich, mit etwas Luft darüber. */
+.pw-zeitmarke::after { content: "heute"; position: absolute; top: -15px; left: 50%;
+                       transform: translateX(-50%);
+                       font-size: .64rem; color: var(--gefahr); font-weight: 700;
+                       white-space: nowrap; line-height: 1;
+                       background: var(--grund); padding: 0 3px; border-radius: 3px; }
 .pw-zeitinfo { display: flex; justify-content: space-between; align-items: center;
                font-size: .74rem; color: var(--gedaempft);
                font-variant-numeric: tabular-nums; }
@@ -2154,6 +2163,17 @@ body.pw-seite .pw-rolle { max-height: calc(100dvh - var(--kopfhoehe) - 150px);
   .pw-balken, .pw-griff, .pw-ferien { touch-action: pan-x pan-y !important; }
   .pw-rolle { overflow: auto !important; -webkit-overflow-scrolling: touch; }
 }
+
+/* ---------- Suchfenster ---------- */
+.su-zeitgitter { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.su-zeitgitter .wahlknopf { padding: 10px 8px; font-size: .86rem; min-height: 44px;
+                            white-space: nowrap; }
+.su-datumsteil { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.su-datumsteil input[type="date"] { width: 100%; }
+@media (min-width: 420px) {
+  .su-zeitgitter { grid-template-columns: repeat(4, 1fr); }
+  .su-zeitgitter .wahlknopf { font-size: .8rem; padding: 10px 4px; }
+}
 </style>
 </head>
 <body>
@@ -2197,7 +2217,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "34.1.0";
+const APP_VERSION = "34.2.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -4263,6 +4283,8 @@ function auftragsKnoepfeBinden(raster, b) {
 // =================================================================
 
 const plan = {
+  sucheAktiv: false,
+  trefferListe: [],
   start: null,      // erster sichtbarer Tag
   zoom: null,       // 1 ist normal, kleiner zeigt mehr Tage
   tage: 15,   // drei Wochen zu je fünf Arbeitstagen
@@ -4884,17 +4906,18 @@ async function sucheDialog(b) {
     + '" placeholder="zum Beispiel 10844, Index oder Messing"></label>'
 
     + '<div class="feld"><span class="feldlabel">Zeitraum</span>'
-    + '<div class="wahlgitter" id="su-zeitwahl">'
+    + '<div class="su-zeitgitter" id="su-zeitwahl">'
     + [["alle", "Ganze Planung"], ["abheute", "Ab heute"],
-       ["vorher", "Vor heute"], ["datum", "Ab einem Datum"]]
+       ["vorher", "Vor heute"], ["datum", "Ab Datum"]]
         .map(([w, t]) => '<button type="button" class="wahlknopf'
           + (w === "alle" ? " aktiv" : "") + '" data-suzeit="' + w + '">' + t + '</button>').join("")
     + '</div>'
-    + '<input type="date" id="su-datum" hidden>'
-    + '<div class="moduswahl" id="su-richtung" hidden>'
-    + '<button type="button" class="moduswahl__knopf aktiv" data-surichtung="vor">ab dort vorwärts</button>'
-    + '<button type="button" class="moduswahl__knopf" data-surichtung="zurueck">ab dort rückwärts</button>'
-    + '</div></div>'
+    + '<div class="su-datumsteil" id="su-datumsteil" hidden>'
+    + '<input type="date" id="su-datum">'
+    + '<div class="moduswahl" id="su-richtung">'
+    + '<button type="button" class="moduswahl__knopf aktiv" data-surichtung="vor">vorwärts</button>'
+    + '<button type="button" class="moduswahl__knopf" data-surichtung="zurueck">rückwärts</button>'
+    + '</div></div></div>'
 
     + '<div class="dialog__knoepfe">'
     + '<button class="knopf knopf--still" id="su-nein">Abbrechen</button>'
@@ -4912,8 +4935,7 @@ async function sucheDialog(b) {
       zeitwahl = k.dataset.suzeit;
       huelle.querySelectorAll("[data-suzeit]").forEach((x) =>
         x.classList.toggle("aktiv", x === k));
-      datumFeld.hidden = zeitwahl !== "datum";
-      richtungFeld.hidden = zeitwahl !== "datum";
+      huelle.querySelector("#su-datumsteil").hidden = zeitwahl !== "datum";
       if (zeitwahl === "datum" && !datumFeld.value) datumFeld.value = isoDatum(new Date());
     };
   });
@@ -5012,11 +5034,15 @@ function sucheHervorheben() {
 
   const liste = plan.trefferListe || [];
   const aktuell = liste[plan.trefferNr];
+  // Ausdrücklich ein Ja/Nein. Ist der Wert undefiniert, würde
+  // classList.toggle die Klasse bei jedem Aufruf umschalten statt
+  // sie zu entfernen — dann wird nach und nach alles blass.
+  const laeuft = plan.sucheAktiv === true && liste.length > 0;
 
   tafel.querySelectorAll("[data-auftrag]").forEach((el) => {
-    const ist = liste.includes(el.dataset.auftrag);
-    el.classList.toggle("pw-balken--blass", plan.sucheAktiv && !ist);
-    el.classList.toggle("pw-balken--treffer", plan.sucheAktiv && el.dataset.auftrag === aktuell);
+    const ist = liste.indexOf(el.dataset.auftrag) !== -1;
+    el.classList.toggle("pw-balken--blass", laeuft && !ist);
+    el.classList.toggle("pw-balken--treffer", laeuft && el.dataset.auftrag === aktuell);
   });
 }
 
@@ -11124,8 +11150,21 @@ async function fahrzeugAnsichtBuchen(ziel) {
               + '<div class="klein">' + esc(m.grund || "") + ' · '
               + (m.status === "angefragt" ? "wartet auf Bewilligung"
                   : m.status === "genehmigt" ? "bewilligt" : "abgelehnt") + '</div>'
+              + '<button class="linkknopf linkknopf--gefahr" data-fz-weg="' + esc(m.id)
+              + '">Zurückziehen</button>'
               + '</div>').join("")
         : "");
+
+  ziel.querySelectorAll("[data-fz-weg]").forEach((el) => {
+    el.onclick = async () => {
+      const ok = await nachfragen({ titel: "Anfrage zurückziehen",
+        text: "Die Anfrage wird gelöscht.", bestaetigen: "Zurückziehen", gefahr: true });
+      if (!ok) return;
+      const { error } = await db.from("fahrzeug_buchungen").delete().eq("id", el.dataset.fzWeg);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Anfrage zurückgezogen."); fahrzeugZeichnen(); }
+    };
+  });
 
   ziel.querySelectorAll("[data-fz-buchen]").forEach((el) => {
     el.onclick = () => fahrzeugAnfrageDialog(el.dataset.fzBuchen,
@@ -11181,7 +11220,7 @@ async function fahrzeugAnsichtHistorie(ziel) {
   let liste;
   try {
     const { data, error } = await db.from("fahrzeug_buchungen")
-      .select("*, fahrzeuge(name), profiles(full_name, email)")
+      .select("*, fahrzeuge(name), profiles!fahrzeug_buchungen_user_id_fkey(full_name, email)")
       .order("von", { ascending: false }).limit(100);
     if (error) throw error;
     liste = data || [];
