@@ -925,18 +925,8 @@ a:focus-visible {
 /* ---------- Planwand ---------- */
 /* Eigenes Scrollfenster: nur so kann die Datumszeile beim
    Herunterscrollen oben mitwandern. */
-/* Auf der Planwand scrollt nur noch die Tafel selbst — der Rest der
-   Seite (Kopfzeile, Regler) bleibt fest stehen. Nur am Desktop: die
-   Rechnung mit der unteren Handy-Navigation ist zu unzuverlässig,
-   dort bleibt es beim normalen Scrollen der ganzen Seite. */
-@media (min-width: 781px) {
-  body.pw-seite { overflow: hidden; height: 100dvh; }
-  body.pw-seite .inhalt { height: calc(100dvh - var(--kopfhoehe)); overflow: hidden;
-                          display: flex; flex-direction: column; }
-  body.pw-seite #pw-inhalt { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
-  body.pw-seite .pw-rolle { flex: 1 1 auto; min-height: 0; }
-  body.pw-seite .pw-legende { flex: none; margin-top: 6px; }
-}
+/* Die Seite scrollt normal. Die Tafel hat ein eigenes Fenster, damit
+   die Kalenderwochen- und Tageszeile darin oben mitwandern kann. */
 .pw-rolle { overflow: auto; max-height: calc(100vh - 260px);
             background: var(--flaeche);
             border: 1px solid var(--linie); border-radius: var(--radius); }
@@ -1597,8 +1587,14 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--marke); }
 .parkzeile__name .kopf__bild { width: 28px; height: 28px; }
 
 /* ---------- Kopfzeile und Menü bleiben stehen ---------- */
-.kopf { position: fixed; top: 0; left: 0; right: 0; z-index: 30; }
+.kopf { position: fixed; top: 0; left: 0; right: 0; z-index: 30;
+        box-sizing: border-box; }
+/* Genau die Höhe der Kopfzeile, damit darunter weder eine Lücke
+   bleibt noch etwas verdeckt wird. */
 .rahmen { padding-top: var(--kopfhoehe); }
+@media (min-width: 780px) {
+  .nav { top: var(--kopfhoehe); }
+}
 @media (min-width: 780px) {
   .nav { position: fixed; top: var(--kopfhoehe); left: 0;
          width: 208px; height: calc(100dvh - var(--kopfhoehe));
@@ -1969,7 +1965,13 @@ pre, .gcode { max-width: 100%; overflow-x: auto; }
   width: 18px; height: 18px; border-radius: 50%; background: var(--marke); border: none; }
 .pw-eckknoepfe { display: flex; gap: 8px; flex: none; }
 @media (max-width: 780px) {
-  .pw-kopfleiste { flex-direction: column; }
+  .pw-kopfleiste { flex-direction: column; align-items: stretch; }
+  /* In einer Spalte wird aus der Flex-Basis eine HÖHE. Ohne diese
+     Zeile reisst "flex: 1 1 600px" ein 600 Pixel hohes Loch. */
+  .pw-regler-reihe { flex: none !important; width: 100%;
+                     flex-direction: column; gap: 10px; }
+  .pw-regler-reihe .pw-zeitregler,
+  .pw-regler-reihe .pw-zoom { flex: none !important; width: 100%; min-width: 0; }
   .pw-eckknoepfe { width: 100%; }
   .pw-eckknoepfe .knopf { flex: 1; }
 }
@@ -2081,24 +2083,22 @@ body.dunkel .pw-balken--laeuft { border-color: #ffffff; }
 .reiter-eintritt { animation: reiterEintritt .2s ease; }
 
 /* ---------- Planwand: möglichst wenig verschenkter Platz ---------- */
-/* Der grosse Innenabstand der Inhaltsfläche und der Platz für die
-   untere Navigation werden hier nicht gebraucht — am Computer gibt
-   es die Leiste gar nicht, und die Tafel scrollt ohnehin selbst. */
+/* Planwand: möglichst wenig verschenkter Platz drumherum.
+   Die Regler-Leiste klebt bewusst NICHT mehr oben — sonst legt sie
+   sich über die Kalenderwochenzeile der Tafel. */
 body.pw-seite .inhalt { padding-top: 4px; padding-bottom: 6px; }
-@media (min-width: 781px) {
-  body.pw-seite .inhalt { padding-bottom: 4px; }
-}
-.pw-kopfleiste { padding: 2px 0 6px !important; gap: 10px !important; }
+.pw-kopfleiste { position: static !important; padding: 0 0 6px !important;
+                 gap: 10px !important; }
 .pw-regler-reihe .pw-zeitregler { padding-top: 13px !important; }
 .pw-rolle + .pw-legende, .pw-legende { margin-top: 6px !important;
                                        font-size: .72rem; opacity: .8; }
-@media (min-width: 781px) {
-  body.pw-seite .pw-rolle { max-height: none; }
-}
-/* Auf dem Handy soll die Tafel möglichst viel Höhe bekommen */
+/* Die Tafel bekommt so viel Höhe wie möglich, ohne dass die Seite
+   dabei ihr eigenes Scrollen verliert. */
+body.pw-seite .pw-rolle { max-height: calc(100dvh - var(--kopfhoehe) - 150px);
+                          min-height: 300px; }
 @media (max-width: 780px) {
   body.pw-seite .pw-rolle { max-height: calc(100dvh - var(--kopfhoehe)
-                            - var(--navhoehe) - 150px); min-height: 320px; }
+                            - var(--navhoehe) - 190px); min-height: 300px; }
 }
 
 /* ---------- Eierzähler ---------- */
@@ -2129,6 +2129,31 @@ body.pw-seite .inhalt { padding-top: 4px; padding-bottom: 6px; }
 .eier-knoepfe .knopf { flex: 1; }
 .eier-zeile { text-align: left; font-size: .85rem; padding: 8px 0;
              border-bottom: 1px solid var(--linie); }
+
+/* ---------- Suche auf der Planwand ---------- */
+.pw-balken--blass { opacity: .16; filter: grayscale(.7); }
+.pw-balken--treffer { outline: 3px solid var(--signalgelb, #f0b429);
+                     outline-offset: 2px; z-index: 5; }
+.su-leiste { position: fixed; z-index: 42; left: 50%; transform: translateX(-50%);
+            bottom: 18px; display: flex; align-items: center; gap: 8px;
+            background: var(--flaeche); border: 1px solid var(--linie-stark);
+            border-radius: var(--radius); padding: 8px 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,.25); max-width: calc(100vw - 24px); }
+.su-leiste__text { font-size: .82rem; font-weight: 600; white-space: nowrap;
+                  overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 780px) {
+  .su-leiste { bottom: calc(var(--navhoehe) + 12px); flex-wrap: wrap;
+              justify-content: center; }
+}
+
+/* ---------- Handy: in der Tafel muss gewischt werden können ---------- */
+/* Die Balken sperren am Computer das Wischen, damit sich Ziehen und
+   Scrollen nicht in die Quere kommen. Auf dem Handy wird gar nicht
+   geschoben — dort muss das Wischen also erlaubt sein. */
+@media (max-width: 780px) {
+  .pw-balken, .pw-griff, .pw-ferien { touch-action: pan-x pan-y !important; }
+  .pw-rolle { overflow: auto !important; -webkit-overflow-scrolling: touch; }
+}
 </style>
 </head>
 <body>
@@ -2172,7 +2197,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "33.1.0";
+const APP_VERSION = "34.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -2594,57 +2619,95 @@ function zeigeLogin() {
 
   // ---------- Anmeldung für ein gewähltes Konto ----------
 
+  // Merkt sich, von welcher Kachel aus geflogen wurde
+  let letzteKachel = null;
+
+  // Baut die Anmeldemaske auf, ohne sie schon zu zeigen
+  const anmeldungAufbauen = (konto) => {
+    anmeldung.innerHTML = ''
+      + (konto.bild_url
+          ? '<img class="login__gross" src="' + esc(konto.bild_url) + '" alt="">'
+          : '<span class="login__gross login__gross--buchstabe">'
+            + esc((konto.full_name || konto.email).charAt(0).toUpperCase()) + '</span>')
+      + '<div class="login__name">' + esc(konto.full_name || konto.email) + '</div>'
+      + '<form id="lf" novalidate>'
+      + '<input type="password" id="lp" class="login__pw" placeholder="Passwort"'
+      + ' autocomplete="current-password" required>'
+      + '<button type="submit" class="knopf knopf--haupt knopf--breit" id="lk">Anmelden</button>'
+      + '</form>'
+      + '<button type="button" class="linkknopf login__anderekonto" id="lg-anderes">'
+      + 'anderes Konto</button>';
+  };
+
+  // Lässt einen Klon von A nach B fliegen und ruft danach fertig() auf
+  const fliegen = (vorlageEl, vonRechteck, nachRechteck, fertig) => {
+    const klon = vorlageEl.cloneNode(true);
+    klon.className = "login__flug";
+    klon.style.cssText = "left:" + vonRechteck.left + "px;top:" + vonRechteck.top
+      + "px;width:" + vonRechteck.width + "px;height:" + vonRechteck.height + "px;";
+    document.body.appendChild(klon);
+
+    requestAnimationFrame(() => {
+      klon.style.left = nachRechteck.left + "px";
+      klon.style.top = nachRechteck.top + "px";
+      klon.style.width = nachRechteck.width + "px";
+      klon.style.height = nachRechteck.height + "px";
+    });
+
+    setTimeout(() => { klon.remove(); if (fertig) fertig(); }, 400);
+  };
+
   const anmeldenZeigen = (konto, bildEl) => {
-    // Die angeklickte Kachel fliegt an ihren neuen Platz unter dem Logo
+    letzteKachel = bildEl || null;
     const quelle = bildEl ? bildEl.getBoundingClientRect() : null;
-    if (quelle) {
-      const klon = bildEl.cloneNode(true);
-      klon.className = "login__flug";
-      klon.style.cssText = "left:" + quelle.left + "px;top:" + quelle.top
-        + "px;width:" + quelle.width + "px;height:" + quelle.height + "px;";
-      document.body.appendChild(klon);
-      auswahl.classList.add("login__kachelfeld--weg");
 
-      const marke = document.getElementById("lg-marke").getBoundingClientRect();
-      requestAnimationFrame(() => {
-        const gross = 96;
-        klon.style.left = (marke.left + marke.width / 2 - gross / 2) + "px";
-        klon.style.top = (marke.bottom + 14) + "px";
-        klon.style.width = gross + "px";
-        klon.style.height = gross + "px";
-      });
-      setTimeout(() => klon.remove(), 400);
-    }
+    // Erst unsichtbar aufbauen und ausmessen, wohin das Bild wirklich
+    // kommt. So trifft die Animation genau die spätere Stelle, statt
+    // sie zu schätzen.
+    anmeldungAufbauen(konto);
+    anmeldung.hidden = false;
+    anmeldung.style.visibility = "hidden";
+    const zielBild = anmeldung.querySelector(".login__gross");
+    const ziel = zielBild ? zielBild.getBoundingClientRect() : null;
+    anmeldung.hidden = true;
+    anmeldung.style.visibility = "";
 
-    setTimeout(() => {
+    const fertigstellen = () => {
       auswahl.hidden = true;
       anmeldung.hidden = false;
       anmeldung.className = "login__block--ein";
-      anmeldung.innerHTML = ''
-        + (konto.bild_url
-            ? '<img class="login__gross" src="' + esc(konto.bild_url) + '" alt="">'
-            : '<span class="login__gross login__gross--buchstabe">'
-              + esc((konto.full_name || konto.email).charAt(0).toUpperCase()) + '</span>')
-        + '<div class="login__name">' + esc(konto.full_name || konto.email) + '</div>'
-        + '<form id="lf" novalidate>'
-        + '<input type="password" id="lp" class="login__pw" placeholder="Passwort"'
-        + ' autocomplete="current-password" required>'
-        + '<button type="submit" class="knopf knopf--haupt knopf--breit" id="lk">Anmelden</button>'
-        + '</form>'
-        + '<button type="button" class="linkknopf login__anderekonto" id="lg-anderes">'
-        + 'anderes Konto</button>';
-
       document.getElementById("lg-anderes").onclick = zurueckZurAuswahl;
       anmeldenBinden(konto.email);
       document.getElementById("lp").focus();
-    }, quelle ? 400 : 0);
+    };
+
+    if (quelle && ziel) {
+      auswahl.classList.add("login__kachelfeld--weg");
+      fliegen(bildEl, quelle, ziel, fertigstellen);
+    } else {
+      fertigstellen();
+    }
   };
 
   const zurueckZurAuswahl = () => {
+    const grossEl = anmeldung.querySelector(".login__gross");
+    const von = grossEl ? grossEl.getBoundingClientRect() : null;
+
+    // Auswahl wieder sichtbar machen, damit das Ziel messbar ist
     anmeldung.hidden = true;
-    anmeldung.innerHTML = "";
     auswahl.hidden = false;
     auswahl.classList.remove("login__kachelfeld--weg");
+
+    const nach = letzteKachel ? letzteKachel.getBoundingClientRect() : null;
+
+    if (von && nach && grossEl) {
+      // Die Kachelwand ist schon da, der Klon fliegt einfach auf
+      // seine Kachel zurück und verschwindet dort.
+      auswahl.classList.add("login__block--ein");
+      fliegen(grossEl, von, nach, () => { anmeldung.innerHTML = ""; });
+    } else {
+      anmeldung.innerHTML = "";
+    }
   };
 
   // Mit Escape zurück zur Auswahl
@@ -4722,7 +4785,7 @@ function balkenInfoVerhalten() {
   const weg = () => { if (fenster) { fenster.remove(); fenster = null; } };
 
   tafel.querySelectorAll("[data-auftrag]").forEach((el) => {
-    el.addEventListener("mouseenter", () => {
+    const zeigen = () => {
       const id = el.dataset.auftrag;
       const j = (plan.auftraege || []).find((x) => x.id === id);
       if (!j) return;
@@ -4762,11 +4825,39 @@ function balkenInfoVerhalten() {
       const oben = r.top > 180;
       fenster.style.left = Math.max(8, Math.min(window.innerWidth - 280, r.left)) + "px";
       fenster.style.top = oben ? (r.top - fenster.offsetHeight - 8) + "px" : (r.bottom + 8) + "px";
-    });
+    };
 
+    // Am Computer beim Darüberfahren
+    el.addEventListener("mouseenter", zeigen);
     el.addEventListener("mouseleave", weg);
     el.addEventListener("mousedown", weg);
+
+    // Auf dem Handy: langes Drücken. Kurzes Tippen bleibt ein Klick,
+    // und sobald gescrollt wird, verschwindet die Vorschau wieder.
+    let halten = null, startY = 0, startX = 0;
+    el.addEventListener("touchstart", (e) => {
+      const t = e.touches[0];
+      startY = t.clientY; startX = t.clientX;
+      clearTimeout(halten);
+      halten = setTimeout(() => { zeigen(); }, 450);
+    }, { passive: true });
+
+    el.addEventListener("touchmove", (e) => {
+      const t = e.touches[0];
+      if (Math.abs(t.clientY - startY) > 8 || Math.abs(t.clientX - startX) > 8) {
+        clearTimeout(halten);
+        weg();
+      }
+    }, { passive: true });
+
+    el.addEventListener("touchend", () => { clearTimeout(halten); });
+    el.addEventListener("touchcancel", () => { clearTimeout(halten); weg(); });
   });
+
+  // Ein Tipp irgendwo anders schliesst die Vorschau
+  document.addEventListener("touchstart", (e) => {
+    if (fenster && !e.target.closest("[data-auftrag]")) weg();
+  }, { passive: true });
 }
 
 // Alles, was ein Auftrag an Angaben trägt, als ein Suchtext
@@ -4783,54 +4874,186 @@ function auftragText(j) {
 }
 
 async function sucheDialog(b) {
-  const w = await dialogFelder({
-    titel: "Auf der Planwand suchen",
-    text: "Gesucht wird in allem: Nummer, Maschine, Notiz, Material, Menge, "
-        + "Farbe, Zustand, Problem, FA und Material vorhanden.",
-    felder: [{ name: "text", label: "Suchbegriff", pflicht: true,
-               wert: plan.letzteSuche || "",
-               platzhalter: "zum Beispiel 10844, Index oder Messing" }],
-    bestaetigen: "Suchen",
+  const huelle = document.createElement("div");
+  huelle.className = "dialog-huelle";
+  huelle.innerHTML = '<div class="dialog"><h2>Auf der Planwand suchen</h2>'
+    + '<p class="klein">Gesucht wird in allem: Nummer, Maschine, Notiz, Material, '
+    + 'Menge, Farbe, Zustand, Problem, FA und Material vorhanden.</p>'
+    + '<label class="feld"><span>Suchbegriff</span>'
+    + '<input type="text" id="su-text" value="' + esc(plan.letzteSuche || "")
+    + '" placeholder="zum Beispiel 10844, Index oder Messing"></label>'
+
+    + '<div class="feld"><span class="feldlabel">Zeitraum</span>'
+    + '<div class="wahlgitter" id="su-zeitwahl">'
+    + [["alle", "Ganze Planung"], ["abheute", "Ab heute"],
+       ["vorher", "Vor heute"], ["datum", "Ab einem Datum"]]
+        .map(([w, t]) => '<button type="button" class="wahlknopf'
+          + (w === "alle" ? " aktiv" : "") + '" data-suzeit="' + w + '">' + t + '</button>').join("")
+    + '</div>'
+    + '<input type="date" id="su-datum" hidden>'
+    + '<div class="moduswahl" id="su-richtung" hidden>'
+    + '<button type="button" class="moduswahl__knopf aktiv" data-surichtung="vor">ab dort vorwärts</button>'
+    + '<button type="button" class="moduswahl__knopf" data-surichtung="zurueck">ab dort rückwärts</button>'
+    + '</div></div>'
+
+    + '<div class="dialog__knoepfe">'
+    + '<button class="knopf knopf--still" id="su-nein">Abbrechen</button>'
+    + '<button class="knopf knopf--haupt" id="su-ja">Suchen</button>'
+    + '</div></div>';
+  document.body.appendChild(huelle);
+
+  let zeitwahl = "alle";
+  let richtung = "vor";
+  const datumFeld = huelle.querySelector("#su-datum");
+  const richtungFeld = huelle.querySelector("#su-richtung");
+
+  huelle.querySelectorAll("[data-suzeit]").forEach((k) => {
+    k.onclick = () => {
+      zeitwahl = k.dataset.suzeit;
+      huelle.querySelectorAll("[data-suzeit]").forEach((x) =>
+        x.classList.toggle("aktiv", x === k));
+      datumFeld.hidden = zeitwahl !== "datum";
+      richtungFeld.hidden = zeitwahl !== "datum";
+      if (zeitwahl === "datum" && !datumFeld.value) datumFeld.value = isoDatum(new Date());
+    };
   });
-  if (!w) return;
-  plan.trefferNr = 0;
-  await zumAuftragSpringen(w.text, b, false);
+
+  huelle.querySelectorAll("[data-surichtung]").forEach((k) => {
+    k.onclick = () => {
+      richtung = k.dataset.surichtung;
+      huelle.querySelectorAll("[data-surichtung]").forEach((x) =>
+        x.classList.toggle("aktiv", x === k));
+    };
+  });
+
+  const zu = () => huelle.remove();
+  huelle.querySelector("#su-nein").onclick = zu;
+  dialogSchliessen(huelle, zu);
+
+  const textFeld = huelle.querySelector("#su-text");
+  textFeld.focus();
+  textFeld.onkeydown = (e) => { if (e.key === "Enter") huelle.querySelector("#su-ja").click(); };
+
+  huelle.querySelector("#su-ja").onclick = async () => {
+    const text = (textFeld.value || "").trim();
+    if (!text) { meldung("Bitte einen Suchbegriff eingeben.", "warn"); return; }
+    zu();
+    plan.sucheZeit = { art: zeitwahl, datum: datumFeld.value || null, richtung: richtung };
+    plan.trefferNr = 0;
+    await sucheStarten(text, b);
+  };
 }
 
-async function zumAuftragSpringen(text, b, weiter) {
+// Passt ein Auftrag in den gewählten Zeitraum?
+function sucheImZeitraum(j) {
+  const z = plan.sucheZeit || { art: "alle" };
+  if (z.art === "alle" || !j.planned_from) return true;
+
+  const heute = isoDatum(new Date());
+  const ende = letzterArbeitstag(j.planned_from, j.planned_days || 1);
+
+  if (z.art === "abheute") return ende >= heute;
+  if (z.art === "vorher") return j.planned_from < heute;
+  if (z.art === "datum" && z.datum) {
+    return z.richtung === "zurueck" ? j.planned_from <= z.datum : ende >= z.datum;
+  }
+  return true;
+}
+
+async function sucheStarten(text, b) {
   const t = (text || "").trim().toLowerCase();
   if (!t) return;
 
-  const treffer = (plan.auftraege || []).filter((j) => auftragText(j).includes(t));
+  const treffer = (plan.auftraege || [])
+    .filter((j) => auftragText(j).includes(t) && sucheImZeitraum(j))
+    .sort((a, c) => String(a.planned_from || "").localeCompare(String(c.planned_from || "")));
+
   plan.letzteSuche = text.trim();
   plan.trefferAnzahl = treffer.length;
+  plan.trefferListe = treffer.map((j) => j.id);
 
   if (!treffer.length) {
+    plan.sucheAktiv = false;
     meldung('Nichts gefunden zu "' + text + '".', "warn");
     return;
   }
 
-  if (!weiter) plan.trefferNr = 0;
-  const ziel = treffer[plan.trefferNr % treffer.length];
-  plan.trefferNr = (plan.trefferNr + 1) % treffer.length;
+  plan.sucheAktiv = true;
+  await sucheZumTreffer(0, b);
+}
 
-  meldung(treffer.length === 1
-    ? "Ein Treffer: " + ziel.job_number
-    : "Treffer " + (((plan.trefferNr + treffer.length - 1) % treffer.length) + 1)
-      + " von " + treffer.length + ": " + ziel.job_number);
+async function sucheZumTreffer(nr, b) {
+  const liste = plan.trefferListe || [];
+  if (!liste.length) return;
+
+  plan.trefferNr = ((nr % liste.length) + liste.length) % liste.length;
+  const ziel = (plan.auftraege || []).find((j) => j.id === liste[plan.trefferNr]);
+  if (!ziel) return;
 
   if (ziel.planned_from) {
     plan.start = naechsterArbeitstag(plusTage(ziel.planned_from, -2));
     await planAktualisieren(b);
+  } else {
+    sucheHervorheben();
   }
 
   setTimeout(() => {
     const el = document.querySelector('[data-auftrag="' + CSS.escape(ziel.id) + '"]');
-    if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
-    el.classList.add("pw-balken--treffer");
-    setTimeout(() => el.classList.remove("pw-balken--treffer"), 2500);
-  }, 200);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+  }, 220);
+
+  sucheLeisteZeigen(b, ziel);
+}
+
+// Alles ausser den Treffern blass schalten
+function sucheHervorheben() {
+  const tafel = document.querySelector(".pw-tafel");
+  if (!tafel) return;
+
+  const liste = plan.trefferListe || [];
+  const aktuell = liste[plan.trefferNr];
+
+  tafel.querySelectorAll("[data-auftrag]").forEach((el) => {
+    const ist = liste.includes(el.dataset.auftrag);
+    el.classList.toggle("pw-balken--blass", plan.sucheAktiv && !ist);
+    el.classList.toggle("pw-balken--treffer", plan.sucheAktiv && el.dataset.auftrag === aktuell);
+  });
+}
+
+function sucheBeenden() {
+  plan.sucheAktiv = false;
+  plan.trefferListe = [];
+  plan.letzteSuche = "";
+  const leiste = document.getElementById("su-leiste");
+  if (leiste) leiste.remove();
+  sucheHervorheben();
+}
+
+// Kleine Leiste mit Weiter-Knopf, solange eine Suche läuft
+function sucheLeisteZeigen(b, ziel) {
+  let leiste = document.getElementById("su-leiste");
+  if (!leiste) {
+    leiste = document.createElement("div");
+    leiste.id = "su-leiste";
+    leiste.className = "su-leiste";
+    document.body.appendChild(leiste);
+  }
+
+  const anzahl = (plan.trefferListe || []).length;
+  leiste.innerHTML = '<span class="su-leiste__text">'
+    + esc(plan.letzteSuche) + ' · Treffer ' + (plan.trefferNr + 1) + ' von ' + anzahl
+    + ' · ' + esc(ziel.job_number) + '</span>'
+    + (anzahl > 1
+        ? '<button type="button" class="knopf knopf--klein" id="su-zurueck">‹</button>'
+          + '<button type="button" class="knopf knopf--klein" id="su-weiter">›</button>'
+        : "")
+    + '<button type="button" class="knopf knopf--klein" id="su-ende">Suche beenden</button>';
+
+  const weiter = document.getElementById("su-weiter");
+  if (weiter) weiter.onclick = () => sucheZumTreffer(plan.trefferNr + 1, b);
+  const zurueck = document.getElementById("su-zurueck");
+  if (zurueck) zurueck.onclick = () => sucheZumTreffer(plan.trefferNr - 1, b);
+  document.getElementById("su-ende").onclick = () => sucheBeenden();
 }
 
 // Ohne Bearbeitungsrecht öffnet ein Klick auf einen Auftrag direkt
@@ -4844,6 +5067,7 @@ function balkenAnsehenVerhalten() {
     el.onclick = () => {
       const j = (plan.auftraege || []).find((x) => x.id === el.dataset.auftrag);
       if (!j) return;
+      if (plan.sucheAktiv) sucheBeenden();
       if (j.drawing_url) betrachter(j.drawing_url, "Zeichnung " + j.job_number, true);
       else meldung("Zu " + j.job_number + " ist keine Zeichnung hinterlegt.", "warn");
     };
@@ -5284,6 +5508,7 @@ function zeichnePlanwand(b) {
   balkenInfoVerhalten();
   if (!darfPlanen()) balkenAnsehenVerhalten();
   statusSchnellVerhalten(b);
+  sucheHervorheben();
 }
 
 // ---------- Ein einzelner Auftragsbalken ----------
@@ -5560,6 +5785,8 @@ function balkenVerhalten(b) {
           planAuftragDialog(null, b, null, null, auftrag);
           return;
         }
+        // Ein Klick beendet eine laufende Suche
+        if (plan.sucheAktiv) sucheBeenden();
         planAuftragDialog(auftrag, b);
         return;
       }
@@ -10812,7 +11039,7 @@ async function fahrzeugZeichnen() {
     + '</div>'
     + '<div class="reiter fahrzeug-reiter">'
     + [["buchen", "Buchen"], ["historie", "Historie"]]
-        .concat(bin ? [["verwaltung", "Verwaltung"]] : [])
+        .concat(bin ? [["verwaltung", "Bewilligen"]] : [])
         .map(([w, t]) => '<button class="reiter__knopf'
           + (fahrzeugZustand.reiter === w ? " aktiv" : "") + '" data-fzreiter="' + w + '">'
           + t + '</button>').join("")
@@ -10840,7 +11067,8 @@ async function fahrzeugeListe() {
 async function fahrzeugStatus(fahrzeugId) {
   const jetzt = new Date().toISOString();
   const [buchung, problem] = await Promise.all([
-    db.from("fahrzeug_buchungen").select("*, profiles(full_name, email)")
+    db.from("fahrzeug_buchungen")
+      .select("*, profiles!fahrzeug_buchungen_user_id_fkey(full_name, email)")
       .eq("fahrzeug_id", fahrzeugId).eq("status", "genehmigt")
       .lte("von", jetzt).gte("bis", jetzt).maybeSingle(),
     db.from("fahrzeug_probleme").select("*")
@@ -10981,7 +11209,8 @@ async function fahrzeugAnsichtVerwaltung(ziel) {
   let anfragen, probleme, fahrzeuge;
   try {
     const [a, p2, f] = await Promise.all([
-      db.from("fahrzeug_buchungen").select("*, fahrzeuge(name), profiles(full_name, email)")
+      db.from("fahrzeug_buchungen")
+        .select("*, fahrzeuge(name), profiles!fahrzeug_buchungen_user_id_fkey(full_name, email)")
         .eq("status", "angefragt").order("von"),
       db.from("fahrzeug_probleme").select("*, fahrzeuge(name), profiles(full_name, email)")
         .eq("behoben", false).order("gemeldet_am", { ascending: false }),
