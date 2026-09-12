@@ -2003,7 +2003,7 @@ pre, .gcode { max-width: 100%; overflow-x: auto; }
                      text-decoration: underline; font-size: .85rem; }
 
 /* ---------- Ränder der Auftragsbalken: dick genug, um sie zu sehen ---------- */
-.pw-balken--laeuft { border: 3px solid #111417; }
+.pw-balken--laeuft { border: 2px solid #111417; }
 body.dunkel .pw-balken--laeuft { border-color: #ffffff; }
 .pw-balken--weissrand { border: 2px solid var(--linie-stark); }
 
@@ -2060,8 +2060,12 @@ body.dunkel .pw-balken--laeuft { border-color: #ffffff; }
 
 /* Übergang: die angeklickte Kachel fliegt vergrössert in die Mitte */
 .login__flug { position: fixed; z-index: 200; border-radius: 10px; object-fit: cover;
-              box-shadow: 0 10px 30px rgba(0,0,0,.4);
-              transition: all .38s cubic-bezier(.2,.8,.2,1); pointer-events: none; }
+              box-shadow: 0 10px 30px rgba(0,0,0,.4); pointer-events: none;
+              transition: left .38s cubic-bezier(.2,.8,.2,1),
+                          top .38s cubic-bezier(.2,.8,.2,1),
+                          width .38s cubic-bezier(.2,.8,.2,1),
+                          height .38s cubic-bezier(.2,.8,.2,1),
+                          opacity .12s linear; }
 .login__kachelfeld--weg { animation: loginAusblenden .25s ease forwards; }
 @keyframes loginAusblenden { to { opacity: 0; transform: scale(.96); } }
 .login__block--ein { animation: loginEinblenden .3s ease; }
@@ -2236,7 +2240,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "35.0.0";
+const APP_VERSION = "35.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -2693,23 +2697,36 @@ function zeigeLogin() {
       klon.style.height = nachRechteck.height + "px";
     });
 
-    setTimeout(() => { klon.remove(); if (fertig) fertig(); }, 400);
+    // Am Ziel wird zuerst das Echte sichtbar, danach blendet der Klon
+    // in einem Wimpernschlag aus — sonst blitzt es beim Wechsel.
+    setTimeout(() => {
+      if (fertig) fertig();
+      klon.style.opacity = "0";
+      setTimeout(() => klon.remove(), 120);
+    }, 400);
   };
 
   const anmeldenZeigen = (konto, bildEl) => {
     letzteKachel = bildEl || null;
-    const quelle = bildEl ? bildEl.getBoundingClientRect() : null;
 
-    // Erst unsichtbar aufbauen und ausmessen, wohin das Bild wirklich
-    // kommt. So trifft die Animation genau die spätere Stelle, statt
-    // sie zu schätzen.
+    // Zuerst das Ziel ausmessen: die Maske wird dafür kurz unsichtbar
+    // eingeblendet. Das verschiebt die Kacheln für einen Augenblick,
+    // deshalb wird die Startstelle ERST DANACH gemessen — sonst
+    // beginnt der Flug an der falschen Stelle und springt.
     anmeldungAufbauen(konto);
     anmeldung.hidden = false;
     anmeldung.style.visibility = "hidden";
+    anmeldung.style.position = "absolute";
+    anmeldung.style.pointerEvents = "none";
     const zielBild = anmeldung.querySelector(".login__gross");
     const ziel = zielBild ? zielBild.getBoundingClientRect() : null;
     anmeldung.hidden = true;
     anmeldung.style.visibility = "";
+    anmeldung.style.position = "";
+    anmeldung.style.pointerEvents = "";
+
+    // Jetzt steht alles wieder wie vorher — hier stimmt die Messung.
+    const quelle = bildEl ? bildEl.getBoundingClientRect() : null;
 
     const fertigstellen = () => {
       auswahl.hidden = true;
@@ -10851,8 +10868,7 @@ async function eierEinbauen() {
   knopf.id = "eier-knopf";
   knopf.className = "eier-knopf";
   knopf.title = "Eier im Lager";
-  knopf.innerHTML = '<span id="eier-knopfbild"></span>'
-    + '<span class="eier-zahl" id="eier-zahl">–</span>';
+  knopf.innerHTML = '\u{1F95A}<span class="eier-zahl" id="eier-zahl">–</span>';
   document.body.appendChild(knopf);
   knopf.onclick = () => eierFensterUmschalten();
 
@@ -10893,9 +10909,6 @@ function eierSchachtelBild(gefuellt, klasse) {
 
 function eierAnzeigen() {
   const s2 = eierSchachteln();
-
-  const bild = document.getElementById("eier-knopfbild");
-  if (bild) bild.innerHTML = eierSchachtelBild(s2.rest, "eier-schachtel eier-schachtel--klein");
 
   const z = document.getElementById("eier-zahl");
   if (z) z.textContent = s2.schachteln + "×6+" + s2.rest;
