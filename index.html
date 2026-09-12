@@ -2360,6 +2360,15 @@ body.dunkel .kopf__logo { filter: brightness(0) invert(1); }
 .login__kachel { position: relative; }
 .login__offen { position: absolute; top: 2px; right: 6px; color: rgba(255,255,255,.7);
                font-size: 1.1rem; line-height: 1; }
+
+/* ---------- Parkname bleibt beim seitlichen Schieben stehen ---------- */
+/* Der farbige Balken ist so breit wie die ganze Tafel. Klebte er
+   selbst, wanderte sein Text trotzdem aus dem Bild. Deshalb bleibt
+   der Balken stehen und nur die Beschriftung darin klebt links. */
+.pw-park { position: static !important;
+          padding-left: 0 !important; padding-right: 0 !important; }
+.pw-park__text { position: sticky; left: 0; display: inline-block;
+                padding: 0 10px; }
 </style>
 </head>
 <body>
@@ -2408,7 +2417,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "37.1.0";
+const APP_VERSION = "37.2.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -5770,7 +5779,8 @@ function zeichnePlanwand(b) {
     const maschinen = (prod.maschinen || []).filter((m) => m.park_id === park.id);
     if (!maschinen.length) return "";
 
-    return '<div class="pw-park">' + esc(park.name) + '</div>'
+    return '<div class="pw-park"><span class="pw-park__text">'
+      + esc(park.name) + '</span></div>'
       + maschinen.map((m) => {
           const zellen = tage.map((t) => '<div class="pw-zelle'
             + (t === heute ? " pw-zelle--heute" : "") + '" data-zelle="'
@@ -5801,7 +5811,7 @@ function zeichnePlanwand(b) {
   }).join("");
 
   // Sieben schmale Zeilen für die Ferien
-  const ferienZeilen = '<div class="pw-park pw-park--ferien">Ferien</div>'
+  const ferienZeilen = '<div class="pw-park pw-park--ferien"><span class="pw-park__text">Ferien</span></div>'
     + Array.from({ length: FERIEN_ZEILEN }, (unused, i2) => {
         const zeile = i2 + 1;
         const zellen = tage.map((t) => '<div class="pw-zelle pw-zelle--fein'
