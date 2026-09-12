@@ -1883,29 +1883,16 @@ pre, .gcode { max-width: 100%; overflow-x: auto; }
 .pw-balken__farbbuchstabe { margin-left: auto; flex: none; font-size: calc(0.62rem * var(--pw-s, 1));
                             font-weight: 700; opacity: .85; padding-left: 4px; }
 
-/* ---------- Chat / Fahrzeug / Eier: schwebende Knöpfe ---------- */
-.chat-knopf, .fahrzeug-knopf, .eier-mitte {
-  position: fixed; z-index: 40; width: 52px; height: 52px;
-  border-radius: 12px; border: none; background: var(--marke); color: #fff;
-  display: grid; place-items: center; cursor: pointer;
-  box-shadow: 0 6px 18px rgba(0,0,0,.25); right: 18px; }
-.eier-mitte { position: static; background: var(--flaeche); color: var(--tinte);
-             border: 1px solid var(--linie-stark); flex-direction: column; gap: 0;
-             font-size: 1.15rem; width: 52px; height: 52px; }
-.chat-knopf:hover, .fahrzeug-knopf:hover, .eier-mitte:hover { background: var(--marke-hell); }
-.chat-knopf { bottom: 18px; }
-.fahrzeug-knopf { bottom: 78px; font-size: 1.3rem; }
-.eier-knopf { position: fixed; z-index: 40; right: 18px; bottom: 138px;
-             display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.eier-minus { width: 26px; height: 22px; border-radius: 7px; border: 1px solid var(--linie-stark);
-             background: var(--flaeche); color: var(--tinte); cursor: pointer;
-             font-size: 1rem; line-height: 1; }
-.eier-zahl { font-size: .62rem; font-weight: 700; margin-top: -2px; }
+/* ---------- Fahrzeugknopf: oben mittig ---------- */
+.fahrzeug-knopf {
+  position: fixed; z-index: 40; left: 50%; transform: translateX(-50%);
+  top: 8px; width: 38px; height: 38px;
+  border-radius: 10px; border: 1px solid var(--linie-stark);
+  background: var(--flaeche); color: var(--tinte);
+  display: grid; place-items: center; cursor: pointer; font-size: 1.15rem; }
+.fahrzeug-knopf:hover { background: var(--marke-hell); }
 @media (max-width: 780px) {
-  .chat-knopf, .fahrzeug-knopf, .eier-mitte { width: 48px; height: 48px; border-radius: 10px; }
-  .chat-knopf { bottom: calc(var(--navhoehe) + 14px); }
-  .fahrzeug-knopf { bottom: calc(var(--navhoehe) + 70px); }
-  .eier-knopf { bottom: calc(var(--navhoehe) + 126px); }
+  .fahrzeug-knopf { width: 34px; height: 34px; top: 10px; font-size: 1rem; }
 }
 .chat-abzeichen { position: absolute; top: -6px; right: -6px; min-width: 20px;
                   height: 20px; padding: 0 5px; border-radius: 10px; background: var(--gefahr);
@@ -2046,13 +2033,19 @@ body.dunkel .pw-balken--laeuft { border-color: #ffffff; }
 .login__kachel-name { font-size: .68rem; text-align: center; line-height: 1.2; color: #fff;
                       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
                       max-width: 100%; }
-.login__gewaehlt { font-size: 1.05rem; font-weight: 650; margin: 6px 0 16px;
-                  text-align: center; }
 .login__laedt { text-align: center; color: rgba(255,255,255,.75); padding: 20px 0;
                font-size: .85rem; }
-.login__manuell { display: block; margin: 12px auto 0; text-align: center; }
-.login__anderekonto { display: block; margin: 10px auto 0; text-align: center;
-                     font-size: .78rem; opacity: .85; }
+.login__gross { display: block; width: 96px; height: 96px; border-radius: 12px;
+               object-fit: cover; margin: 0 auto 10px;
+               box-shadow: 0 4px 14px rgba(0,0,0,.3); }
+.login__gross--buchstabe { background: var(--flaeche); color: var(--marke);
+                          display: grid; place-items: center; font-size: 2.2rem;
+                          font-weight: 700; }
+.login__name { text-align: center; font-size: 1.15rem; font-weight: 650;
+              margin-bottom: 18px; }
+.login__pw { width: 100%; margin-bottom: 12px; }
+.login__anderekonto { display: block; margin: 14px auto 0; text-align: center;
+                     font-size: .8rem; opacity: .85; }
 
 /* Übergang: die angeklickte Kachel fliegt vergrössert in die Mitte */
 .login__flug { position: fixed; z-index: 200; border-radius: 10px; object-fit: cover;
@@ -2064,8 +2057,11 @@ body.dunkel .pw-balken--laeuft { border-color: #ffffff; }
 @keyframes loginEinblenden { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
 /* ---------- Fahrzeuge ---------- */
-.fahrzeug-panel { bottom: 82px; }
-@media (max-width: 780px) { .fahrzeug-panel { bottom: calc(var(--navhoehe) + 70px); } }
+.fahrzeug-panel { top: calc(var(--kopfhoehe) + 6px); bottom: auto;
+                 left: 50%; right: auto; transform: translateX(-50%); }
+@media (max-width: 780px) {
+  .fahrzeug-panel { top: calc(var(--kopfhoehe) + 4px); height: 70dvh; }
+}
 .fahrzeug-reiter { padding: 0 10px; margin: 0; flex: none; }
 .fahrzeug-inhalt { flex: 1; overflow-y: auto; padding: 10px 12px; }
 .fz-karte { border: 1px solid var(--linie); border-radius: var(--radius);
@@ -2083,6 +2079,56 @@ body.dunkel .pw-balken--laeuft { border-color: #ffffff; }
 @keyframes reiterEintritt { from { opacity: 0; transform: scale(.97) translateY(4px); }
                             to { opacity: 1; transform: none; } }
 .reiter-eintritt { animation: reiterEintritt .2s ease; }
+
+/* ---------- Planwand: möglichst wenig verschenkter Platz ---------- */
+/* Der grosse Innenabstand der Inhaltsfläche und der Platz für die
+   untere Navigation werden hier nicht gebraucht — am Computer gibt
+   es die Leiste gar nicht, und die Tafel scrollt ohnehin selbst. */
+body.pw-seite .inhalt { padding-top: 4px; padding-bottom: 6px; }
+@media (min-width: 781px) {
+  body.pw-seite .inhalt { padding-bottom: 4px; }
+}
+.pw-kopfleiste { padding: 2px 0 6px !important; gap: 10px !important; }
+.pw-regler-reihe .pw-zeitregler { padding-top: 13px !important; }
+.pw-rolle + .pw-legende, .pw-legende { margin-top: 6px !important;
+                                       font-size: .72rem; opacity: .8; }
+@media (min-width: 781px) {
+  body.pw-seite .pw-rolle { max-height: none; }
+}
+/* Auf dem Handy soll die Tafel möglichst viel Höhe bekommen */
+@media (max-width: 780px) {
+  body.pw-seite .pw-rolle { max-height: calc(100dvh - var(--kopfhoehe)
+                            - var(--navhoehe) - 150px); min-height: 320px; }
+}
+
+/* ---------- Eierzähler ---------- */
+.eier-knopf { position: fixed; z-index: 40; top: 8px;
+             left: calc(50% + 46px); transform: translateX(-50%);
+             width: 38px; height: 38px; border-radius: 10px;
+             border: 1px solid var(--linie-stark); background: var(--flaeche);
+             color: var(--tinte); display: grid; place-items: center;
+             cursor: pointer; font-size: 1.05rem; line-height: 1; }
+.eier-knopf:hover { background: var(--marke-hell); }
+.eier-zahl { font-size: .58rem; font-weight: 700; margin-top: -3px; }
+@media (max-width: 780px) {
+  .eier-knopf { width: 34px; height: 34px; top: 10px; left: calc(50% + 42px); }
+}
+.eier-dialog { max-width: 340px; text-align: center; }
+.eier-kopf { display: flex; align-items: center; justify-content: space-between;
+            gap: 10px; margin-bottom: 10px; }
+.eier-kopf h2 { margin: 0; font-size: 1.1rem; }
+.eier-kopfknoepfe { display: flex; align-items: center; gap: 8px; }
+.eier-gross { display: block; width: 100%; background: var(--grund); border: none;
+             border-radius: var(--radius); padding: 18px 0 22px; cursor: pointer;
+             position: relative; margin-bottom: 14px; }
+.eier-gross:active { background: var(--marke-hell); }
+.eier-gross__bild { display: block; font-size: 4.5rem; line-height: 1; }
+.eier-gross__zahl { display: block; font-size: 2rem; font-weight: 700;
+                   margin-top: 6px; font-variant-numeric: tabular-nums; }
+.eier-knoepfe { display: flex; gap: 8px; }
+.eier-knoepfe .knopf { flex: 1; }
+.eier-zeile { text-align: left; font-size: .85rem; padding: 8px 0;
+             border-bottom: 1px solid var(--linie); }
 </style>
 </head>
 <body>
@@ -2126,7 +2172,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "32.1.0";
+const APP_VERSION = "33.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -2398,7 +2444,8 @@ function nachfragen(o) {
     h.innerHTML = '<div class="dialog" role="dialog" aria-modal="true">'
       + '<h2>' + esc(o.titel) + '</h2><p>' + esc(o.text) + '</p>'
       + '<div class="dialog__knoepfe">'
-      + '<button class="knopf knopf--still" data-nein>Abbrechen</button>'
+      + '<button class="knopf knopf--still" data-nein>'
+      + esc(o.abbrechen || "Abbrechen") + '</button>'
       + '<button class="knopf ' + (o.gefahr ? "knopf--gefahr" : "knopf--haupt") + '" data-ja>'
       + esc(o.bestaetigen || "Ja, ausführen") + '</button></div></div>';
     document.body.appendChild(h);
@@ -2534,145 +2581,147 @@ async function profilLaden() {
 function zeigeLogin() {
   WURZEL.innerHTML = ''
     + '<div class="login"><div class="login__karte">'
-    + '<div class="login__marke">'
+    + '<div class="login__marke" id="lg-marke">'
     + '<img class="login__bild" src="./login.png" alt="Hofer + Co. Präzisionsdrehteile">'
     + '<div class="login__untertitel">' + esc(APP_UNTERTITEL) + '</div>'
     + '</div>'
-    + '<div id="lk-kacheln"><div class="login__laedt">Wird geladen …</div></div>'
-    + '<form id="lf" novalidate hidden>'
-    + '<div id="lk-gewaehlt" hidden></div>'
-    + '<label class="feld" id="lk-namefeld"><span>Benutzername</span>'
-    + '<input type="text" id="le" autocomplete="username" autocapitalize="none"'
-    + ' spellcheck="false" required></label>'
-    + '<label class="feld"><span>Passwort</span>'
-    + '<input type="password" id="lp" autocomplete="current-password" required></label>'
-    + '<button type="submit" class="knopf knopf--haupt knopf--breit" id="lk">Anmelden</button>'
-    + '<button type="button" class="linkknopf login__anderekonto" id="lk-zurueck-unten" hidden>'
-    + 'anderes Konto</button>'
-    + '</form></div></div>';
+    + '<div id="lg-auswahl"><div class="login__laedt">Wird geladen …</div></div>'
+    + '<div id="lg-anmeldung" hidden></div>'
+    + '</div></div>';
 
-  const namensfeld = document.getElementById("le");
+  const auswahl = document.getElementById("lg-auswahl");
+  const anmeldung = document.getElementById("lg-anmeldung");
 
-  const form = document.getElementById("lf");
+  // ---------- Anmeldung für ein gewähltes Konto ----------
 
-  // Kacheln mit allen Konten. Klappt nur, wenn login_kacheln in der
-  // Datenbank existiert — sonst zeigt sich als Rückfalloption
-  // einfach das gewöhnliche Formular.
+  const anmeldenZeigen = (konto, bildEl) => {
+    // Die angeklickte Kachel fliegt an ihren neuen Platz unter dem Logo
+    const quelle = bildEl ? bildEl.getBoundingClientRect() : null;
+    if (quelle) {
+      const klon = bildEl.cloneNode(true);
+      klon.className = "login__flug";
+      klon.style.cssText = "left:" + quelle.left + "px;top:" + quelle.top
+        + "px;width:" + quelle.width + "px;height:" + quelle.height + "px;";
+      document.body.appendChild(klon);
+      auswahl.classList.add("login__kachelfeld--weg");
+
+      const marke = document.getElementById("lg-marke").getBoundingClientRect();
+      requestAnimationFrame(() => {
+        const gross = 96;
+        klon.style.left = (marke.left + marke.width / 2 - gross / 2) + "px";
+        klon.style.top = (marke.bottom + 14) + "px";
+        klon.style.width = gross + "px";
+        klon.style.height = gross + "px";
+      });
+      setTimeout(() => klon.remove(), 400);
+    }
+
+    setTimeout(() => {
+      auswahl.hidden = true;
+      anmeldung.hidden = false;
+      anmeldung.className = "login__block--ein";
+      anmeldung.innerHTML = ''
+        + (konto.bild_url
+            ? '<img class="login__gross" src="' + esc(konto.bild_url) + '" alt="">'
+            : '<span class="login__gross login__gross--buchstabe">'
+              + esc((konto.full_name || konto.email).charAt(0).toUpperCase()) + '</span>')
+        + '<div class="login__name">' + esc(konto.full_name || konto.email) + '</div>'
+        + '<form id="lf" novalidate>'
+        + '<input type="password" id="lp" class="login__pw" placeholder="Passwort"'
+        + ' autocomplete="current-password" required>'
+        + '<button type="submit" class="knopf knopf--haupt knopf--breit" id="lk">Anmelden</button>'
+        + '</form>'
+        + '<button type="button" class="linkknopf login__anderekonto" id="lg-anderes">'
+        + 'anderes Konto</button>';
+
+      document.getElementById("lg-anderes").onclick = zurueckZurAuswahl;
+      anmeldenBinden(konto.email);
+      document.getElementById("lp").focus();
+    }, quelle ? 400 : 0);
+  };
+
+  const zurueckZurAuswahl = () => {
+    anmeldung.hidden = true;
+    anmeldung.innerHTML = "";
+    auswahl.hidden = false;
+    auswahl.classList.remove("login__kachelfeld--weg");
+  };
+
+  // Mit Escape zurück zur Auswahl
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !anmeldung.hidden && document.getElementById("lg-auswahl")) {
+      zurueckZurAuswahl();
+    }
+  });
+
+  // ---------- Das eigentliche Anmelden ----------
+
+  function anmeldenBinden(vorgabeMail) {
+    const knopf = document.getElementById("lk");
+    document.getElementById("lf").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const nameFeld = document.getElementById("le");
+      const eingabe = (vorgabeMail || (nameFeld ? nameFeld.value : "")).trim().toLowerCase();
+      const pw = document.getElementById("lp").value;
+      if (!eingabe || !pw) { meldung("Benutzername und Passwort eingeben.", "warn"); return; }
+
+      // Ohne @ wird daraus automatisch eine gültige Adresse.
+      const email = eingabe.includes("@") ? eingabe : eingabe + LOGIN_ENDUNG;
+
+      knopf.disabled = true;
+      knopf.textContent = "Anmelden …";
+      try {
+        const { error } = await zeitlimit(
+          db.auth.signInWithPassword({ email: email, password: pw }), 15000, "Anmeldung");
+        if (error) throw error;
+        await profilLaden();
+        zeichneGeruest();
+      } catch (f) {
+        meldung(fehlertext(f), "fehler");
+        knopf.disabled = false;
+        knopf.textContent = "Anmelden";
+      }
+    });
+  }
+
+  // ---------- Kachelauswahl aufbauen ----------
+
+  const formularOhneKacheln = () => {
+    auswahl.innerHTML = ''
+      + '<form id="lf" novalidate>'
+      + '<label class="feld"><span>Benutzername</span>'
+      + '<input type="text" id="le" autocomplete="username" autocapitalize="none"'
+      + ' spellcheck="false" required></label>'
+      + '<label class="feld"><span>Passwort</span>'
+      + '<input type="password" id="lp" autocomplete="current-password" required></label>'
+      + '<button type="submit" class="knopf knopf--haupt knopf--breit" id="lk">Anmelden</button>'
+      + '</form>';
+    anmeldenBinden(null);
+  };
+
   (async () => {
     try {
       const { data, error } = await db.from("login_kacheln").select("*");
       if (error || !data || !data.length) throw error || new Error("leer");
 
-      const kasten = document.getElementById("lk-kacheln");
-      kasten.innerHTML = '<div class="login__kachelfeld" id="lk-feld">'
-        + '<div class="login__kacheln">'
-        + data.map((u) => '<button type="button" class="login__kachel" data-mail="'
-            + esc(u.email) + '" data-name="' + esc(u.full_name || u.email) + '">'
+      auswahl.innerHTML = '<div class="login__kacheln">'
+        + data.map((u, i) => '<button type="button" class="login__kachel" data-nr="' + i + '">'
             + (u.bild_url
                 ? '<img src="' + esc(u.bild_url) + '" alt="">'
                 : '<span class="login__kachel-buchstabe">'
                   + esc((u.full_name || u.email).charAt(0).toUpperCase()) + '</span>')
             + '<span class="login__kachel-name">' + esc(u.full_name || u.email) + '</span>'
             + '</button>').join("")
-        + '</div></div>'
-        + '<button type="button" class="linkknopf login__manuell" id="lk-manuell">Anderes Konto eingeben</button>';
+        + '</div>';
 
-      document.getElementById("lk-namefeld").hidden = true;
-
-      const passwortfeld = document.getElementById("lp").closest("label");
-      const zurueckUnten = document.getElementById("lk-zurueck-unten");
-
-      const gewaehlt = (mail, name, bildEl) => {
-        namensfeld.value = mail;
-
-        // Die angeklickte Kachel fliegt vergrössert in die Mitte,
-        // der Rest blendet aus — dann bleibt nur noch der Name,
-        // das Passwortfeld und ganz klein "anderes Konto" darunter.
-        const feld = document.getElementById("lk-feld");
-        const quelle = bildEl.getBoundingClientRect();
-        const klon = bildEl.cloneNode(true);
-        klon.className = "login__flug";
-        klon.style.left = quelle.left + "px";
-        klon.style.top = quelle.top + "px";
-        klon.style.width = quelle.width + "px";
-        klon.style.height = quelle.height + "px";
-        document.body.appendChild(klon);
-        feld.classList.add("login__kachelfeld--weg");
-
-        requestAnimationFrame(() => {
-          const zielGross = 88;
-          klon.style.left = (window.innerWidth / 2 - zielGross / 2) + "px";
-          klon.style.top = "70px";
-          klon.style.width = zielGross + "px";
-          klon.style.height = zielGross + "px";
-        });
-
-        setTimeout(() => {
-          klon.remove();
-          kasten.hidden = true;
-
-          const g = document.getElementById("lk-gewaehlt");
-          g.hidden = false;
-          g.className = "login__block--ein";
-          g.innerHTML = '<div class="login__gewaehlt">' + esc(name) + '</div>';
-
-          form.hidden = false;
-          zurueckUnten.hidden = false;
-          zurueckUnten.onclick = () => {
-            form.hidden = true;
-            kasten.hidden = false;
-            document.getElementById("lk-feld").classList.remove("login__kachelfeld--weg");
-            g.hidden = true;
-            namensfeld.value = "";
-            document.getElementById("lp").value = "";
-          };
-
-          if (passwortfeld) passwortfeld.classList.add("login__block--ein");
-          document.getElementById("lp").focus();
-        }, 380);
-      };
-
-      kasten.querySelectorAll("[data-mail]").forEach((k) => {
-        k.onclick = () => gewaehlt(k.dataset.mail, k.dataset.name, k.querySelector("img, .login__kachel-buchstabe"));
+      auswahl.querySelectorAll("[data-nr]").forEach((k) => {
+        k.onclick = () => anmeldenZeigen(data[Number(k.dataset.nr)],
+          k.querySelector("img, .login__kachel-buchstabe"));
       });
-
-      document.getElementById("lk-manuell").onclick = () => {
-        kasten.hidden = true;
-        form.hidden = false;
-        document.getElementById("lk-namefeld").hidden = false;
-        namensfeld.focus();
-      };
     } catch (f) {
-      // Keine Kacheln möglich — dann eben gleich das gewöhnliche Formular.
-      document.getElementById("lk-kacheln").innerHTML = "";
-      form.hidden = false;
+      formularOhneKacheln();
     }
   })();
-
-  const knopf = document.getElementById("lk");
-  document.getElementById("lf").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const eingabe = namensfeld.value.trim().toLowerCase();
-    const pw = document.getElementById("lp").value;
-    if (!eingabe || !pw) { meldung("Benutzername und Passwort eingeben.", "warn"); return; }
-
-    // Ohne @ wird daraus automatisch eine gültige Adresse.
-    const email = eingabe.includes("@") ? eingabe : eingabe + LOGIN_ENDUNG;
-
-    knopf.disabled = true;
-    knopf.textContent = "Anmelden …";
-    try {
-      const { error } = await zeitlimit(
-        db.auth.signInWithPassword({ email: email, password: pw }), 15000, "Anmeldung");
-      if (error) throw error;
-      await profilLaden();
-      zeichneGeruest();
-    } catch (f) {
-      meldung(fehlertext(f), "fehler");
-      knopf.disabled = false;
-      knopf.textContent = "Anmelden";
-    }
-  });
 }
 
 // -----------------------------------------------------------------
@@ -3723,7 +3772,13 @@ function parkAuswahl() {
 
 function parkAuswahlBinden(b) {
   document.querySelectorAll("[data-park]").forEach((el) => {
-    el.onclick = () => { prod.parkId = el.dataset.park; seiteProduktion(b); };
+    el.onclick = () => {
+      prod.parkId = el.dataset.park;
+      // Nur den Inhalt neu zeichnen — die Maschinen sind alle geladen.
+      const ziel = document.getElementById("prod-inhalt");
+      if (ziel) ansichtErfassen(ziel, b);
+      else seiteProduktion(b);
+    };
   });
 }
 
@@ -3819,14 +3874,19 @@ async function ansichtErfassen(ziel, b) {
     ? "Woche " + kurzDatum(von) + " – " + kurzDatum(bis)
     : wochentagName(prod.tag) + ", " + kurzDatum(prod.tag) + ausIso(prod.tag).getFullYear();
 
+  // Datum und Tag/Woche ändern nur den angezeigten Ausschnitt.
+  // Parks, Maschinen und Aufträge sind schon geladen — es reicht,
+  // den Inhalt neu zu zeichnen, statt die Seite neu aufzubauen.
+  const inhaltNeu = () => ansichtErfassen(ziel, b);
+
   document.getElementById("zurueck").onclick = () => {
-    prod.tag = plusTage(prod.tag, istWoche ? -7 : -1); seiteProduktion(b); };
+    prod.tag = plusTage(prod.tag, istWoche ? -7 : -1); inhaltNeu(); };
   document.getElementById("vor").onclick = () => {
-    prod.tag = plusTage(prod.tag, istWoche ? 7 : 1); seiteProduktion(b); };
+    prod.tag = plusTage(prod.tag, istWoche ? 7 : 1); inhaltNeu(); };
   document.getElementById("heute").onclick = () => {
-    prod.tag = isoDatum(new Date()); seiteProduktion(b); };
+    prod.tag = isoDatum(new Date()); inhaltNeu(); };
   document.querySelectorAll("[data-modus]").forEach((el) => {
-    el.onclick = () => { prod.modus = el.dataset.modus; seiteProduktion(b); };
+    el.onclick = () => { prod.modus = el.dataset.modus; inhaltNeu(); };
   });
 
   // Nach jeder gespeicherten Zahl wird nur das Raster neu geladen,
@@ -4607,37 +4667,28 @@ function griffVerhalten(b) {
 
       const altD = auftrag.planned_days, altV = auftrag.planned_from;
 
-      // Wird der Balken kürzer, entsteht dahinter eine Lücke.
-      // Die nachfolgenden Aufträge dürfen bündig nachrücken.
-      let nachruecken = false;
+      // Ändert sich die Dauer, wandern alle nachfolgenden Aufträge
+      // auf dieser Maschine automatisch mit — länger schiebt sie nach
+      // hinten, kürzer zieht sie wieder heran. So bleibt die Reihe
+      // ohne Zutun bündig.
       let dahinter = [];
-      if (dauerJetzt < dauerStart && altV) {
+      const differenz = dauerJetzt - dauerStart;
+      if (differenz !== 0 && altV) {
         const altesEnde = letzterArbeitstag(altV, altD);
         dahinter = (plan.auftraege || []).filter((x) =>
           x.id !== auftrag.id && x.machine_id === auftrag.machine_id
           && x.planned_from && x.planned_from > altesEnde
           && x.plan_status !== "fertig");
-
-        if (dahinter.length) {
-          nachruecken = await nachfragen({
-            titel: "Lücke schliessen?",
-            text: "Der Auftrag wird kürzer. Sollen die " + dahinter.length
-                + " nachfolgenden Aufträge auf dieser Maschine bündig nachrücken?",
-            bestaetigen: "Ja, nachrücken", abbrechen: "Nein, Lücke lassen" });
-        }
       }
 
       const { error } = await db.from("jobs").update(daten).eq("id", auftrag.id);
       if (error) { meldung(fehlertext(error), "fehler"); return; }
 
       const vorherNachrueck = [];
-      if (nachruecken) {
-        const differenz = dauerStart - dauerJetzt;
-        for (const x of dahinter) {
-          vorherNachrueck.push({ id: x.id, von: x.planned_from });
-          const neu = arbeitstagePlus(x.planned_from, -differenz);
-          await db.from("jobs").update({ planned_from: neu }).eq("id", x.id);
-        }
+      for (const x of dahinter) {
+        vorherNachrueck.push({ id: x.id, von: x.planned_from });
+        const neu = arbeitstagePlus(x.planned_from, differenz);
+        await db.from("jobs").update({ planned_from: neu }).eq("id", x.id);
       }
 
       merkeSchritt("Dauer von " + auftrag.job_number, async () => {
@@ -4648,7 +4699,8 @@ function griffVerhalten(b) {
           .update({ planned_days: altD, planned_from: altV }).eq("id", auftrag.id);
         planAktualisieren(b);
       });
-      meldung(dauerJetzt + (dauerJetzt === 1 ? " Tag" : " Tage") + " eingeplant.");
+      meldung(dauerJetzt + (dauerJetzt === 1 ? " Tag" : " Tage") + " eingeplant."
+        + (dahinter.length ? "  " + dahinter.length + " nachfolgende mitverschoben." : ""));
       planAktualisieren(b);
     });
 
@@ -4699,8 +4751,8 @@ function balkenInfoVerhalten() {
             : "Keine Stückzahl hinterlegt") + '</div>'
         + '<div class="pw-info__zeile">' + esc(material.join(" · ")) + '</div>'
         + '<div class="pw-info__zeile">✎ ' + (j.plan_note ? esc(j.plan_note) : "keine Notiz") + '</div>'
-        + '<div class="pw-info__zeile' + (j.problem ? " pw-info__zeile--warn" : "") + '">'
-        + (j.problem ? "⚠ " + esc(j.problem) : "Kein Problem gemeldet") + '</div>'
+        + (j.problem ? '<div class="pw-info__zeile pw-info__zeile--warn">⚠ '
+            + esc(j.problem) + '</div>' : "")
         + '<div class="pw-info__zeile pw-info__zeile--klein">'
         + (j.fa_erstellt ? "FA erstellt" : "FA fehlt")
         + " · " + (j.material_ok ? "Material vorhanden" : "Material fehlt") + '</div>';
@@ -5527,13 +5579,11 @@ function balkenVerhalten(b) {
         && x.plan_status !== "fertig");
 
       if (dahinter.length) {
-        const wahl = await auswahlDialog("Was soll mit der Lücke passieren?", [
-          { wert: "luecke", text: "Lücke lassen" },
-          { wert: "nach", text: "Die " + dahinter.length
-            + " folgenden Aufträge nachrücken lassen" },
-        ]);
-        if (!wahl) return;
-        nachruecken = wahl === "nach";
+        nachruecken = await nachfragen({
+          titel: "Lücke schliessen?",
+          text: "Auf der alten Maschine entsteht eine Lücke. Sollen die "
+              + dahinter.length + " nachfolgenden Aufträge aufrücken?",
+          bestaetigen: "Ja, aufrücken", abbrechen: "Nein, Lücke lassen" });
       }
       const { error } = await db.from("jobs")
         .update({ machine_id: maschineId, planned_from: datum })
@@ -5782,7 +5832,8 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     + '" placeholder="z. B. 40 kg oder 6 Stangen"></label>'
     + '<label class="feld"><span>Liefertermin</span>'
     + '<input id="pl-liefer" type="text" placeholder="z. B. KW 44" value="' 
-    + esc(auftrag ? (auftrag.material_liefertermin || "") : "") + '"></label>'
+    + esc(auftrag ? (auftrag.material_liefertermin || "")
+        : (v ? (v.material_liefertermin || "") : "")) + '"></label>'
     + '</div></div>'
 
     + '<div class="feld"><span class="feldlabel">Vorbereitung</span>'
@@ -5904,7 +5955,9 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
   const kopierenEigen = huelle.querySelector("#pl-kopieren-eigen");
   if (kopierenEigen) kopierenEigen.onclick = () => {
     zu();
-    planAuftragDialog(null, b, null, null, auftrag);
+    // Dieselbe Maschine ist voreingestellt, ebenso alles andere aus
+    // der Vorlage. Was nicht passt, lässt sich im Fenster ändern.
+    planAuftragDialog(null, b, auftrag.machine_id, null, auftrag);
   };
 
   const pdfKnopf = huelle.querySelector("[data-pdfzeigen]");
@@ -6672,9 +6725,10 @@ function seiteRechner(b) {
   });
 
   const ziel = document.getElementById("rech-inhalt");
-  if (rech.ansicht === "winkel") return rechnerWinkel(ziel);
-  if (rech.ansicht === "gcode") return rechnerGcode(ziel);
-  return rechnerDrehzahl(ziel, b);
+  if (rech.ansicht === "winkel") rechnerWinkel(ziel);
+  else if (rech.ansicht === "gcode") rechnerGcode(ziel);
+  else rechnerDrehzahl(ziel, b);
+  reiterUebergang(ziel);
 }
 
 // ---------- Drehzahl ----------
@@ -8478,7 +8532,11 @@ async function seiteEinstellungen(b) {
     + '<label class="schalter"><input type="checkbox" id="e-wochestart"'
     + (einstellung("wochestart") ? " checked" : "") + '>'
     + '<span>Erfassung immer mit der Wochenansicht öffnen</span></label>'
-    + '<p class="hinweis">Gilt nur auf diesem Gerät.</p></section>'
+    + '<label class="schalter"><input type="checkbox" id="e-angemeldet"'
+    + (einstellung("angemeldetbleiben") ? " checked" : "") + '>'
+    + '<span>Angemeldet bleiben — nicht nach fünf Minuten abmelden</span></label>'
+    + '<p class="hinweis">Gilt nur auf diesem Gerät. Ohne Haken meldet sich die '
+    + 'App nach fünf Minuten ohne Bedienung selbst ab.</p></section>'
 
     + (bin
       ? '<section class="karte"><h2>Benutzer</h2>'
@@ -8524,6 +8582,11 @@ async function seiteEinstellungen(b) {
     einstellungSetzen("wochenende", e.target.checked);
   document.getElementById("e-wochestart").onchange = (e) =>
     einstellungSetzen("wochestart", e.target.checked);
+  document.getElementById("e-angemeldet").onchange = (e) => {
+    einstellungSetzen("angemeldetbleiben", e.target.checked);
+    // Sofort wirksam, nicht erst nach dem nächsten Anmelden
+    if (window.untaetigNeuStarten) window.untaetigNeuStarten();
+  };
 
   // ---------- Eigenes Konto ----------
   document.getElementById("ns").onclick = async () => {
@@ -10479,62 +10542,192 @@ const chat = {
 };
 
 // ---------- Eierzähler ----------
-// Bewusst simpel: eine Zahl, hoch und runter. Am Computer mit den
-// Pfeiltasten, auf dem Handy gibt es dafür keine — dort tippt man
-// auf die Zahl (plus eins) oder auf das kleine Minus (minus eins).
-const eier = { wert: 0 };
+// Ein Knopf oben in der Leiste öffnet ein Fenster: ein grosses Ei
+// zum Antippen (eins mehr), ein Minus für Vertipper, ein Weiter
+// zum Abbuchen über einen Ziffernblock, und oben rechts die
+// Historie, wer wann wie viele genommen hat.
+
+const eier = { wert: 0, kanal: null };
 
 async function eierEinbauen() {
   if (document.getElementById("eier-knopf")) return;
 
-  const knopf = document.createElement("div");
+  const knopf = document.createElement("button");
   knopf.id = "eier-knopf";
   knopf.className = "eier-knopf";
   knopf.title = "Eier im Lager";
-  knopf.innerHTML = '<button type="button" class="eier-minus" id="eier-minus" title="Eins weniger">–</button>'
-    + '<button type="button" class="eier-mitte" id="eier-plus" tabindex="0"'
-    + ' title="Eins mehr — oder mit den Pfeiltasten">🥚<span class="eier-zahl" id="eier-zahl">–</span></button>';
+  knopf.innerHTML = '🥚<span class="eier-zahl" id="eier-zahl">–</span>';
   document.body.appendChild(knopf);
+  knopf.onclick = () => eierFensterUmschalten();
 
+  await eierStandLaden();
+
+  // Andere Geräte live mitbekommen
+  if (db && typeof db.channel === "function" && !eier.kanal) {
+    eier.kanal = db.channel("eier-" + Date.now())
+      .on("postgres_changes", { event: "*", schema: "public", table: "eier_zaehler" }, (n) => {
+        if (n.new) { eier.wert = Number(n.new.wert) || 0; eierAnzeigen(); }
+      })
+      .subscribe();
+  }
+}
+
+async function eierStandLaden() {
   try {
     const r = await db.from("eier_zaehler").select("wert").eq("id", true).maybeSingle();
     eier.wert = (r.data && Number(r.data.wert)) || 0;
   } catch (f) { eier.wert = 0; }
-  document.getElementById("eier-zahl").textContent = eier.wert;
+  eierAnzeigen();
+}
 
-  let taste = null;
-  const speichern = () => {
-    clearTimeout(taste);
-    taste = setTimeout(() => {
-      db.from("eier_zaehler").upsert({ id: true, wert: eier.wert });
-    }, 400);
-  };
-  const anzeigen = () => { document.getElementById("eier-zahl").textContent = eier.wert; };
+function eierAnzeigen() {
+  const z = document.getElementById("eier-zahl");
+  if (z) z.textContent = eier.wert;
+  const gross = document.getElementById("eier-grosszahl");
+  if (gross) gross.textContent = eier.wert;
+}
 
-  const plusKnopf = document.getElementById("eier-plus");
-  const minusKnopf = document.getElementById("eier-minus");
+async function eierSpeichern(neuerWert) {
+  eier.wert = Math.max(0, neuerWert);
+  eierAnzeigen();
+  const { error } = await db.from("eier_zaehler").upsert({ id: true, wert: eier.wert });
+  if (error) meldung(fehlertext(error), "fehler");
+}
 
-  plusKnopf.onclick = () => { eier.wert++; anzeigen(); speichern(); };
-  minusKnopf.onclick = () => { eier.wert = Math.max(0, eier.wert - 1); anzeigen(); speichern(); };
+// ---------- Das Fenster ----------
 
-  plusKnopf.addEventListener("keydown", (e) => {
-    if (e.key === "ArrowUp") { e.preventDefault(); eier.wert++; }
-    else if (e.key === "ArrowDown") { e.preventDefault(); eier.wert = Math.max(0, eier.wert - 1); }
-    else return;
-    anzeigen(); speichern();
+function eierFensterUmschalten() {
+  const da = document.getElementById("eier-fenster");
+  if (da) { da.remove(); return; }
+
+  const huelle = document.createElement("div");
+  huelle.id = "eier-fenster";
+  huelle.className = "dialog-huelle";
+  huelle.innerHTML = '<div class="dialog eier-dialog">'
+    + '<div class="eier-kopf">'
+    + '<h2>Eier im Lager</h2>'
+    + '<div class="eier-kopfknoepfe">'
+    + '<button type="button" class="knopf knopf--klein" id="eier-historie">Historie</button>'
+    + '<button type="button" class="dialog__schliessen-inline" id="eier-zu">×</button>'
+    + '</div></div>'
+    + '<div id="eier-koerper"></div>'
+    + '</div>';
+  document.body.appendChild(huelle);
+
+  const zu = () => huelle.remove();
+  document.getElementById("eier-zu").onclick = zu;
+  dialogSchliessen(huelle, zu);
+  document.getElementById("eier-historie").onclick = () => eierHistorieZeigen();
+
+  eierZaehlerZeigen();
+}
+
+function eierZaehlerZeigen() {
+  const koerper = document.getElementById("eier-koerper");
+  if (!koerper) return;
+
+  koerper.innerHTML = '<p class="hinweis">Auf das Ei tippen zählt eins dazu.</p>'
+    + '<button type="button" class="eier-gross" id="eier-plus" title="Eins dazu">'
+    + '<span class="eier-gross__bild">🥚</span>'
+    + '<span class="eier-gross__zahl" id="eier-grosszahl">' + eier.wert + '</span>'
+    + '</button>'
+    + '<div class="eier-knoepfe">'
+    + '<button type="button" class="knopf" id="eier-minus">– eins weniger</button>'
+    + '<button type="button" class="knopf knopf--haupt" id="eier-weiter">Eier nehmen</button>'
+    + '</div>';
+
+  document.getElementById("eier-plus").onclick = () => eierSpeichern(eier.wert + 1);
+  document.getElementById("eier-minus").onclick = () => eierSpeichern(eier.wert - 1);
+  document.getElementById("eier-weiter").onclick = () => eierAbbuchenZeigen();
+}
+
+// ---------- Abbuchen mit Ziffernblock ----------
+
+function eierAbbuchenZeigen() {
+  const koerper = document.getElementById("eier-koerper");
+  if (!koerper) return;
+
+  let eingabe = "";
+
+  koerper.innerHTML = '<p class="hinweis">Wie viele Eier nimmst du mit? '
+    + 'Im Lager sind ' + eier.wert + '.</p>'
+    + '<div class="numpad-anzeige" id="eier-anzeige">0</div>'
+    + '<div class="numpad-tasten">'
+    + [7,8,9,4,5,6,1,2,3].map((n) => '<button type="button" class="numpad-taste" data-eiz="'
+        + n + '">' + n + '</button>').join("")
+    + '<button type="button" class="numpad-taste" data-eic="weg">⌫</button>'
+    + '<button type="button" class="numpad-taste" data-eiz="0">0</button>'
+    + '<button type="button" class="numpad-taste" data-eic="leer">C</button>'
+    + '</div>'
+    + '<div class="eier-knoepfe">'
+    + '<button type="button" class="knopf" id="eier-zurueck">Zurück</button>'
+    + '<button type="button" class="knopf knopf--haupt" id="eier-nehmen">Nehmen</button>'
+    + '</div>';
+
+  const anzeige = document.getElementById("eier-anzeige");
+  const zeigen = () => { anzeige.textContent = eingabe || "0"; };
+
+  koerper.querySelectorAll("[data-eiz]").forEach((t) => {
+    t.onclick = () => { eingabe = (eingabe + t.dataset.eiz).replace(/^0+(?=\d)/, ""); zeigen(); };
   });
+  koerper.querySelector('[data-eic="weg"]').onclick = () => { eingabe = eingabe.slice(0, -1); zeigen(); };
+  koerper.querySelector('[data-eic="leer"]').onclick = () => { eingabe = ""; zeigen(); };
 
-  // Andere Geräte live mitbekommen
-  if (db && typeof db.channel === "function") {
-    db.channel("eier-" + Date.now())
-      .on("postgres_changes", { event: "*", schema: "public", table: "eier_zaehler" }, (n) => {
-        if (n.new && document.activeElement !== plusKnopf) {
-          eier.wert = Number(n.new.wert) || 0;
-          anzeigen();
-        }
-      })
-      .subscribe();
+  document.getElementById("eier-zurueck").onclick = () => eierZaehlerZeigen();
+
+  document.getElementById("eier-nehmen").onclick = async () => {
+    const menge = Number(eingabe) || 0;
+    if (menge < 1) { meldung("Bitte eine Anzahl eingeben.", "warn"); return; }
+    if (menge > eier.wert) {
+      meldung("So viele sind nicht da. Im Lager sind " + eier.wert + ".", "warn");
+      return;
+    }
+
+    await eierSpeichern(eier.wert - menge);
+    try {
+      await db.from("eier_historie").insert({
+        menge: menge, user_id: profil.id, rest: eier.wert,
+      });
+    } catch (f) { /* die Historie ist Beiwerk */ }
+
+    meldung(menge + (menge === 1 ? " Ei" : " Eier") + " genommen.");
+    eierZaehlerZeigen();
+  };
+}
+
+// ---------- Historie ----------
+
+async function eierHistorieZeigen() {
+  const koerper = document.getElementById("eier-koerper");
+  if (!koerper) return;
+  koerper.innerHTML = '<div class="laedt">Wird geladen …</div>';
+
+  let liste = [];
+  try {
+    const { data, error } = await db.from("eier_historie")
+      .select("*, profiles(full_name, email)")
+      .order("wann", { ascending: false }).limit(80);
+    if (error) throw error;
+    liste = data || [];
+  } catch (f) {
+    koerper.innerHTML = '<p class="hinweis">' + esc(fehlertext(f)) + '</p>'
+      + '<div class="eier-knoepfe"><button type="button" class="knopf" id="eier-zurueck2">'
+      + 'Zurück</button></div>';
+    document.getElementById("eier-zurueck2").onclick = () => eierZaehlerZeigen();
+    return;
   }
+
+  koerper.innerHTML = (liste.length
+      ? liste.map((h) => '<div class="eier-zeile">'
+          + '<strong>' + esc((h.profiles && (h.profiles.full_name || h.profiles.email)) || "?")
+          + '</strong> hat ' + h.menge + (h.menge === 1 ? " Ei" : " Eier") + ' genommen'
+          + '<div class="klein">' + esc(datumZeitKurz(h.wann)) + '</div>'
+          + '</div>').join("")
+      : '<p class="hinweis">Noch nichts abgebucht.</p>')
+    + '<div class="eier-knoepfe"><button type="button" class="knopf" id="eier-zurueck2">'
+    + 'Zurück</button></div>';
+
+  document.getElementById("eier-zurueck2").onclick = () => eierZaehlerZeigen();
 }
 
 // Kurzer Eintritts-Effekt beim Reiterwechsel — auf jeden Container
@@ -11258,6 +11451,9 @@ function zeichneSeite() {
   bereich.classList.toggle("inhalt--breit", pfad === "planwand");
   document.body.classList.toggle("pw-seite", pfad === "planwand");
   seite.zeige(bereich);
+  // Derselbe sanfte Eintritt wie beim Reiterwechsel, jetzt auch
+  // beim Wechsel zwischen den Hauptbereichen.
+  reiterUebergang(bereich);
 }
 
 function zeichneGeruest() {
@@ -11345,7 +11541,7 @@ function zeichneGeruest() {
     profil = null;
     document.querySelectorAll(".dialog-huelle").forEach((el) => el.remove());
     chatEinbautStoppen();
-    ["fahrzeug-knopf", "fahrzeug-panel", "eier-knopf"].forEach((id) => {
+    ["fahrzeug-knopf", "fahrzeug-panel", "eier-knopf", "eier-fenster"].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.remove();
     });
@@ -11366,12 +11562,16 @@ function zeichneGeruest() {
     };
   };
 
-  // Nach fünf Minuten ohne jede Bewegung wird automatisch abgemeldet.
+  // Nach fünf Minuten ohne jede Bewegung wird automatisch abgemeldet —
+  // ausser der Haken "Angemeldet bleiben" ist in den Einstellungen
+  // gesetzt. Dann meldet man sich nur noch selbst ab.
   let untaetigTakt = null;
   const untaetigZuruecksetzen = () => {
     clearTimeout(untaetigTakt);
+    if (einstellung("angemeldetbleiben")) return;
     untaetigTakt = setTimeout(async () => {
       if (!profil) return;
+      if (einstellung("angemeldetbleiben")) return;
       await jetztAbmelden();
       meldung("Wegen Inaktivität automatisch abgemeldet.", "warn");
     }, 5 * 60 * 1000);
@@ -11379,13 +11579,14 @@ function zeichneGeruest() {
   ["mousemove", "mousedown", "keydown", "touchstart", "scroll", "wheel"].forEach((art) => {
     document.addEventListener(art, untaetigZuruecksetzen, { passive: true });
   });
+  // Damit der Haken in den Einstellungen sofort greift
+  window.untaetigNeuStarten = untaetigZuruecksetzen;
   untaetigZuruecksetzen();
 
   if (!location.hash) location.hash = "#/dashboard";
   zeichneSeite();
-  chatEinbauen();
-  eierEinbauen();
   fahrzeugEinbauen();
+  eierEinbauen();
 }
 
 window.addEventListener("hashchange", () => {
