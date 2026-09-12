@@ -2232,6 +2232,58 @@ body.dunkel .kopf__logo { filter: brightness(0) invert(1); }
 @media (max-width: 780px) {
   .eier-dialog { max-height: 80dvh; }
 }
+
+/* ---------- Anmeldung: ruhiger Wechsel statt fliegendem Bild ---------- */
+.login__wechsel--raus { animation: loginRaus .16s ease forwards; }
+.login__wechsel--rein { animation: loginRein .26s cubic-bezier(.2,.8,.2,1); }
+@keyframes loginRaus { to { opacity: 0; transform: scale(.97); } }
+@keyframes loginRein { from { opacity: 0; transform: scale(.97); }
+                       to { opacity: 1; transform: none; } }
+
+/* ---------- Auftragsfenster: alles auf einen Blick ---------- */
+.dialog--auftrag { max-width: min(1180px, 96vw); width: 96vw;
+                  max-height: 92dvh; display: flex; flex-direction: column; }
+.auf-kopf { display: flex; align-items: flex-start; justify-content: space-between;
+           gap: 12px; margin-bottom: 8px; flex: none; }
+.auf-kopf h2 { margin: 0; font-size: 1.25rem; line-height: 1.1; }
+.auf-kopf__unter { display: block; font-size: .76rem; color: var(--gedaempft); margin-top: 2px; }
+.auf-kopf__knoepfe { display: flex; gap: 6px; flex: none; }
+
+.problemkasten--schmal { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+                        padding: 7px 11px; margin-bottom: 8px; font-size: .82rem; }
+
+.auf-raster { display: grid; grid-template-columns: 1fr; gap: 0 20px;
+             flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.auf-spalte { display: flex; flex-direction: column; min-width: 0; }
+.auf-spalte .feld { margin-bottom: 9px; }
+.auf-spalte .feld > span { margin-bottom: 3px; font-size: .76rem; }
+.auf-spalte input, .auf-spalte select { min-height: 36px; padding: 6px 9px; font-size: .9rem; }
+.auf-blocktitel { font-size: .76rem; font-weight: 700; color: var(--gedaempft);
+                 margin-bottom: 6px; }
+
+.auf-zweier { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.auf-dreier { display: grid; grid-template-columns: 1fr 64px 1fr; gap: 8px; }
+.auf-zweier .feld, .auf-dreier .feld { margin-bottom: 9px; }
+
+.auf-zustand { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.auf-zustand .wahlknopf { padding: 7px 6px; min-height: 36px; font-size: .82rem; }
+
+.schalter--eng { padding: 3px 0; font-size: .85rem; }
+.feld--wachsend { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+.feld--wachsend textarea { flex: 1 1 auto; min-height: 90px; resize: vertical;
+                          font-size: .88rem; padding: 7px 9px; }
+
+.dialog--auftrag .farbwahl { padding: 7px; gap: 5px; }
+.dialog--auftrag .farbknopf { width: 27px; height: 27px; font-size: .6rem; border-radius: 6px; }
+.dialog--auftrag .dialog__knoepfe { flex: none; margin-top: 10px; }
+.dialog--auftrag .pdfreihe { gap: 6px; }
+
+@media (min-width: 720px) {
+  .auf-raster { grid-template-columns: 1fr 1fr; }
+}
+@media (min-width: 1000px) {
+  .auf-raster { grid-template-columns: 1fr 1fr 1fr; overflow-y: visible; }
+}
 </style>
 </head>
 <body>
@@ -2275,7 +2327,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "35.2.0";
+const APP_VERSION = "36.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -2718,84 +2770,40 @@ function zeigeLogin() {
   };
 
   // Lässt einen Klon von A nach B fliegen und ruft danach fertig() auf
-  const fliegen = (vorlageEl, vonRechteck, nachRechteck, fertig) => {
-    const klon = vorlageEl.cloneNode(true);
-    klon.className = "login__flug";
-    klon.style.cssText = "left:" + vonRechteck.left + "px;top:" + vonRechteck.top
-      + "px;width:" + vonRechteck.width + "px;height:" + vonRechteck.height + "px;";
-    document.body.appendChild(klon);
-
-    requestAnimationFrame(() => {
-      klon.style.left = nachRechteck.left + "px";
-      klon.style.top = nachRechteck.top + "px";
-      klon.style.width = nachRechteck.width + "px";
-      klon.style.height = nachRechteck.height + "px";
-    });
-
-    // Am Ziel wird zuerst das Echte sichtbar, danach blendet der Klon
-    // in einem Wimpernschlag aus — sonst blitzt es beim Wechsel.
-    setTimeout(() => {
-      if (fertig) fertig();
-      klon.style.opacity = "0";
-      setTimeout(() => klon.remove(), 120);
-    }, 400);
-  };
+  // Kein fliegender Klon mehr: der machte beim Start und beim
+  // Zurückgehen jedes Mal einen kleinen Sprung, weil sich das Layout
+  // zwischen Messen und Losfliegen minimal verschiebt. Ein sauberes
+  // Aus- und Einblenden wirkt ruhiger und ist nicht zu schlagen.
 
   const anmeldenZeigen = (konto, bildEl) => {
     letzteKachel = bildEl || null;
-
-    // Das Ziel muss genau so gemessen werden, wie es nachher steht:
-    // also OHNE die Kachelwand, denn die verschwindet ja. Sonst
-    // landet das Bild zu tief und springt am Ende nach oben.
     anmeldungAufbauen(konto);
-    auswahl.hidden = true;
-    anmeldung.hidden = false;
-    anmeldung.style.visibility = "hidden";
-    const zielBild = anmeldung.querySelector(".login__gross");
-    const ziel = zielBild ? zielBild.getBoundingClientRect() : null;
-    anmeldung.hidden = true;
-    anmeldung.style.visibility = "";
-    auswahl.hidden = false;
 
-    // Kachelwand steht wieder — erst jetzt stimmt die Startstelle.
-    const quelle = bildEl ? bildEl.getBoundingClientRect() : null;
-
-    const fertigstellen = () => {
+    auswahl.classList.add("login__wechsel--raus");
+    setTimeout(() => {
       auswahl.hidden = true;
+      auswahl.classList.remove("login__wechsel--raus");
+
       anmeldung.hidden = false;
-      anmeldung.className = "login__block--ein";
+      anmeldung.className = "login__wechsel--rein";
       document.getElementById("lg-anderes").onclick = zurueckZurAuswahl;
       anmeldenBinden(konto.email);
       document.getElementById("lp").focus();
-    };
-
-    if (quelle && ziel) {
-      auswahl.classList.add("login__kachelfeld--weg");
-      fliegen(bildEl, quelle, ziel, fertigstellen);
-    } else {
-      fertigstellen();
-    }
+    }, 160);
   };
 
   const zurueckZurAuswahl = () => {
-    const grossEl = anmeldung.querySelector(".login__gross");
-    const von = grossEl ? grossEl.getBoundingClientRect() : null;
-
-    // Auswahl wieder sichtbar machen, damit das Ziel messbar ist
-    anmeldung.hidden = true;
-    auswahl.hidden = false;
-    auswahl.classList.remove("login__kachelfeld--weg");
-
-    const nach = letzteKachel ? letzteKachel.getBoundingClientRect() : null;
-
-    if (von && nach && grossEl) {
-      // Die Kachelwand ist schon da, der Klon fliegt einfach auf
-      // seine Kachel zurück und verschwindet dort.
-      auswahl.classList.add("login__block--ein");
-      fliegen(grossEl, von, nach, () => { anmeldung.innerHTML = ""; });
-    } else {
+    anmeldung.className = "login__wechsel--raus";
+    setTimeout(() => {
+      anmeldung.hidden = true;
       anmeldung.innerHTML = "";
-    }
+      anmeldung.className = "";
+
+      auswahl.hidden = false;
+      auswahl.classList.remove("login__kachelfeld--weg");
+      auswahl.classList.add("login__wechsel--rein");
+      setTimeout(() => auswahl.classList.remove("login__wechsel--rein"), 260);
+    }, 160);
   };
 
   // Mit Escape zurück zur Auswahl
@@ -3556,11 +3564,17 @@ function darfSchreiben() {
     || r === "langdreher" || r === "kurzdreher";
 }
 
+// Mitarbeiter dürfen überall zusehen, aber nur im Einkauf mitmachen.
+function darfEinkaufen() {
+  return darfSchreiben() || meineRolle() === "mitarbeiter";
+}
+
 const ROLLEN = {
   admin: "Administrator",
   planwand: "Planwand",
   langdreher: "Langdreher",
   kurzdreher: "Kurzdreher",
+  mitarbeiter: "Mitarbeiter",
 };
 
 // Hinweisbalken, wenn jemand einen Bereich nur ansehen darf
@@ -6142,25 +6156,43 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
 
   const huelle = document.createElement("div");
   huelle.className = "dialog-huelle";
-  huelle.innerHTML = '<div class="dialog dialog--breit">'
-    + (auftrag ? '<div class="dialog__kopfzeile">'
-        + '<h2>' + esc(auftrag.job_number) + '</h2>'
-        + '<div class="dialog__kopfknoepfe">'
-        + '<button type="button" class="knopf knopf--klein knopf--warnung" id="pl-problem-eigen">'
-        + 'Problem melden</button>'
-        + '<button type="button" class="knopf knopf--klein" id="pl-kopieren-eigen">Kopieren</button>'
-        + '</div></div>'
-      : '<h2>' + (vorlage ? "Kopie anlegen" : "Auftrag einplanen") + '</h2>')
-    + (vorlage
-        ? '<p class="klein">Übernommen von ' + esc(vorlage.job_number)
-          + '. HOCO Nr., Maschine, Stückzahl und Zeichnung bitte neu setzen.</p>' : "")
+  huelle.innerHTML = '<div class="dialog dialog--auftrag">'
+
+    // ---------- Kopfzeile ----------
+    + '<div class="auf-kopf">'
+    + '<div class="auf-kopf__titel">'
     + (auftrag
-        ? '<p class="klein">' + esc(auftrag.maschine)
-          + (auftrag.stand ? ' · Stand ' + zahlText(auftrag.stand) : "")
-          + (auftrag.target_quantity ? ' von ' + zahlText(auftrag.target_quantity) : "")
-          + '</p>'
+        ? '<h2>' + esc(auftrag.job_number) + '</h2>'
+          + '<span class="auf-kopf__unter">' + esc(auftrag.maschine || "")
+          + (auftrag.stand ? ' · ' + zahlText(auftrag.stand) : "")
+          + (auftrag.target_quantity ? ' / ' + zahlText(auftrag.target_quantity) : "")
+          + '</span>'
+        : '<h2>' + (vorlage ? "Kopie anlegen" : "Auftrag einplanen") + '</h2>'
+          + (vorlage ? '<span class="auf-kopf__unter">von ' + esc(vorlage.job_number)
+              + ' — Nummer, Maschine, Stückzahl und Zeichnung neu setzen</span>' : ""))
+    + '</div>'
+    + (auftrag
+        ? '<div class="auf-kopf__knoepfe">'
+          + '<button type="button" class="knopf knopf--klein knopf--warnung" id="pl-problem-eigen">Problem</button>'
+          + '<button type="button" class="knopf knopf--klein" id="pl-kopieren-eigen">Kopieren</button>'
+          + '</div>'
+        : "")
+    + '</div>'
+
+    + (auftrag && auftrag.problem
+        ? '<div class="problemkasten problemkasten--schmal">'
+          + '<span>⚠ ' + esc(auftrag.problem) + '</span>'
+          + '<span class="klein">' + esc(auftrag.problem_von || "") + '</span>'
+          + (darf ? '<button type="button" class="knopf knopf--klein" id="pl-problemweg">'
+              + 'Erledigt</button>' : "")
+          + '</div>'
         : "")
 
+    // ---------- Drei Spalten ----------
+    + '<div class="auf-raster">'
+
+    // Spalte 1: Auftrag und Zeit
+    + '<div class="auf-spalte">'
     + (auftrag ? "" :
         '<label class="feld"><span>HOCO Nr.</span>'
         + '<input id="pl-nr" type="text" autocapitalize="characters"></label>')
@@ -6170,83 +6202,67 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
         + ((auftrag && auftrag.machine_id === m.id)
             || (!auftrag && vorgabeMaschine === m.id) ? " selected" : "") + '>' + esc(m.name)
         + (m.machine_number ? " (" + esc(m.machine_number) + ")" : "") + '</option>').join("")
-    + '</select><span class="feldhinweis">Hier lässt sich der Auftrag auch ohne Ziehen '
-    + 'auf eine andere Maschine setzen.</span></label>' 
+    + '</select></label>'
 
-    + '<div class="zeitraumwahl">'
-    + '<label class="feld"><span>Geplant ab</span>'
+    + '<div class="auf-dreier">'
+    + '<label class="feld"><span>Ab</span>'
     + '<input id="pl-von" type="date" value="'
     + esc(auftrag ? (auftrag.planned_from || "")
         : (vorgabeDatum || isoDatum(new Date()))) + '"></label>'
-    + '<label class="feld"><span>Dauer in Arbeitstagen</span>'
+    + '<label class="feld"><span>Tage</span>'
     + '<input id="pl-tage" inputmode="decimal" type="number" min="1" step="1" value="'
     + (auftrag ? (auftrag.planned_days || 1) : (v ? (v.planned_days || 1) : 1))
     + '"></label>'
-    + '</div>'
-    + '<label class="feld"><span>Letzter Tag</span>'
+    + '<label class="feld"><span>Bis</span>'
     + '<input id="pl-bis" type="date" value="'
     + esc(auftrag && auftrag.planned_from
-        ? letzterArbeitstag(auftrag.planned_from, auftrag.planned_days || 1) : "") + '">'
-    + '<span class="feldhinweis">Von, Bis und Dauer hängen zusammen. '
-    + 'Änderst du eines, passen sich die anderen an.</span></label>'
+        ? letzterArbeitstag(auftrag.planned_from, auftrag.planned_days || 1) : "") + '"></label>'
+    + '</div>'
 
-    + '<div class="dialogspalten">'
-    + '<div class="dialogspalte">'
-    + '<div class="dialog__block"><div class="dialog__blocktitel">Material</div>'
-    + '<div class="zeitraumwahl">'
-    + '<label class="feld"><span>Aussendurchmesser in mm</span>'
+    + '<label class="feld"><span>Fertigungsmenge</span>'
+    + '<input id="pl-menge" inputmode="decimal" type="number" min="0" step="1" value="'
+    + (auftrag && auftrag.target_quantity !== null && auftrag.target_quantity !== undefined
+        ? auftrag.target_quantity : "") + '" placeholder="Stück"></label>'
+
+    + '<div class="feld"><span class="feldlabel">Vorbereitung</span>'
+    + '<label class="schalter schalter--eng"><input type="checkbox" id="pl-fa"'
+    + ((auftrag && auftrag.fa_erstellt) || (!auftrag && v && v.fa_erstellt) ? " checked" : "")
+    + (darf ? "" : " disabled") + '><span>FA erstellt</span></label>'
+    + '<label class="schalter schalter--eng"><input type="checkbox" id="pl-material"'
+    + ((auftrag && auftrag.material_ok) || (!auftrag && v && v.material_ok) ? " checked" : "")
+    + (darf ? "" : " disabled") + '><span>Material da</span></label>'
+    + '</div>'
+    + '</div>'
+
+    // Spalte 2: Material
+    + '<div class="auf-spalte">'
+    + '<div class="auf-blocktitel">Material</div>'
+    + '<div class="auf-zweier">'
+    + '<label class="feld"><span>⌀ in mm</span>'
     + '<input id="pl-dm" inputmode="decimal" type="number" step="0.1" min="0" value="'
     + esc(auftrag && auftrag.material_dm !== null && auftrag.material_dm !== undefined
         ? auftrag.material_dm
         : (v && v.material_dm !== null && v.material_dm !== undefined ? v.material_dm : ""))
-    + '" placeholder="z. B. 12"></label>'
+    + '" placeholder="12"></label>'
     + '<label class="feld"><span>Toleranz</span>'
-    + '<input id="pl-tol" type="text" list="pl-tol-liste" placeholder="ohne Toleranz" value="'
+    + '<input id="pl-tol" type="text" list="pl-tol-liste" placeholder="keine" value="'
     + esc(auftrag ? (auftrag.material_toleranz || "")
         : (v ? (v.material_toleranz || "") : "")) + '">'
     + '<datalist id="pl-tol-liste">'
     + ['h6', 'h7', 'h8', 'h9', 'h10', 'h11', 'h12', 'h13'].map((t) =>
         '<option value="' + t + '">').join("")
-    + '</datalist></label>' 
+    + '</datalist></label>'
     + '</div>'
-    + '<div class="zeitraumwahl">'
     + '<label class="feld"><span>Menge vorhanden oder bestellt</span>'
     + '<input id="pl-menge-mat" type="text" value="'
     + esc(auftrag ? (auftrag.material_menge || "") : (v ? (v.material_menge || "") : ""))
-    + '" placeholder="z. B. 40 kg oder 6 Stangen"></label>'
+    + '" placeholder="40 kg oder 6 Stangen"></label>'
     + '<label class="feld"><span>Liefertermin</span>'
-    + '<input id="pl-liefer" type="text" placeholder="z. B. KW 44" value="' 
+    + '<input id="pl-liefer" type="text" placeholder="KW 44" value="'
     + esc(auftrag ? (auftrag.material_liefertermin || "")
         : (v ? (v.material_liefertermin || "") : "")) + '"></label>'
-    + '</div></div>'
 
-    + '<div class="feld"><span class="feldlabel">Vorbereitung</span>'
-    + '<label class="schalter"><input type="checkbox" id="pl-fa"'
-    + ((auftrag && auftrag.fa_erstellt) || (!auftrag && v && v.fa_erstellt) ? " checked" : "") + (darf ? "" : " disabled") + '>'
-    + '<span>FA ist erstellt</span></label>'
-    + '<label class="schalter"><input type="checkbox" id="pl-material"'
-    + ((auftrag && auftrag.material_ok) || (!auftrag && v && v.material_ok) ? " checked" : "") + (darf ? "" : " disabled") + '>'
-    + '<span>Material vorhanden oder bestellt</span></label>'
-    + '</div>'
-
-    + '</div>'
-    + '<div class="dialogspalte">'
-    + '<label class="feld"><span>Fertigungsmenge</span>'
-    + '<div class="mengefeld">'
-    + '<input id="pl-menge" inputmode="decimal" type="number" min="0" step="1" value="'
-    + (auftrag && auftrag.target_quantity !== null && auftrag.target_quantity !== undefined
-        ? auftrag.target_quantity : "") + '" placeholder="wie viele Stück">'
-    + '</div></label>'
-
-    + '<div class="feld"><span class="feldlabel">Zustand'
-    + (darf ? "" : ' <span class="klein">– darfst du ändern</span>') + '</span>'
-    + '<div class="wahlgitter">'
-    + Object.keys(PLANSTATUS).map((k) => '<button type="button" class="wahlknopf'
-        + (planZustand === k ? " aktiv" : "") + '" data-plstatus="' + k + '">'
-        + PLANSTATUS[k].zeichen + ' ' + PLANSTATUS[k].name + '</button>').join("")
-    + '</div></div>'
-
-    + '<div class="feld"><span class="feldlabel">Farbe</span>'
+    + '<div class="feld"><span class="feldlabel">Farbe und Material</span>'
     + '<div class="farbwahl">'
     + farbenZurWahl().map((f) => {
         const zu = FARBZUTEILUNG[f.wert];
@@ -6259,41 +6275,42 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     + '</div>'
     + '<span class="feldhinweis" id="pl-farbmaterial"></span>'
     + '</div>'
+    + '</div>'
 
-    + '<label class="feld"><span>Notiz für die Maschine</span>'
-    + '<textarea id="pl-notiz" rows="5" placeholder="Rüsthinweise, Besonderheiten, Werkzeuge …"'
+    // Spalte 3: Zustand, Notiz, Zeichnung
+    + '<div class="auf-spalte">'
+    + '<div class="feld"><span class="feldlabel">Zustand</span>'
+    + '<div class="auf-zustand">'
+    + Object.keys(PLANSTATUS).map((k) => '<button type="button" class="wahlknopf'
+        + (planZustand === k ? " aktiv" : "") + '" data-plstatus="' + k + '">'
+        + PLANSTATUS[k].zeichen + ' ' + PLANSTATUS[k].name + '</button>').join("")
+    + '</div></div>'
+
+    + '<label class="feld feld--wachsend"><span>Notiz für die Maschine</span>'
+    + '<textarea id="pl-notiz" placeholder="Rüsthinweise, Besonderheiten, Werkzeuge …"'
     + (darf ? "" : " readonly") + '>'
     + esc(auftrag ? (auftrag.plan_note || "") : (v ? (v.plan_note || "") : ""))
     + '</textarea></label>'
 
-    + '<div class="feld"><span class="feldlabel">Zeichnung als PDF</span>'
+    + '<div class="feld"><span class="feldlabel">Zeichnung</span>'
+    + '<div class="pdfreihe">'
     + (auftrag && auftrag.drawing_url
-        ? '<button type="button" class="knopf pdflink" data-pdfzeigen="'
-          + esc(auftrag.drawing_url) + '">Zeichnung ansehen</button>' : "")
-    + '<div class="pdfabstand"></div>' 
+        ? '<button type="button" class="knopf knopf--klein pdflink" data-pdfzeigen="'
+          + esc(auftrag.drawing_url) + '">Ansehen</button>' : "")
     + (darf
-        ? '<label class="knopf bildknopf">PDF auswählen'
+        ? '<label class="knopf knopf--klein bildknopf">PDF wählen'
           + '<input type="file" id="pl-pdf" accept="application/pdf" hidden></label>'
-          + '<span class="feldhinweis" id="pl-pdfstand"></span>'
         : "")
     + '</div>'
-
-    + (auftrag && auftrag.problem
-        ? '<div class="problemkasten">'
-          + '<div class="problemkasten__kopf">⚠ Gemeldetes Problem</div>'
-          + '<div class="problemkasten__text">' + esc(auftrag.problem) + '</div>'
-          + '<div class="klein">' + esc(auftrag.problem_von || "")
-          + (auftrag.problem_at ? ' · ' + esc(datumZeitKurz(auftrag.problem_at)) : "") + '</div>'
-          + (darf ? '<button type="button" class="knopf knopf--klein" id="pl-problemweg">'
-              + 'Problem erledigt</button>' : "")
-          + '</div>'
-        : "")
-
+    + (darf ? '<span class="feldhinweis" id="pl-pdfstand"></span>' : "")
     + '</div>'
     + '</div>'
+
+    + '</div>'
+
     + '<div class="dialog__knoepfe">'
     + (auftrag && darf
-        ? '<button class="knopf knopf--gefahr" id="pl-loeschen">Auftrag löschen</button>' : "")
+        ? '<button class="knopf knopf--gefahr" id="pl-loeschen">Löschen</button>' : "")
     + '<button class="knopf knopf--still" id="pl-nein">Schliessen</button>'
     + '<button class="knopf knopf--haupt" id="pl-ja">Speichern</button>'
     + '</div></div>';
@@ -9008,7 +9025,9 @@ async function seiteEinstellungen(b) {
         + '<div><strong>Planwand</strong> sieht alle Parks und darf ändern, '
         + 'sobald oben Bearbeiten eingeschaltet ist.</div>'
         + '<div><strong>Langdreher</strong> und <strong>Kurzdreher</strong> sehen nur '
-        + 'ihren Park, in Produktion und Planwand.</div></div></section>'
+        + 'ihren Park, in Produktion und Planwand.</div>'
+        + '<div><strong>Mitarbeiter</strong> darf überall zusehen und den '
+        + 'Einkauf nutzen, sonst nichts ändern.</div></div></section>'
       : '<section class="karte"><h2>Meine Rolle</h2>'
         + '<p><strong>' + esc(ROLLEN[ich.role] || ich.role || "") + '</strong></p>'
         + '</section>')
