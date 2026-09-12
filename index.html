@@ -2319,6 +2319,27 @@ body.dunkel .kopf__logo { filter: brightness(0) invert(1); }
   .pw-regler-reihe .pw-zoom { width: 100%; }
   .pw-kopfleiste { gap: 8px !important; }
 }
+
+/* ---------- Anmeldung am Rechner: grösser und luftiger ---------- */
+@media (min-width: 700px) {
+  .login__karte { max-width: 560px; padding: 34px 30px 30px; }
+  .login__kacheln { grid-template-columns: repeat(auto-fit, minmax(94px, 1fr)); gap: 14px; }
+  .login__kachel img, .login__kachel-buchstabe { max-width: 104px; border-radius: 12px; }
+  .login__kachel-buchstabe { font-size: 1.9rem; }
+  .login__kachel-name { font-size: .8rem; }
+  .login__gross { width: 124px; height: 124px; border-radius: 14px; }
+  .login__gross--buchstabe { font-size: 2.8rem; }
+  .login__name { font-size: 1.3rem; }
+  .login__bild { margin: -34px -30px 0; }
+}
+
+/* ---------- Startseite: Bestellungen in Zahlen ---------- */
+.db-bestellzahlen { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.db-bestellzahl { text-align: center; background: var(--grund);
+                 border-radius: var(--radius); padding: 10px 6px; }
+.db-bestellzahl strong { display: block; font-size: 1.7rem; line-height: 1.1;
+                        font-variant-numeric: tabular-nums; }
+.db-bestellzahl span { font-size: .74rem; color: var(--gedaempft); }
 </style>
 </head>
 <body>
@@ -2362,7 +2383,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "36.3.0";
+const APP_VERSION = "37.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -3110,46 +3131,43 @@ async function seiteDashboard(b) {
 
   const statusEl = document.getElementById("db-status");
   if (statusEl) {
-    let offeneListe = [];
+    // Zusammenfassung statt langer Liste: wie viele in welchem Zustand
+    let zaehler = { offen: 0, bestellt: 0, teilweise_geliefert: 0 };
+    let spaeteste = null;
     try {
       const { data, error } = await zeitlimit(
-        db.from("order_items")
-          .select("*, articles(article_number, name), suppliers(name, website)")
-          .in("status", ["offen", "bestellt", "teilweise_geliefert"])
-          .order("needed_by", { ascending: true, nullsFirst: false })
-          .limit(25),
+        db.from("order_items").select("status, needed_by")
+          .in("status", ["offen", "bestellt", "teilweise_geliefert"]),
         9000, "Bestellungen");
-      if (!error) offeneListe = data || [];
+      if (!error) {
+        (data || []).forEach((z) => {
+          if (zaehler[z.status] !== undefined) zaehler[z.status]++;
+          if (z.needed_by && z.needed_by < heute
+              && (!spaeteste || z.needed_by < spaeteste)) spaeteste = z.needed_by;
+        });
+      }
     } catch (f) { console.warn("Bestellungen:", f.message); }
 
+    const gesamt = zaehler.offen + zaehler.bestellt + zaehler.teilweise_geliefert;
+
     statusEl.innerHTML = '<section class="karte" data-zu="bestellungen">'
-      + '<h2>Offene Bestellungen'
-      + (offeneListe.length ? ' <span class="marke">' + offeneListe.length + '</span>' : "")
-      + '</h2>'
-      + (offeneListe.length
-        ? '<table class="tabelle tabelle--db-bestellungen"><tbody>' + offeneListe.map((z) => {
-            const a2 = z.articles || {};
-            const spaet = z.needed_by && z.needed_by < heute;
-            return '<tr><td><strong>' + esc(a2.article_number || "?") + '</strong> '
-              + esc(a2.name || "")
-              + '<div class="klein">'
-              + (() => {
-          const a2 = z.articles || {};
-          const jetzt = a2.suppliers ? a2.suppliers.name : null;
-          const damals = z.suppliers ? z.suppliers.name : null;
-          if (jetzt && damals && jetzt !== damals) {
-            return esc(jetzt) + ' <span class="klein">(bei Erfassung: '
-              + esc(damals) + ')</span>';
-          }
-          return esc(jetzt || damals || "ohne Lieferant");
-        })()
-              + ' · <span class="statuschip statuschip--' + esc(z.status) + '">'
-              + esc(BESTELLSTATUS[z.status] || z.status) + '</span>'
-              + (z.needed_by ? ' <span class="' + (spaet ? "minus stark" : "") + '">bis '
-                  + kurzDatum(z.needed_by) + '</span>' : "")
-              + '</div></td>'
-              + '<td class="mitte stark">' + zahlText(z.quantity) + '</td></tr>';
-          }).join("") + '</tbody></table>'
+      + '<h2>Bestellungen'
+      + (gesamt ? ' <span class="marke">' + gesamt + '</span>' : "") + '</h2>'
+      + (gesamt
+        ? '<div class="db-bestellzahlen">'
+          + '<div class="db-bestellzahl"><strong>' + zaehler.offen + '</strong>'
+          + '<span>offen</span></div>'
+          + '<div class="db-bestellzahl"><strong>' + zaehler.bestellt + '</strong>'
+          + '<span>bestellt</span></div>'
+          + '<div class="db-bestellzahl"><strong>' + zaehler.teilweise_geliefert + '</strong>'
+          + '<span>teilweise da</span></div>'
+          + '</div>'
+          + (ueberfaellig
+              ? '<p class="hinweis minus stark">' + ueberfaellig
+                + (ueberfaellig === 1 ? " Position ist" : " Positionen sind")
+                + ' über der Frist' + (spaeteste ? ", seit " + kurzDatum(spaeteste) : "")
+                + '.</p>'
+              : "")
         : '<p class="hinweis">Keine offenen Bestellungen.</p>')
       + '</section>';
   }
@@ -4034,7 +4052,7 @@ async function ansichtErfassen(ziel, b) {
   if (!maschinen.length) {
     ziel.innerHTML = parkAuswahl()
       + '<div class="suchleiste"><input type="search" id="p-suche"'
-      + ' placeholder="HOCO Nr., Maschine oder Maschinennummer" value="'
+      + ' placeholder="Suchen" value="'
       + esc(prod.suche || "") + '" autocomplete="off"></div>'
       + '<div class="karte karte--hinweis"><p>'
       + (suchtext
@@ -4063,7 +4081,7 @@ async function ansichtErfassen(ziel, b) {
     + '<button class="moduswahl__knopf' + (istWoche ? " aktiv" : "") + '" data-modus="woche">Woche</button>'
     + '</div>'
     + '<div class="suchleiste"><input type="search" id="p-suche"'
-    + ' placeholder="HOCO Nr., Maschine oder Maschinennummer" value="' + esc(prod.suche || "") + '"'
+    + ' placeholder="Suchen" value="' + esc(prod.suche || "") + '"'
     + ' autocomplete="off"></div>'
     + '<div id="raster"><div class="laedt">Zahlen werden geladen …</div></div>';
 
@@ -5006,13 +5024,25 @@ function zeitWischen(b) {
   if (!rolle) return;
 
   let laeuftGerade = false;
+  let letztesLinks = rolle.scrollLeft;
 
   rolle.addEventListener("scroll", () => {
     if (laeuftGerade || plan.imDialog) return;
 
+    // Nur auf echtes seitliches Wischen reagieren. Beim Scrollen nach
+    // unten bleibt scrollLeft gleich — sonst würde die Tafel dabei
+    // endlos weiter in die Vergangenheit rutschen.
+    const linksJetzt = rolle.scrollLeft;
+    const seitlich = linksJetzt !== letztesLinks;
+    letztesLinks = linksJetzt;
+    if (!seitlich) return;
+
     const rand = 40;
     const maximum = rolle.scrollWidth - rolle.clientWidth;
     const schritt = Math.max(3, Math.round(plan.tage / 3));
+
+    // Passt die Tafel ganz ins Bild, gibt es nichts zu schieben
+    if (rolle.scrollWidth <= rolle.clientWidth + 8) return;
 
     if (rolle.scrollLeft <= rand) {
       // Am linken Rand: weiter in die Vergangenheit
@@ -5150,7 +5180,7 @@ async function sucheDialog(b) {
     + 'Menge, Farbe, Zustand, Problem, FA und Material vorhanden.</p>'
     + '<label class="feld"><span>Suchbegriff</span>'
     + '<input type="text" id="su-text" value="' + esc(plan.letzteSuche || "")
-    + '" placeholder="zum Beispiel 10844, Index oder Messing"></label>'
+    + '"></label>'
 
     + '<div class="feld"><span class="feldlabel">Zeitraum</span>'
     + '<div class="su-zeitgitter" id="su-zeitwahl">'
@@ -5532,7 +5562,7 @@ async function ferienDialog(eintrag, zeile, datum, b) {
     + '<input id="fd-bis" type="date" value="' + esc(bisVorgabe) + '"></label>'
     + '</div>'
     + '<label class="feld"><span>Notiz</span>'
-    + '<input id="fd-notiz" type="text" placeholder="kann leer bleiben" value="'
+    + '<input id="fd-notiz" type="text" value="'
     + esc(eintrag ? (eintrag.note || "") : "") + '"></label>'
 
     + '<div class="dialog__knoepfe">'
@@ -6343,7 +6373,7 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     + '<label class="feld"><span>Fertigungsmenge</span>'
     + '<input id="pl-menge" inputmode="decimal" type="number" min="0" step="1" value="'
     + (auftrag && auftrag.target_quantity !== null && auftrag.target_quantity !== undefined
-        ? auftrag.target_quantity : "") + '" placeholder="Stück"></label>'
+        ? auftrag.target_quantity : "") + '"></label>'
 
     + '<div class="feld"><span class="feldlabel">Vorbereitung</span>'
     + '<label class="schalter schalter--eng"><input type="checkbox" id="pl-fa"'
@@ -6378,9 +6408,9 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     + esc(auftrag && auftrag.material_dm !== null && auftrag.material_dm !== undefined
         ? auftrag.material_dm
         : (v && v.material_dm !== null && v.material_dm !== undefined ? v.material_dm : ""))
-    + '" placeholder="12"></label>'
+    + '"></label>'
     + '<label class="feld"><span>Toleranz</span>'
-    + '<input id="pl-tol" type="text" list="pl-tol-liste" placeholder="keine" value="'
+    + '<input id="pl-tol" type="text" list="pl-tol-liste" value="'
     + esc(auftrag ? (auftrag.material_toleranz || "")
         : (v ? (v.material_toleranz || "") : "")) + '">'
     + '<datalist id="pl-tol-liste">'
@@ -6391,9 +6421,9 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     + '<label class="feld"><span>Menge vorhanden oder bestellt</span>'
     + '<input id="pl-menge-mat" type="text" value="'
     + esc(auftrag ? (auftrag.material_menge || "") : (v ? (v.material_menge || "") : ""))
-    + '" placeholder="40 kg oder 6 Stangen"></label>'
+    + '"></label>'
     + '<label class="feld"><span>Liefertermin</span>'
-    + '<input id="pl-liefer" type="text" placeholder="KW 44" value="'
+    + '<input id="pl-liefer" type="text" value="'
     + esc(auftrag ? (auftrag.material_liefertermin || "")
         : (v ? (v.material_liefertermin || "") : "")) + '"></label>'
 
@@ -6422,7 +6452,7 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     + '</div></div>'
 
     + '<label class="feld feld--wachsend"><span>Notiz für die Maschine</span>'
-    + '<textarea id="pl-notiz" placeholder="Rüsthinweise, Besonderheiten, Werkzeuge …"'
+    + '<textarea id="pl-notiz"'
     + (darf ? "" : " readonly") + '>'
     + esc(auftrag ? (auftrag.plan_note || "") : (v ? (v.plan_note || "") : ""))
     + '</textarea></label>'
@@ -6690,7 +6720,7 @@ async function ansichtUebersicht(ziel, b) {
     + '<button class="linkknopf" id="u-heute">Heute</button></div>'
     + '</div>'
     + '<div class="suchleiste"><input type="search" id="u-suche"'
-    + ' placeholder="HOCO Nr., Maschine oder Maschinennummer" value="'
+    + ' placeholder="Suchen" value="'
     + esc(prod.uebersichtSuche) + '" autocomplete="off"></div>'
     + '<div id="u-inhalt"><div class="laedt">Zahlen werden geladen …</div></div>';
 
@@ -7333,14 +7363,14 @@ function rechnerDrehzahl(ziel, b) {
     + '<section class="karte"><h2>Werkzeug</h2>'
     + '<label class="feld"><span>Durchmesser in mm</span>'
     + '<input type="number" id="r-d" inputmode="decimal" step="0.1" value="'
-    + esc(rech.durchmesser) + '" placeholder="z. B. 8"></label>'
+    + esc(rech.durchmesser) + '"></label>'
     + '<div class="zeitraumwahl">'
     + '<label class="feld"><span>Zähne</span>'
     + '<input type="number" id="r-z" inputmode="numeric" step="1" value="'
-    + esc(rech.zaehne) + '" placeholder="optional"></label>'
+    + esc(rech.zaehne) + '"></label>'
     + '<label class="feld"><span>fz in mm</span>'
     + '<input type="number" id="r-fz" inputmode="decimal" step="0.01" value="'
-    + esc(rech.fz) + '" placeholder="optional"></label>'
+    + esc(rech.fz) + '"></label>'
     + '</div></section>'
 
     + '<section class="karte karte--ergebnis">'
@@ -7744,7 +7774,7 @@ function rechnerWinkel(ziel) {
     + '<div class="zeitraumwahl">'
     + '<label class="feld"><span>Bohrung ⌀ in mm</span>'
     + '<input type="number" id="f-d" inputmode="decimal" step="0.1" value="' + esc(fase.d)
-    + '" placeholder="z. B. 10"></label>'
+    + '"></label>'
     + '<label class="feld"><span>Fasenbreite b in mm</span>'
     + '<input type="number" id="f-b" inputmode="decimal" step="0.05" value="' + esc(fase.b) + '"></label>'
     + '</div>'
@@ -7843,7 +7873,7 @@ async function ladeBestellungen(offen) {
 async function seiteBestellungen(b) {
   b.innerHTML = '<h1 class="seitentitel">Bestellungen</h1>'
     + '<div class="reiter">'
-    + [["offen", "Offen"], ["historie", "Historie"],
+    + [["offen", "Offen"], ["bestellt", "Bestellt"], ["historie", "Historie"],
        ["artikel", "Artikel"], ["bezeichnungen", "Bezeichnungen"],
        ["lieferanten", "Lieferanten"]]
       .map(([w, t]) => '<button class="reiter__knopf' + (best.ansicht === w ? " aktiv" : "")
@@ -7861,13 +7891,14 @@ async function seiteBestellungen(b) {
   else if (best.ansicht === "bezeichnungen") await bestBezeichnungen(ziel, b);
   else if (best.ansicht === "lieferanten") await bestLieferanten(ziel, b);
   else if (best.ansicht === "historie") await bestHistorie(ziel, b);
-  else await bestOffen(ziel, b);
+  else if (best.ansicht === "bestellt") await bestOffen(ziel, b, "bestellt");
+  else await bestOffen(ziel, b, "offen");
   reiterUebergang(ziel);
 }
 
 // ---------- Offene Positionen, nach Lieferant gruppiert ----------
 
-async function bestOffen(ziel, b) {
+async function bestOffen(ziel, b, bereich) {
   let liste;
   try { liste = await ladeBestellungen(true); }
   catch (f) {
@@ -7878,11 +7909,12 @@ async function bestOffen(ziel, b) {
   const heute = isoDatum(new Date());
 
   // Drei getrennte Blöcke, innerhalb davon nach Lieferant gruppiert
-  const bloecke = [
-    { status: "offen", titel: "Offen" },
-    { status: "bestellt", titel: "Bestellt" },
-    { status: "teilweise_geliefert", titel: "Teilweise geliefert" },
-  ];
+  // Reiter "Offen" zeigt nur noch wirklich Offenes. Was bestellt ist
+  // oder teilweise geliefert wurde, steht im Reiter "Bestellt".
+  const bloecke = (bereich === "bestellt")
+    ? [{ status: "bestellt", titel: "Bestellt" },
+       { status: "teilweise_geliefert", titel: "Teilweise geliefert" }]
+    : [{ status: "offen", titel: "Offen" }];
 
   const zeileHtml = (z) => {
     const a2 = z.articles || {};
@@ -7928,7 +7960,7 @@ async function bestOffen(ziel, b) {
   });
 
   ziel.innerHTML = '<div class="suchleiste">'
-    + '<input type="search" id="bo-suche" placeholder="Suchen: Artikel, Lieferant, Notiz, wer …"'
+    + '<input type="search" id="bo-suche" placeholder="Suchen"'
     + ' value="' + esc(best.offenSuche) + '" autocomplete="off"></div>'
     + (darfSchreiben()
       ? '<button class="knopf knopf--haupt knopf--breit" id="b-neu">+ Neue Position</button>' : "")
@@ -7972,7 +8004,7 @@ async function bestOffen(ziel, b) {
     let taste = null;
     suchfeldOffen.oninput = () => {
       clearTimeout(taste);
-      taste = setTimeout(() => { best.offenSuche = suchfeldOffen.value; bestOffen(ziel, b); }, 300);
+      taste = setTimeout(() => { best.offenSuche = suchfeldOffen.value; bestOffen(ziel, b, bereich); }, 300);
     };
     if (best.offenSuche) {
       suchfeldOffen.focus();
@@ -8298,7 +8330,7 @@ async function positionDialog(b) {
   huelle.className = "dialog-huelle";
   huelle.innerHTML = '<div class="dialog"><h2>Neue Bestellposition</h2>'
     + '<div class="suchleiste">'
-    + '<input type="text" id="pd-such" placeholder="Artikelnummer oder Name" autocomplete="off">'
+    + '<input type="text" id="pd-such" placeholder="Suchen" autocomplete="off">'
     + '</div>'
     + '<div id="pd-treffer" class="pd-treffer"></div>'
     + '<div id="pd-rest" hidden>'
@@ -8316,11 +8348,11 @@ async function positionDialog(b) {
     + '<button type="button" class="moduswahl__knopf" data-ziel="andere">Anderes</button>'
     + '</div>'
     + '<select id="pd-zielauswahl" class="auswahl" hidden></select>'
-    + '<input type="text" id="pd-zielfrei" hidden placeholder="Wohin genau?">'
+    + '<input type="text" id="pd-zielfrei" hidden>'
     + '</div>'
 
     + '<label class="feld"><span>Notiz</span>'
-    + '<textarea id="pd-notiz" rows="2" placeholder="kann leer bleiben"></textarea></label>'
+    + '<textarea id="pd-notiz" rows="2"></textarea></label>'
     + '</div>'
     + '<div class="dialog__knoepfe">'
     + '<button class="knopf knopf--still" id="pd-nein">Abbrechen</button>'
@@ -8506,7 +8538,7 @@ async function bestHistorie(ziel, b) {
   }
 
   ziel.innerHTML = '<div class="suchleiste">'
-    + '<input type="search" id="bh-suche" placeholder="Suchen: Artikel, Lieferant, wer …"'
+    + '<input type="search" id="bh-suche" placeholder="Suchen"'
     + ' value="' + esc(best.historieSuche) + '" autocomplete="off"></div>'
     + '<section class="karte">'
     + '<h2>Abgeschlossene Bestellungen'
@@ -8555,7 +8587,7 @@ async function bestHistorie(ziel, b) {
 
 async function bestArtikel(ziel, b) {
   ziel.innerHTML = '<div class="suchleiste">'
-    + '<input type="search" id="ar-suche" placeholder="Artikelnummer, Name oder Lieferant"'
+    + '<input type="search" id="ar-suche" placeholder="Suchen"'
     + ' value="' + esc(best.artikelSuche || "") + '" autocomplete="off">'
     + '<select id="ar-bez" class="auswahl"><option value="">Alle Bezeichnungen</option>'
     + '</select></div>'
@@ -8706,7 +8738,7 @@ async function artikelBearbeiten(artikel, b) {
     + '</select></label>'
 
     + '<label class="feld"><span>Beschreibung</span>'
-    + '<textarea id="ab-beschreibung" rows="2" placeholder="nur falls nötig, kann leer bleiben">'
+    + '<textarea id="ab-beschreibung" rows="2">'
     + esc(artikel.description || "") + '</textarea></label>' 
 
     + '<div class="dialog__knoepfe">'
@@ -8817,7 +8849,7 @@ async function artikelBearbeiten(artikel, b) {
 
 async function bestBezeichnungen(ziel, b) {
   ziel.innerHTML = '<div class="suchleiste">'
-    + '<input type="search" id="bz-suche" placeholder="Bezeichnung suchen"'
+    + '<input type="search" id="bz-suche" placeholder="Suchen"'
     + ' value="' + esc(best.bezSuche) + '" autocomplete="off"></div>'
     + (darfSchreiben()
       ? '<button class="knopf knopf--haupt knopf--breit" id="bz-neu">'
@@ -8927,7 +8959,7 @@ async function bestLieferanten(ziel, b) {
     : liste.filter((l) => l.name.toLowerCase().includes(suchtLf));
 
   ziel.innerHTML = '<div class="suchleiste">'
-    + '<input type="search" id="lf-suche" placeholder="Lieferant suchen"'
+    + '<input type="search" id="lf-suche" placeholder="Suchen"'
     + ' value="' + esc(best.liefSuche) + '" autocomplete="off"></div>'
     + (darfSchreiben()
       ? '<button class="knopf knopf--haupt knopf--breit" id="lf-neu">+ Neuer Lieferant</button>' : "")
@@ -9172,6 +9204,9 @@ async function farbListeZeichnen() {
   });
 }
 
+// Welcher Reiter in den Einstellungen offen ist
+const einst = { reiter: "allgemein" };
+
 async function seiteEinstellungen(b) {
   const ich = profil || {};
   const bin = istAdmin();
@@ -9198,9 +9233,9 @@ async function seiteEinstellungen(b) {
     + 'nächsten zwei Wochen ansteht.</span></label>'
     + '<label class="feld feld--abstand"><span>Neues Passwort</span>'
     + '<input type="password" id="np" autocomplete="new-password"'
-    + ' placeholder="mindestens 8 Zeichen"></label>'
+    + '></label>'
     + '<button class="knopf" id="ps">Passwort ändern</button></section>'
-    '<section class="karte"><h2>Darstellung</h2>'
+    + '<section class="karte"><h2>Darstellung</h2>'
     + '<label class="schalter"><input type="checkbox" id="e-dunkel"'
     + (einstellung("dunkel") ? " checked" : "") + '>'
     + '<span>Dunkler Modus</span></label>'
@@ -9221,7 +9256,7 @@ async function seiteEinstellungen(b) {
         + '<p class="hinweis">Wer die Rolle Planwand hat, schaltet damit das '
         + 'Bearbeiten frei. Gilt für alle.</p>'
         + '<label class="feld"><span>Pin</span>'
-        + '<input type="text" id="pin-feld" inputmode="numeric" placeholder="0000"></label>'
+        + '<input type="text" id="pin-feld" inputmode="numeric"></label>'
         + '<button class="knopf" id="pin-speichern">Pin speichern</button></section>'
       : "")
     + '<section class="karte"><h2>Über die App</h2>'
@@ -12295,8 +12330,7 @@ function zeichneGeruest() {
     + SEITEN.map((s) => '<a class="nav__punkt" data-nav="' + s.pfad + '" href="#/' + s.pfad + '">'
         + '<span class="nav__zeichen" aria-hidden="true">' + s.zeichen + '</span>'
         + '<span class="nav__text">' + esc(s.titel) + '</span></a>').join("")
-    + '</nav><main class="inhalt" id="inhalt"></main></div>'
-    + '<div class="versionsecke">v' + esc(APP_VERSION) + '</div>';
+    + '</nav><main class="inhalt" id="inhalt"></main></div>';
 
   const adminKnopf = document.getElementById("kopf-admin");
   if (adminKnopf) adminKnopf.onclick = async () => {
