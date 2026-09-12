@@ -2340,6 +2340,26 @@ body.dunkel .kopf__logo { filter: brightness(0) invert(1); }
 .db-bestellzahl strong { display: block; font-size: 1.7rem; line-height: 1.1;
                         font-variant-numeric: tabular-nums; }
 .db-bestellzahl span { font-size: .74rem; color: var(--gedaempft); }
+
+/* ---------- Handy: die Tafel muss breiter sein als der Bildschirm ---------- */
+/* Weiter oben zwingt eine Regel die Tafel auf Bildschirmbreite —
+   dann gibt es nichts zu wischen. Hier wird das zurückgenommen,
+   damit die festen Spaltenbreiten wieder greifen. */
+@media (max-width: 780px) {
+  .pw-rolle { overflow-x: auto !important; overflow-y: auto;
+              -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
+  .pw-tafel { width: max-content !important; min-width: 100% !important; }
+  .pw-zeile, .pw-zeile--kw { grid-template-columns: var(--pw-name, 108px)
+                             calc(var(--pw-spalte, 40px) * var(--pw-tage, 15)) !important; }
+  .pw-zeile--kopf { grid-template-columns: var(--pw-name, 108px)
+                    repeat(var(--pw-tage, 15), var(--pw-spalte, 40px)) !important; }
+  .pw-name, .pw-park { position: sticky; left: 0; z-index: 3; background: var(--flaeche); }
+}
+}
+
+.login__kachel { position: relative; }
+.login__offen { position: absolute; top: 2px; right: 6px; color: rgba(255,255,255,.7);
+               font-size: 1.1rem; line-height: 1; }
 </style>
 </head>
 <body>
@@ -2383,7 +2403,12 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "37.0.0";
+
+// Festes Passwort für Konten, die ohne Passwort anmelden dürfen.
+// Es steht offen im Code — das ist der Preis für die Bequemlichkeit
+// und gilt nur für Konten, die das selbst eingeschaltet haben.
+const OFFENES_PASSWORT = "hofer-offen-2026";
+const APP_VERSION = "37.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -2831,7 +2856,26 @@ function zeigeLogin() {
   // zwischen Messen und Losfliegen minimal verschiebt. Ein sauberes
   // Aus- und Einblenden wirkt ruhiger und ist nicht zu schlagen.
 
-  const anmeldenZeigen = (konto, bildEl) => {
+  // Direkt anmelden, ohne Passwortfeld
+  const sofortAnmelden = async (konto) => {
+    meldung("Anmelden …");
+    try {
+      const { error } = await zeitlimit(
+        db.auth.signInWithPassword({ email: konto.email, password: OFFENES_PASSWORT }),
+        15000, "Anmeldung");
+      if (error) throw error;
+      await profilLaden();
+      zeichneGeruest();
+    } catch (f) {
+      meldung("Das klappt nicht mehr ohne Passwort. Bitte Passwort eingeben.", "warn");
+      anmeldenZeigen(konto, null, true);
+    }
+  };
+
+  const anmeldenZeigen = (konto, bildEl, erzwingePasswort) => {
+    // Wer kein Passwort braucht, kommt gleich hinein
+    if (konto.ohne_passwort && !erzwingePasswort) { sofortAnmelden(konto); return; }
+
     letzteKachel = bildEl || null;
     anmeldungAufbauen(konto);
 
@@ -2926,6 +2970,7 @@ function zeigeLogin() {
                 : '<span class="login__kachel-buchstabe">'
                   + esc((u.full_name || u.email).charAt(0).toUpperCase()) + '</span>')
             + '<span class="login__kachel-name">' + esc(u.full_name || u.email) + '</span>'
+            + (u.ohne_passwort ? '<span class="login__offen" title="Ohne Passwort">•</span>' : "")
             + '</button>').join("")
         + '</div>';
 
@@ -9234,7 +9279,12 @@ async function seiteEinstellungen(b) {
     + '<label class="feld feld--abstand"><span>Neues Passwort</span>'
     + '<input type="password" id="np" autocomplete="new-password"'
     + '></label>'
-    + '<button class="knopf" id="ps">Passwort ändern</button></section>'
+    + '<button class="knopf" id="ps">Passwort ändern</button>'
+    + '<label class="schalter feld--abstand"><input type="checkbox" id="mk-ohnepw"'
+    + (ich.ohne_passwort ? " checked" : "") + '>'
+    + '<span>Ohne Passwort anmelden</span></label>'
+    + '<p class="hinweis">Mit Haken genügt ein Klick auf die eigene Kachel. '
+    + 'Bequem, aber jeder am Gerät kommt damit in dein Konto.</p></section>'
     + '<section class="karte"><h2>Darstellung</h2>'
     + '<label class="schalter"><input type="checkbox" id="e-dunkel"'
     + (einstellung("dunkel") ? " checked" : "") + '>'
@@ -9359,7 +9409,59 @@ async function seiteEinstellungen(b) {
     if (pw.length < 8) return meldung("Mindestens 8 Zeichen.", "warn");
     const { error } = await db.auth.updateUser({ password: pw });
     if (error) meldung(fehlertext(error), "fehler");
-    else { document.getElementById("np").value = ""; meldung("Passwort geändert."); }
+    else {
+      document.getElementById("np").value = "";
+      // Ein eigenes Passwort hebt die passwortlose Anmeldung auf
+      await db.from("profiles").update({ ohne_passwort: false }).eq("id", ich.id);
+      ich.ohne_passwort = false;
+      const haken = document.getElementById("mk-ohnepw");
+      if (haken) haken.checked = false;
+      meldung("Passwort geändert.");
+    }
+  };
+
+  // Ohne Passwort anmelden: dafür wird ein festes, in der App
+  // hinterlegtes Passwort gesetzt, das die Anmeldeseite kennt.
+  const ohnePwFeld = document.getElementById("mk-ohnepw");
+  if (ohnePwFeld) ohnePwFeld.onchange = async () => {
+    if (ohnePwFeld.checked) {
+      const ok = await nachfragen({
+        titel: "Ohne Passwort anmelden",
+        text: "Ab dann genügt ein Klick auf deine Kachel. Jeder, der an dieses "
+            + "Gerät kommt, kann sich damit als du anmelden. Dein bisheriges "
+            + "Passwort wird dabei ersetzt.",
+        bestaetigen: "Einschalten", gefahr: true });
+      if (!ok) { ohnePwFeld.checked = false; return; }
+
+      const r = await db.auth.updateUser({ password: OFFENES_PASSWORT });
+      if (r.error) { ohnePwFeld.checked = false; return meldung(fehlertext(r.error), "fehler"); }
+
+      const { error } = await db.from("profiles")
+        .update({ ohne_passwort: true }).eq("id", ich.id);
+      if (error) { ohnePwFeld.checked = false; return meldung(fehlertext(error), "fehler"); }
+      ich.ohne_passwort = true;
+      meldung("Du kommst jetzt ohne Passwort hinein.");
+    } else {
+      const w = await dialogFelder({
+        titel: "Passwort setzen",
+        text: "Damit dein Konto wieder geschützt ist, braucht es ein Passwort.",
+        felder: [{ name: "pw", label: "Neues Passwort", typ: "password", pflicht: true }],
+        bestaetigen: "Speichern",
+      });
+      if (!w || (w.pw || "").length < 8) {
+        ohnePwFeld.checked = true;
+        return meldung("Mindestens 8 Zeichen. Nichts geändert.", "warn");
+      }
+
+      const r = await db.auth.updateUser({ password: w.pw });
+      if (r.error) { ohnePwFeld.checked = true; return meldung(fehlertext(r.error), "fehler"); }
+
+      const { error } = await db.from("profiles")
+        .update({ ohne_passwort: false }).eq("id", ich.id);
+      if (error) { ohnePwFeld.checked = true; return meldung(fehlertext(error), "fehler"); }
+      ich.ohne_passwort = false;
+      meldung("Passwort gesetzt.");
+    }
   };
 
   const gebFeld = document.getElementById("mk-geburtstag");
