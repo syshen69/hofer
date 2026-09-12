@@ -2423,7 +2423,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "37.3.0";
+const APP_VERSION = "37.4.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -2709,25 +2709,47 @@ function nachfragen(o) {
 }
 
 // Einstellungen, die nur dieses Gerät betreffen
+// Einstellungen hängen am Konto, nicht am Gerät. Der Zwischenspeicher
+// im Browser bleibt trotzdem gefüllt, damit die App beim Start sofort
+// richtig aussieht, bevor das Profil geladen ist.
 function einstellung(name) {
+  if (profil && profil.einstellungen && profil.einstellungen[name] !== undefined) {
+    return profil.einstellungen[name] === true || profil.einstellungen[name] === "1";
+  }
   try { return localStorage.getItem("hudson." + name) === "1"; }
   catch (e) { return false; }
 }
+
 function einstellungWert(name, standard) {
+  if (profil && profil.einstellungen && profil.einstellungen[name] !== undefined) {
+    return String(profil.einstellungen[name]);
+  }
   try {
     const w = localStorage.getItem("hudson." + name);
     return w === null ? standard : w;
   } catch (e) { return standard; }
 }
 
-function einstellungSetzenWert(name, wert) {
+// Schreibt in den Zwischenspeicher und ans Konto
+function einstellungAblegen(name, wert) {
   try { localStorage.setItem("hudson." + name, String(wert)); }
   catch (e) { /* im privaten Modus nicht verfügbar */ }
+
+  if (!profil || !profil.id || !db) return;
+  profil.einstellungen = profil.einstellungen || {};
+  profil.einstellungen[name] = wert;
+
+  db.from("profiles").update({ einstellungen: profil.einstellungen })
+    .eq("id", profil.id)
+    .then((r) => { if (r && r.error) console.warn("Einstellung:", r.error.message); });
+}
+
+function einstellungSetzenWert(name, wert) {
+  einstellungAblegen(name, String(wert));
 }
 
 function einstellungSetzen(name, wert) {
-  try { localStorage.setItem("hudson." + name, wert ? "1" : "0"); }
-  catch (e) { /* z. B. im privaten Modus nicht verfügbar */ }
+  einstellungAblegen(name, wert ? "1" : "0");
 }
 
 function fehlertext(e) {
@@ -2813,7 +2835,8 @@ async function profilLaden() {
 
   try {
     const { data, error } = await zeitlimit(
-      db.from("profiles").select("id, email, full_name, role, is_active, geburtstag, bild_url, parks")
+      db.from("profiles").select("id, email, full_name, role, is_active, geburtstag, "
+        + "bild_url, parks, darf_bearbeiten, ist_planer, initialen, ohne_passwort, einstellungen")
         .eq("id", s.user.id).single(), 10000, "Profil");
     if (error || !data) throw error || new Error("kein Profil");
     profil = data;
@@ -9318,7 +9341,7 @@ async function seiteEinstellungen(b) {
     + '<label class="schalter"><input type="checkbox" id="e-angemeldet"'
     + (einstellung("angemeldetbleiben") ? " checked" : "") + '>'
     + '<span>Angemeldet bleiben — nicht nach fünf Minuten abmelden</span></label>'
-    + '<p class="hinweis">Gilt nur auf diesem Gerät. Ohne Haken meldet sich die '
+    + '<p class="hinweis">Gilt überall, wo du dich anmeldest. Ohne Haken meldet sich die '
     + 'App nach fünf Minuten ohne Bedienung selbst ab.</p></section>'
 
     + (bin
@@ -12427,6 +12450,11 @@ function zeichneSeite() {
 }
 
 function zeichneGeruest() {
+  // Die Einstellungen kommen vom Konto. Erst jetzt, nach dem
+  // Anmelden, stehen sie fest — also hier noch einmal anwenden.
+  document.body.classList.toggle("dunkel", einstellung("dunkel"));
+  if (einstellung("navschmal")) document.body.classList.add("nav--schmal");
+
   const anzeige = (profil && (profil.full_name || profil.email)) || "";
   WURZEL.innerHTML = ''
     + '<header class="kopf">'
