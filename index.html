@@ -1089,7 +1089,7 @@ a:focus-visible {
 .pw-aktionen .knopf { flex: 1 1 200px; }
 .pw-rolle + .pw-legende { margin-top: 12px; }
 .pw-zeile--fein .pw-spuren--fein { min-height: 30px; }
-.pw-park--ferien { margin-top: 4px; border-top: 2px solid var(--linie-stark); }
+.pw-zeile--ferienkopf { margin-top: 4px; border-top: 2px solid var(--linie-stark); }
 
 /* ---------- Probleme an Aufträgen ---------- */
 .knopf--warnung { border-color: #c08415; color: #8a5c10; }
@@ -2353,7 +2353,7 @@ body.dunkel .kopf__logo { filter: brightness(0) invert(1); }
                              calc(var(--pw-spalte, 40px) * var(--pw-tage, 15)) !important; }
   .pw-zeile--kopf { grid-template-columns: var(--pw-name, 108px)
                     repeat(var(--pw-tage, 15), var(--pw-spalte, 40px)) !important; }
-  .pw-name, .pw-park { position: sticky; left: 0; z-index: 3; background: var(--flaeche); }
+  .pw-name { position: sticky; left: 0; z-index: 3; background: var(--flaeche); }
 }
 }
 
@@ -2361,14 +2361,20 @@ body.dunkel .kopf__logo { filter: brightness(0) invert(1); }
 .login__offen { position: absolute; top: 2px; right: 6px; color: rgba(255,255,255,.7);
                font-size: 1.1rem; line-height: 1; }
 
-/* ---------- Parkname bleibt beim seitlichen Schieben stehen ---------- */
-/* Der farbige Balken ist so breit wie die ganze Tafel. Klebte er
-   selbst, wanderte sein Text trotzdem aus dem Bild. Deshalb bleibt
-   der Balken stehen und nur die Beschriftung darin klebt links. */
-.pw-park { position: static !important;
-          padding-left: 0 !important; padding-right: 0 !important; }
-.pw-park__text { position: sticky; left: 0; display: inline-block;
-                padding: 0 10px; }
+/* ---------- Parkzeile verhält sich wie eine Maschinenzeile ---------- */
+/* Links der Name in der festen Spalte, rechts die farbige Fläche.
+   Dadurch bleibt der Parkname beim Schieben stehen — genau wie die
+   Maschinennummer darunter. */
+.pw-zeile--park { border-bottom: 1px solid var(--linie); }
+.pw-park { background: var(--marke-hell) !important; color: var(--marke);
+          font-size: .78rem; font-weight: 700; text-transform: uppercase;
+          letter-spacing: .06em; justify-content: center;
+          position: sticky; left: 0; z-index: 3; }
+.pw-parkflaeche { background: var(--marke-hell); }
+.pw-park--ferien { background: #f2f4f7 !important; color: var(--gedaempft) !important; }
+.pw-parkflaeche--ferien { background: #f2f4f7; }
+body.dunkel .pw-park { background: #22303f !important; }
+body.dunkel .pw-parkflaeche { background: #22303f; }
 </style>
 </head>
 <body>
@@ -2417,7 +2423,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "37.2.0";
+const APP_VERSION = "37.3.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -5779,8 +5785,12 @@ function zeichnePlanwand(b) {
     const maschinen = (prod.maschinen || []).filter((m) => m.park_id === park.id);
     if (!maschinen.length) return "";
 
-    return '<div class="pw-park"><span class="pw-park__text">'
-      + esc(park.name) + '</span></div>'
+    // Als richtige Zeile mit Namensspalte — dadurch bleibt der
+    // Parkname beim seitlichen Schieben genauso stehen wie die
+    // Maschinennummer daneben.
+    return '<div class="pw-zeile pw-zeile--park">'
+      + '<div class="pw-name pw-park">' + esc(park.name) + '</div>'
+      + '<div class="pw-parkflaeche"></div></div>'
       + maschinen.map((m) => {
           const zellen = tage.map((t) => '<div class="pw-zelle'
             + (t === heute ? " pw-zelle--heute" : "") + '" data-zelle="'
@@ -5811,7 +5821,7 @@ function zeichnePlanwand(b) {
   }).join("");
 
   // Sieben schmale Zeilen für die Ferien
-  const ferienZeilen = '<div class="pw-park pw-park--ferien"><span class="pw-park__text">Ferien</span></div>'
+  const ferienZeilen = '<div class="pw-zeile pw-zeile--park pw-zeile--ferienkopf"><div class="pw-name pw-park pw-park--ferien">Ferien</div><div class="pw-parkflaeche pw-parkflaeche--ferien"></div></div>'
     + Array.from({ length: FERIEN_ZEILEN }, (unused, i2) => {
         const zeile = i2 + 1;
         const zellen = tage.map((t) => '<div class="pw-zelle pw-zelle--fein'
