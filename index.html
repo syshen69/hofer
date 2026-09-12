@@ -2131,7 +2131,7 @@ body.pw-seite .pw-rolle { max-height: calc(100dvh - var(--kopfhoehe) - 150px);
              border-radius: var(--radius); padding: 18px 0 22px; cursor: pointer;
              position: relative; margin-bottom: 14px; }
 .eier-gross:active { background: var(--marke-hell); }
-.eier-gross__bild { display: block; font-size: 4.5rem; line-height: 1; }
+.eier-gross__bild { display: block; }
 .eier-gross__zahl { display: block; font-size: 2rem; font-weight: 700;
                    margin-top: 6px; font-variant-numeric: tabular-nums; }
 .eier-knoepfe { display: flex; gap: 8px; }
@@ -2174,6 +2174,25 @@ body.pw-seite .pw-rolle { max-height: calc(100dvh - var(--kopfhoehe) - 150px);
   .su-zeitgitter { grid-template-columns: repeat(4, 1fr); }
   .su-zeitgitter .wahlknopf { font-size: .8rem; padding: 10px 4px; }
 }
+
+.pw-kw__jahr { opacity: .6; margin-left: 3px; font-weight: 500; }
+
+/* ---------- Eierschachtel ---------- */
+.eier-schachtel { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px;
+                 background: #c8a878; border-radius: 4px; padding: 3px; }
+.eier-mulde { background: #a88858; border-radius: 50%; aspect-ratio: 1; }
+.eier-mulde--voll { background: #fffaf0; box-shadow: inset 0 -1px 2px rgba(0,0,0,.2); }
+.eier-schachtel--klein { width: 26px; gap: 1.5px; padding: 2px; }
+.eier-schachtel--gross { width: 150px; gap: 6px; padding: 9px; margin: 0 auto 10px;
+                        border-radius: 8px; }
+.eier-schachtel--gross .eier-mulde { box-shadow: inset 0 2px 5px rgba(0,0,0,.25); }
+.eier-schachtel--gross .eier-mulde--voll { box-shadow: inset 0 -2px 4px rgba(0,0,0,.18); }
+.eier-knopf .eier-zahl { font-size: .5rem; margin-top: 1px; letter-spacing: -.02em; }
+.eier-gross__zahl { font-size: 1rem; font-weight: 500; }
+.eier-gross__zahl strong { font-size: 1.6rem; }
+
+/* ---------- Logo im Dunkelmodus weiss ---------- */
+body.dunkel .kopf__logo { filter: brightness(0) invert(1); }
 </style>
 </head>
 <body>
@@ -2217,7 +2236,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "34.2.0";
+const APP_VERSION = "35.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -4488,7 +4507,7 @@ function planSyncStoppen() {
 
 function masseBerechnen(b) {
   if (!plan.tageWunsch) plan.tageWunsch = Number(einstellungWert("pwtage", 15)) || 15;
-  plan.tage = Math.max(5, Math.min(150, plan.tageWunsch));
+  plan.tage = Math.max(5, Math.min(200, plan.tageWunsch));
 
   const breite = (b && b.clientWidth) || window.innerWidth;
   const gesamt = Math.max(280, breite) - 8;
@@ -4551,9 +4570,9 @@ async function ansichtPlanwand(ziel, b) {
     + '</div>'
     + '<div class="pw-zoom">'
     + '<span class="klein">Tage</span>'
-    + '<input type="range" id="pw-regler" min="5" max="150" step="1" value="'
+    + '<input type="range" id="pw-regler" min="5" max="200" step="1" value="'
     + (plan.tageWunsch || 15) + '">'
-    + '<input type="number" id="pw-zoomwert" min="5" max="150" value="'
+    + '<input type="number" id="pw-zoomwert" min="5" max="200" value="'
     + (plan.tageWunsch || 15) + '">'
     + '</div>'
     + '</div>'
@@ -4587,21 +4606,40 @@ async function ansichtPlanwand(ziel, b) {
     document.addEventListener("keydown", plan._suchTaste);
   }
 
-  // Zeitregler: ein halbes Jahr zurück bis ein halbes Jahr vor
+  // Zeitregler: rückwärts so weit, wie Aufträge eingeplant sind,
+  // vorwärts zwei Jahre. So kommt man überall hin, ohne dass der
+  // Regler bei wenigen Aufträgen unnötig lang wird.
   const zeitregler = document.getElementById("pw-zeit");
   if (zeitregler) {
     const heuteIso = isoDatum(new Date());
-    const nullpunkt = arbeitstagePlus(wochenStart(heuteIso), -100);
+    const heuteStart = wochenStart(heuteIso);
+
+    // Ältester eingeplanter Auftrag, mindestens aber 60 Arbeitstage
+    let aeltester = heuteStart;
+    (plan.auftraege || []).forEach((j) => {
+      if (j.planned_from && j.planned_from < aeltester) aeltester = j.planned_from;
+    });
+
+    let zurueck = 60;
+    if (aeltester < heuteStart) {
+      zurueck = Math.max(60, arbeitstageZwischen(wochenStart(aeltester), heuteStart) + 10);
+    }
+    const vorwaerts = 520;   // rund zwei Jahre in Arbeitstagen
+
+    const nullpunkt = arbeitstagePlus(heuteStart, -zurueck);
+    const spanne = zurueck + vorwaerts;
+    zeitregler.min = 0;
+    zeitregler.max = spanne;
 
     // Position des aktuellen Starts auf der Skala
-    let stelle = 100;
-    for (let i = 0; i <= 200; i++) {
+    let stelle = zurueck;
+    for (let i = 0; i <= spanne; i++) {
       if (arbeitstagePlus(nullpunkt, i) >= plan.start) { stelle = i; break; }
     }
     zeitregler.value = stelle;
 
     const marke = document.getElementById("pw-zeitmarke");
-    if (marke) marke.style.left = (100 / 200 * 100) + "%";
+    if (marke) marke.style.left = (zurueck / spanne * 100) + "%";
 
     const beschriften = () => {
       const von = arbeitstagePlus(nullpunkt, Number(zeitregler.value));
@@ -4626,7 +4664,7 @@ async function ansichtPlanwand(ziel, b) {
   const zahlfeld = document.getElementById("pw-zoomwert");
 
   const zoomSetzen = (wert) => {
-    const n = Math.max(5, Math.min(150, Math.round(Number(wert) || 15)));
+    const n = Math.max(5, Math.min(200, Math.round(Number(wert) || 15)));
     plan.tageWunsch = n;
     einstellungSetzenWert("pwtage", n);
     masseBerechnen(b);
@@ -5416,16 +5454,20 @@ function zeichnePlanwand(b) {
   const wochen = [];
   tage.forEach((t) => {
     const w = kalenderwoche(t);
+    const jahr = Number(String(t).slice(0, 4));
     const letzte = wochen[wochen.length - 1];
-    if (letzte && letzte.kw === w) letzte.anzahl++;
-    else wochen.push({ kw: w, anzahl: 1 });
+    if (letzte && letzte.kw === w && letzte.jahr === jahr) letzte.anzahl++;
+    else wochen.push({ kw: w, jahr: jahr, anzahl: 1 });
   });
 
+  // Das Jahr steht dabei, damit beim Blättern über den
+  // Jahreswechsel klar bleibt, welche Woche gemeint ist.
   const kwZeile = '<div class="pw-zeile pw-zeile--kw">'
     + '<div class="pw-name pw-name--kopf">Woche</div>'
     + '<div class="pw-kw-spuren">'
     + wochen.map((w) => '<div class="pw-kw" style="--spann:' + w.anzahl + '">KW '
-        + w.kw + '</div>').join("")
+        + w.kw + '<span class="pw-kw__jahr">' + String(w.jahr).slice(2) + '</span>'
+        + '</div>').join("")
     + '</div></div>';
 
   const kopf = '<div class="pw-zeile pw-zeile--kopf">'
@@ -10809,7 +10851,8 @@ async function eierEinbauen() {
   knopf.id = "eier-knopf";
   knopf.className = "eier-knopf";
   knopf.title = "Eier im Lager";
-  knopf.innerHTML = '🥚<span class="eier-zahl" id="eier-zahl">–</span>';
+  knopf.innerHTML = '<span id="eier-knopfbild"></span>'
+    + '<span class="eier-zahl" id="eier-zahl">–</span>';
   document.body.appendChild(knopf);
   knopf.onclick = () => eierFensterUmschalten();
 
@@ -10833,11 +10876,40 @@ async function eierStandLaden() {
   eierAnzeigen();
 }
 
+// Sechs Eier ergeben eine Schachtel. Angezeigt werden immer beide
+// Zahlen: volle Schachteln und die losen Eier obendrauf.
+function eierSchachteln() {
+  return { schachteln: Math.floor(eier.wert / 6), rest: eier.wert % 6 };
+}
+
+// Zeichnet eine Schachtel mit sechs Mulden, gefüllt nach Anzahl
+function eierSchachtelBild(gefuellt, klasse) {
+  let felder = "";
+  for (let i = 0; i < 6; i++) {
+    felder += '<span class="eier-mulde' + (i < gefuellt ? " eier-mulde--voll" : "") + '"></span>';
+  }
+  return '<span class="' + (klasse || "eier-schachtel") + '">' + felder + '</span>';
+}
+
 function eierAnzeigen() {
+  const s2 = eierSchachteln();
+
+  const bild = document.getElementById("eier-knopfbild");
+  if (bild) bild.innerHTML = eierSchachtelBild(s2.rest, "eier-schachtel eier-schachtel--klein");
+
   const z = document.getElementById("eier-zahl");
-  if (z) z.textContent = eier.wert;
-  const gross = document.getElementById("eier-grosszahl");
-  if (gross) gross.textContent = eier.wert;
+  if (z) z.textContent = s2.schachteln + "×6+" + s2.rest;
+
+  const gross = document.getElementById("eier-grossbild");
+  if (gross) gross.innerHTML = eierSchachtelBild(s2.rest, "eier-schachtel eier-schachtel--gross");
+
+  const text = document.getElementById("eier-grosszahl");
+  if (text) {
+    text.innerHTML = '<strong>' + s2.schachteln + '</strong> '
+      + (s2.schachteln === 1 ? "volle Schachtel" : "volle Schachteln")
+      + ' <span class="klein">und ' + s2.rest
+      + (s2.rest === 1 ? " Ei" : " Eier") + ' lose</span>';
+  }
 }
 
 async function eierSpeichern(neuerWert) {
@@ -10879,10 +10951,11 @@ function eierZaehlerZeigen() {
   const koerper = document.getElementById("eier-koerper");
   if (!koerper) return;
 
-  koerper.innerHTML = '<p class="hinweis">Auf das Ei tippen zählt eins dazu.</p>'
-    + '<button type="button" class="eier-gross" id="eier-plus" title="Eins dazu">'
-    + '<span class="eier-gross__bild">🥚</span>'
-    + '<span class="eier-gross__zahl" id="eier-grosszahl">' + eier.wert + '</span>'
+  koerper.innerHTML = '<p class="hinweis">Auf die Schachtel tippen legt ein Ei hinein. '
+    + 'Ist sie voll, beginnt die nächste.</p>' 
+    + '<button type="button" class="eier-gross" id="eier-plus" title="Ein Ei dazu">' 
+    + '<span class="eier-gross__bild" id="eier-grossbild"></span>' 
+    + '<span class="eier-gross__zahl" id="eier-grosszahl"></span>' 
     + '</button>'
     + '<div class="eier-knoepfe">'
     + '<button type="button" class="knopf" id="eier-minus">– eins weniger</button>'
@@ -10892,6 +10965,7 @@ function eierZaehlerZeigen() {
   document.getElementById("eier-plus").onclick = () => eierSpeichern(eier.wert + 1);
   document.getElementById("eier-minus").onclick = () => eierSpeichern(eier.wert - 1);
   document.getElementById("eier-weiter").onclick = () => eierAbbuchenZeigen();
+  eierAnzeigen();
 }
 
 // ---------- Abbuchen mit Ziffernblock ----------
@@ -11116,7 +11190,9 @@ async function fahrzeugAnsichtBuchen(ziel) {
   try {
     fahrzeuge = await fahrzeugeListe();
     const { data } = await db.from("fahrzeug_buchungen")
-      .select("*, fahrzeuge(name)").eq("user_id", profil.id)
+      .select("*, fahrzeuge(name),"
+        + " entscheider:profiles!fahrzeug_buchungen_entschieden_von_fkey(full_name, email)")
+      .eq("user_id", profil.id)
       .in("status", ["angefragt", "genehmigt"]).order("von");
     meine = data || [];
   } catch (f) {
@@ -11149,7 +11225,10 @@ async function fahrzeugAnsichtBuchen(ziel) {
               + esc(datumZeitKurz(m.von)) + ' – ' + esc(datumZeitKurz(m.bis))
               + '<div class="klein">' + esc(m.grund || "") + ' · '
               + (m.status === "angefragt" ? "wartet auf Bewilligung"
-                  : m.status === "genehmigt" ? "bewilligt" : "abgelehnt") + '</div>'
+                  : m.status === "genehmigt" ? "bewilligt" : "abgelehnt")
+              + (m.entscheider
+                  ? ' von ' + esc(m.entscheider.full_name || m.entscheider.email) : "")
+              + '</div>' 
               + '<button class="linkknopf linkknopf--gefahr" data-fz-weg="' + esc(m.id)
               + '">Zurückziehen</button>'
               + '</div>').join("")
@@ -11220,7 +11299,9 @@ async function fahrzeugAnsichtHistorie(ziel) {
   let liste;
   try {
     const { data, error } = await db.from("fahrzeug_buchungen")
-      .select("*, fahrzeuge(name), profiles!fahrzeug_buchungen_user_id_fkey(full_name, email)")
+      .select("*, fahrzeuge(name),"
+        + " profiles!fahrzeug_buchungen_user_id_fkey(full_name, email),"
+        + " entscheider:profiles!fahrzeug_buchungen_entschieden_von_fkey(full_name, email)")
       .order("von", { ascending: false }).limit(100);
     if (error) throw error;
     liste = data || [];
@@ -11237,6 +11318,9 @@ async function fahrzeugAnsichtHistorie(ziel) {
     + esc(datumZeitKurz(b2.von)) + ' – ' + esc(datumZeitKurz(b2.bis))
     + '<div class="klein">' + esc(b2.grund || "") + ' · '
     + (b2.status === "angefragt" ? "wartet" : b2.status === "genehmigt" ? "bewilligt" : "abgelehnt")
+    + (b2.entscheider
+        ? ' von ' + esc(b2.entscheider.full_name || b2.entscheider.email) : "")
+    + (b2.entschieden_am ? ' am ' + esc(datumZeitKurz(b2.entschieden_am)) : "")
     + '</div></div>').join("");
 }
 
