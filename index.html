@@ -2303,6 +2303,16 @@ body.dunkel .kopf__logo { filter: brightness(0) invert(1); }
 .planerzeile { display: grid; grid-template-columns: 1fr 72px; gap: 10px; align-items: center; }
 .planerzeile__kuerzel { min-height: 34px; padding: 4px 8px; text-align: center;
                        font-weight: 700; text-transform: uppercase; }
+
+.kuerzelfeld { width: 58px; min-height: 32px; padding: 4px 6px; text-align: center;
+              font-weight: 700; text-transform: uppercase; font-size: .85rem; }
+@media (max-width: 720px) {
+  .tabelle--benutzer .bu-plant::before { content: "Plant: "; color: var(--gedaempft);
+                                         font-size: .8rem; }
+  .tabelle--benutzer .bu-kuerzel::before { content: "Kürzel: "; color: var(--gedaempft);
+                                           font-size: .8rem; }
+  .tabelle--benutzer .bu-plant, .tabelle--benutzer .bu-kuerzel { text-align: left !important; }
+}
 </style>
 </head>
 <body>
@@ -2346,7 +2356,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "36.1.0";
+const APP_VERSION = "36.2.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -9113,12 +9123,9 @@ async function seiteEinstellungen(b) {
 
   // Die Seite wird sofort aufgebaut. Die Benutzerliste kommt danach,
   // damit hier nie mehr etwas hängen bleibt.
-  b.innerHTML = '<div class="einstellungenkopf">'
-    + '<h1 class="seitentitel">Einstellungen</h1>'
-    + '<button class="knopf knopf--gefahr" id="ab">Abmelden</button>'
-    + '</div>'
-
-    + '<section class="karte"><h2>Mein Konto</h2>'
+  // Jeder Reiter baut sein Markup in einer eigenen Funktion auf,
+  // damit die einzelnen Blöcke unverändert und in sich gültig bleiben.
+  const teilAllgemein = () =>     '<section class="karte"><h2>Mein Konto</h2>'
     + '<div class="kontokopf">'
     + (ich.bild_url
         ? '<img class="profilbild-gross" src="' + esc(ich.bild_url) + '" alt="">'
@@ -9138,8 +9145,7 @@ async function seiteEinstellungen(b) {
     + '<input type="password" id="np" autocomplete="new-password"'
     + ' placeholder="mindestens 8 Zeichen"></label>'
     + '<button class="knopf" id="ps">Passwort ändern</button></section>'
-
-    + '<section class="karte"><h2>Darstellung</h2>'
+    '<section class="karte"><h2>Darstellung</h2>'
     + '<label class="schalter"><input type="checkbox" id="e-dunkel"'
     + (einstellung("dunkel") ? " checked" : "") + '>'
     + '<span>Dunkler Modus</span></label>'
@@ -9156,47 +9162,6 @@ async function seiteEinstellungen(b) {
     + 'App nach fünf Minuten ohne Bedienung selbst ab.</p></section>'
 
     + (bin
-      ? '<section class="karte"><h2>Wer plant</h2>'
-        + '<p class="hinweis">Angehakte Personen erscheinen im Auftragsfenster '
-        + 'unter „Eingeplant von". Das Kürzel steht danach gross auf dem Balken.</p>'
-        + '<div id="planerliste"><div class="laedt">Wird geladen …</div></div>'
-        + '</section>'
-      : "")
-
-    + (bin
-      ? '<section class="karte"><h2>Farben und Material</h2>'
-        + '<p class="hinweis">Nur Farben mit einem Material erscheinen im '
-        + 'Auftragsfenster. Das Kürzel steht auf dem Balken — mehrere Angaben '
-        + 'mit Schrägstrich, zum Beispiel E/N.</p>'
-        + '<div id="farbliste"><div class="laedt">Wird geladen …</div></div>'
-        + '</section>'
-      : "")
-
-    + (bin
-      ? '<section class="karte"><h2>Benutzer</h2>'
-        + '<div id="benutzerliste"><div class="laedt">Wird geladen …</div></div>'
-        + '<div class="rollenhilfe">'
-        + '<div><strong>Administrator</strong> darf alles, ohne etwas einzuschalten.</div>'
-        + '<div><strong>Planwand</strong> sieht alle Parks und darf ändern, '
-        + 'sobald oben Bearbeiten eingeschaltet ist.</div>'
-        + '<div><strong>Langdreher</strong> und <strong>Kurzdreher</strong> sehen nur '
-        + 'ihren Park, in Produktion und Planwand.</div>'
-        + '<div><strong>Mitarbeiter</strong> darf überall zusehen und den '
-        + 'Einkauf nutzen, sonst nichts ändern.</div></div></section>'
-      : '<section class="karte"><h2>Meine Rolle</h2>'
-        + '<p><strong>' + esc(ROLLEN[ich.role] || ich.role || "") + '</strong></p>'
-        + '</section>')
-
-    + (bin
-      ? '<section class="karte"><div class="karte__kopf"><h2>Personen ohne Login</h2>'
-        + '<button class="linkknopf" id="pe-neu">+ Person</button></div>'
-        + '<p class="hinweis">Für Kollegen, die die App nicht benutzen, deren '
-        + 'Geburtstag aber auf der Startseite erscheinen soll.</p>'
-        + '<div id="personenliste"><div class="laedt">Wird geladen …</div></div>'
-        + '</section>'
-      : "")
-
-    + (bin
       ? '<section class="karte"><h2>Pin für die Planwand</h2>'
         + '<p class="hinweis">Wer die Rolle Planwand hat, schaltet damit das '
         + 'Bearbeiten frei. Gilt für alle.</p>'
@@ -9204,10 +9169,74 @@ async function seiteEinstellungen(b) {
         + '<input type="text" id="pin-feld" inputmode="numeric" placeholder="0000"></label>'
         + '<button class="knopf" id="pin-speichern">Pin speichern</button></section>'
       : "")
-
     + '<section class="karte"><h2>Über die App</h2>'
-    + '<p class="klein">Version ' + esc(APP_VERSION) + ' · angemeldet als '
-    + esc(ich.email || "") + '</p></section>';
+    + '<p class="klein">Version ' + esc(APP_VERSION) + ' · angemeldet als ' + esc(ich.email || "") + '</p></section>';
+
+  const teilFarben = () =>
+    '<section class="karte"><h2>Farben und Material</h2>'
+    + '<p class="hinweis">Nur Farben mit einem Material erscheinen im '
+    + 'Auftragsfenster. Das Kürzel steht auf dem Balken — mehrere Angaben '
+    + 'mit Schrägstrich, zum Beispiel E/N.</p>'
+    + '<div id="farbliste"><div class="laedt">Wird geladen …</div></div>'
+    + '</section>';
+
+  const teilNutzer = () =>
+    '<section class="karte"><h2>Benutzer mit Login</h2>'
+    + '<div id="benutzerliste"><div class="laedt">Wird geladen …</div></div>'
+    + '<div class="rollenhilfe">'
+    + '<div><strong>Administrator</strong> darf alles, ohne etwas einzuschalten.</div>'
+    + '<div><strong>Planwand</strong> sieht alle Parks und darf ändern, '
+    + 'sobald oben Bearbeiten eingeschaltet ist.</div>'
+    + '<div><strong>Langdreher</strong> und <strong>Kurzdreher</strong> sehen nur '
+    + 'ihren Park, in Produktion und Planwand.</div>'
+    + '<div><strong>Mitarbeiter</strong> darf überall zusehen und den '
+    + 'Einkauf nutzen, sonst nichts ändern.</div>'
+    + '<div class="klein">Das Häkchen bei <strong>Plant</strong> heisst: Diese Person '
+    + 'erscheint im Auftragsfenster unter „Eingeplant von". Das Kürzel daneben '
+    + 'steht danach gross auf dem Balken.</div>'
+    + '</div></section>'
+
+    + '<section class="karte"><div class="karte__kopf"><h2>Personen ohne Login</h2>'
+    + '<button class="linkknopf" id="pe-neu">+ Person</button></div>'
+    + '<p class="hinweis">Für Kollegen, die die App nicht benutzen, deren '
+    + 'Geburtstag aber auf der Startseite erscheinen soll.</p>'
+    + '<div id="personenliste"><div class="laedt">Wird geladen …</div></div>'
+    + '</section>';
+
+  b.innerHTML = '<div class="einstellungenkopf">'
+    + '<h1 class="seitentitel">Einstellungen</h1>'
+    + '<button class="knopf knopf--gefahr" id="ab">Abmelden</button>'
+    + '</div>'
+
+    + '<div class="reiter">'
+    + [["allgemein", "Allgemein"]]
+        .concat(bin ? [["farben", "Farben und Material"], ["nutzer", "Nutzer"]] : [])
+        .map(([w, tt]) => '<button class="reiter__knopf'
+          + (einst.reiter === w ? " aktiv" : "") + '" data-einst="' + w + '">'
+          + tt + '</button>').join("")
+    + '</div>'
+
+    + '<div id="einst-inhalt">'
+    + (einst.reiter === "farben" ? teilFarben()
+        : einst.reiter === "nutzer" ? teilNutzer()
+        : teilAllgemein())
+    + '</div>';
+
+  // Reiter wechseln
+  b.querySelectorAll("[data-einst]").forEach((el) => {
+    el.onclick = () => { einst.reiter = el.dataset.einst; seiteEinstellungen(b); };
+  });
+
+  if (window.abmeldenBinden) window.abmeldenBinden();
+
+  // Ab hier gehören alle Bedienelemente zum Reiter Allgemein.
+  // Auf den anderen Reitern gibt es sie nicht — dann ist hier Schluss.
+  if (einst.reiter === "farben") { farbListeZeichnen(); return; }
+  if (einst.reiter === "nutzer") {
+    benutzerlisteLaden(b, bin);
+    personenlisteLaden(b);
+    return;
+  }
 
   // ---------- Darstellung ----------
   document.getElementById("e-dunkel").onchange = (e) => {
@@ -9269,9 +9298,6 @@ async function seiteEinstellungen(b) {
       seiteEinstellungen(b);
     } catch (f2) { meldung(fehlertext(f2), "fehler"); }
   };
-
-  if (window.abmeldenBinden) window.abmeldenBinden();
-  if (bin) { farbListeZeichnen(); planerListeZeichnen(); }
 
   // ---------- Pin ----------
   const pinFeld = document.getElementById("pin-feld");
@@ -9445,6 +9471,7 @@ async function benutzerlisteLaden(b, bin) {
   ziel.innerHTML = '<div class="tabellenrolle">'
     + '<table class="tabelle tabelle--benutzer"><thead><tr>'
     + '<th>Name</th><th>Rolle</th><th class="mitte">Bearbeiten</th>'
+    + '<th class="mitte">Plant</th><th class="mitte">Kürzel</th>'
     + '<th>Geburtstag</th><th class="rechts">Status</th>'
     + '</tr></thead><tbody>'
     + leute.map((u) => {
@@ -9472,6 +9499,14 @@ async function benutzerlisteLaden(b, bin) {
               ? '<input type="checkbox" data-bearb="' + esc(u.id) + '"'
                 + (u.darf_bearbeiten ? " checked" : "") + '>'
               : (u.role === "admin" ? "immer" : (u.darf_bearbeiten ? "ja" : "nein"))) + '</td>'
+          + '<td class="bu-plant mitte">' + (bin
+              ? '<input type="checkbox" data-plan-ist="' + esc(u.id) + '"'
+                + (u.ist_planer ? " checked" : "") + '>'
+              : (u.ist_planer ? "ja" : "nein")) + '</td>'
+          + '<td class="bu-kuerzel mitte">' + (bin
+              ? '<input type="text" class="kuerzelfeld" data-plan-kuerzel="' + esc(u.id)
+                + '" maxlength="4" value="' + esc(u.initialen || "") + '">'
+              : esc(u.initialen || "–")) + '</td>'
           + '<td class="bu-geb">' + (bin
               ? '<input type="date" class="gebfeld" data-geb="' + esc(u.id) + '" value="'
                 + esc(u.geburtstag || "") + '">'
@@ -9528,6 +9563,42 @@ async function benutzerlisteLaden(b, bin) {
         .update({ full_name: name || null }).eq("id", el.dataset.name);
       if (error) meldung(fehlertext(error), "fehler");
       else meldung("Name gespeichert.");
+    };
+  });
+
+  // Wer plant, und mit welchem Kürzel
+  const kuerzelVorschlag = (name) => {
+    const teile = String(name || "").trim().split(/\s+/);
+    return ((teile[0] || "").charAt(0) + (teile[1] || "").charAt(0)).toUpperCase();
+  };
+
+  ziel.querySelectorAll("[data-plan-ist]").forEach((el) => {
+    el.onchange = async () => {
+      const id = el.dataset.planIst;
+      const kFeld = ziel.querySelector('[data-plan-kuerzel="' + id + '"]');
+      const daten = { ist_planer: el.checked };
+
+      // Beim Anhaken ohne Kürzel gleich die Initialen vorschlagen
+      if (el.checked && kFeld && !(kFeld.value || "").trim()) {
+        const person = leute.find((u) => u.id === id);
+        const k = kuerzelVorschlag(person && person.full_name);
+        if (k) { kFeld.value = k; daten.initialen = k; }
+      }
+
+      const { error } = await db.from("profiles").update(daten).eq("id", id);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { await planerLaden(); meldung("Gespeichert."); }
+    };
+  });
+
+  ziel.querySelectorAll("[data-plan-kuerzel]").forEach((el) => {
+    el.onchange = async () => {
+      const wert = (el.value || "").trim().toUpperCase();
+      el.value = wert;
+      const { error } = await db.from("profiles")
+        .update({ initialen: wert || null }).eq("id", el.dataset.planKuerzel);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { await planerLaden(); meldung("Kürzel gespeichert."); }
     };
   });
 
