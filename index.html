@@ -2004,7 +2004,7 @@ pre, .gcode { max-width: 100%; overflow-x: auto; }
 
 /* ---------- Ränder der Auftragsbalken: dick genug, um sie zu sehen ---------- */
 .pw-balken--laeuft { border: 2px solid #111417; }
-body.dunkel .pw-balken--laeuft { border-color: #ffffff; }
+body.dunkel .pw-balken--laeuft { border: 2px solid #ffffff; }
 .pw-balken--weissrand { border: 2px solid var(--linie-stark); }
 
 /* ---------- Info-Fenster beim Darüberfahren ---------- */
@@ -2284,6 +2284,25 @@ body.dunkel .kopf__logo { filter: brightness(0) invert(1); }
 @media (min-width: 1000px) {
   .auf-raster { grid-template-columns: 1fr 1fr 1fr; overflow-y: visible; }
 }
+
+/* ---------- Kürzel des Planers am Balken ---------- */
+.pw-balken__planer { flex: none; margin-left: auto; padding-left: calc(6px * var(--pw-s, 1));
+                    font-size: calc(1.05rem * var(--pw-s, 1)); font-weight: 800;
+                    letter-spacing: -.02em; line-height: 1; opacity: .9;
+                    white-space: nowrap; }
+
+/* ---------- Planer im Auftragsfenster ---------- */
+.auf-planer { display: flex; flex-wrap: wrap; gap: 6px; }
+.planerknopf { min-width: 42px; min-height: 34px; padding: 4px 8px;
+              border: 1px solid var(--linie-stark); border-radius: var(--radius);
+              background: var(--flaeche); color: var(--tinte);
+              font: inherit; font-weight: 700; font-size: .82rem; cursor: pointer; }
+.planerknopf.aktiv { background: var(--marke); border-color: var(--marke); color: #fff; }
+
+.planerzeilen { display: flex; flex-direction: column; gap: 6px; }
+.planerzeile { display: grid; grid-template-columns: 1fr 72px; gap: 10px; align-items: center; }
+.planerzeile__kuerzel { min-height: 34px; padding: 4px 8px; text-align: center;
+                       font-weight: 700; text-transform: uppercase; }
 </style>
 </head>
 <body>
@@ -2327,7 +2346,7 @@ const APP_UNTERTITEL = "HOFER TOOL";
 // Wer sich nur mit dem Namen anmeldet, bekommt diese Endung angehängt.
 // Aus "saheesan.hudson" wird also saheesan.hudson@hoferco.ch.
 const LOGIN_ENDUNG = "@hoferco.ch";
-const APP_VERSION = "36.0.0";
+const APP_VERSION = "36.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -4492,6 +4511,26 @@ function farbenZurWahl() {
     (FARBZUTEILUNG[a.wert].sortierung || 0) - (FARBZUTEILUNG[b2.wert].sortierung || 0));
 }
 
+// Wer plant, wird in den Einstellungen angehakt. Nur diese
+// Personen erscheinen im Auftragsfenster zur Auswahl.
+let PLANER = [];
+
+async function planerLaden() {
+  try {
+    const { data, error } = await db.from("profiles")
+      .select("id, full_name, email, initialen, ist_planer")
+      .eq("is_active", true).eq("ist_planer", true).order("full_name");
+    if (error) throw error;
+    PLANER = (data || []).filter((u) => (u.initialen || "").trim());
+  } catch (f) { PLANER = []; }
+}
+
+// Kürzel der angemeldeten Person, falls sie selbst plant
+function meineInitialen() {
+  const ich = PLANER.find((u) => u.id === (profil && profil.id));
+  return ich ? (ich.initialen || "").trim() : "";
+}
+
 async function farbzuteilungLaden() {
   try {
     const { data, error } = await db.from("farb_material").select("*").order("sortierung");
@@ -4979,6 +5018,9 @@ function balkenInfoVerhalten() {
         + '<div class="pw-info__zeile">✎ ' + (j.plan_note ? esc(j.plan_note) : "keine Notiz") + '</div>'
         + (j.problem ? '<div class="pw-info__zeile pw-info__zeile--warn">⚠ '
             + esc(j.problem) + '</div>' : "")
+        + (j.geplant_von
+            ? '<div class="pw-info__zeile pw-info__zeile--klein">Eingeplant von '
+              + esc(j.geplant_von) + '</div>' : "")
         + '<div class="pw-info__zeile pw-info__zeile--klein">'
         + (j.fa_erstellt ? "FA erstellt" : "FA fehlt")
         + " · " + (j.material_ok ? "Material vorhanden" : "Material fehlt") + '</div>';
@@ -5768,6 +5810,9 @@ function planBalken(j, spalte, dauer, angeschnitten, vorlaufTage, dauerWahr) {
     + '<div class="pw-zeile2">' + esc(zeileMenge) + '</div>'
     + '<div class="pw-zeile3">' + esc(zeileMaterial) + '</div>'
     + '</div>'
+    + (j.geplant_von
+        ? '<span class="pw-balken__planer" title="Eingeplant von ' + esc(j.geplant_von) + '">'
+          + esc(j.geplant_von) + '</span>' : "")
     + '</div>' 
 
     + (darfPlanen() && !angeschnitten
@@ -6154,6 +6199,17 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
   let planZustand = (auftrag && auftrag.plan_status) || "geplant";
   let planFarbe = (auftrag && auftrag.color) || (v && v.color) || "blau";
 
+  // Wer hat eingeplant? Bei einem neuen Auftrag sind die eigenen
+  // Initialen schon gesetzt, sofern man selbst als Planer eingetragen
+  // ist. Ändern lässt sich das jederzeit.
+  let gewaehltePlaner = [];
+  if (auftrag && auftrag.geplant_von) {
+    gewaehltePlaner = String(auftrag.geplant_von).split("/").map((x) => x.trim()).filter(Boolean);
+  } else if (!auftrag) {
+    const eigene = meineInitialen();
+    if (eigene) gewaehltePlaner = [eigene];
+  }
+
   const huelle = document.createElement("div");
   huelle.className = "dialog-huelle";
   huelle.innerHTML = '<div class="dialog dialog--auftrag">'
@@ -6232,6 +6288,20 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     + ((auftrag && auftrag.material_ok) || (!auftrag && v && v.material_ok) ? " checked" : "")
     + (darf ? "" : " disabled") + '><span>Material da</span></label>'
     + '</div>'
+
+    + (PLANER.length
+        ? '<div class="feld"><span class="feldlabel">Eingeplant von</span>'
+          + '<div class="auf-planer">'
+          + PLANER.map((u) => {
+              const kuerzel = (u.initialen || "").trim();
+              const drin = gewaehltePlaner.indexOf(kuerzel) !== -1;
+              return '<button type="button" class="planerknopf' + (drin ? " aktiv" : "")
+                + '" data-planer="' + esc(kuerzel) + '"'
+                + ' title="' + esc(u.full_name || u.email) + '">'
+                + esc(kuerzel) + '</button>';
+            }).join("")
+          + '</div></div>'
+        : "")
     + '</div>'
 
     // Spalte 2: Material
@@ -6380,6 +6450,17 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     };
   });
 
+  // Kürzel an- und abwählen
+  huelle.querySelectorAll("[data-planer]").forEach((el) => {
+    el.onclick = () => {
+      const k = el.dataset.planer;
+      const i2 = gewaehltePlaner.indexOf(k);
+      if (i2 === -1) gewaehltePlaner.push(k);
+      else gewaehltePlaner.splice(i2, 1);
+      el.classList.toggle("aktiv", i2 === -1);
+    };
+  });
+
   const farbHinweis = $("pl-farbmaterial");
   const farbHinweisSetzen = () => {
     if (!farbHinweis) return;
@@ -6435,6 +6516,7 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
       drawing_url: pdfAdresse,
       plan_status: planZustand,
       color: planFarbe,
+      geplant_von: gewaehltePlaner.length ? gewaehltePlaner.join("/") : null,
       fa_erstellt: $("pl-fa").checked,
       material_ok: $("pl-material").checked,
       material_dm: $("pl-dm").value === "" ? null : Number($("pl-dm").value),
@@ -8909,6 +8991,71 @@ function einstellungenOeffnen() {
 // Farben den Materialien zuordnen. Jede Farbe der Palette bekommt
 // ein Feld für das Material und eines für das Kürzel. Leeres
 // Material heisst: die Farbe erscheint nicht im Auftragsfenster.
+// Wer plant, und mit welchem Kürzel. Nur Angehakte erscheinen
+// später im Auftragsfenster.
+async function planerListeZeichnen() {
+  const kasten = document.getElementById("planerliste");
+  if (!kasten) return;
+
+  let leute = [];
+  try {
+    const { data, error } = await db.from("profiles")
+      .select("id, full_name, email, initialen, ist_planer")
+      .eq("is_active", true).order("full_name");
+    if (error) throw error;
+    leute = data || [];
+  } catch (f) {
+    kasten.innerHTML = '<p class="hinweis">' + esc(fehlertext(f)) + '</p>';
+    return;
+  }
+
+  // Vorschlag aus dem Namen, falls noch nichts hinterlegt ist
+  const vorschlag = (name) => {
+    const teile = String(name || "").trim().split(/\s+/);
+    return ((teile[0] || "").charAt(0) + (teile[1] || "").charAt(0)).toUpperCase();
+  };
+
+  kasten.innerHTML = '<div class="planerzeilen">'
+    + leute.map((u) => '<div class="planerzeile">'
+        + '<label class="schalter schalter--eng">'
+        + '<input type="checkbox" data-plan-ist="' + esc(u.id) + '"'
+        + (u.ist_planer ? " checked" : "") + '>'
+        + '<span>' + esc(u.full_name || u.email) + '</span></label>'
+        + '<input type="text" class="planerzeile__kuerzel" data-plan-kuerzel="' + esc(u.id)
+        + '" maxlength="4" value="' + esc(u.initialen || "")
+        + '" placeholder="' + esc(vorschlag(u.full_name)) + '">'
+        + '</div>').join("")
+    + '</div>';
+
+  const speichern = async (id, daten) => {
+    const { error } = await db.from("profiles").update(daten).eq("id", id);
+    if (error) { meldung(fehlertext(error), "fehler"); return; }
+    await planerLaden();
+    meldung("Gespeichert.");
+  };
+
+  kasten.querySelectorAll("[data-plan-ist]").forEach((el) => {
+    el.onchange = async () => {
+      const id = el.dataset.planIst;
+      const kuerzelFeld = kasten.querySelector('[data-plan-kuerzel="' + id + '"]');
+      const daten = { ist_planer: el.checked };
+
+      // Beim Anhaken ohne Kürzel gleich den Vorschlag eintragen
+      if (el.checked && !(kuerzelFeld.value || "").trim()) {
+        const person = leute.find((u) => u.id === id);
+        const k = vorschlag(person && person.full_name);
+        if (k) { kuerzelFeld.value = k; daten.initialen = k; }
+      }
+      await speichern(id, daten);
+    };
+  });
+
+  kasten.querySelectorAll("[data-plan-kuerzel]").forEach((el) => {
+    el.onchange = () => speichern(el.dataset.planKuerzel,
+      { initialen: (el.value || "").trim().toUpperCase() || null });
+  });
+}
+
 async function farbListeZeichnen() {
   const kasten = document.getElementById("farbliste");
   if (!kasten) return;
@@ -9007,6 +9154,14 @@ async function seiteEinstellungen(b) {
     + '<span>Angemeldet bleiben — nicht nach fünf Minuten abmelden</span></label>'
     + '<p class="hinweis">Gilt nur auf diesem Gerät. Ohne Haken meldet sich die '
     + 'App nach fünf Minuten ohne Bedienung selbst ab.</p></section>'
+
+    + (bin
+      ? '<section class="karte"><h2>Wer plant</h2>'
+        + '<p class="hinweis">Angehakte Personen erscheinen im Auftragsfenster '
+        + 'unter „Eingeplant von". Das Kürzel steht danach gross auf dem Balken.</p>'
+        + '<div id="planerliste"><div class="laedt">Wird geladen …</div></div>'
+        + '</section>'
+      : "")
 
     + (bin
       ? '<section class="karte"><h2>Farben und Material</h2>'
@@ -9116,7 +9271,7 @@ async function seiteEinstellungen(b) {
   };
 
   if (window.abmeldenBinden) window.abmeldenBinden();
-  if (bin) farbListeZeichnen();
+  if (bin) { farbListeZeichnen(); planerListeZeichnen(); }
 
   // ---------- Pin ----------
   const pinFeld = document.getElementById("pin-feld");
@@ -12116,7 +12271,7 @@ function zeichneGeruest() {
   untaetigZuruecksetzen();
 
   if (!location.hash) location.hash = "#/dashboard";
-  farbzuteilungLaden().then(() => zeichneSeite());
+  Promise.all([farbzuteilungLaden(), planerLaden()]).then(() => zeichneSeite());
   fahrzeugEinbauen();
   eierEinbauen();
 }
