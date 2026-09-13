@@ -2444,7 +2444,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "37.7.0";
+const APP_VERSION = "37.8.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -4535,6 +4535,7 @@ function auftragsKnoepfeBinden(raster, b) {
 const plan = {
   sucheAktiv: false,
   trefferListe: [],
+  wischSperre: false,
   start: null,      // erster sichtbarer Tag
   zoom: null,       // 1 ist normal, kleiner zeigt mehr Tage
   tage: 15,   // drei Wochen zu je fünf Arbeitstagen
@@ -5137,26 +5138,23 @@ function zeitWischen(b) {
   if (!isMobil()) return;
   const rolle = document.querySelector(".pw-rolle");
   if (!rolle) return;
-
-  // Beim Neuzeichnen entsteht ein frisches Element. Falls doch einmal
-  // dasselbe zweimal durchläuft, wird nicht doppelt gelauscht.
   if (rolle.dataset.wischt === "1") return;
   rolle.dataset.wischt = "1";
 
-  let laeuftGerade = false;
   let letztesLinks = rolle.scrollLeft;
 
   rolle.addEventListener("scroll", () => {
-    if (laeuftGerade || plan.imDialog) return;
+    // Die Sperre liegt bewusst am plan-Objekt und nicht in dieser
+    // Funktion: Beim Neuzeichnen entsteht ein neues Element mit einem
+    // neuen Zuhörer, und eine Sperre hier drin würde für den nicht
+    // gelten — das Nachjustieren würde sofort den nächsten Schritt
+    // auslösen und sich aufschaukeln.
+    if (plan.wischSperre || plan.imDialog) return;
 
-    // Nur auf echtes seitliches Wischen reagieren. Beim Scrollen nach
-    // unten bleibt scrollLeft gleich — sonst würde die Tafel dabei
-    // endlos weiter in die Vergangenheit rutschen.
     const linksJetzt = rolle.scrollLeft;
     if (linksJetzt === letztesLinks) return;
     letztesLinks = linksJetzt;
 
-    // Passt die Tafel ganz ins Bild, gibt es nichts zu schieben
     if (rolle.scrollWidth <= rolle.clientWidth + 8) return;
 
     const rand = 60;
@@ -5165,26 +5163,28 @@ function zeitWischen(b) {
     const schritt = Math.max(2, Math.round(plan.tage / 4));
 
     const nachziehen = (richtung) => {
-      laeuftGerade = true;
+      plan.wischSperre = true;
       const vorher = rolle.scrollLeft;
 
       plan.start = arbeitstagePlus(plan.start, richtung * schritt);
 
-      // Ohne Datenbankzugriff: die Aufträge liegen schon im Speicher.
-      // Dadurch gibt es keine Wartezeit und kein Ruckeln.
-      zeichnePlanwand(b);
+      try {
+        // Ohne Datenbankzugriff: die Aufträge liegen schon im Speicher.
+        zeichnePlanwand(b);
 
-      const neu = document.querySelector(".pw-rolle");
-      if (neu) {
-        // Genau um die verschobenen Tage gegensteuern, dann bleibt
-        // der Finger optisch an derselben Stelle auf der Tafel.
-        neu.scrollLeft = Math.max(0, vorher - richtung * schritt * spalte);
-        letztesLinks = neu.scrollLeft;
+        const neu = document.querySelector(".pw-rolle");
+        if (neu) {
+          // Genau um die verschobenen Tage gegensteuern, dann bleibt
+          // die Tafel optisch unter dem Finger stehen.
+          neu.scrollLeft = Math.max(0, vorher - richtung * schritt * spalte);
+        }
+      } catch (f) {
+        console.warn("Wischen:", f.message);
       }
 
-      // zeichnePlanwand bindet alle Knöpfe und auch diese Wischlogik
-      // gleich selbst wieder — hier ist also nichts mehr zu tun.
-      requestAnimationFrame(() => { laeuftGerade = false; });
+      // Egal was passiert: die Sperre muss wieder aufgehen, sonst
+      // lässt sich gar nicht mehr wischen.
+      setTimeout(() => { plan.wischSperre = false; }, 120);
     };
 
     if (rolle.scrollLeft <= rand) nachziehen(-1);
