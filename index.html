@@ -2444,7 +2444,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "37.8.0";
+const APP_VERSION = "37.9.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -5160,7 +5160,10 @@ function zeitWischen(b) {
     const rand = 60;
     const maximum = rolle.scrollWidth - rolle.clientWidth;
     const spalte = plan.spalte || 40;
-    const schritt = Math.max(2, Math.round(plan.tage / 4));
+    // Immer um einen ganzen Bildschirm weiterrücken. Der Puffer
+    // links und rechts fängt das ab, deshalb ist danach wieder
+    // reichlich Platz zum Weiterwischen.
+    const schritt = Math.max(2, plan.tage);
 
     const nachziehen = (richtung) => {
       plan.wischSperre = true;
@@ -5172,10 +5175,11 @@ function zeitWischen(b) {
         // Ohne Datenbankzugriff: die Aufträge liegen schon im Speicher.
         zeichnePlanwand(b);
 
-        const neu = document.querySelector(".pw-rolle");
+          const neu = document.querySelector(".pw-rolle");
         if (neu) {
-          // Genau um die verschobenen Tage gegensteuern, dann bleibt
-          // die Tafel optisch unter dem Finger stehen.
+          // zeichnePlanwand hat schon auf den Pufferanfang gestellt.
+          // Von dort aus um die verschobenen Tage gegensteuern, dann
+          // bleibt die Tafel optisch unter dem Finger stehen.
           neu.scrollLeft = Math.max(0, vorher - richtung * schritt * spalte);
         }
       } catch (f) {
@@ -5810,7 +5814,14 @@ function neuZeichnen(b) {
 }
 
 function zeichnePlanwand(b) {
-  const tage = arbeitstage(plan.start, plan.tage);
+  // Auf dem Handy wird links und rechts je ein Bildschirm mehr
+  // gezeichnet. Sonst ist die Tafel kaum breiter als das Display,
+  // man ist dauernd am Rand und es zittert beim Wischen.
+  plan.puffer = isMobil() ? plan.tage : 0;
+  const zeichenStart = plan.puffer
+    ? arbeitstagePlus(plan.start, -plan.puffer) : plan.start;
+
+  const tage = arbeitstage(zeichenStart, plan.tage + plan.puffer * 2);
   plan.sichtbareTage = tage;
   const heute = isoDatum(new Date());
 
@@ -5929,7 +5940,7 @@ function zeichnePlanwand(b) {
   const heuteSpalte = tage.indexOf(heute);
 
   document.getElementById("pw-inhalt").innerHTML =
-    '<div class="pw-rolle"><div class="pw-tafel" style="--pw-tage:' + plan.tage
+    '<div class="pw-rolle"><div class="pw-tafel" style="--pw-tage:' + tage.length
     + ';--pw-s:' + (plan.skala || 1)
     + ';--pw-spalte:' + (plan.spalte || 40) + 'px'
     + ';--pw-name:' + (plan.namensbreite || 108) + 'px">'
@@ -5941,6 +5952,13 @@ function zeichnePlanwand(b) {
     + '<p class="pw-legende">Balken antippen öffnet den Auftrag. '
     + 'Langes Drücken verschiebt ihn, an den Rändern ziehen ändert die Dauer. '
     + 'Fertige Aufträge werden dunkelgrau.</p>';
+
+  // Der Puffer liegt links davor — also dorthin scrollen, wo der
+  // eigentlich gewählte Zeitraum beginnt.
+  if (plan.puffer) {
+    const rolle = document.querySelector(".pw-rolle");
+    if (rolle) rolle.scrollLeft = plan.puffer * (plan.spalte || 40);
+  }
 
   balkenVerhalten(b);
   griffVerhalten(b);
