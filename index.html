@@ -2389,6 +2389,13 @@ body.dunkel .pw-parkflaeche { background: #22303f; }
 /* ---------- Benutzertabelle: Namensfeld nutzt die volle Spalte ---------- */
 .tabelle--benutzer .namensfeld-liste { width: 100%; min-width: 0; }
 .tabelle--benutzer .kuerzelfeld { width: 100%; min-width: 0; max-width: 58px; }
+
+/* ---------- Auftragsnummer auf der Startseite antippen ---------- */
+.problemzeile__nr--klick { background: none; border: none; padding: 0;
+                          font: inherit; font-weight: 650; color: var(--marke);
+                          cursor: pointer; text-decoration: underline;
+                          text-underline-offset: 2px; }
+.problemzeile__nr--klick:hover { color: var(--marke-dunkel, var(--marke)); }
 </style>
 </head>
 <body>
@@ -2437,7 +2444,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "37.5.0";
+const APP_VERSION = "37.6.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -3310,7 +3317,8 @@ async function zeichneProbleme(b) {
     + liste.map((j) => '<div class="problemzeile">'
         + '<span class="problemzeile__zeichen">⚠</span>'
         + '<div class="problemzeile__inhalt">'
-        + '<div class="problemzeile__nr">' + esc(j.job_number) + '</div>'
+        + '<button class="problemzeile__nr problemzeile__nr--klick" data-zeigen="'
+        + esc(j.job_number) + '">' + esc(j.job_number) + '</button>'
         + '<div>' + esc(j.problem) + '</div>'
         + '<div class="klein">' + esc(j.problem_von || "")
         + (j.problem_at ? " · " + esc(datumZeitKurz(j.problem_at)) : "") + '</div>'
@@ -3320,6 +3328,10 @@ async function zeichneProbleme(b) {
             : "")
         + '</div>').join("")
     + '</section>';
+
+  ziel.querySelectorAll("[data-zeigen]").forEach((el) => {
+    el.onclick = () => aufPlanwandZeigen(el.dataset.zeigen);
+  });
 
   ziel.querySelectorAll("[data-probweg]").forEach((el) => {
     el.onclick = async () => {
@@ -3362,7 +3374,9 @@ async function zeichneVorbereitung(b) {
         + bald.map((j) => '<div class="problemzeile">'
             + '<span class="problemzeile__zeichen">⏱</span>'
             + '<div class="problemzeile__inhalt">'
-            + '<div class="problemzeile__nr">' + esc(j.job_number)
+            + '<div class="problemzeile__nr">'
+            + '<button class="problemzeile__nr--klick" data-zeigen="'
+            + esc(j.job_number) + '">' + esc(j.job_number) + '</button>'
             + '<span class="klein"> ' + esc(j.maschine) + ' · ab '
             + esc(kurzDatum(j.planned_from)) + '</span></div>'
             + '<div class="klein">'
@@ -3371,6 +3385,10 @@ async function zeichneVorbereitung(b) {
             + '</div></div></div>').join("")
       : '<p class="hinweis">Für die nächsten sieben Tage ist alles vorbereitet.</p>')
     + '</section>';
+
+  ziel.querySelectorAll("[data-zeigen]").forEach((el) => {
+    el.onclick = (e) => { e.stopPropagation(); aufPlanwandZeigen(el.dataset.zeigen); };
+  });
 }
 
 // Kurzfassung der Einkaufsliste
@@ -5356,6 +5374,17 @@ function sucheImZeitraum(j) {
   return true;
 }
 
+// Von der Startseite aus einen Auftrag auf der Planwand zeigen.
+// Es wird zur Planwand gewechselt und dort dieselbe Suche
+// ausgelöst, die auch der Suchknopf benutzt.
+function aufPlanwandZeigen(nummer) {
+  if (!nummer) return;
+  plan.sucheZeit = { art: "alle", datum: null, richtung: "vor" };
+  plan.trefferNr = 0;
+  plan.offeneSuche = nummer;          // wird nach dem Aufbau ausgeführt
+  location.hash = "#/planwand";
+}
+
 async function sucheStarten(text, b) {
   const t = (text || "").trim().toLowerCase();
   if (!t) return;
@@ -5916,6 +5945,13 @@ function zeichnePlanwand(b) {
   ferienGriffe(b);
   balkenInfoVerhalten();
   zeitWischen(b);
+
+  // Kam der Aufruf von der Startseite, gleich danach suchen
+  if (plan.offeneSuche) {
+    const was = plan.offeneSuche;
+    plan.offeneSuche = null;
+    setTimeout(() => sucheStarten(was, b), 60);
+  }
   if (!darfPlanen()) balkenAnsehenVerhalten();
   statusSchnellVerhalten(b);
   sucheHervorheben();
