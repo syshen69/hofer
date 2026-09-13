@@ -2444,7 +2444,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "37.6.0";
+const APP_VERSION = "37.7.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -5138,6 +5138,11 @@ function zeitWischen(b) {
   const rolle = document.querySelector(".pw-rolle");
   if (!rolle) return;
 
+  // Beim Neuzeichnen entsteht ein frisches Element. Falls doch einmal
+  // dasselbe zweimal durchläuft, wird nicht doppelt gelauscht.
+  if (rolle.dataset.wischt === "1") return;
+  rolle.dataset.wischt = "1";
+
   let laeuftGerade = false;
   let letztesLinks = rolle.scrollLeft;
 
@@ -5148,43 +5153,42 @@ function zeitWischen(b) {
     // unten bleibt scrollLeft gleich — sonst würde die Tafel dabei
     // endlos weiter in die Vergangenheit rutschen.
     const linksJetzt = rolle.scrollLeft;
-    const seitlich = linksJetzt !== letztesLinks;
+    if (linksJetzt === letztesLinks) return;
     letztesLinks = linksJetzt;
-    if (!seitlich) return;
-
-    const rand = 40;
-    const maximum = rolle.scrollWidth - rolle.clientWidth;
-    const schritt = Math.max(3, Math.round(plan.tage / 3));
 
     // Passt die Tafel ganz ins Bild, gibt es nichts zu schieben
     if (rolle.scrollWidth <= rolle.clientWidth + 8) return;
 
-    if (rolle.scrollLeft <= rand) {
-      // Am linken Rand: weiter in die Vergangenheit
+    const rand = 60;
+    const maximum = rolle.scrollWidth - rolle.clientWidth;
+    const spalte = plan.spalte || 40;
+    const schritt = Math.max(2, Math.round(plan.tage / 4));
+
+    const nachziehen = (richtung) => {
       laeuftGerade = true;
-      plan.start = arbeitstagePlus(plan.start, -schritt);
-      planAktualisieren(b).then(() => {
-        const neu = document.querySelector(".pw-rolle");
-        if (neu) {
-          // Um genau die nachgeladenen Tage weiterrücken, damit es
-          // sich anfühlt, als wäre nichts passiert.
-          neu.scrollLeft = (neu.scrollWidth - neu.clientWidth) * (schritt / plan.tage) + rand;
-        }
-        setTimeout(() => { laeuftGerade = false; }, 250);
-      });
-    } else if (rolle.scrollLeft >= maximum - rand) {
-      // Am rechten Rand: weiter in die Zukunft
-      laeuftGerade = true;
-      plan.start = arbeitstagePlus(plan.start, schritt);
-      planAktualisieren(b).then(() => {
-        const neu = document.querySelector(".pw-rolle");
-        if (neu) {
-          neu.scrollLeft = Math.max(0,
-            (neu.scrollWidth - neu.clientWidth) * (1 - schritt / plan.tage) - rand);
-        }
-        setTimeout(() => { laeuftGerade = false; }, 250);
-      });
-    }
+      const vorher = rolle.scrollLeft;
+
+      plan.start = arbeitstagePlus(plan.start, richtung * schritt);
+
+      // Ohne Datenbankzugriff: die Aufträge liegen schon im Speicher.
+      // Dadurch gibt es keine Wartezeit und kein Ruckeln.
+      zeichnePlanwand(b);
+
+      const neu = document.querySelector(".pw-rolle");
+      if (neu) {
+        // Genau um die verschobenen Tage gegensteuern, dann bleibt
+        // der Finger optisch an derselben Stelle auf der Tafel.
+        neu.scrollLeft = Math.max(0, vorher - richtung * schritt * spalte);
+        letztesLinks = neu.scrollLeft;
+      }
+
+      // zeichnePlanwand bindet alle Knöpfe und auch diese Wischlogik
+      // gleich selbst wieder — hier ist also nichts mehr zu tun.
+      requestAnimationFrame(() => { laeuftGerade = false; });
+    };
+
+    if (rolle.scrollLeft <= rand) nachziehen(-1);
+    else if (rolle.scrollLeft >= maximum - rand) nachziehen(1);
   }, { passive: true });
 }
 
