@@ -1893,15 +1893,21 @@ pre, .gcode { max-width: 100%; overflow-x: auto; }
                             font-weight: 700; opacity: .85; padding-left: 4px; }
 
 /* ---------- Fahrzeugknopf: oben mittig ---------- */
-.fahrzeug-knopf {
+/* Beide Knöpfe sitzen in einer gemeinsamen Leiste. Dadurch ist der
+   Abstand immer gleich, egal wie breit der Bildschirm ist. */
+.werkzeugleiste {
   position: fixed; z-index: 40; left: 50%; transform: translateX(-50%);
-  top: 8px; width: 38px; height: 38px;
+  top: 8px; display: flex; align-items: center; gap: 10px; }
+.fahrzeug-knopf, .eier-knopf {
+  position: static; width: 38px; height: 38px; flex: none;
   border-radius: 10px; border: 1px solid var(--linie-stark);
   background: var(--flaeche); color: var(--tinte);
-  display: grid; place-items: center; cursor: pointer; font-size: 1.15rem; }
-.fahrzeug-knopf:hover { background: var(--marke-hell); }
+  display: grid; place-items: center; cursor: pointer; font-size: 1.15rem;
+  line-height: 1; padding: 0; }
+.fahrzeug-knopf:hover, .eier-knopf:hover { background: var(--marke-hell); }
 @media (max-width: 780px) {
-  .fahrzeug-knopf { width: 34px; height: 34px; top: 10px; font-size: 1rem; }
+  .werkzeugleiste { top: 10px; gap: 8px; }
+  .fahrzeug-knopf, .eier-knopf { width: 34px; height: 34px; font-size: 1rem; }
 }
 .chat-abzeichen { position: absolute; top: -6px; right: -6px; min-width: 20px;
                   height: 20px; padding: 0 5px; border-radius: 10px; background: var(--gefahr);
@@ -2119,17 +2125,7 @@ body.pw-seite .pw-rolle { max-height: calc(100dvh - var(--kopfhoehe) - 150px);
 }
 
 /* ---------- Eierzähler ---------- */
-.eier-knopf { position: fixed; z-index: 40; top: 8px;
-             left: calc(50% + 46px); transform: translateX(-50%);
-             width: 38px; height: 38px; border-radius: 10px;
-             border: 1px solid var(--linie-stark); background: var(--flaeche);
-             color: var(--tinte); display: grid; place-items: center;
-             cursor: pointer; font-size: 1.05rem; line-height: 1; }
-.eier-knopf:hover { background: var(--marke-hell); }
 .eier-zahl { font-size: .58rem; font-weight: 700; margin-top: -3px; }
-@media (max-width: 780px) {
-  .eier-knopf { width: 34px; height: 34px; top: 10px; left: calc(50% + 42px); }
-}
 .eier-dialog { max-width: 340px; text-align: center; }
 .eier-kopf { display: flex; align-items: center; justify-content: space-between;
             gap: 10px; margin-bottom: 10px; }
@@ -2231,7 +2227,7 @@ body.dunkel .kopf__logo { filter: brightness(0) invert(1); }
 }
 
 /* ---------- Eierknopf mittig und Fenster wie beim Fahrzeug ---------- */
-.eier-knopf { flex-direction: column; line-height: 1; }
+
 .eier-dialog { max-height: 88dvh; overflow-y: auto; }
 @media (max-width: 780px) {
   .eier-dialog { max-height: 80dvh; }
@@ -2402,6 +2398,13 @@ body.dunkel .pw-parkflaeche { background: #22303f; }
 
 /* ---------- Kopfzeile einer Lieferantenkarte ---------- */
 .karte__kopfrechts { display: flex; align-items: center; gap: 10px; flex: none; }
+
+/* ---------- Zustand direkt in der Produktion ändern ---------- */
+.auftrag__status { background: var(--grund); border: 1px solid var(--linie-stark);
+                  border-radius: var(--radius); padding: 3px 9px; font: inherit;
+                  font-size: .78rem; font-weight: 600; color: var(--tinte);
+                  cursor: pointer; white-space: nowrap; }
+.auftrag__status:hover { background: var(--marke-hell); border-color: var(--marke); }
 </style>
 </head>
 <body>
@@ -2450,7 +2453,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "38.1.0";
+const APP_VERSION = "38.3.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -4297,8 +4300,14 @@ function auftragsZeile(maschine) {
           + '">Auftrag wählen</button>' : "")
       + '</div>';
   }
+  const zustand = PLANSTATUS[j.plan_status || "geplant"] || PLANSTATUS.geplant;
+
   return '<div class="auftrag">'
     + '<span class="auftrag__nr">' + esc(j.job_number) + '</span>'
+    // Den Zustand darf jeder ändern, auch ohne Schreibrecht.
+    + '<button class="auftrag__status" data-auftrag-status="' + esc(j.id) + '"'
+    + ' title="Zustand ändern">' + zustand.zeichen + ' '
+    + esc(zustand.name) + '</button>'
     + '<span class="auftrag__seit">'
     + (j.target_quantity ? "Ziel " + zahlText(j.target_quantity) + " Stück"
         : "seit " + kurzDatum(isoDatum(new Date(j.started_at)))) + '</span>'
@@ -4451,6 +4460,30 @@ async function prodAuftraegeAktualisieren(b) {
 }
 
 function auftragsKnoepfeBinden(raster, b) {
+  // Zustand ändern — bewusst für alle, auch ohne Schreibrecht
+  raster.querySelectorAll("[data-auftrag-status]").forEach((el) => {
+    el.onclick = async () => {
+      const id = el.dataset.auftragStatus;
+      const j = Object.values(prod.auftraege || {}).find((x) => x.id === id);
+      if (!j) return;
+
+      const wahl = await auswahlDialog("Zustand ändern — " + j.job_number,
+        Object.keys(PLANSTATUS).map((k) => ({
+          wert: k, text: PLANSTATUS[k].zeichen + "  " + PLANSTATUS[k].name,
+        })));
+      if (!wahl || wahl === j.plan_status) return;
+
+      const daten = { plan_status: wahl };
+      if (wahl === "fertig" && !j.ended_at) {
+        daten.ended_at = new Date().toISOString();
+        daten.ended_by = profil.id;
+      }
+      const { error } = await db.from("jobs").update(daten).eq("id", j.id);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Zustand geändert."); await prodAuftraegeAktualisieren(b); }
+    };
+  });
+
   raster.querySelectorAll("[data-auftrag-start]").forEach((el) => {
     el.onclick = async () => {
       const maschineId = el.dataset.auftragStart;
@@ -8574,9 +8607,13 @@ async function positionDialog(b) {
 
       if (!(prod.maschinen || []).length) {
         try {
+          // Die Parks müssen zuerst da sein: ohne sie kann nicht
+          // entschieden werden, welche Maschinen jemand sehen darf,
+          // und die Liste bliebe leer.
+          if (!(prod.parks || []).length) prod.parks = await ladeParks(false);
           prod.maschinen = await ladeMaschinen(false);
           zielFuellen();
-        } catch (f) { /* dann bleibt die Liste leer */ }
+        } catch (f) { meldung(fehlertext(f), "fehler"); }
       }
       return;
     }
@@ -9221,15 +9258,19 @@ async function bestLieferanten(ziel, b) {
   });
 }
 
-// Erzeugt einen fertigen Bestellbrief und öffnet das Druckfenster.
-// Dort lässt sich "Als PDF speichern" wählen — dadurch braucht es
-// keine zusätzliche Bibliothek in der App.
+// Erzeugt einen Bestellbrief im Stil der bestehenden Hofer-Vorlage
+// und öffnet das Druckfenster. Dort lässt sich "Als PDF speichern"
+// wählen — so braucht es keine zusätzliche Bibliothek in der App.
 const HOFER_ANSCHRIFT = {
   name: "Hofer + Co. Präzisionsdrehteile",
   strasse: "Alte Bernstrasse 24",
-  ort: "4573 Lohn-Ammannsegg",
-  mail: "admin@hoferco.ch",
+  plzOrt: "CH-4573 Lohn-Ammannsegg",
+  ort: "Lohn",
+  plz: "4573",
   telefon: "032 677 55 77",
+  fax: "032 677 55 70",
+  mail: "admin@hoferco.ch",
+  seite: "www.hoferco.ch",
 };
 
 function bestellungDrucken(lieferant, posten) {
@@ -9238,18 +9279,37 @@ function bestellungDrucken(lieferant, posten) {
     return;
   }
 
-  const heuteText = langDatum(isoDatum(new Date()));
+  // Volles Datum wie im Muster: 20.08.2026
+  const jetzt = new Date();
+  const heuteText = String(jetzt.getDate()).padStart(2, "0") + "."
+    + String(jetzt.getMonth() + 1).padStart(2, "0") + "." + jetzt.getFullYear();
   const wer = (profil && (profil.full_name || profil.email)) || "";
 
+  // Kürzel der angemeldeten Person, sonst der ganze Name
+  const zeichen = (profil && profil.initialen)
+    ? profil.initialen
+    : wer.split(/\s+/).map((t, i, a) =>
+        (i < a.length - 1 ? t.charAt(0) + "." : t)).join(" ");
+
+  const basis = location.origin + location.pathname.replace(/[^/]*$/, "");
+
+  // Leerzeilen auffüllen, damit die Tabelle wie im Muster aussieht
+  const mindestens = 12;
   const zeilen = posten.map((z) => {
     const a = z.articles || {};
+    const text = (a.article_number || "")
+      + (z.note ? "   " + z.note : "");
     return '<tr>'
-      + '<td>' + esc(a.article_number || "") + '</td>'
-      + '<td>' + esc(a.name || "") + '</td>'
-      + '<td class="rechts">' + zahlText(z.quantity) + '</td>'
-      + '<td>' + esc(a.unit || "Stück") + '</td>'
+      + '<td class="sp-artikel">' + esc(text) + '</td>'
+      + '<td class="sp-menge">' + zahlText(z.quantity) + ' '
+      + esc(a.unit || "Stk.") + '</td>'
+      + '<td class="sp-preis"></td>'
       + '</tr>';
-  }).join("");
+  });
+  while (zeilen.length < mindestens) {
+    zeilen.push('<tr><td class="sp-artikel">&nbsp;</td>'
+      + '<td class="sp-menge"></td><td class="sp-preis"></td></tr>');
+  }
 
   const fenster = window.open("", "_blank");
   if (!fenster) {
@@ -9257,70 +9317,104 @@ function bestellungDrucken(lieferant, posten) {
     return;
   }
 
+  const stil = [
+    "@page { size: A4; margin: 14mm 16mm 16mm; }",
+    "* { box-sizing: border-box; }",
+    "body { font-family: Calibri, 'Segoe UI', system-ui, Arial, sans-serif;",
+    "       color: #1a1a1a; font-size: 11pt; line-height: 1.4; margin: 0; }",
+
+    ".briefkopf { width: 100%; }",
+    ".briefkopf img { width: 100%; display: block; }",
+
+    ".kontakt { display: flex; justify-content: space-between;",
+    "           font-size: 9.5pt; margin: 4mm 0 14mm; }",
+
+    "h1 { font-size: 22pt; margin: 0 0 12mm; letter-spacing: .01em; }",
+
+    ".anschriftzeile { display: flex; justify-content: space-between;",
+    "                  gap: 14mm; margin-bottom: 8mm; }",
+    ".zeichen { font-size: 10.5pt; }",
+    ".zeichen div { display: flex; gap: 6mm; margin-bottom: 1mm; }",
+    ".zeichen .beschriftung { width: 26mm; color: #333; }",
+    ".empfaenger { font-size: 10.5pt; min-width: 62mm; }",
+    ".empfaenger div { display: flex; gap: 6mm; margin-bottom: 1mm; }",
+    ".empfaenger .beschriftung { width: 14mm; font-weight: 700; text-align: right; }",
+    ".empfaenger .ort { font-weight: 700; }",
+
+    "table { width: 100%; border-collapse: collapse; margin-top: 2mm; }",
+    "th { font-size: 10.5pt; font-weight: 700; text-align: left;",
+    "     padding: 1.5mm 2mm; border-bottom: 1.2pt solid #1a1a1a; }",
+    "th.sp-menge, th.sp-preis { border-left: .8pt solid #1a1a1a; }",
+    "td { padding: 0; height: 7.5mm; border-bottom: .8pt solid #1a1a1a;",
+    "     font-size: 10.5pt; }",
+    "td.sp-artikel { padding: 0 2mm; }",
+    "td.sp-menge, td.sp-preis { border-left: .8pt solid #1a1a1a; padding: 0 2mm; }",
+    ".sp-menge { width: 24mm; }",
+    ".sp-preis { width: 22mm; }",
+
+    ".bitte { text-align: center; font-weight: 700; margin: 6mm 0 12mm;",
+    "         font-size: 11pt; line-height: 1.5; }",
+    ".gruss { font-size: 11pt; }",
+    ".unterschrift { height: 16mm; }",
+  ].join("");
+
   fenster.document.write('<!doctype html><html lang="de"><head>'
     + '<meta charset="utf-8">'
     + '<title>Bestellung ' + esc(lieferant ? lieferant.name : "") + '</title>'
-    + '<style>'
-    + '@page { size: A4; margin: 20mm; }'
-    + 'body { font-family: system-ui, "Segoe UI", Arial, sans-serif; color: #1d2430;'
-    + '       font-size: 11pt; line-height: 1.45; }'
-    + '.kopf { display: flex; justify-content: space-between;'
-    + '        align-items: flex-start; margin-bottom: 26mm; }'
-    + '.logo { max-height: 22mm; }'
-    + '.absender { font-size: 9pt; color: #55606c; text-align: right; }'
-    + '.empfaenger { margin-bottom: 14mm; }'
-    + '.datum { text-align: right; margin-bottom: 10mm; font-size: 10pt; }'
-    + 'h1 { font-size: 13pt; margin: 0 0 6mm; }'
-    + 'table { width: 100%; border-collapse: collapse; margin: 6mm 0 10mm; }'
-    + 'th { text-align: left; font-size: 9pt; text-transform: uppercase;'
-    + '     letter-spacing: .05em; border-bottom: 1.5pt solid #1d2430; padding: 2mm 1mm; }'
-    + 'td { padding: 2mm 1mm; border-bottom: .4pt solid #c9d0d8; }'
-    + '.rechts { text-align: right; }'
-    + '.gruss { margin-top: 12mm; }'
-    + '</style></head><body>'
+    + '<style>' + stil + '</style></head><body>'
 
-    + '<div class="kopf">'
-    + '<img class="logo" src="' + location.origin + location.pathname.replace(/[^/]*$/, "")
-    + 'logo.png" alt="">'
-    + '<div class="absender">'
-    + '<strong>' + esc(HOFER_ANSCHRIFT.name) + '</strong><br>'
-    + esc(HOFER_ANSCHRIFT.strasse) + '<br>'
-    + esc(HOFER_ANSCHRIFT.ort) + '<br>'
-    + esc(HOFER_ANSCHRIFT.telefon) + '<br>'
-    + esc(HOFER_ANSCHRIFT.mail)
-    + '</div></div>'
+    + '<div class="briefkopf"><img src="' + basis + 'briefkopf.png" alt=""'
+    + ' onerror="this.style.display=\'none\'"></div>'
 
-    + '<div class="empfaenger">'
-    + '<strong>' + esc(lieferant ? lieferant.name : "") + '</strong><br>'
-    + (lieferant && lieferant.adresse
-        ? esc(lieferant.adresse).replace(/\n/g, "<br>") + '<br>' : "")
-    + (lieferant && lieferant.email ? esc(lieferant.email) : "")
+    + '<div class="kontakt">'
+    + '<div>Tel: ' + esc(HOFER_ANSCHRIFT.telefon) + '<br>'
+    + 'E-Mail: ' + esc(HOFER_ANSCHRIFT.mail) + '</div>'
+    + '<div>Fax: ' + esc(HOFER_ANSCHRIFT.fax) + '<br>'
+    + 'Homepage: ' + esc(HOFER_ANSCHRIFT.seite) + '</div>'
     + '</div>'
 
-    + '<div class="datum">' + esc(HOFER_ANSCHRIFT.ort.split(" ").slice(1).join(" "))
-    + ', ' + esc(heuteText) + '</div>'
-
     + '<h1>Bestellung</h1>'
-    + '<p>Guten Tag<br>Wir bestellen die folgenden Artikel. '
-    + 'Lieferung so bald wie möglich.</p>'
+
+    + '<div class="anschriftzeile">'
+    + '<div class="zeichen">'
+    + '<div><span class="beschriftung">unser Zeichen:</span><span>'
+    + esc(zeichen) + '</span></div>'
+    + '<div><span class="beschriftung">' + esc(HOFER_ANSCHRIFT.plz) + ' '
+    + esc(HOFER_ANSCHRIFT.ort) + ', den</span><span>' + esc(heuteText) + '</span></div>'
+    + '</div>'
+
+    + '<div class="empfaenger">'
+    + '<div><span class="beschriftung">Firma:</span><span>'
+    + esc(lieferant ? lieferant.name : "") + '</span></div>'
+    + (lieferant && lieferant.adresse
+        ? esc(lieferant.adresse).split("\n").map((z, i, alle) =>
+            '<div><span class="beschriftung"></span><span'
+            + (i === alle.length - 1 ? ' class="ort"' : "") + '>'
+            + z + '</span></div>').join("")
+        : "")
+    + (lieferant && lieferant.email
+        ? '<div><span class="beschriftung">z.Hd.</span><span>'
+          + esc(lieferant.email) + '</span></div>' : "")
+    + '</div></div>'
 
     + '<table><thead><tr>'
-    + '<th>Artikelnummer</th><th>Bezeichnung</th>'
-    + '<th class="rechts">Menge</th><th>Einheit</th>'
-    + '</tr></thead><tbody>' + zeilen + '</tbody></table>'
+    + '<th class="sp-artikel">Artikel-Nr./Text:</th>'
+    + '<th class="sp-menge">Menge:</th>'
+    + '<th class="sp-preis">Preis:</th>'
+    + '</tr></thead><tbody>' + zeilen.join("") + '</tbody></table>'
 
-    + '<p>Für eine Bestätigung mit Liefertermin sind wir dankbar.</p>'
+    + '<p class="bitte">Wir bitten um eine Bestätigung<br>'
+    + 'mit dem voraussichtlichen Liefertermin</p>'
 
-    + '<div class="gruss">Freundliche Grüsse<br><br>'
-    + esc(wer) + '<br>'
-    + esc(HOFER_ANSCHRIFT.name) + '</div>'
+    + '<div class="gruss">Mit freundlichen Grüssen'
+    + '<div class="unterschrift"></div>'
+    + esc(wer) + '</div>'
 
     + '</body></html>');
   fenster.document.close();
 
-  // Kurz warten, damit das Logo geladen ist
-  fenster.onload = () => setTimeout(() => fenster.print(), 250);
-  setTimeout(() => { try { fenster.print(); } catch (f) { /* schon gedruckt */ } }, 900);
+  fenster.onload = () => setTimeout(() => fenster.print(), 300);
+  setTimeout(() => { try { fenster.print(); } catch (f) { /* schon gedruckt */ } }, 1000);
 }
 
 async function lieferantDialog(lieferant, b) {
@@ -11712,6 +11806,19 @@ const chat = {
 
 const eier = { wert: 0, kanal: null };
 
+// Beide schwebenden Knöpfe teilen sich eine Leiste, damit ihr
+// Abstand auf jedem Bildschirm gleich bleibt.
+function werkzeugleiste() {
+  let leiste = document.getElementById("werkzeugleiste");
+  if (!leiste) {
+    leiste = document.createElement("div");
+    leiste.id = "werkzeugleiste";
+    leiste.className = "werkzeugleiste";
+    document.body.appendChild(leiste);
+  }
+  return leiste;
+}
+
 async function eierEinbauen() {
   if (document.getElementById("eier-knopf")) return;
 
@@ -11720,7 +11827,7 @@ async function eierEinbauen() {
   knopf.className = "eier-knopf";
   knopf.title = "Eier im Lager";
   knopf.innerHTML = "\u{1F95A}";
-  document.body.appendChild(knopf);
+  werkzeugleiste().appendChild(knopf);
   knopf.onclick = () => eierFensterUmschalten();
 
   await eierStandLaden();
@@ -11912,10 +12019,29 @@ async function eierHistorieZeigen() {
           + '<div class="klein">' + esc(datumZeitKurz(h.wann)) + '</div>'
           + '</div>').join("")
       : '<p class="hinweis">Noch nichts abgebucht.</p>')
-    + '<div class="eier-knoepfe"><button type="button" class="knopf" id="eier-zurueck2">'
-    + 'Zurück</button></div>';
+    + '<div class="eier-knoepfe">'
+    + '<button type="button" class="knopf" id="eier-zurueck2">Zurück</button>'
+    + (liste.length
+        ? '<button type="button" class="knopf knopf--gefahr" id="eier-leeren">'
+          + 'Historie löschen</button>' : "")
+    + '</div>';
 
   document.getElementById("eier-zurueck2").onclick = () => eierZaehlerZeigen();
+
+  const leeren = document.getElementById("eier-leeren");
+  if (leeren) leeren.onclick = async () => {
+    const ok = await nachfragen({
+      titel: "Historie löschen",
+      text: "Alle Einträge werden entfernt. Der Bestand bleibt unverändert.",
+      bestaetigen: "Löschen", gefahr: true });
+    if (!ok) return;
+
+    // Ohne Bedingung löscht Supabase nichts, deshalb eine, die
+    // auf jede Zeile zutrifft.
+    const { error } = await db.from("eier_historie").delete().gt("menge", -1);
+    if (error) meldung(fehlertext(error), "fehler");
+    else { meldung("Historie gelöscht."); eierHistorieZeigen(); }
+  };
 }
 
 // Kurzer Eintritts-Effekt beim Reiterwechsel — auf jeden Container
@@ -12029,7 +12155,7 @@ async function fahrzeugEinbauen() {
   knopf.className = "fahrzeug-knopf";
   knopf.title = "Fahrzeuge";
   knopf.textContent = "🚗";
-  document.body.appendChild(knopf);
+  werkzeugleiste().prepend(knopf);
   knopf.onclick = () => fahrzeugPanelUmschalten();
 }
 
@@ -12829,7 +12955,7 @@ function zeichneGeruest() {
     profil = null;
     document.querySelectorAll(".dialog-huelle").forEach((el) => el.remove());
     chatEinbautStoppen();
-    ["fahrzeug-knopf", "fahrzeug-panel", "eier-knopf", "eier-fenster"].forEach((id) => {
+    ["werkzeugleiste", "fahrzeug-panel", "eier-fenster"].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.remove();
     });
