@@ -2450,7 +2450,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "38.0.0";
+const APP_VERSION = "38.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -8148,9 +8148,11 @@ async function bestOffen(ziel, b, bereich) {
         // innerhalb des Blocks nach Lieferant gruppieren
         const gruppen = {};
         const seiten = {};
+        const perMail = {};
         eigene.forEach((z) => {
           const name = (z.suppliers && z.suppliers.name) || "Ohne Lieferant";
           if (z.suppliers && z.suppliers.website) seiten[name] = z.suppliers.website;
+          if (z.suppliers && z.suppliers.bestellweg === "mail") perMail[name] = z.suppliers;
           (gruppen[name] = gruppen[name] || []).push(z);
         });
 
@@ -9163,7 +9165,7 @@ async function bestLieferanten(ziel, b) {
                 + ' target="_blank" rel="noopener">' + esc(l.name) + ' ↗</a>'
               : esc(l.name)) + '</td>'
           + (darfSchreiben() ? '<td class="rechts nowrap">'
-              + '<button class="linkknopf" data-lf="' + esc(l.id) + '">Umbenennen</button> '
+              + '<button class="linkknopf" data-lf="' + esc(l.id) + '">Anpassen</button> '
               + '<button class="linkknopf linkknopf--gefahr" data-lfweg="' + esc(l.id)
               + '" data-name="' + esc(l.name) + '">Löschen</button></td>' : "")
           + '</tr>').join("") + '</tbody></table>'
@@ -11963,6 +11965,13 @@ const fahrzeugZustand = { reiter: "buchen" };
 function kalendereintrag(buchung) {
   const fahrzeug = buchung.fahrzeuge ? buchung.fahrzeuge.name : "Fahrzeug";
 
+  // Wer das Fahrzeug braucht, und wer es bewilligt hat
+  const nutzer = buchung.profiles
+    ? (buchung.profiles.full_name || buchung.profiles.email)
+    : ((profil && (profil.full_name || profil.email)) || "");
+  const bewilliger = buchung.entscheider
+    ? (buchung.entscheider.full_name || buchung.entscheider.email) : "";
+
   // Zeitstempel im Format, das Kalender erwarten: 20260415T081500Z
   const stempel = (wert) => {
     const d = new Date(wert);
@@ -11985,8 +11994,12 @@ function kalendereintrag(buchung) {
     "DTSTAMP:" + stempel(new Date()),
     "DTSTART:" + stempel(buchung.von),
     "DTEND:" + stempel(buchung.bis),
-    "SUMMARY:" + sauber(fahrzeug + " reserviert"),
-    "DESCRIPTION:" + sauber(buchung.grund || ""),
+    "SUMMARY:" + sauber(fahrzeug + " — " + (nutzer || "reserviert")),
+    "DESCRIPTION:" + sauber(
+      "Fahrzeug: " + fahrzeug
+      + "\nWer: " + (nutzer || "unbekannt")
+      + "\nWofür: " + (buchung.grund || "—")
+      + "\nBewilligt von: " + (bewilliger || "—")),
     "LOCATION:" + sauber("Hofer + Co. Präzisionsdrehteile"),
     "END:VEVENT",
     "END:VCALENDAR",
