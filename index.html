@@ -2453,7 +2453,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "38.3.0";
+const APP_VERSION = "38.4.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -9258,58 +9258,31 @@ async function bestLieferanten(ziel, b) {
   });
 }
 
-// Erzeugt einen Bestellbrief im Stil der bestehenden Hofer-Vorlage
-// und öffnet das Druckfenster. Dort lässt sich "Als PDF speichern"
-// wählen — so braucht es keine zusätzliche Bibliothek in der App.
-const HOFER_ANSCHRIFT = {
-  name: "Hofer + Co. Präzisionsdrehteile",
-  strasse: "Alte Bernstrasse 24",
-  plzOrt: "CH-4573 Lohn-Ammannsegg",
-  ort: "Lohn",
-  plz: "4573",
-  telefon: "032 677 55 77",
-  fax: "032 677 55 70",
-  mail: "admin@hoferco.ch",
-  seite: "www.hoferco.ch",
-};
-
+// Bestellbrief nach der Hofer-Vorlage. Öffnet ein eigenes Fenster
+// mit einem Knopf zum Speichern als PDF.
 function bestellungDrucken(lieferant, posten) {
   if (!posten || !posten.length) {
     meldung("Für diesen Lieferanten ist nichts offen.", "warn");
     return;
   }
 
-  // Volles Datum wie im Muster: 20.08.2026
+  // Volles Datum: 12.09.2026
   const jetzt = new Date();
   const heuteText = String(jetzt.getDate()).padStart(2, "0") + "."
     + String(jetzt.getMonth() + 1).padStart(2, "0") + "." + jetzt.getFullYear();
+
   const wer = (profil && (profil.full_name || profil.email)) || "";
-
-  // Kürzel der angemeldeten Person, sonst der ganze Name
-  const zeichen = (profil && profil.initialen)
-    ? profil.initialen
-    : wer.split(/\s+/).map((t, i, a) =>
-        (i < a.length - 1 ? t.charAt(0) + "." : t)).join(" ");
-
+  const zeichen = (profil && profil.initialen) ? profil.initialen : wer;
   const basis = location.origin + location.pathname.replace(/[^/]*$/, "");
 
-  // Leerzeilen auffüllen, damit die Tabelle wie im Muster aussieht
-  const mindestens = 12;
   const zeilen = posten.map((z) => {
     const a = z.articles || {};
-    const text = (a.article_number || "")
-      + (z.note ? "   " + z.note : "");
+    const text = (a.article_number || "") + (z.note ? "   " + z.note : "");
     return '<tr>'
-      + '<td class="sp-artikel">' + esc(text) + '</td>'
-      + '<td class="sp-menge">' + zahlText(z.quantity) + ' '
-      + esc(a.unit || "Stk.") + '</td>'
-      + '<td class="sp-preis"></td>'
+      + '<td class="a">' + esc(text) + '</td>'
+      + '<td class="m">' + zahlText(z.quantity) + ' ' + esc(a.unit || "Stk.") + '</td>'
       + '</tr>';
-  });
-  while (zeilen.length < mindestens) {
-    zeilen.push('<tr><td class="sp-artikel">&nbsp;</td>'
-      + '<td class="sp-menge"></td><td class="sp-preis"></td></tr>');
-  }
+  }).join("");
 
   const fenster = window.open("", "_blank");
   if (!fenster) {
@@ -9318,103 +9291,115 @@ function bestellungDrucken(lieferant, posten) {
   }
 
   const stil = [
-    "@page { size: A4; margin: 14mm 16mm 16mm; }",
+    "@page { size: A4; margin: 0; }",
     "* { box-sizing: border-box; }",
-    "body { font-family: Calibri, 'Segoe UI', system-ui, Arial, sans-serif;",
-    "       color: #1a1a1a; font-size: 11pt; line-height: 1.4; margin: 0; }",
+    "body { margin: 0; font-family: Calibri, 'Segoe UI', system-ui, Arial, sans-serif;",
+    "       color: #1a1a1a; font-size: 11pt; line-height: 1.45; background: #e8eaed; }",
+    ".blatt { width: 210mm; min-height: 297mm; margin: 8mm auto; background: #fff;",
+    "         padding-bottom: 20mm; box-shadow: 0 2px 12px rgba(0,0,0,.15); }",
 
-    ".briefkopf { width: 100%; }",
-    ".briefkopf img { width: 100%; display: block; }",
+    ".balken { background: #003884; color: #fff; padding: 7mm 16mm;",
+    "          display: flex; align-items: center; justify-content: space-between; gap: 10mm; }",
+    ".balken img { height: 15mm; width: auto; filter: brightness(0) invert(1); }",
+    ".balken .adresse { text-align: right; font-size: 9pt; line-height: 1.6; }",
+    ".balken .ort { font-weight: 700; }",
 
-    ".kontakt { display: flex; justify-content: space-between;",
-    "           font-size: 9.5pt; margin: 4mm 0 14mm; }",
+    ".inhalt { padding: 0 16mm; }",
+    ".kontakt { display: flex; justify-content: space-between; font-size: 9.5pt;",
+    "           color: #444; padding: 3mm 0 9mm; border-bottom: .4pt solid #dfe3e8;",
+    "           margin-bottom: 9mm; }",
 
-    "h1 { font-size: 22pt; margin: 0 0 12mm; letter-spacing: .01em; }",
+    ".oben { display: flex; justify-content: space-between; gap: 12mm; margin-bottom: 10mm; }",
+    "h1 { font-size: 20pt; font-weight: 600; margin: 0 0 5mm; }",
+    ".angabe { display: flex; gap: 4mm; margin-bottom: 1mm; font-size: 10.5pt; }",
+    ".angabe .b { width: 26mm; color: #666; }",
+    ".an { min-width: 58mm; padding-top: 2mm; font-size: 10.5pt; }",
+    ".an .titel { font-size: 8.5pt; color: #888; letter-spacing: .1em; margin-bottom: 2mm; }",
+    ".an .firma, .an .ort { font-weight: 700; }",
+    ".an .mail { margin-top: 1.5mm; color: #555; }",
 
-    ".anschriftzeile { display: flex; justify-content: space-between;",
-    "                  gap: 14mm; margin-bottom: 8mm; }",
-    ".zeichen { font-size: 10.5pt; }",
-    ".zeichen div { display: flex; gap: 6mm; margin-bottom: 1mm; }",
-    ".zeichen .beschriftung { width: 26mm; color: #333; }",
-    ".empfaenger { font-size: 10.5pt; min-width: 62mm; }",
-    ".empfaenger div { display: flex; gap: 6mm; margin-bottom: 1mm; }",
-    ".empfaenger .beschriftung { width: 14mm; font-weight: 700; text-align: right; }",
-    ".empfaenger .ort { font-weight: 700; }",
+    "table { width: 100%; border-collapse: collapse; margin-bottom: 9mm; }",
+    "th { font-size: 8.5pt; letter-spacing: .1em; color: #003884; font-weight: 700;",
+    "     text-align: left; padding: 0 1mm 2mm; border-bottom: 1pt solid #003884; }",
+    "th.m, td.m { text-align: right; width: 32mm; }",
+    "td { font-size: 10.5pt; padding: 2.4mm 1mm; border-bottom: .4pt solid #e3e7ec; }",
 
-    "table { width: 100%; border-collapse: collapse; margin-top: 2mm; }",
-    "th { font-size: 10.5pt; font-weight: 700; text-align: left;",
-    "     padding: 1.5mm 2mm; border-bottom: 1.2pt solid #1a1a1a; }",
-    "th.sp-menge, th.sp-preis { border-left: .8pt solid #1a1a1a; }",
-    "td { padding: 0; height: 7.5mm; border-bottom: .8pt solid #1a1a1a;",
-    "     font-size: 10.5pt; }",
-    "td.sp-artikel { padding: 0 2mm; }",
-    "td.sp-menge, td.sp-preis { border-left: .8pt solid #1a1a1a; padding: 0 2mm; }",
-    ".sp-menge { width: 24mm; }",
-    ".sp-preis { width: 22mm; }",
+    ".bitte { font-size: 10.5pt; margin-bottom: 11mm; line-height: 1.6; }",
+    ".gruss { font-size: 10.5pt; }",
+    ".platz { height: 15mm; }",
+    ".name { font-weight: 700; }",
+    ".firma2 { color: #666; font-size: 9.5pt; }",
 
-    ".bitte { text-align: center; font-weight: 700; margin: 6mm 0 12mm;",
-    "         font-size: 11pt; line-height: 1.5; }",
-    ".gruss { font-size: 11pt; }",
-    ".unterschrift { height: 16mm; }",
+    ".leiste { position: fixed; top: 10px; right: 14px; display: flex; gap: 8px; }",
+    ".leiste button { font: inherit; font-size: 10pt; padding: 7px 14px; cursor: pointer;",
+    "                 border: 1px solid #003884; background: #003884; color: #fff;",
+    "                 border-radius: 6px; }",
+    "@media print { .leiste { display: none; }",
+    "  body { background: #fff; }",
+    "  .blatt { margin: 0; box-shadow: none; min-height: auto; } }",
   ].join("");
+
+  const anschrift = (lieferant && lieferant.adresse)
+    ? esc(lieferant.adresse).split("\n").filter((x) => x.trim())
+    : [];
 
   fenster.document.write('<!doctype html><html lang="de"><head>'
     + '<meta charset="utf-8">'
     + '<title>Bestellung ' + esc(lieferant ? lieferant.name : "") + '</title>'
     + '<style>' + stil + '</style></head><body>'
 
-    + '<div class="briefkopf"><img src="' + basis + 'briefkopf.png" alt=""'
-    + ' onerror="this.style.display=\'none\'"></div>'
+    + '<div class="leiste">'
+    + '<button onclick="window.print()">Als PDF speichern</button>'
+    + '</div>'
+
+    + '<div class="blatt">'
+
+    + '<div class="balken">'
+    + '<img src="' + basis + 'logo.png" alt="Hofer + Co.">'
+    + '<div class="adresse">Alte Bernstrasse 24<br>'
+    + '<span class="ort">CH-4573 Lohn-Ammannsegg</span></div>'
+    + '</div>'
+
+    + '<div class="inhalt">'
 
     + '<div class="kontakt">'
-    + '<div>Tel: ' + esc(HOFER_ANSCHRIFT.telefon) + '<br>'
-    + 'E-Mail: ' + esc(HOFER_ANSCHRIFT.mail) + '</div>'
-    + '<div>Fax: ' + esc(HOFER_ANSCHRIFT.fax) + '<br>'
-    + 'Homepage: ' + esc(HOFER_ANSCHRIFT.seite) + '</div>'
+    + '<div>Tel: 032 677 55 77 &nbsp;·&nbsp; admin@hoferco.ch</div>'
+    + '<div>Fax: 032 677 55 70 &nbsp;·&nbsp; www.hoferco.ch</div>'
     + '</div>'
 
+    + '<div class="oben">'
+    + '<div>'
     + '<h1>Bestellung</h1>'
-
-    + '<div class="anschriftzeile">'
-    + '<div class="zeichen">'
-    + '<div><span class="beschriftung">unser Zeichen:</span><span>'
+    + '<div class="angabe"><span class="b">Unser Zeichen</span><span>'
     + esc(zeichen) + '</span></div>'
-    + '<div><span class="beschriftung">' + esc(HOFER_ANSCHRIFT.plz) + ' '
-    + esc(HOFER_ANSCHRIFT.ort) + ', den</span><span>' + esc(heuteText) + '</span></div>'
+    + '<div class="angabe"><span class="b">Lohn, den</span><span>'
+    + esc(heuteText) + '</span></div>'
     + '</div>'
 
-    + '<div class="empfaenger">'
-    + '<div><span class="beschriftung">Firma:</span><span>'
-    + esc(lieferant ? lieferant.name : "") + '</span></div>'
-    + (lieferant && lieferant.adresse
-        ? esc(lieferant.adresse).split("\n").map((z, i, alle) =>
-            '<div><span class="beschriftung"></span><span'
-            + (i === alle.length - 1 ? ' class="ort"' : "") + '>'
-            + z + '</span></div>').join("")
-        : "")
+    + '<div class="an">'
+    + '<div class="titel">AN</div>'
+    + '<div class="firma">' + esc(lieferant ? lieferant.name : "") + '</div>'
+    + anschrift.map((z, i) => '<div' + (i === anschrift.length - 1 ? ' class="ort"' : "")
+        + '>' + z + '</div>').join("")
     + (lieferant && lieferant.email
-        ? '<div><span class="beschriftung">z.Hd.</span><span>'
-          + esc(lieferant.email) + '</span></div>' : "")
+        ? '<div class="mail">' + esc(lieferant.email) + '</div>' : "")
     + '</div></div>'
 
     + '<table><thead><tr>'
-    + '<th class="sp-artikel">Artikel-Nr./Text:</th>'
-    + '<th class="sp-menge">Menge:</th>'
-    + '<th class="sp-preis">Preis:</th>'
-    + '</tr></thead><tbody>' + zeilen.join("") + '</tbody></table>'
+    + '<th class="a">ARTIKEL</th><th class="m">MENGE</th>'
+    + '</tr></thead><tbody>' + zeilen + '</tbody></table>'
 
-    + '<p class="bitte">Wir bitten um eine Bestätigung<br>'
-    + 'mit dem voraussichtlichen Liefertermin</p>'
+    + '<p class="bitte">Wir bitten um eine Bestätigung dieser Bestellung sowie '
+    + 'um Angabe des voraussichtlichen Liefertermins.</p>'
 
     + '<div class="gruss">Mit freundlichen Grüssen'
-    + '<div class="unterschrift"></div>'
-    + esc(wer) + '</div>'
+    + '<div class="platz"></div>'
+    + '<div class="name">' + esc(wer) + '</div>'
+    + '<div class="firma2">Hofer + Co. Präzisionsdrehteile</div>'
+    + '</div>'
 
-    + '</body></html>');
+    + '</div></div></body></html>');
   fenster.document.close();
-
-  fenster.onload = () => setTimeout(() => fenster.print(), 300);
-  setTimeout(() => { try { fenster.print(); } catch (f) { /* schon gedruckt */ } }, 1000);
 }
 
 async function lieferantDialog(lieferant, b) {
