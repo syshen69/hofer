@@ -2396,6 +2396,12 @@ body.dunkel .pw-parkflaeche { background: #22303f; }
                           cursor: pointer; text-decoration: underline;
                           text-underline-offset: 2px; }
 .problemzeile__nr--klick:hover { color: var(--marke-dunkel, var(--marke)); }
+
+/* ---------- Kopfzeile einer Lieferantenkarte ---------- */
+.karte__kopfrechts { display: flex; align-items: center; gap: 10px; flex: none; }
+
+/* ---------- Kopfzeile einer Lieferantenkarte ---------- */
+.karte__kopfrechts { display: flex; align-items: center; gap: 10px; flex: none; }
 </style>
 </head>
 <body>
@@ -2444,7 +2450,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "37.9.0";
+const APP_VERSION = "38.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -3769,6 +3775,16 @@ function dialogFelder(o) {
 
     const felder = (o.felder || []).map((f) => {
       const id = nr + f.name;
+      if (f.auswahl) {
+        return '<label class="feld"><span>' + esc(f.label) + '</span>'
+          + '<select id="' + id + '">'
+          + f.auswahl.map(([wert, text]) => '<option value="' + esc(wert) + '"'
+              + (String(f.wert) === String(wert) ? " selected" : "") + '>'
+              + esc(text) + '</option>').join("")
+          + '</select>'
+          + (f.hinweis ? '<span class="feldhinweis">' + esc(f.hinweis) + '</span>' : "")
+          + '</label>';
+      }
       if (f.typ === "textarea") {
         return '<label class="feld"><span>' + esc(f.label) + '</span>'
           + '<textarea id="' + id + '" rows="3" placeholder="' + esc(f.platzhalter || "") + '">'
@@ -8018,7 +8034,7 @@ const OFFENE_STATUS = ["offen", "bestellt", "teilweise_geliefert"];
 
 async function ladeBestellungen(offen) {
   let a = db.from("order_items")
-    .select("*, articles(article_number, name, unit, supplier_id, description, suppliers(name, website)), suppliers(name, website), profiles!order_items_created_by_fkey(full_name, email)")
+    .select("*, articles(article_number, name, unit, supplier_id, description, suppliers(name, website)), suppliers(name, website, email, adresse, bestellweg), profiles!order_items_created_by_fkey(full_name, email)")
     .order("needed_by", { ascending: true, nullsFirst: false })
     .order("created_at");
   if (offen) a = a.in("status", OFFENE_STATUS);
@@ -8146,8 +8162,12 @@ async function bestOffen(ziel, b, bereich) {
                   ? '<a class="lieferantlink" href="' + esc(seiten[name]) + '"'
                     + ' target="_blank" rel="noopener">' + esc(name) + ' ↗</a>'
                   : esc(name)) + '</h2>'
-              + '<span class="klein">' + gruppen[name].length + ' Position'
-              + (gruppen[name].length === 1 ? "" : "en") + '</span></div>'
+              + '<div class="karte__kopfrechts">' 
+              + (perMail[name]
+                  ? '<button class="knopf knopf--klein" data-bestellpdf="' + esc(name)
+                    + '">PDF</button>' : "")
+              + '<span class="klein">' + gruppen[name].length + ' Position' 
+              + (gruppen[name].length === 1 ? "" : "en") + '</span></div></div>' 
               + '<table class="tabelle tabelle--bestellungen"><tbody>'
               + gruppen[name].map(zeileHtml).join("")
               + '</tbody></table></section>').join("");
@@ -8158,6 +8178,17 @@ async function bestOffen(ziel, b, bereich) {
         + (sucht ? 'Nichts gefunden zu "' + esc(best.offenSuche) + '".'
                 : "Keine offenen Bestellpositionen.")
         + '</p></div>');
+
+  ziel.querySelectorAll("[data-bestellpdf]").forEach((el) => {
+    el.onclick = () => {
+      const name = el.dataset.bestellpdf;
+      const lieferant = (gefiltert.find((z) => z.suppliers
+        && z.suppliers.name === name) || {}).suppliers;
+      const posten = gefiltert.filter((z) => (z.suppliers && z.suppliers.name) === name
+        && z.status !== "geliefert");
+      bestellungDrucken(lieferant, posten);
+    };
+  });
 
   const suchfeldOffen = document.getElementById("bo-suche");
   if (suchfeldOffen) {
@@ -9188,6 +9219,108 @@ async function bestLieferanten(ziel, b) {
   });
 }
 
+// Erzeugt einen fertigen Bestellbrief und öffnet das Druckfenster.
+// Dort lässt sich "Als PDF speichern" wählen — dadurch braucht es
+// keine zusätzliche Bibliothek in der App.
+const HOFER_ANSCHRIFT = {
+  name: "Hofer + Co. Präzisionsdrehteile",
+  strasse: "Alte Bernstrasse 24",
+  ort: "4573 Lohn-Ammannsegg",
+  mail: "admin@hoferco.ch",
+  telefon: "032 677 55 77",
+};
+
+function bestellungDrucken(lieferant, posten) {
+  if (!posten || !posten.length) {
+    meldung("Für diesen Lieferanten ist nichts offen.", "warn");
+    return;
+  }
+
+  const heuteText = langDatum(isoDatum(new Date()));
+  const wer = (profil && (profil.full_name || profil.email)) || "";
+
+  const zeilen = posten.map((z) => {
+    const a = z.articles || {};
+    return '<tr>'
+      + '<td>' + esc(a.article_number || "") + '</td>'
+      + '<td>' + esc(a.name || "") + '</td>'
+      + '<td class="rechts">' + zahlText(z.quantity) + '</td>'
+      + '<td>' + esc(a.unit || "Stück") + '</td>'
+      + '</tr>';
+  }).join("");
+
+  const fenster = window.open("", "_blank");
+  if (!fenster) {
+    meldung("Das Fenster wurde blockiert. Bitte Pop-ups für diese Seite erlauben.", "warn");
+    return;
+  }
+
+  fenster.document.write('<!doctype html><html lang="de"><head>'
+    + '<meta charset="utf-8">'
+    + '<title>Bestellung ' + esc(lieferant ? lieferant.name : "") + '</title>'
+    + '<style>'
+    + '@page { size: A4; margin: 20mm; }'
+    + 'body { font-family: system-ui, "Segoe UI", Arial, sans-serif; color: #1d2430;'
+    + '       font-size: 11pt; line-height: 1.45; }'
+    + '.kopf { display: flex; justify-content: space-between;'
+    + '        align-items: flex-start; margin-bottom: 26mm; }'
+    + '.logo { max-height: 22mm; }'
+    + '.absender { font-size: 9pt; color: #55606c; text-align: right; }'
+    + '.empfaenger { margin-bottom: 14mm; }'
+    + '.datum { text-align: right; margin-bottom: 10mm; font-size: 10pt; }'
+    + 'h1 { font-size: 13pt; margin: 0 0 6mm; }'
+    + 'table { width: 100%; border-collapse: collapse; margin: 6mm 0 10mm; }'
+    + 'th { text-align: left; font-size: 9pt; text-transform: uppercase;'
+    + '     letter-spacing: .05em; border-bottom: 1.5pt solid #1d2430; padding: 2mm 1mm; }'
+    + 'td { padding: 2mm 1mm; border-bottom: .4pt solid #c9d0d8; }'
+    + '.rechts { text-align: right; }'
+    + '.gruss { margin-top: 12mm; }'
+    + '</style></head><body>'
+
+    + '<div class="kopf">'
+    + '<img class="logo" src="' + location.origin + location.pathname.replace(/[^/]*$/, "")
+    + 'logo.png" alt="">'
+    + '<div class="absender">'
+    + '<strong>' + esc(HOFER_ANSCHRIFT.name) + '</strong><br>'
+    + esc(HOFER_ANSCHRIFT.strasse) + '<br>'
+    + esc(HOFER_ANSCHRIFT.ort) + '<br>'
+    + esc(HOFER_ANSCHRIFT.telefon) + '<br>'
+    + esc(HOFER_ANSCHRIFT.mail)
+    + '</div></div>'
+
+    + '<div class="empfaenger">'
+    + '<strong>' + esc(lieferant ? lieferant.name : "") + '</strong><br>'
+    + (lieferant && lieferant.adresse
+        ? esc(lieferant.adresse).replace(/\n/g, "<br>") + '<br>' : "")
+    + (lieferant && lieferant.email ? esc(lieferant.email) : "")
+    + '</div>'
+
+    + '<div class="datum">' + esc(HOFER_ANSCHRIFT.ort.split(" ").slice(1).join(" "))
+    + ', ' + esc(heuteText) + '</div>'
+
+    + '<h1>Bestellung</h1>'
+    + '<p>Guten Tag<br>Wir bestellen die folgenden Artikel. '
+    + 'Lieferung so bald wie möglich.</p>'
+
+    + '<table><thead><tr>'
+    + '<th>Artikelnummer</th><th>Bezeichnung</th>'
+    + '<th class="rechts">Menge</th><th>Einheit</th>'
+    + '</tr></thead><tbody>' + zeilen + '</tbody></table>'
+
+    + '<p>Für eine Bestätigung mit Liefertermin sind wir dankbar.</p>'
+
+    + '<div class="gruss">Freundliche Grüsse<br><br>'
+    + esc(wer) + '<br>'
+    + esc(HOFER_ANSCHRIFT.name) + '</div>'
+
+    + '</body></html>');
+  fenster.document.close();
+
+  // Kurz warten, damit das Logo geladen ist
+  fenster.onload = () => setTimeout(() => fenster.print(), 250);
+  setTimeout(() => { try { fenster.print(); } catch (f) { /* schon gedruckt */ } }, 900);
+}
+
 async function lieferantDialog(lieferant, b) {
   const w = await dialogFelder({
     titel: lieferant ? "Lieferant bearbeiten" : "Neuer Lieferant",
@@ -9195,8 +9328,15 @@ async function lieferantDialog(lieferant, b) {
       { name: "name", label: "Name", pflicht: true,
         wert: lieferant ? lieferant.name : "" },
       { name: "website", label: "Website", wert: lieferant ? (lieferant.website || "") : "",
-        platzhalter: "www.beispiel.ch",
         hinweis: "Der Name wird dann in der Liste anklickbar." },
+      { name: "email", label: "E-Mail", wert: lieferant ? (lieferant.email || "") : "" },
+      { name: "adresse", label: "Anschrift", typ: "textarea",
+        wert: lieferant ? (lieferant.adresse || "") : "",
+        hinweis: "Strasse, PLZ und Ort — erscheint auf der Bestellung." },
+      { name: "bestellweg", label: "Bestellt wird",
+        auswahl: [["website", "über die Website"], ["mail", "per E-Mail"]],
+        wert: lieferant ? (lieferant.bestellweg || "website") : "website",
+        hinweis: "Bei E-Mail erscheint in der offenen Liste ein PDF-Knopf." },
     ],
     bestaetigen: "Speichern",
   });
@@ -9206,7 +9346,13 @@ async function lieferantDialog(lieferant, b) {
   let seite = (w.website || "").trim();
   if (seite && !/^https?:\/\//i.test(seite)) seite = "https://" + seite;
 
-  const daten = { name: w.name, website: seite || null };
+  const daten = {
+    name: w.name,
+    website: seite || null,
+    email: (w.email || "").trim() || null,
+    adresse: (w.adresse || "").trim() || null,
+    bestellweg: w.bestellweg === "mail" ? "mail" : "website",
+  };
 
   const { error } = lieferant
     ? await db.from("suppliers").update(daten).eq("id", lieferant.id)
@@ -11812,6 +11958,56 @@ function chatEinbauen() {
 
 const fahrzeugZustand = { reiter: "buchen" };
 
+// Erzeugt eine Termindatei, die Outlook und jeder andere Kalender
+// öffnen kann. Beim Doppelklick landet der Termin im Kalender.
+function kalendereintrag(buchung) {
+  const fahrzeug = buchung.fahrzeuge ? buchung.fahrzeuge.name : "Fahrzeug";
+
+  // Zeitstempel im Format, das Kalender erwarten: 20260415T081500Z
+  const stempel = (wert) => {
+    const d = new Date(wert);
+    return d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  };
+
+  // Zeilenumbrüche und Sonderzeichen müssen maskiert werden
+  const sauber = (t) => String(t || "")
+    .replace(/\\/g, "\\\\").replace(/;/g, "\\;")
+    .replace(/,/g, "\\,").replace(/\n/g, "\\n");
+
+  const zeilen = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Hofer Tool//Fahrzeuge//DE",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    "BEGIN:VEVENT",
+    "UID:" + buchung.id + "@hofer-tool",
+    "DTSTAMP:" + stempel(new Date()),
+    "DTSTART:" + stempel(buchung.von),
+    "DTEND:" + stempel(buchung.bis),
+    "SUMMARY:" + sauber(fahrzeug + " reserviert"),
+    "DESCRIPTION:" + sauber(buchung.grund || ""),
+    "LOCATION:" + sauber("Hofer + Co. Präzisionsdrehteile"),
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ];
+
+  // Kalender verlangen Zeilenenden mit Wagenrücklauf
+  const inhalt = zeilen.join("\r\n");
+  const datei = new Blob([inhalt], { type: "text/calendar;charset=utf-8" });
+  const adresse = URL.createObjectURL(datei);
+
+  const a = document.createElement("a");
+  a.href = adresse;
+  a.download = fahrzeug.replace(/[^\wäöüÄÖÜß -]/g, "") + ".ics";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(adresse), 2000);
+
+  meldung("Termindatei erstellt. Zum Eintragen in Outlook öffnen.");
+}
+
 async function fahrzeugEinbauen() {
   if (document.getElementById("fahrzeug-knopf")) return;
 
@@ -11942,10 +12138,20 @@ async function fahrzeugAnsichtBuchen(ziel) {
               + (m.entscheider
                   ? ' von ' + esc(m.entscheider.full_name || m.entscheider.email) : "")
               + '</div>' 
+              + (m.status === "genehmigt"
+                  ? '<button class="linkknopf" data-fz-outlook="' + esc(m.id)
+                    + '">Outlook</button> ' : "")
               + '<button class="linkknopf linkknopf--gefahr" data-fz-weg="' + esc(m.id)
               + '">Zurückziehen</button>'
               + '</div>').join("")
         : "");
+
+  ziel.querySelectorAll("[data-fz-outlook]").forEach((el) => {
+    el.onclick = () => {
+      const m = meine.find((x) => x.id === el.dataset.fzOutlook);
+      if (m) kalendereintrag(m);
+    };
+  });
 
   ziel.querySelectorAll("[data-fz-weg]").forEach((el) => {
     el.onclick = async () => {
