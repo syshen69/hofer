@@ -2554,7 +2554,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "44.0.0";
+const APP_VERSION = "44.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -7871,8 +7871,8 @@ async function ansichtTypen(ziel, b) {
 
 // =================================================================
 //  HOCO Nr.
-//  Stammdaten je Teil: Bezeichnung, Material, Materialgrösse,
-//  Waschgebinde. Dazu die Einrichtblätter, die dafür hinterlegt
+//  Stammdaten je Teil: Bezeichnung, Material, Materialgrösse.
+//  Dazu die Einrichtblätter, die dafür hinterlegt
 //  sind — je Maschinentyp eines, manchmal mehrere.
 // =================================================================
 
@@ -7912,14 +7912,6 @@ async function ladeHocoAusAuftraegen() {
 function groesseAusAuftrag(j) {
   if (!j || !j.material_dm) return "";
   return "Ø" + j.material_dm + (j.material_toleranz ? " " + j.material_toleranz : "");
-}
-
-async function ladeWaschgebinde() {
-  const { data, error } = await zeitlimit(
-    db.from("wash_containers").select("*").order("sortierung").order("name"),
-    10000, "Waschgebinde");
-  if (error) throw error;
-  return data || [];
 }
 
 async function ladeBlaetter(hocoNr) {
@@ -7968,7 +7960,6 @@ async function blattHolenOderAnlegen(hocoNr, typId, jobId, maschineId) {
     bezeichnung: teil ? teil.bezeichnung : null,
     material: teil ? teil.material : null,
     material_groesse: teil ? teil.material_groesse : null,
-    waschgebinde: teil ? teil.waschgebinde : null,
     zeichnungs_nr: teil ? teil.zeichnungs_nr : null,
     infos: teil ? teil.infos : null,
   };
@@ -8060,7 +8051,6 @@ async function blattFenster(blatt) {
       + '<table class="tabelle tabelle--kopf"><tbody>'
       + kopfFeld("Artikelbezeichnung", blatt.bezeichnung)
       + kopfFeld("Material", [blatt.material, blatt.material_groesse].filter((x) => x).join(" · "))
-      + kopfFeld("Waschgebinde", blatt.waschgebinde)
       + kopfFeld("Programm Nr.", blatt.programm_nr)
       + kopfFeld("Stückzeit", blatt.stueckzeit_s ? blatt.stueckzeit_s + " Sek./Stk." : "")
       + kopfFeld("Maschinenlaufzeit", blatt.laufzeit_min ? blatt.laufzeit_min + " Min." : "")
@@ -8104,7 +8094,6 @@ async function blattFenster(blatt) {
           { name: "bez", label: "Artikelbezeichnung", wert: blatt.bezeichnung || "" },
           { name: "mat", label: "Material", wert: blatt.material || "" },
           { name: "groesse", label: "Materialgrösse", wert: blatt.material_groesse || "" },
-          { name: "wasch", label: "Waschgebinde", wert: blatt.waschgebinde || "" },
           { name: "prog", label: "Programm Nr.", wert: blatt.programm_nr || "" },
           { name: "zeit", label: "Stückzeit in Sekunden", typ: "number",
             wert: blatt.stueckzeit_s || "" },
@@ -8116,7 +8105,7 @@ async function blattFenster(blatt) {
       if (!w) return;
       const daten = {
         bezeichnung: w.bez || null, material: w.mat || null,
-        material_groesse: w.groesse || null, waschgebinde: w.wasch || null,
+        material_groesse: w.groesse || null,
         programm_nr: w.prog || null,
         stueckzeit_s: w.zeit === "" || w.zeit === undefined ? null : Number(w.zeit),
         laufzeit_min: w.lauf === "" || w.lauf === undefined ? null : Number(w.lauf),
@@ -8194,10 +8183,9 @@ async function ansichtHoco(ziel, b) {
   const darf = darfSchreiben();
   ziel.innerHTML = '<div class="laedt">Wird geladen …</div>';
 
-  let teile, gebinde, typen, ausPlan = {};
+  let teile, typen, ausPlan = {};
   try {
-    [teile, gebinde, typen] = await Promise.all([
-      ladeHoco(prod.hocoSuche), ladeWaschgebinde(), ladeTypen()]);
+    [teile, typen] = await Promise.all([ladeHoco(prod.hocoSuche), ladeTypen()]);
     try { ausPlan = await ladeHocoAusAuftraegen(); } catch (f) { /* geht auch ohne */ }
   } catch (f) {
     ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p>'
@@ -8206,7 +8194,6 @@ async function ansichtHoco(ziel, b) {
   }
 
   const neuLaden = () => seiteProduktion(b);
-  const gebindeWahl = [["", "ohne"]].concat(gebinde.map((g) => [g.name, g.name]));
 
   // ----- Ein einzelnes Teil -----
   if (prod.hocoOffen) {
@@ -8226,7 +8213,6 @@ async function ansichtHoco(ziel, b) {
       + [["Artikelbezeichnung", t.bezeichnung],
          ["Material", t.material],
          ["Materialgrösse", t.material_groesse],
-         ["Waschgebinde", t.waschgebinde],
          ["Zeichnungs Nr.", t.zeichnungs_nr],
          ["Fabrik-Auftr. Nr.", t.fabrik_auftrag],
          ["Allgemeine Infos", t.infos]]
@@ -8258,7 +8244,7 @@ async function ansichtHoco(ziel, b) {
 
     const bearb = document.getElementById("hoco-bearb");
     if (bearb) bearb.onclick = async () => {
-      const w = await hocoDialog(t, gebindeWahl);
+      const w = await hocoDialog(t);
       if (w) neuLaden();
     };
     return;
@@ -8297,7 +8283,7 @@ async function ansichtHoco(ziel, b) {
     + ' autocomplete="off" value="' + esc(prod.hocoSuche || "") + '"></div>'
     + (liste.length
       ? '<table class="tabelle"><thead><tr><th>HOCO Nr.</th><th>Bezeichnung</th>'
-        + '<th>Material</th><th>Waschgebinde</th><th></th></tr></thead><tbody>'
+        + '<th>Material</th><th></th></tr></thead><tbody>'
         + liste.map((t) => '<tr' + (t.ohneStamm ? ' class="zeile--offen"' : "") + '>'
           + '<td>' + (t.ohneStamm
               ? '<strong>' + esc(t.hoco_nr) + '</strong>'
@@ -8308,7 +8294,6 @@ async function ansichtHoco(ziel, b) {
               : esc(t.bezeichnung || "")) + '</td>'
           + '<td' + (t.ohneStamm ? ' class="gedaempft"' : "") + '>'
           + esc([t.material, t.material_groesse].filter((x) => x).join(" · ")) + '</td>'
-          + '<td>' + esc(t.waschgebinde || "") + '</td>'
           + '<td class="rechts nowrap">'
           + (darf
               ? (t.ohneStamm
@@ -8321,18 +8306,6 @@ async function ansichtHoco(ziel, b) {
           + '</td></tr>').join("") + '</tbody></table>'
       : '<p class="hinweis">' + (prod.hocoSuche ? "Nichts gefunden."
           : "Noch keine HOCO Nr. und noch kein Auftrag auf der Planwand.") + '</p>')
-    + '</section>'
-
-    + '<section class="karte"><div class="karte__kopf"><h2>Waschgebinde</h2></div>'
-    + (gebinde.length
-      ? '<table class="tabelle"><tbody>' + gebinde.map((g) =>
-          '<tr><td>' + esc(g.name) + '</td><td class="rechts nowrap">'
-          + (darf ? '<button class="linkknopf" data-geb-um="' + esc(g.id) + '">Bearbeiten</button> '
-              + '<button class="linkknopf linkknopf--gefahr" data-geb-weg="' + esc(g.id)
-              + '" data-name="' + esc(g.name) + '">Löschen</button>' : "")
-          + '</td></tr>').join("") + '</tbody></table>'
-      : '<p class="hinweis">Noch kein Waschgebinde angelegt.</p>')
-    + (darf ? '<button class="knopf knopf--klein" id="geb-neu">+ Waschgebinde</button>' : "")
     + '</section>';
 
   const such = document.getElementById("hoco-such");
@@ -8349,7 +8322,7 @@ async function ansichtHoco(ziel, b) {
   if (!darf) return;
 
   document.getElementById("hoco-neu").onclick = async () => {
-    const w = await hocoDialog(null, gebindeWahl);
+    const w = await hocoDialog(null);
     if (w) neuLaden();
   };
 
@@ -8358,7 +8331,7 @@ async function ansichtHoco(ziel, b) {
       const nr = el.dataset.hocoAnlegen;
       const j = ausPlan[nr] || {};
       // Durchmesser, Material und Zeichnung kommen aus dem Auftrag
-      const w = await hocoDialog(null, gebindeWahl, {
+      const w = await hocoDialog(null, {
         hoco_nr: nr,
         material_groesse: groesseAusAuftrag(j),
         zeichnung_url: j.drawing_url || null,
@@ -8370,7 +8343,7 @@ async function ansichtHoco(ziel, b) {
   ziel.querySelectorAll("[data-hoco-um]").forEach((el) => {
     el.onclick = async () => {
       const t = teile.find((x) => x.hoco_nr === el.dataset.hocoUm);
-      const w = await hocoDialog(t, gebindeWahl);
+      const w = await hocoDialog(t);
       if (w) neuLaden();
     };
   });
@@ -8390,44 +8363,10 @@ async function ansichtHoco(ziel, b) {
     };
   });
 
-  document.getElementById("geb-neu").onclick = async () => {
-    const w = await dialogFelder({ titel: "Neues Waschgebinde",
-      felder: [{ name: "name", label: "Bezeichnung", pflicht: true,
-                 platzhalter: "z. B. Typ 5 gross" }], bestaetigen: "Anlegen" });
-    if (!w) return;
-    const { error } = await db.from("wash_containers")
-      .insert({ name: w.name, sortierung: gebinde.length + 1 });
-    if (error) meldung(fehlertext(error), "fehler");
-    else { meldung("Angelegt."); neuLaden(); }
-  };
-
-  ziel.querySelectorAll("[data-geb-um]").forEach((el) => {
-    el.onclick = async () => {
-      const g = gebinde.find((x) => x.id === el.dataset.gebUm) || {};
-      const w = await dialogFelder({ titel: "Waschgebinde bearbeiten",
-        felder: [{ name: "name", label: "Bezeichnung", wert: g.name, pflicht: true }] });
-      if (!w) return;
-      const { error } = await db.from("wash_containers").update({ name: w.name }).eq("id", g.id);
-      if (error) meldung(fehlertext(error), "fehler");
-      else { meldung("Gespeichert."); neuLaden(); }
-    };
-  });
-
-  ziel.querySelectorAll("[data-geb-weg]").forEach((el) => {
-    el.onclick = async () => {
-      const ok = await nachfragen({ titel: "Waschgebinde löschen",
-        text: '"' + el.dataset.name + '" löschen? Teile, bei denen es eingetragen ist, '
-            + "behalten den Text.", bestaetigen: "Löschen", gefahr: true });
-      if (!ok) return;
-      const { error } = await db.from("wash_containers").delete().eq("id", el.dataset.gebWeg);
-      if (error) meldung(fehlertext(error), "fehler");
-      else { meldung("Gelöscht."); neuLaden(); }
-    };
-  });
 }
 
 // Anlegen und Bearbeiten in einem Dialog
-async function hocoDialog(teil, gebindeWahl, vorgabe) {
+async function hocoDialog(teil, vorgabe) {
   const v = vorgabe || {};
   const w = await dialogFelder({
     titel: teil ? "HOCO Nr. bearbeiten" : "Neue HOCO Nr.",
@@ -8442,8 +8381,6 @@ async function hocoDialog(teil, gebindeWahl, vorgabe) {
       { name: "groesse", label: "Materialgrösse",
         wert: teil ? (teil.material_groesse || "") : (v.material_groesse || ""),
         platzhalter: "z. B. Ø20h9" },
-      { name: "wasch", label: "Waschgebinde", auswahl: gebindeWahl,
-        wert: teil ? (teil.waschgebinde || "") : "" },
       { name: "zeichnung", label: "Zeichnungs Nr.", wert: teil ? (teil.zeichnungs_nr || "") : "" },
       { name: "fa", label: "Fabrik-Auftr. Nr.", wert: teil ? (teil.fabrik_auftrag || "") : "" },
       { name: "infos", label: "Allgemeine Infos", wert: teil ? (teil.infos || "") : "" },
@@ -8454,7 +8391,6 @@ async function hocoDialog(teil, gebindeWahl, vorgabe) {
     bezeichnung: w.bez || null,
     material: w.mat || null,
     material_groesse: w.groesse || null,
-    waschgebinde: w.wasch || null,
     zeichnungs_nr: w.zeichnung || null,
     fabrik_auftrag: w.fa || null,
     infos: w.infos || null,
