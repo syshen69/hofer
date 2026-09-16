@@ -2530,7 +2530,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "39.2.0";
+const APP_VERSION = "39.3.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -8359,7 +8359,7 @@ const OFFENE_STATUS = ["offen", "bestellt", "teilweise_geliefert"];
 
 async function ladeBestellungen(offen) {
   let a = db.from("order_items")
-    .select("*, articles(article_number, name, unit, supplier_id, description, suppliers(name, website)), suppliers(name, website, email, adresse, bestellweg), profiles!order_items_created_by_fkey(full_name, email)")
+    .select("*, articles(article_number, name, unit, supplier_id, description, suppliers(name, website, email, adresse, bestellweg)), suppliers(name, website, email, adresse, bestellweg), profiles!order_items_created_by_fkey(full_name, email)")
     .order("needed_by", { ascending: true, nullsFirst: false })
     .order("created_at");
   if (offen) a = a.in("status", OFFENE_STATUS);
@@ -8475,9 +8475,14 @@ async function bestOffen(ziel, b, bereich) {
         const seiten = {};
         const perMail = {};
         eigene.forEach((z) => {
-          const name = (z.suppliers && z.suppliers.name) || "Ohne Lieferant";
-          if (z.suppliers && z.suppliers.website) seiten[name] = z.suppliers.website;
-          if (z.suppliers && z.suppliers.bestellweg === "mail") perMail[name] = z.suppliers;
+          // Massgeblich ist der Lieferant, der heute am Artikel steht.
+          // Die Position selbst merkt sich den vom Tag der Erfassung —
+          // sonst bliebe sie nach einem Wechsel beim alten hängen.
+          const lief = (z.articles && z.articles.suppliers)
+            || z.suppliers || null;
+          const name = (lief && lief.name) || "Ohne Lieferant";
+          if (lief && lief.website) seiten[name] = lief.website;
+          if (lief && lief.bestellweg === "mail") perMail[name] = lief;
           (gruppen[name] = gruppen[name] || []).push(z);
         });
 
@@ -9331,19 +9336,44 @@ async function artikelBearbeiten(artikel, b) {
       return;
     }
 
+    const lieferantNeu = liefFeld.value;
+    const lieferantAlt = artikel.supplier_id || null;
+
     const r = await db.from("articles").update({
       article_number: nummer,
       name: name,
       description: ($("ab-beschreibung").value || "").trim() || null,
       unit: "Stück",
-      supplier_id: liefFeld.value,
+      supplier_id: lieferantNeu,
     }).eq("id", artikel.id).select();
+
+    // Wechselt der Lieferant, ziehen alle noch offenen Bestellpositionen
+    // dieses Artikels mit. Die Position merkt sich sonst den Lieferanten
+    // vom Tag der Erfassung und bleibt beim falschen stehen.
+    // Bereits gelieferte bleiben unangetastet — deren Geschichte soll
+    // sich nicht rückwirkend ändern.
+    let mitgezogen = 0;
+    if (!r.error && lieferantNeu !== lieferantAlt) {
+      const u = await db.from("order_items")
+        .update({ supplier_id: lieferantNeu })
+        .eq("article_id", artikel.id)
+        .in("status", OFFENE_STATUS)
+        .select();
+      if (!u.error) mitgezogen = (u.data || []).length;
+    }
 
     zu();
     if (r.error) meldung(fehlertext(r.error), "fehler");
     else if ((r.data || []).length === 0)
       meldung("Nichts geändert. Vermutlich fehlen die Rechte in der Datenbank.", "fehler");
-    else { meldung("Gespeichert."); seiteBestellungen(b); }
+    else {
+      meldung(mitgezogen
+        ? "Gespeichert. " + mitgezogen
+          + (mitgezogen === 1 ? " offene Position" : " offene Positionen")
+          + " beim neuen Lieferanten."
+        : "Gespeichert.");
+      seiteBestellungen(b);
+    }
   };
 
   $("ab-weg").onclick = async () => {
