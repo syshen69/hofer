@@ -1252,30 +1252,33 @@ a:focus-visible {
 .spass-frage { text-align: center; font-size: 1.15rem; margin: 18px 0; }
 .spass-antworten { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 6px; }
 
-/* ---------- Planwand: alles skaliert mit dem Zoom ---------- */
-.pw-tafel { --pw-s: 1; }
-.pw-zeile { grid-template-columns: calc(108px * var(--pw-s)) 1fr; }
-.pw-zeile--kopf { grid-template-columns: calc(108px * var(--pw-s))
+/* ---------- Planwand: Zoom wirkt nur waagrecht ----------
+   --pw-s  skaliert, was in den Tagesspalten steht
+   --pw-v  bleibt fest, damit die Zeilenhöhe beim Zoomen gleich
+           bleibt und immer gleich viele Maschinen sichtbar sind */
+.pw-tafel { --pw-s: 1; --pw-v: 1; }
+.pw-zeile { grid-template-columns: calc(108px * var(--pw-v)) 1fr; }
+.pw-zeile--kopf { grid-template-columns: calc(108px * var(--pw-v))
                   repeat(var(--pw-tage, 15), 1fr); }
-.pw-zeile--kw { grid-template-columns: calc(108px * var(--pw-s)) 1fr; }
-.pw-name { padding: calc(5px * var(--pw-s)) calc(8px * var(--pw-s));
-           font-size: calc(0.78rem * var(--pw-s)); }
-.pw-name span { font-size: calc(0.7rem * var(--pw-s)); }
-.pw-park { padding: calc(5px * var(--pw-s)) calc(8px * var(--pw-s));
-           font-size: calc(0.7rem * var(--pw-s)); }
-.pw-spuren { min-height: calc(30px * var(--pw-s)); }
-.pw-spuren--fein { min-height: calc(24px * var(--pw-s)); }
-.pw-balken { padding: calc(2px * var(--pw-s)) calc(5px * var(--pw-s));
-             font-size: calc(0.68rem * var(--pw-s)); gap: calc(4px * var(--pw-s)); }
-.pw-balken__prozent { font-size: calc(0.62rem * var(--pw-s)); }
-.pw-balken__status, .pw-balken__warnung { font-size: calc(0.68rem * var(--pw-s)); }
-.pw-balken__fehlt { font-size: calc(0.55rem * var(--pw-s)); }
-.pw-ferien { font-size: calc(0.66rem * var(--pw-s));
-             padding: calc(1px * var(--pw-s)) calc(5px * var(--pw-s)); }
-.pw-tag { padding: calc(4px * var(--pw-s)) 2px; font-size: calc(0.66rem * var(--pw-s)); }
-.pw-tag__datum { font-size: calc(0.6rem * var(--pw-s)); }
-.pw-kw { font-size: calc(0.66rem * var(--pw-s)); padding: calc(3px * var(--pw-s)) 0; }
-.fest__nr, .fest__auftrag { font-size: calc(0.68rem * var(--pw-s)); }
+.pw-zeile--kw { grid-template-columns: calc(108px * var(--pw-v)) 1fr; }
+.pw-name { padding: calc(4px * var(--pw-v)) calc(8px * var(--pw-v));
+           font-size: calc(0.86rem * var(--pw-v)); }
+.pw-name span { font-size: calc(0.76rem * var(--pw-v)); }
+.pw-park { padding: calc(4px * var(--pw-v)) calc(8px * var(--pw-v));
+           font-size: calc(0.74rem * var(--pw-v)); }
+.pw-spuren { min-height: calc(34px * var(--pw-v)); }
+.pw-spuren--fein { min-height: calc(24px * var(--pw-v)); }
+.pw-balken { padding: calc(2px * var(--pw-v)) calc(5px * var(--pw-s));
+             font-size: calc(0.74rem * var(--pw-s)); gap: calc(4px * var(--pw-s)); }
+.pw-balken__prozent { font-size: calc(0.66rem * var(--pw-s)); }
+.pw-balken__status, .pw-balken__warnung { font-size: calc(0.72rem * var(--pw-s)); }
+.pw-balken__fehlt { font-size: calc(0.6rem * var(--pw-s)); }
+.pw-ferien { font-size: calc(0.72rem * var(--pw-v));
+             padding: calc(1px * var(--pw-v)) calc(5px * var(--pw-s)); }
+.pw-tag { padding: calc(3px * var(--pw-v)) 1px; font-size: calc(0.72rem * var(--pw-s)); }
+.pw-tag__datum { font-size: calc(0.72rem * var(--pw-s)); }
+.pw-kw { font-size: calc(0.7rem * var(--pw-s)); padding: calc(3px * var(--pw-v)) 0; }
+.fest__nr, .fest__auftrag { font-size: calc(0.7rem * var(--pw-s)); }
 
 /* ---------- Planwand: feste Spaltenbreite, nichts wird gequetscht ---------- */
 .pw-tafel { --pw-s: 1; --pw-spalte: 40px; width: max-content; min-width: 100%; }
@@ -2404,7 +2407,81 @@ body.dunkel .pw-parkflaeche { background: #22303f; }
                   border-radius: var(--radius); padding: 3px 9px; font: inherit;
                   font-size: .78rem; font-weight: 600; color: var(--tinte);
                   cursor: pointer; white-space: nowrap; }
-.auftrag__status:hover { background: var(--marke-hell); border-color: var(--marke); }
+/* =================================================================
+   Planwand, letzter Stand — steht bewusst ganz am Schluss, damit es
+   die früheren Regeln überstimmt.
+   ================================================================= */
+
+/* Die Namensspalte hängt am senkrechten Massstab, nicht am Zoom.
+   Das Spaltenmodell selbst bleibt unangetastet: die Tafel füllt die
+   Breite, die Tage teilen sich den Rest zu gleichen Teilen. */
+.pw-tafel { --pw-v: 1; }
+.pw-zeile--monat { grid-template-columns: var(--pw-name, 108px) 1fr;
+                   border-bottom: 1px solid var(--linie); }
+.pw-monat-spuren { display: grid;
+                   grid-template-columns: repeat(var(--pw-tage, 15), 1fr); }
+
+/* ---------- Maschinenname: eine Zeile, etwas grösser ---------- */
+.pw-name { display: flex; flex-direction: row; align-items: center;
+           justify-content: flex-start; gap: 6px;
+           font-size: calc(0.88rem * var(--pw-v)); font-weight: 600;
+           white-space: nowrap; overflow: hidden; }
+.pw-name__text { overflow: hidden; text-overflow: ellipsis; }
+.pw-name__nr { flex: none; font-weight: 400; color: var(--gedaempft);
+               font-size: calc(0.76rem * var(--pw-v)); margin-left: 0; }
+
+/* ---------- Monatszeile über den Wochen ---------- */
+.pw-monat-spuren { display: grid;
+                   grid-template-columns: repeat(var(--pw-tage, 15), var(--pw-spalte)); }
+.pw-monat { grid-column: span var(--spann); text-align: center;
+            font-size: calc(0.76rem * var(--pw-v)); font-weight: 700;
+            letter-spacing: .04em; color: var(--tinte); background: var(--grund);
+            padding: calc(3px * var(--pw-v)) 0;
+            border-left: 2px solid var(--flaeche);
+            white-space: nowrap; overflow: hidden; }
+
+/* ---------- Tagesspalte: Wochentag oben, Tageszahl darunter ---------- */
+.pw-tag { padding: calc(2px * var(--pw-v)) 1px; text-align: center; line-height: 1.15; }
+.pw-tag__wt { display: block; font-weight: 600;
+              font-size: calc(0.72rem * var(--pw-s)); color: var(--gedaempft); }
+.pw-tag__datum { display: block; font-weight: 700;
+                 font-size: calc(0.8rem * var(--pw-s)); color: var(--tinte); }
+.pw-tag--heute .pw-tag__wt, .pw-tag--heute .pw-tag__datum { color: var(--marke); }
+
+/* ---------- Zeilenhöhe: fest, damit der Zoom sie nicht verändert ---------- */
+.pw-spuren { min-height: calc(44px * var(--pw-v)); }
+.pw-spuren--fein { min-height: calc(24px * var(--pw-v)); }
+
+/* ---------- Balken: zwei Zeilen, schwarz auf aufgehellter Farbe ----------
+   Die kräftige Farbe steht als Streifen links, damit sie auch bei
+   kleinem Zoom sofort erkennbar bleibt. */
+.pw-balken { border-left: 5px solid var(--voll, #003884);
+             padding: calc(2px * var(--pw-v)) calc(5px * var(--pw-s));
+             align-items: stretch; font-weight: 500;
+             font-size: calc(0.76rem * var(--pw-s)); }
+.pw-balken__inhalt { display: flex; flex-direction: column;
+                     justify-content: center; align-items: flex-start;
+                     text-align: left; gap: 0; }
+.pw-zeile1 { font-size: calc(0.8rem * var(--pw-s)); font-weight: 600;
+             letter-spacing: 0; }
+.pw-zeile2 { font-size: calc(0.72rem * var(--pw-s)); font-weight: 400;
+             opacity: 1; color: inherit; }
+.pw-zeile3 { display: none; }
+.pw-balken__statusgross { font-size: calc(1.35rem * var(--pw-v)); opacity: .9; }
+.pw-balken__planer { font-size: calc(0.7rem * var(--pw-s)); font-weight: 600;
+                     opacity: .75; }
+.pw-balken__fehlt { background: rgba(0, 0, 0, .14); color: inherit;
+                    border-radius: 3px; padding: 0 3px; font-weight: 700; }
+.pw-balken--fertig { opacity: .75; }
+.pw-balken--laeuft { box-shadow: inset 0 0 0 2px rgba(0, 0, 0, .55); }
+.pw-rest { background: rgba(255, 255, 255, .45); }
+
+/* Im dunklen Modus bleiben die Balken hell — schwarze Schrift auf
+   heller Fläche ist auf der Wand in beiden Modi am besten lesbar. */
+body.dunkel .pw-balken,
+body.dunkel .pw-zeile1,
+body.dunkel .pw-zeile2,
+body.dunkel .pw-balken__nr { color: #10151c !important; }
 </style>
 </head>
 <body>
@@ -2453,7 +2530,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "38.6.0";
+const APP_VERSION = "39.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -3470,7 +3547,13 @@ async function zeichneGeburtstage() {
   const heute = new Date();
   const heuteNur = new Date(heute.getFullYear(), heute.getMonth(), heute.getDate());
 
-  const alle = leute.map((m) => {
+  const alle = leute.filter((m) => {
+    // Ohne gültiges Datum wird die Zeile übersprungen, statt dass
+    // die ganze Liste abbricht.
+    if (!m.geburtstag) return false;
+    const d = ausIso(m.geburtstag);
+    return d && !isNaN(d.getTime());
+  }).map((m) => {
     const g = ausIso(m.geburtstag);
     let naechster = new Date(heute.getFullYear(), g.getMonth(), g.getDate());
     if (naechster < heuteNur) {
@@ -3956,6 +4039,8 @@ function kurzDatum(text) {
 
 const WOCHENTAGE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
 const WT_KURZ = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+const MONATE = ["Januar", "Februar", "März", "April", "Mai", "Juni",
+                "Juli", "August", "September", "Oktober", "November", "Dezember"];
 
 function wochentagName(text) { return WOCHENTAGE[(ausIso(text).getDay() + 6) % 7]; }
 // Zeichen für die Zielart einer Lieferung
@@ -4701,6 +4786,73 @@ function farbeVon(wert) {
   return { ...f, material: zu ? zu.material : "", buchstabe: zu ? (zu.buchstabe || "") : "" };
 }
 
+// Mischt eine Farbe mit Weiss. anteil 0 = unverändert, 1 = weiss.
+function aufhellen(hex, anteil) {
+  const h = String(hex || "#888888").replace("#", "");
+  const voll = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const misch = (i) => {
+    const w = parseInt(voll.slice(i, i + 2), 16);
+    return Math.round(w + (255 - w) * anteil).toString(16).padStart(2, "0");
+  };
+  return "#" + misch(0) + misch(2) + misch(4);
+}
+
+// ---------- Aufträge dürfen sich auf einer Maschine nicht überlagern ----------
+
+// Letzter Arbeitstag eines Auftrags
+function planEnde(von, tage) {
+  return letzterArbeitstag(von, Math.max(1, tage || 1));
+}
+
+// Liegt der Zeitraum frei? Gibt sonst den störenden Auftrag zurück.
+function planKonflikt(maschineId, von, tage, ausserId) {
+  const bis = planEnde(von, tage);
+  return (plan.auftraege || []).find((x) => {
+    if (x.id === ausserId || x.machine_id !== maschineId || !x.planned_from) return false;
+    const xBis = planEnde(x.planned_from, x.planned_days || 1);
+    return x.planned_from <= bis && von <= xBis;
+  }) || null;
+}
+
+// Schiebt nach hinten, bis der Zeitraum frei ist.
+function freierStart(maschineId, wunsch, tage, ausserId) {
+  let von = wunsch;
+  for (let i = 0; i < 400; i++) {
+    const stoerer = planKonflikt(maschineId, von, tage, ausserId);
+    if (!stoerer) return von;
+    von = naechsterArbeitstag(
+      arbeitstagePlus(stoerer.planned_from, stoerer.planned_days || 1));
+  }
+  return von;
+}
+
+// Packt alle offenen Aufträge einer Maschine ab einem Tag lückenlos
+// hintereinander. Gibt die vorherigen Daten zurück, damit sich der
+// Schritt zurücknehmen lässt.
+async function planAufruecken(maschineId, abDatum, ausserId) {
+  const reihe = (plan.auftraege || [])
+    .filter((x) => x.machine_id === maschineId && x.planned_from
+      && x.id !== ausserId && x.planned_from >= abDatum
+      && x.plan_status !== "fertig")
+    .sort((a, c) => a.planned_from < c.planned_from ? -1
+      : (a.planned_from > c.planned_from ? 1 : String(a.id).localeCompare(String(c.id))));
+
+  const vorher = [];
+  let zeiger = naechsterArbeitstag(abDatum);
+
+  for (const x of reihe) {
+    // Nie über einen Auftrag drüber, der nicht mitwandert
+    zeiger = freierStart(maschineId, zeiger, x.planned_days || 1, x.id);
+    if (zeiger !== x.planned_from) {
+      vorher.push({ id: x.id, von: x.planned_from });
+      await db.from("jobs").update({ planned_from: zeiger }).eq("id", x.id);
+      x.planned_from = zeiger;
+    }
+    zeiger = naechsterArbeitstag(arbeitstagePlus(zeiger, x.planned_days || 1));
+  }
+  return vorher;
+}
+
 // Nur Farben, denen ein Material zugeteilt wurde, stehen im
 // Auftragsfenster zur Auswahl.
 function farbenZurWahl() {
@@ -4853,16 +5005,25 @@ function masseBerechnen(b) {
   const breite = (b && b.clientWidth) || window.innerWidth;
   const gesamt = Math.max(280, breite) - 8;
 
-  let namensbreite = Math.min(108, Math.floor(gesamt / 5));
+  let namensbreite = Math.min(158, Math.floor(gesamt / 5));
   plan.spalte = Math.max(9, (gesamt - namensbreite) / plan.tage);
 
   if (plan.spalte < 22) {
-    namensbreite = Math.min(namensbreite, 64);
+    namensbreite = Math.min(namensbreite, 96);
     plan.spalte = Math.max(9, (gesamt - namensbreite) / plan.tage);
   }
 
   plan.namensbreite = namensbreite;
-  plan.skala = Math.max(0.5, Math.min(1.1, plan.spalte / 40));
+
+  // Waagrechter Massstab: gilt nur für das, was in den Tagesspalten
+  // steht. Eng gefasst, damit die Schrift lesbar bleibt.
+  plan.skala = Math.max(0.82, Math.min(1.1, plan.spalte / 44));
+
+  // Senkrechter Massstab bleibt fest. Sonst würden beim Verkürzen des
+  // Zeitraums die Zeilen mitwachsen und man sähe plötzlich weniger
+  // Maschinen — genau das soll nicht passieren.
+  plan.vskala = 1;
+
   plan.knapp = plan.spalte < 30;
   plan.sehrKnapp = plan.spalte < 18;
 }
@@ -5149,11 +5310,23 @@ function griffVerhalten(b) {
       const { error } = await db.from("jobs").update(daten).eq("id", auftrag.id);
       if (error) { meldung(fehlertext(error), "fehler"); return; }
 
+      // Örtlich gleich nachziehen, sonst rechnet die Prüfung auf
+      // Überlappung noch mit der alten Dauer.
+      auftrag.planned_days = dauerJetzt;
+      if (daten.planned_from) auftrag.planned_from = daten.planned_from;
+
       const vorherNachrueck = [];
+      // Der Reihe nach: der Abstand zwischen den Aufträgen bleibt
+      // erhalten, aber keiner darf auf einem anderen landen.
+      dahinter.sort((a, c) => a.planned_from < c.planned_from ? -1
+        : (a.planned_from > c.planned_from ? 1 : 0));
       for (const x of dahinter) {
+        const gewuenscht = arbeitstagePlus(x.planned_from, differenz);
+        const neu = freierStart(auftrag.machine_id, gewuenscht, x.planned_days || 1, x.id);
+        if (neu === x.planned_from) continue;
         vorherNachrueck.push({ id: x.id, von: x.planned_from });
-        const neu = arbeitstagePlus(x.planned_from, differenz);
         await db.from("jobs").update({ planned_from: neu }).eq("id", x.id);
+        x.planned_from = neu;
       }
 
       merkeSchritt("Dauer von " + auftrag.job_number, async () => {
@@ -5248,9 +5421,17 @@ function zeitWischen(b) {
 function balkenInfoVerhalten() {
   const tafel = document.querySelector(".pw-tafel");
   if (!tafel) return;
+
   let fenster = null;
 
-  const weg = () => { if (fenster) { fenster.remove(); fenster = null; } };
+  // Alle Vorschaufenster aufräumen, auch solche aus einem früheren
+  // Aufbau der Wand. Sonst bleibt beim Neuzeichnen — etwa beim
+  // Kopieren — ein Fenster stehen, das niemand mehr wegbekommt.
+  const weg = () => {
+    document.querySelectorAll(".pw-info").forEach((x) => x.remove());
+    fenster = null;
+  };
+  weg();
 
   tafel.querySelectorAll("[data-auftrag]").forEach((el) => {
     const zeigen = () => {
@@ -5889,23 +6070,42 @@ function zeichnePlanwand(b) {
     else wochen.push({ kw: w, jahr: jahr, anzahl: 1 });
   });
 
+  // Monate über den Wochen, wie auf dem alten Infoboard
+  const monate = [];
+  tage.forEach((t) => {
+    const d = ausIso(t);
+    const schluessel = d.getFullYear() + "-" + d.getMonth();
+    const letzter = monate[monate.length - 1];
+    if (letzter && letzter.schluessel === schluessel) letzter.anzahl++;
+    else monate.push({ schluessel: schluessel, anzahl: 1,
+                       name: MONATE[d.getMonth()] + " " + d.getFullYear() });
+  });
+
+  const monatZeile = '<div class="pw-zeile pw-zeile--monat">'
+    + '<div class="pw-name pw-name--kopf"></div>'
+    + '<div class="pw-monat-spuren">'
+    + monate.map((m) => '<div class="pw-monat" style="--spann:' + m.anzahl + '">'
+        + esc(m.name) + '</div>').join("")
+    + '</div></div>';
+
   // Das Jahr steht dabei, damit beim Blättern über den
   // Jahreswechsel klar bleibt, welche Woche gemeint ist.
   const kwZeile = '<div class="pw-zeile pw-zeile--kw">'
     + '<div class="pw-name pw-name--kopf">Woche</div>'
     + '<div class="pw-kw-spuren">'
     + wochen.map((w) => '<div class="pw-kw" style="--spann:' + w.anzahl + '">KW '
-        + w.kw + '<span class="pw-kw__jahr">' + String(w.jahr).slice(2) + '</span>'
-        + '</div>').join("")
+        + w.kw + '</div>').join("")
     + '</div></div>';
 
+  // Wochentag und Tageszahl stehen immer da, unabhängig vom Zoom.
+  // Der Monat steht ja eine Zeile darüber.
   const kopf = '<div class="pw-zeile pw-zeile--kopf">'
     + '<div class="pw-name pw-name--kopf">Maschine</div>'
     + tage.map((t) => {
         const wt = WT_KURZ[(ausIso(t).getDay() + 6) % 7];
         return '<div class="pw-tag' + (t === heute ? " pw-tag--heute" : "") + '">'
-          + '<span class="pw-tag__wt">' + (plan.sehrKnapp ? wt.charAt(0) : wt) + '</span>'
-          + (plan.knapp ? "" : '<span class="pw-tag__datum">' + kurzDatum(t) + '</span>')
+          + '<span class="pw-tag__wt">' + wt + '</span>'
+          + '<span class="pw-tag__datum">' + ausIso(t).getDate() + '</span>'
           + '</div>';
       }).join("")
     + '</div>';
@@ -5939,11 +6139,11 @@ function zeichnePlanwand(b) {
             }).join("");
 
           return '<div class="pw-zeile">'
-            + '<div class="pw-name">'
-            + (plan.sehrKnapp && m.machine_number
-                ? esc(m.machine_number)
-                : esc(m.name)
-                  + (m.machine_number ? '<span>' + esc(m.machine_number) + '</span>' : ""))
+            + '<div class="pw-name" title="' + esc(m.name)
+            + (m.machine_number ? " " + esc(m.machine_number) : "") + '">'
+            + '<span class="pw-name__text">' + esc(m.name) + '</span>'
+            + (m.machine_number
+                ? '<span class="pw-name__nr">' + esc(m.machine_number) + '</span>' : "")
             + '</div>'
             + '<div class="pw-spuren">' + zellen
             + '<div class="pw-balken-schicht">' + balken + '</div></div></div>';
@@ -5993,7 +6193,7 @@ function zeichnePlanwand(b) {
     + ';--pw-s:' + (plan.skala || 1)
     + ';--pw-spalte:' + (plan.spalte || 40) + 'px'
     + ';--pw-name:' + (plan.namensbreite || 108) + 'px">'
-    + '<div class="pw-kopfblock">' + kwZeile + kopf + '</div>'
+    + '<div class="pw-kopfblock">' + monatZeile + kwZeile + kopf + '</div>'
     + zeilen + ferienZeilen
     + (heuteSpalte >= 0
         ? '<div class="pw-heutelinie" style="--heute:' + heuteSpalte + '"></div>' : "")
@@ -6035,14 +6235,14 @@ function planBalken(j, spalte, dauer, angeschnitten, vorlaufTage, dauerWahr) {
   const fertig = st === "fertig";
   const f = farbeVon(j.color);
 
-  const hg = fertig ? "#4a5158" : f.hex;
-  // Schwarz auf hellen Balkenfarben, Weiss auf dunklen — unabhaengig
-  // vom hellen oder dunklen Modus der App selbst. f.schrift ist pro
-  // Farbe genau dafuer hinterlegt.
-  const vg = fertig ? "#ffffff" : f.schrift;
+  // Schwarze Schrift liest sich am besten. Damit sie auf jeder Farbe
+  // trägt, wird die Balkenfläche aufgehellt und die volle Farbe als
+  // Streifen an den linken Rand gelegt — so bleibt sie erkennbar.
+  const voll = fertig ? "#6b7280" : f.hex;
+  const hg = fertig ? "#d9dce0" : aufhellen(f.hex, 0.62);
+  const vg = "#10151c";
   const laeuft = st === "laeuft";
-  const randKlasse = laeuft ? " pw-balken--laeuft"
-    : ((!fertig && j.color === "weiss") ? " pw-balken--weissrand" : "");
+  const randKlasse = laeuft ? " pw-balken--laeuft" : "";
 
   // Fortschritt in Schritten von fünf Prozent, bezogen auf den
   // GANZEN Auftrag — nicht auf den Ausschnitt, den man gerade sieht.
@@ -6066,25 +6266,21 @@ function planBalken(j, spalte, dauer, angeschnitten, vorlaufTage, dauerWahr) {
     restLinks = Math.max(0, Math.min(100, ((grenzTag - vorlauf) / dauer) * 100));
   }
 
-  // Zeile 2: Stückzahlen, am Ende der Liefertermin fürs Material
-  let zeileMenge = "";
+  // Zeile 2: Stückzahl, Material und Liefertermin zusammen — zwei
+  // Zeilen reichen, drei waren zu gedrängt.
+  const teile2 = [];
   if (j.target_quantity) {
-    zeileMenge = (st === "laeuft" || (j.stand || 0) > 0)
+    teile2.push((st === "laeuft" || (j.stand || 0) > 0)
       ? zahlText(j.stand || 0) + " / " + zahlText(j.target_quantity)
-      : zahlText(j.target_quantity) + " Stück";
+      : zahlText(j.target_quantity) + " Stk");
   }
-  if (j.material_liefertermin) {
-    zeileMenge += (zeileMenge ? "  ·  " : "") + j.material_liefertermin;
-  }
-
-  // Zeile 3: Material — Durchmesser, Toleranz, Menge
-  const materialTeile = [];
   if (j.material_dm) {
-    materialTeile.push("⌀" + j.material_dm
+    teile2.push("⌀" + j.material_dm
       + (j.material_toleranz ? " " + j.material_toleranz : ""));
   }
-  if (j.material_menge) materialTeile.push(j.material_menge);
-  const zeileMaterial = materialTeile.join(" · ");
+  if (j.material_menge) teile2.push(j.material_menge);
+  if (j.material_liefertermin) teile2.push(kurzDatum(j.material_liefertermin));
+  const zeileZwei = teile2.join(" · ");
 
   return '<div class="pw-balken' + (fertig ? " pw-balken--fertig" : "")
     + (angeschnitten ? " pw-balken--offen" : "") + randKlasse + '"'
@@ -6092,7 +6288,7 @@ function planBalken(j, spalte, dauer, angeschnitten, vorlaufTage, dauerWahr) {
     + ' data-von="' + spalte + '" data-dauer="' + Math.max(1, dauer) + '"'
     + ' data-angeschnitten="' + (angeschnitten ? "1" : "0") + '"'
     + ' style="--von:' + spalte + ';--dauer:' + Math.max(1, dauer)
-    + ';background:' + hg + ';color:' + vg + '">'
+    + ';--voll:' + voll + ';background:' + hg + ';color:' + vg + '">'
 
     + (restLinks !== null
         ? '<div class="pw-rest" style="left:' + restLinks + '%"></div>' : "")
@@ -6111,8 +6307,7 @@ function planBalken(j, spalte, dauer, angeschnitten, vorlaufTage, dauerWahr) {
     + (j.plan_note ? '<span class="pw-balken__zeichen" title="Notiz">✎</span>' : "")
     + (j.drawing_url ? '<span class="pw-balken__zeichen">PDF</span>' : "")
     + '</div>'
-    + '<div class="pw-zeile2">' + esc(zeileMenge) + '</div>'
-    + '<div class="pw-zeile3">' + esc(zeileMaterial) + '</div>'
+    + '<div class="pw-zeile2">' + esc(zeileZwei) + '</div>'
     + '</div>'
     + (j.geplant_von
         ? '<span class="pw-balken__planer" title="Eingeplant von ' + esc(j.geplant_von) + '">'
@@ -6313,10 +6508,19 @@ function balkenVerhalten(b) {
       if (!ziel) { meldung("Kein Ziel getroffen. Nichts geändert.", "warn"); return; }
 
       const teile = ziel.split("|");
-      const maschineId = teile[0], datum = teile[1];
+      const maschineId = teile[0];
+      let datum = teile[1];
       if (maschineId === auftrag.machine_id && datum === auftrag.planned_from) return;
 
       const vorherM = auftrag.machine_id, vorherD = auftrag.planned_from;
+      const eigeneTage = auftrag.planned_days || 1;
+
+      // Zwei Aufträge dürfen auf einer Maschine nie gleichzeitig laufen.
+      // Ist der Platz belegt, rutscht der Auftrag hinter den Störer.
+      const stoerer = planKonflikt(maschineId, datum, eigeneTage, auftrag.id);
+      if (stoerer) {
+        datum = freierStart(maschineId, datum, eigeneTage, auftrag.id);
+      }
 
       // Entsteht auf der alten Maschine eine Lücke, fragen wir nach
       let nachruecken = false;
@@ -6338,16 +6542,14 @@ function balkenVerhalten(b) {
 
       if (error) meldung(fehlertext(error), "fehler");
       else {
-        // Nachrücken: alle folgenden um die frei gewordenen Tage vorziehen
-        const vorher = [];
-        if (nachruecken) {
-          const tage = auftrag.planned_days || 1;
-          for (const x of dahinter) {
-            vorher.push({ id: x.id, von: x.planned_from });
-            const neu = arbeitstagePlus(x.planned_from, -tage);
-            await db.from("jobs").update({ planned_from: neu }).eq("id", x.id);
-          }
-        }
+        // Der Auftrag ist weg — im örtlichen Stand gleich nachziehen,
+        // sonst rechnet das Aufrücken noch mit dem alten Platz.
+        auftrag.machine_id = maschineId;
+        auftrag.planned_from = datum;
+
+        const vorher = nachruecken
+          ? await planAufruecken(vorherM, vorherD, auftrag.id)
+          : [];
 
         merkeSchritt("Verschieben von " + auftrag.job_number, async () => {
           for (const v of vorher) {
@@ -6358,7 +6560,10 @@ function balkenVerhalten(b) {
             .eq("id", auftrag.id);
           planAktualisieren(b);
         });
-        meldung("Verschoben."); planAktualisieren(b);
+        meldung(stoerer
+          ? "Verschoben — der Platz war belegt, deshalb hinter " + stoerer.job_number + "."
+          : "Verschoben.");
+        planAktualisieren(b);
       }
     });
 
@@ -6567,8 +6772,15 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     + '<div class="auf-dreier">'
     + '<label class="feld"><span>Ab</span>'
     + '<input id="pl-von" type="date" value="'
+    // Ein neuer Auftrag beginnt dort, wo die Maschine wieder frei
+    // ist — nicht heute. Sonst liegt die Kopie sofort auf einem
+    // anderen Auftrag.
     + esc(auftrag ? (auftrag.planned_from || "")
-        : (vorgabeDatum || isoDatum(new Date()))) + '"></label>'
+        : (vorgabeDatum
+            || naechsterFreierTag(vorgabeMaschine
+                 || (v && v.machine_id)
+                 || ((maschinen && maschinen[0]) ? maschinen[0].id : null))
+            || isoDatum(new Date()))) + '"></label>'
     + '<label class="feld"><span>Tage</span>'
     + '<input id="pl-tage" inputmode="decimal" type="number" min="1" step="1" value="'
     + (auftrag ? (auftrag.planned_days || 1) : (v ? (v.planned_days || 1) : 1))
@@ -6831,7 +7043,19 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     };
 
     let fehler;
+    let verschobenAuf = null;
+
     if (auftrag) {
+      // Überlagert der geänderte Zeitraum einen anderen Auftrag auf
+      // derselben Maschine, rutscht er dahinter.
+      if (daten.planned_from) {
+        const frei = freierStart(daten.machine_id, daten.planned_from,
+          daten.planned_days || 1, auftrag.id);
+        if (frei !== daten.planned_from) {
+          verschobenAuf = frei;
+          daten.planned_from = frei;
+        }
+      }
       ({ error: fehler } = await db.from("jobs").update(daten).eq("id", auftrag.id));
     } else {
       const nr = ($("pl-nr").value || "").trim();
@@ -6839,11 +7063,25 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
       daten.job_number = nr;
       // Kein Datum angegeben: hinter den letzten Auftrag dieser Maschine
       if (!daten.planned_from) daten.planned_from = naechsterFreierTag(daten.machine_id);
+      // Und in jedem Fall auf einen Platz, der noch frei ist
+      const frei = freierStart(daten.machine_id, daten.planned_from,
+        daten.planned_days || 1, null);
+      if (frei !== daten.planned_from) {
+        verschobenAuf = frei;
+        daten.planned_from = frei;
+      }
       ({ error: fehler } = await db.from("jobs").insert(daten));
     }
 
     if (fehler) meldung(fehlertext(fehler), "fehler");
-    else { zu(); meldung("Gespeichert."); planAktualisieren(b); }
+    else {
+      zu();
+      meldung(verschobenAuf
+        ? "Gespeichert — der gewünschte Platz war belegt, Beginn jetzt "
+          + kurzDatum(verschobenAuf) + "."
+        : "Gespeichert.");
+      planAktualisieren(b);
+    }
   };
 
   const loeschen = $("pl-loeschen");
@@ -6886,12 +7124,12 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
 
     const vorherNachrueck = [];
     if (!error && nachruecken) {
-      const differenz = auftrag.planned_days || 1;
-      for (const x of dahinter) {
-        vorherNachrueck.push({ id: x.id, von: x.planned_from });
-        const neu = arbeitstagePlus(x.planned_from, -differenz);
-        await db.from("jobs").update({ planned_from: neu }).eq("id", x.id);
-      }
+      // Örtlich entfernen, damit das Aufrücken nicht mit dem
+      // gelöschten Auftrag rechnet
+      const i = (plan.auftraege || []).findIndex((x) => x.id === auftrag.id);
+      if (i >= 0) plan.auftraege.splice(i, 1);
+      const zurueck = await planAufruecken(auftrag.machine_id, auftrag.planned_from, auftrag.id);
+      zurueck.forEach((z) => vorherNachrueck.push(z));
     }
 
     zu();
@@ -9280,20 +9518,18 @@ function bestellungDrucken(lieferant, posten) {
   const wer = (profil && (profil.full_name || profil.email)) || "";
   const mail = (profil && profil.email) || "";
 
-  // Vor- und Nachname der angemeldeten Person. Quelle ist der
-  // hinterlegte Name, sonst der Teil der Mailadresse vor dem @.
-  // Punkt, Unterstrich und Bindestrich gelten als Trennzeichen:
-  // aus saheesan.hudson@hoferco.ch wird Saheesan Hudson.
-  // Bindestriche bleiben dabei Teil des Namens: Müller-Weber.
+  // Vor- und Nachname der angemeldeten Person kommen aus der
+  // Mailadresse, nicht aus dem Anzeigenamen. Getrennt wird am Punkt
+  // und am Unterstrich: aus saheesan.hudson@hoferco.ch wird
+  // Saheesan Hudson. Bindestriche bleiben Teil des Namens, damit
+  // aus anna-lena.mueller-weber nicht Anna Weber wird. Nur wenn
+  // keine Adresse hinterlegt ist, greift ersatzweise der Anzeigename.
   const gross = (t) => t.toLowerCase().split("-")
     .map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join("-");
-  const quelle = (wer && wer.indexOf("@") === -1) ? wer : mail.split("@")[0];
-  // Steht im Namen ein Leerzeichen, ist es ein richtiger Name und wird
-  // nur dort getrennt. Sonst kommt er aus der Mailadresse, dann gelten
-  // Punkt, Unterstrich und Bindestrich als Trennzeichen.
+  const quelle = mail ? mail.split("@")[0] : wer;
   const teile = (/\s/.test(quelle.trim())
     ? quelle.trim().split(/\s+/)
-    : quelle.split(/[._-]+/)).filter((t) => t);
+    : quelle.split(/[._]+/)).filter((t) => t);
   const vorname = gross(teile[0] || "");
   const nachname = teile.length > 1 ? gross(teile[teile.length - 1]) : "";
 
