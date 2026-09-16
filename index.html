@@ -1901,20 +1901,25 @@ pre, .gcode { max-width: 100%; overflow-x: auto; }
 .werkzeugleiste {
   position: fixed; z-index: 40; left: 50%; transform: translateX(-50%);
   top: 8px; display: flex; align-items: center; gap: 10px; }
-.fahrzeug-knopf, .eier-knopf {
-  position: static; width: 38px; height: 38px; flex: none;
+.fahrzeug-knopf, .eier-knopf, .chat-knopf {
+  /* relativ, damit das Abzeichen für ungelesene Nachrichten
+     an der Ecke des Knopfes klebt */
+  position: relative; width: 38px; height: 38px; flex: none;
   border-radius: 10px; border: 1px solid var(--linie-stark);
   background: var(--flaeche); color: var(--tinte);
   display: grid; place-items: center; cursor: pointer; font-size: 1.15rem;
   line-height: 1; padding: 0; }
-.fahrzeug-knopf:hover, .eier-knopf:hover { background: var(--marke-hell); }
+.fahrzeug-knopf:hover, .eier-knopf:hover, .chat-knopf:hover { background: var(--marke-hell); }
 @media (max-width: 780px) {
   .werkzeugleiste { top: 10px; gap: 8px; }
-  .fahrzeug-knopf, .eier-knopf { width: 34px; height: 34px; font-size: 1rem; }
+  .fahrzeug-knopf, .eier-knopf, .chat-knopf { width: 34px; height: 34px; font-size: 1rem; }
 }
 .chat-abzeichen { position: absolute; top: -6px; right: -6px; min-width: 20px;
                   height: 20px; padding: 0 5px; border-radius: 10px; background: var(--gefahr);
                   color: #fff; font-size: .68rem; font-weight: 700; display: grid; place-items: center; }
+/* display: grid würde sonst das hidden aus dem Code überstimmen,
+   und die Null stünde dauerhaft am Knopf */
+.chat-abzeichen[hidden] { display: none; }
 
 .chat-panel { position: fixed; z-index: 41; width: 340px; max-width: calc(100vw - 32px);
               height: 480px; max-height: calc(100dvh - 120px); background: var(--flaeche);
@@ -2530,7 +2535,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "39.3.0";
+const APP_VERSION = "40.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -12460,7 +12465,8 @@ function chatEinbauen() {
     + 'L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5'
     + 'a8.48 8.48 0 0 1 8 8v.5z"/></svg>'
     + '<span class="chat-abzeichen" id="chat-abzeichen" hidden>0</span>';
-  document.body.appendChild(knopf);
+  // Neben dem Fahrzeugknopf oben in der Leiste
+  werkzeugleiste().prepend(knopf);
   knopf.onclick = () => chatPanelUmschalten();
 
   chatUngeleseneLaden();
@@ -12991,12 +12997,18 @@ async function chatListeZeichnen() {
   let liste;
   try { liste = await chatGespraecheLaden(); chat.gespraeche = liste; }
   catch (f) {
-    document.getElementById("chat-liste").innerHTML =
-      '<p class="hinweis">Chat ist noch nicht eingerichtet: ' + esc(fehlertext(f)) + '</p>';
+    // Während des Ladens kann längst eine Unterhaltung offen sein —
+    // dann gibt es die Liste nicht mehr.
+    const k = document.getElementById("chat-liste");
+    if (k) {
+      k.innerHTML = '<p class="hinweis">Chat ist noch nicht eingerichtet: '
+        + esc(fehlertext(f)) + '</p>';
+    }
     return;
   }
 
   const kasten = document.getElementById("chat-liste");
+  if (!kasten) return;
   if (!liste.length) {
     kasten.innerHTML = '<p class="hinweis">Noch keine Unterhaltung. '
       + 'Tipp oben auf "Nachricht" oder "Gruppe", um zu starten.</p>';
@@ -13005,7 +13017,11 @@ async function chatListeZeichnen() {
 
   kasten.innerHTML = liste.map((g) => {
     const wer = chatName(g);
-    const vorschau = g.letzte ? g.letzte.text : "Noch keine Nachricht";
+    // Eine Nachricht kann auch nur ein Anhang ohne Text sein
+    const vorschau = g.letzte
+      ? ((g.letzte.text || "").trim()
+          || (g.letzte.datei_name ? "📎 " + g.letzte.datei_name : "Anhang"))
+      : "Noch keine Nachricht";
     return '<button class="chat-eintrag' + (g.ungelesen ? " chat-eintrag--ungelesen" : "")
       + '" data-gespraech="' + esc(g.id) + '">'
       + '<span class="chat-eintrag__symbol">' + (g.ist_gruppe ? "◉" : esc(wer.charAt(0).toUpperCase()))
@@ -13349,7 +13365,7 @@ function zeichneGeruest() {
     profil = null;
     document.querySelectorAll(".dialog-huelle").forEach((el) => el.remove());
     chatEinbautStoppen();
-    ["werkzeugleiste", "fahrzeug-panel", "eier-fenster"].forEach((id) => {
+    ["werkzeugleiste", "fahrzeug-panel", "eier-fenster", "chat-panel"].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.remove();
     });
@@ -13395,6 +13411,7 @@ function zeichneGeruest() {
   Promise.all([farbzuteilungLaden(), planerLaden()]).then(() => zeichneSeite());
   fahrzeugEinbauen();
   eierEinbauen();
+  chatEinbauen();
 }
 
 window.addEventListener("hashchange", () => {
