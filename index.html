@@ -2505,6 +2505,7 @@ body.dunkel .pw-balken__nr { color: #10151c !important; }
 .blatt__kopf .knopf { margin-left: auto; }
 .tabelle--kopf td:first-child { width: 190px; }
 .marken { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.zeile--offen td { background: var(--grund); }
 </style>
 </head>
 <body>
@@ -2553,7 +2554,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "43.2.0";
+const APP_VERSION = "44.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -7892,12 +7893,25 @@ async function ladeHoco(suche) {
 // gezeigt, wofür noch keine Stammdaten hinterlegt sind.
 async function ladeHocoAusAuftraegen() {
   const { data, error } = await zeitlimit(
-    db.from("jobs").select("job_number").order("job_number").limit(1000),
+    db.from("jobs")
+      .select("job_number, material_dm, material_toleranz, material_menge, drawing_url")
+      .order("created_at", { ascending: false }).limit(1000),
     12000, "Aufträge");
   if (error) throw error;
-  const gesehen = {};
-  (data || []).forEach((j) => { if (j.job_number) gesehen[j.job_number] = true; });
-  return Object.keys(gesehen).sort();
+  // Je Nummer der jüngste Auftrag — daraus kommen Durchmesser,
+  // Material und Zeichnung, wenn noch keine Stammdaten da sind.
+  const karte = {};
+  (data || []).forEach((j) => {
+    if (!j.job_number || karte[j.job_number]) return;
+    karte[j.job_number] = j;
+  });
+  return karte;
+}
+
+// Aus Durchmesser und Toleranz des Auftrags wird die Materialgrösse
+function groesseAusAuftrag(j) {
+  if (!j || !j.material_dm) return "";
+  return "Ø" + j.material_dm + (j.material_toleranz ? " " + j.material_toleranz : "");
 }
 
 async function ladeWaschgebinde() {
@@ -8180,7 +8194,7 @@ async function ansichtHoco(ziel, b) {
   const darf = darfSchreiben();
   ziel.innerHTML = '<div class="laedt">Wird geladen …</div>';
 
-  let teile, gebinde, typen, ausPlan = [];
+  let teile, gebinde, typen, ausPlan = {};
   try {
     [teile, gebinde, typen] = await Promise.all([
       ladeHoco(prod.hocoSuche), ladeWaschgebinde(), ladeTypen()]);
@@ -8238,6 +8252,10 @@ async function ansichtHoco(ziel, b) {
 
     document.getElementById("hoco-zurueck").onclick = () => { prod.hocoOffen = null; neuLaden(); };
 
+    const zeichnungKnopf = ziel.querySelector("[data-zeichnung]");
+    if (zeichnungKnopf) zeichnungKnopf.onclick = () =>
+      betrachter(zeichnungKnopf.dataset.zeichnung, "Zeichnung " + t.hoco_nr, true);
+
     const bearb = document.getElementById("hoco-bearb");
     if (bearb) bearb.onclick = async () => {
       const w = await hocoDialog(t, gebindeWahl);
@@ -8247,50 +8265,63 @@ async function ansichtHoco(ziel, b) {
   }
 
   // ----- Übersicht -----
+  // Eine einzige Liste. Nummern aus der Planwand, für die es noch
+  // keine Stammdaten gibt, stehen mit dabei — mit dem, was am
+  // Auftrag hinterlegt ist, damit man sieht, was übernommen wird.
+  const bekannt = {};
+  teile.forEach((t) => { bekannt[t.hoco_nr] = true; });
+
+  const suchText = (prod.hocoSuche || "").trim().toLowerCase();
+  const nurPlan = Object.keys(ausPlan)
+    .filter((nr) => !bekannt[nr])
+    .filter((nr) => !suchText || nr.toLowerCase().includes(suchText))
+    .sort()
+    .map((nr) => ({
+      hoco_nr: nr, ohneStamm: true,
+      // Am Auftrag steht nur die Grösse. Die Materialart gehört an
+      // die HOCO Nr. und wird dort einmal hinterlegt.
+      material: "",
+      material_groesse: groesseAusAuftrag(ausPlan[nr]),
+    }));
+
+  const liste = teile.concat(nurPlan)
+    .sort((x, y) => String(x.hoco_nr).localeCompare(String(y.hoco_nr)));
+
   ziel.innerHTML = '<section class="karte">'
     + '<div class="karte__kopf"><h2>HOCO Nr.</h2>'
+    + '<span class="marke">' + liste.length + '</span>'
     + (darf ? '<div class="karte__aktionen">'
         + '<button class="knopf knopf--klein" id="hoco-neu">+ HOCO Nr.</button></div>' : "")
     + '</div>'
     + '<div class="suchleiste"><input type="text" id="hoco-such" placeholder="Suchen"'
     + ' autocomplete="off" value="' + esc(prod.hocoSuche || "") + '"></div>'
-    + (teile.length
+    + (liste.length
       ? '<table class="tabelle"><thead><tr><th>HOCO Nr.</th><th>Bezeichnung</th>'
         + '<th>Material</th><th>Waschgebinde</th><th></th></tr></thead><tbody>'
-        + teile.map((t) => '<tr>'
-          + '<td><button class="linkknopf" data-hoco-auf="' + esc(t.hoco_nr) + '">'
-          + '<strong>' + esc(t.hoco_nr) + '</strong></button></td>'
-          + '<td>' + esc(t.bezeichnung || "") + '</td>'
-          + '<td>' + esc([t.material, t.material_groesse].filter((x) => x).join(" · ")) + '</td>'
+        + liste.map((t) => '<tr' + (t.ohneStamm ? ' class="zeile--offen"' : "") + '>'
+          + '<td>' + (t.ohneStamm
+              ? '<strong>' + esc(t.hoco_nr) + '</strong>'
+              : '<button class="linkknopf" data-hoco-auf="' + esc(t.hoco_nr) + '">'
+                + '<strong>' + esc(t.hoco_nr) + '</strong></button>') + '</td>'
+          + '<td>' + (t.ohneStamm
+              ? '<span class="gedaempft">noch nicht hinterlegt</span>'
+              : esc(t.bezeichnung || "")) + '</td>'
+          + '<td' + (t.ohneStamm ? ' class="gedaempft"' : "") + '>'
+          + esc([t.material, t.material_groesse].filter((x) => x).join(" · ")) + '</td>'
           + '<td>' + esc(t.waschgebinde || "") + '</td>'
           + '<td class="rechts nowrap">'
-          + (darf ? '<button class="linkknopf" data-hoco-um="' + esc(t.hoco_nr) + '">Bearbeiten</button> '
-              + '<button class="linkknopf linkknopf--gefahr" data-hoco-weg="' + esc(t.hoco_nr)
-              + '">Löschen</button>' : "")
+          + (darf
+              ? (t.ohneStamm
+                  ? '<button class="linkknopf" data-hoco-anlegen="' + esc(t.hoco_nr)
+                    + '">Stammdaten anlegen</button>'
+                  : '<button class="linkknopf" data-hoco-um="' + esc(t.hoco_nr) + '">Bearbeiten</button> '
+                    + '<button class="linkknopf linkknopf--gefahr" data-hoco-weg="' + esc(t.hoco_nr)
+                    + '">Löschen</button>')
+              : "")
           + '</td></tr>').join("") + '</tbody></table>'
-      : '<p class="hinweis">' + (prod.hocoSuche ? "Nichts gefunden." : "Noch keine HOCO Nr. angelegt.") + '</p>')
+      : '<p class="hinweis">' + (prod.hocoSuche ? "Nichts gefunden."
+          : "Noch keine HOCO Nr. und noch kein Auftrag auf der Planwand.") + '</p>')
     + '</section>'
-
-    + (() => {
-        // Nummern, die auf der Planwand laufen, aber noch keine
-        // Stammdaten haben. Ein Klick legt sie an.
-        const bekannt = {};
-        teile.forEach((t) => { bekannt[t.hoco_nr] = true; });
-        const offen = ausPlan.filter((nr) => !bekannt[nr]);
-        if (!offen.length) return "";
-        return '<section class="karte"><div class="karte__kopf">'
-          + '<h2>Aus der Planwand, noch ohne Stammdaten</h2>'
-          + '<span class="marke">' + offen.length + '</span></div>'
-          + '<p class="klein">Diese Nummern kommen bei Aufträgen vor. Ohne Stammdaten '
-          + 'kann ein Einrichtblatt nichts übernehmen.</p>'
-          + '<div class="marken">'
-          + offen.slice(0, 60).map((nr) => '<button class="knopf knopf--klein"'
-              + ' data-hoco-anlegen="' + esc(nr) + '">+ ' + esc(nr) + '</button>').join("")
-          + '</div>'
-          + (offen.length > 60 ? '<p class="klein">… und ' + (offen.length - 60)
-              + ' weitere.</p>' : "")
-          + '</section>';
-      })()
 
     + '<section class="karte"><div class="karte__kopf"><h2>Waschgebinde</h2></div>'
     + (gebinde.length
@@ -8324,7 +8355,14 @@ async function ansichtHoco(ziel, b) {
 
   ziel.querySelectorAll("[data-hoco-anlegen]").forEach((el) => {
     el.onclick = async () => {
-      const w = await hocoDialog(null, gebindeWahl, el.dataset.hocoAnlegen);
+      const nr = el.dataset.hocoAnlegen;
+      const j = ausPlan[nr] || {};
+      // Durchmesser, Material und Zeichnung kommen aus dem Auftrag
+      const w = await hocoDialog(null, gebindeWahl, {
+        hoco_nr: nr,
+        material_groesse: groesseAusAuftrag(j),
+        zeichnung_url: j.drawing_url || null,
+      });
       if (w) neuLaden();
     };
   });
@@ -8389,17 +8427,20 @@ async function ansichtHoco(ziel, b) {
 }
 
 // Anlegen und Bearbeiten in einem Dialog
-async function hocoDialog(teil, gebindeWahl, vorgabeNr) {
+async function hocoDialog(teil, gebindeWahl, vorgabe) {
+  const v = vorgabe || {};
   const w = await dialogFelder({
     titel: teil ? "HOCO Nr. bearbeiten" : "Neue HOCO Nr.",
     felder: [
       ...(teil ? [] : [{ name: "nr", label: "HOCO Nr.", pflicht: true,
-                        wert: vorgabeNr || "",
+                        wert: v.hoco_nr || "",
                         platzhalter: "z. B. 10007-0414" }]),
       { name: "bez", label: "Artikelbezeichnung", wert: teil ? (teil.bezeichnung || "") : "" },
-      { name: "mat", label: "Material", wert: teil ? (teil.material || "") : "",
+      { name: "mat", label: "Material",
+        wert: teil ? (teil.material || "") : (v.material || ""),
         platzhalter: "z. B. CW400J" },
-      { name: "groesse", label: "Materialgrösse", wert: teil ? (teil.material_groesse || "") : "",
+      { name: "groesse", label: "Materialgrösse",
+        wert: teil ? (teil.material_groesse || "") : (v.material_groesse || ""),
         platzhalter: "z. B. Ø20h9" },
       { name: "wasch", label: "Waschgebinde", auswahl: gebindeWahl,
         wert: teil ? (teil.waschgebinde || "") : "" },
@@ -8418,6 +8459,9 @@ async function hocoDialog(teil, gebindeWahl, vorgabeNr) {
     fabrik_auftrag: w.fa || null,
     infos: w.infos || null,
   };
+  // Die Zeichnung gehört zum Teil und gilt für jeden Typ gleich.
+  // Beim Anlegen wird sie aus dem Auftrag übernommen, falls dort eine hängt.
+  if (!teil && v.zeichnung_url) daten.zeichnung_url = v.zeichnung_url;
 
   const { error } = teil
     ? await db.from("hoco_parts").update(daten).eq("hoco_nr", teil.hoco_nr)
