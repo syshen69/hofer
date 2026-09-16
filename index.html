@@ -2530,7 +2530,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "39.0.0";
+const APP_VERSION = "39.2.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -4826,6 +4826,50 @@ function freierStart(maschineId, wunsch, tage, ausserId) {
   return von;
 }
 
+// Räumt eine Maschine auf: Der Auftrag mit der Kennung festId bleibt,
+// wo er ist, alle anderen weichen ihm aus und rücken so weit nach
+// hinten, wie nötig. Die Reihenfolge nach Datum bleibt erhalten.
+// Gibt die alten Daten zurück, damit sich alles zurücknehmen lässt.
+async function planKonflikteLoesen(maschineId, festId) {
+  const alle = (plan.auftraege || [])
+    .filter((x) => x.machine_id === maschineId && x.planned_from)
+    .sort((a, c) => a.planned_from < c.planned_from ? -1
+      : (a.planned_from > c.planned_from ? 1 : String(a.id).localeCompare(String(c.id))));
+
+  const gesetzt = [];
+  const fest = alle.find((x) => x.id === festId);
+  if (fest) gesetzt.push(fest);
+
+  const vorher = [];
+
+  for (const x of alle) {
+    if (x.id === festId) continue;
+    let von = x.planned_from;
+
+    let nochmal = true, schutz = 0;
+    while (nochmal && schutz++ < 400) {
+      nochmal = false;
+      for (const g of gesetzt) {
+        const gBis = planEnde(g.planned_from, g.planned_days || 1);
+        const xBis = planEnde(von, x.planned_days || 1);
+        if (von <= gBis && g.planned_from <= xBis) {
+          von = naechsterArbeitstag(
+            arbeitstagePlus(g.planned_from, g.planned_days || 1));
+          nochmal = true;
+        }
+      }
+    }
+
+    if (von !== x.planned_from) {
+      vorher.push({ id: x.id, von: x.planned_from });
+      await db.from("jobs").update({ planned_from: von }).eq("id", x.id);
+      x.planned_from = von;
+    }
+    gesetzt.push(x);
+  }
+  return vorher;
+}
+
 // Packt alle offenen Aufträge einer Maschine ab einem Tag lückenlos
 // hintereinander. Gibt die vorherigen Daten zurück, damit sich der
 // Schritt zurücknehmen lässt.
@@ -5443,8 +5487,8 @@ function balkenInfoVerhalten() {
       const zustand = PLANSTATUS[j.plan_status || "geplant"] || PLANSTATUS.geplant;
       const material = [];
       material.push(j.material_dm
-        ? "⌀" + j.material_dm + (j.material_toleranz ? " " + j.material_toleranz : "")
-        : "⌀ –");
+        ? "Ø" + j.material_dm + (j.material_toleranz ? " " + j.material_toleranz : "")
+        : "Ø –");
       material.push(j.material_menge || "Menge –");
       material.push(j.material_liefertermin ? "bis " + j.material_liefertermin : "Termin –");
 
@@ -6266,21 +6310,27 @@ function planBalken(j, spalte, dauer, angeschnitten, vorlaufTage, dauerWahr) {
     restLinks = Math.max(0, Math.min(100, ((grenzTag - vorlauf) / dauer) * 100));
   }
 
-  // Zeile 2: Stückzahl, Material und Liefertermin zusammen — zwei
-  // Zeilen reichen, drei waren zu gedrängt.
-  const teile2 = [];
-  if (j.target_quantity) {
-    teile2.push((st === "laeuft" || (j.stand || 0) > 0)
-      ? zahlText(j.stand || 0) + " / " + zahlText(j.target_quantity)
-      : zahlText(j.target_quantity) + " Stk");
+  // Zeile 2: solange geplant oder gerüstet wird, steht dort die zu
+  // fertigende Stückzahl und daneben die Materialgrösse. Sobald der
+  // Auftrag läuft oder fertig ist, zählt nur noch Soll gegen Ist —
+  // das Material ist dann längst an der Maschine.
+  const laufendOderFertig = (st === "laeuft" || fertig);
+  let zeileZwei = "";
+  if (laufendOderFertig) {
+    if (j.target_quantity) {
+      zeileZwei = zahlText(j.target_quantity) + " / " + zahlText(j.stand || 0);
+    } else if (j.stand) {
+      zeileZwei = zahlText(j.stand) + " Stk";
+    }
+  } else {
+    const teile2 = [];
+    if (j.target_quantity) teile2.push(zahlText(j.target_quantity) + " Stk");
+    if (j.material_dm) {
+      teile2.push("Ø" + j.material_dm
+        + (j.material_toleranz ? " " + j.material_toleranz : ""));
+    }
+    zeileZwei = teile2.join("   ");
   }
-  if (j.material_dm) {
-    teile2.push("⌀" + j.material_dm
-      + (j.material_toleranz ? " " + j.material_toleranz : ""));
-  }
-  if (j.material_menge) teile2.push(j.material_menge);
-  if (j.material_liefertermin) teile2.push(kurzDatum(j.material_liefertermin));
-  const zeileZwei = teile2.join(" · ");
 
   return '<div class="pw-balken' + (fertig ? " pw-balken--fertig" : "")
     + (angeschnitten ? " pw-balken--offen" : "") + randKlasse + '"'
@@ -6509,62 +6559,59 @@ function balkenVerhalten(b) {
 
       const teile = ziel.split("|");
       const maschineId = teile[0];
-      let datum = teile[1];
+      const datum = teile[1];
       if (maschineId === auftrag.machine_id && datum === auftrag.planned_from) return;
 
       const vorherM = auftrag.machine_id, vorherD = auftrag.planned_from;
-      const eigeneTage = auftrag.planned_days || 1;
 
-      // Zwei Aufträge dürfen auf einer Maschine nie gleichzeitig laufen.
-      // Ist der Platz belegt, rutscht der Auftrag hinter den Störer.
-      const stoerer = planKonflikt(maschineId, datum, eigeneTage, auftrag.id);
-      if (stoerer) {
-        datum = freierStart(maschineId, datum, eigeneTage, auftrag.id);
-      }
+      const { error } = await db.from("jobs")
+        .update({ machine_id: maschineId, planned_from: datum })
+        .eq("id", auftrag.id);
 
-      // Entsteht auf der alten Maschine eine Lücke, fragen wir nach
-      let nachruecken = false;
+      if (error) { meldung(fehlertext(error), "fehler"); return; }
+
+      // Örtlich gleich nachziehen, sonst rechnen die nächsten
+      // Schritte noch mit dem alten Platz.
+      auftrag.machine_id = maschineId;
+      auftrag.planned_from = datum;
+
+      // Der Auftrag bleibt liegen, wo er abgelegt wurde. Was ihm im
+      // Weg liegt, weicht nach hinten aus.
+      const ausgewichen = await planKonflikteLoesen(maschineId, auftrag.id);
+
+      // Bleibt dort, wo er herkam, eine Lücke? Dann fragen wir nach.
       const dahinter = (plan.auftraege || []).filter((x) =>
         x.id !== auftrag.id && x.machine_id === vorherM
         && x.planned_from && vorherD && x.planned_from > vorherD
         && x.plan_status !== "fertig");
 
+      let aufgeschlossen = [];
       if (dahinter.length) {
-        nachruecken = await nachfragen({
-          titel: "Lücke schliessen?",
-          text: "Auf der alten Maschine entsteht eine Lücke. Sollen die "
-              + dahinter.length + " nachfolgenden Aufträge aufrücken?",
-          bestaetigen: "Ja, aufrücken", abbrechen: "Nein, Lücke lassen" });
+        const luecke = await nachfragen({
+          titel: "Lücke lassen?",
+          text: "Wo der Auftrag stand, ist jetzt Platz frei. Soll die Lücke "
+              + "bleiben, oder sollen die " + dahinter.length
+              + " nachfolgenden Aufträge aufschliessen?",
+          bestaetigen: "Ja, Lücke lassen",
+          abbrechen: "Nein, aufschliessen" });
+        if (!luecke) aufgeschlossen = await planAufruecken(vorherM, vorherD, auftrag.id);
       }
-      const { error } = await db.from("jobs")
-        .update({ machine_id: maschineId, planned_from: datum })
-        .eq("id", auftrag.id);
 
-      if (error) meldung(fehlertext(error), "fehler");
-      else {
-        // Der Auftrag ist weg — im örtlichen Stand gleich nachziehen,
-        // sonst rechnet das Aufrücken noch mit dem alten Platz.
-        auftrag.machine_id = maschineId;
-        auftrag.planned_from = datum;
-
-        const vorher = nachruecken
-          ? await planAufruecken(vorherM, vorherD, auftrag.id)
-          : [];
-
-        merkeSchritt("Verschieben von " + auftrag.job_number, async () => {
-          for (const v of vorher) {
-            await db.from("jobs").update({ planned_from: v.von }).eq("id", v.id);
-          }
-          await db.from("jobs")
-            .update({ machine_id: vorherM, planned_from: vorherD })
-            .eq("id", auftrag.id);
-          planAktualisieren(b);
-        });
-        meldung(stoerer
-          ? "Verschoben — der Platz war belegt, deshalb hinter " + stoerer.job_number + "."
-          : "Verschoben.");
+      const zurueck = ausgewichen.concat(aufgeschlossen);
+      merkeSchritt("Verschieben von " + auftrag.job_number, async () => {
+        for (const v of zurueck) {
+          await db.from("jobs").update({ planned_from: v.von }).eq("id", v.id);
+        }
+        await db.from("jobs")
+          .update({ machine_id: vorherM, planned_from: vorherD })
+          .eq("id", auftrag.id);
         planAktualisieren(b);
-      }
+      });
+
+      meldung("Verschoben."
+        + (ausgewichen.length ? "  " + ausgewichen.length + " ausgewichen." : "")
+        + (aufgeschlossen.length ? "  " + aufgeschlossen.length + " aufgeschlossen." : ""));
+      planAktualisieren(b);
     });
 
     el.addEventListener("pointercancel", aufraeumen);
@@ -6760,7 +6807,8 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     + '<div class="auf-spalte">'
     + (auftrag ? "" :
         '<label class="feld"><span>HOCO Nr.</span>'
-        + '<input id="pl-nr" type="text" autocapitalize="characters"></label>')
+        + '<input id="pl-nr" type="text" autocapitalize="characters" value="'
+        + esc(v ? (v.job_number || "") : "") + '"></label>')
     + '<label class="feld"><span>Maschine</span><select id="pl-maschine"'
     + (darf ? "" : " disabled") + '>'
     + maschinen.map((m) => '<option value="' + esc(m.id) + '"'
@@ -6794,7 +6842,9 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     + '<label class="feld"><span>Fertigungsmenge</span>'
     + '<input id="pl-menge" inputmode="decimal" type="number" min="0" step="1" value="'
     + (auftrag && auftrag.target_quantity !== null && auftrag.target_quantity !== undefined
-        ? auftrag.target_quantity : "") + '"></label>'
+        ? auftrag.target_quantity
+        : (v && v.target_quantity !== null && v.target_quantity !== undefined
+            ? v.target_quantity : "")) + '"></label>'
 
     + '<div class="feld"><span class="feldlabel">Vorbereitung</span>'
     + '<label class="schalter schalter--eng"><input type="checkbox" id="pl-fa"'
@@ -6824,7 +6874,7 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     + '<div class="auf-spalte">'
     + '<div class="auf-blocktitel">Material</div>'
     + '<div class="auf-zweier">'
-    + '<label class="feld"><span>⌀ in mm</span>'
+    + '<label class="feld"><span>Ø in mm</span>'
     + '<input id="pl-dm" inputmode="decimal" type="number" step="0.1" min="0" value="'
     + esc(auftrag && auftrag.material_dm !== null && auftrag.material_dm !== undefined
         ? auftrag.material_dm
@@ -6908,7 +6958,9 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
   $("pl-nein").onclick = zu;
   dialogSchliessen(huelle, zu);
 
-  let pdfAdresse = auftrag ? auftrag.drawing_url : null;
+  // Die Kopie übernimmt auch die Zeichnung. Neu gesetzt werden
+  // nur Beginn und Ende.
+  let pdfAdresse = auftrag ? auftrag.drawing_url : (v ? (v.drawing_url || null) : null);
 
   // Von, Bis und Dauer im Gleichklang halten
   const felderKoppeln = () => {
@@ -7043,45 +7095,47 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     };
 
     let fehler;
-    let verschobenAuf = null;
+    let festId = null;
 
     if (auftrag) {
-      // Überlagert der geänderte Zeitraum einen anderen Auftrag auf
-      // derselben Maschine, rutscht er dahinter.
-      if (daten.planned_from) {
-        const frei = freierStart(daten.machine_id, daten.planned_from,
-          daten.planned_days || 1, auftrag.id);
-        if (frei !== daten.planned_from) {
-          verschobenAuf = frei;
-          daten.planned_from = frei;
-        }
-      }
       ({ error: fehler } = await db.from("jobs").update(daten).eq("id", auftrag.id));
+      if (!fehler) {
+        // Örtlich nachziehen, damit das Aufräumen mit den neuen
+        // Werten rechnet
+        auftrag.planned_from = daten.planned_from;
+        auftrag.planned_days = daten.planned_days;
+        auftrag.machine_id = daten.machine_id;
+        festId = auftrag.id;
+      }
     } else {
       const nr = ($("pl-nr").value || "").trim();
       if (!nr) { meldung("HOCO Nr. wird benötigt.", "warn"); return; }
       daten.job_number = nr;
-      // Kein Datum angegeben: hinter den letzten Auftrag dieser Maschine
+      // Ohne eigene Angabe hinter den letzten Auftrag dieser Maschine
       if (!daten.planned_from) daten.planned_from = naechsterFreierTag(daten.machine_id);
-      // Und in jedem Fall auf einen Platz, der noch frei ist
-      const frei = freierStart(daten.machine_id, daten.planned_from,
-        daten.planned_days || 1, null);
-      if (frei !== daten.planned_from) {
-        verschobenAuf = frei;
-        daten.planned_from = frei;
+
+      const r = await db.from("jobs").insert(daten).select();
+      fehler = r.error;
+      const neuerSatz = (r.data || [])[0];
+      if (!fehler && neuerSatz) {
+        plan.auftraege.push(Object.assign({}, daten, { id: neuerSatz.id }));
+        festId = neuerSatz.id;
       }
-      ({ error: fehler } = await db.from("jobs").insert(daten));
     }
 
-    if (fehler) meldung(fehlertext(fehler), "fehler");
-    else {
-      zu();
-      meldung(verschobenAuf
-        ? "Gespeichert — der gewünschte Platz war belegt, Beginn jetzt "
-          + kurzDatum(verschobenAuf) + "."
-        : "Gespeichert.");
-      planAktualisieren(b);
-    }
+    if (fehler) { meldung(fehlertext(fehler), "fehler"); return; }
+
+    // Der eingetragene Beginn gilt. Was ihm im Weg liegt, rückt nach
+    // hinten, damit die Reihe wieder sauber aneinander steht.
+    const verschoben = festId
+      ? await planKonflikteLoesen(daten.machine_id, festId) : [];
+
+    zu();
+    meldung(verschoben.length
+      ? "Gespeichert. " + verschoben.length
+        + (verschoben.length === 1 ? " Auftrag ist" : " Aufträge sind") + " nachgerückt."
+      : "Gespeichert.");
+    planAktualisieren(b);
   };
 
   const loeschen = $("pl-loeschen");
@@ -7934,7 +7988,7 @@ function bildGcode(g) {
     + ' stroke="var(--tinte)" stroke-width="1"/>'
     + '<line x1="82" y1="' + mitte + '" x2="94" y2="' + mitte + '"'
     + ' stroke="var(--tinte)" stroke-width="1"/>'
-    + '<text x="78" y="' + (oben + 34) + '" class="zbeschriftung" text-anchor="end">⌀'
+    + '<text x="78" y="' + (oben + 34) + '" class="zbeschriftung" text-anchor="end">Ø'
     + z(dm) + '</text>'
 
     // Fasenmass oben
@@ -8146,7 +8200,7 @@ function bildBohrung(d, b, w, t) {
     + '<text x="130" y="57" class="zbeschriftung">' + z(w, "β") + '°</text>'
     // Bohrungsdurchmesser
     + '<line x1="140" y1="150" x2="160" y2="150" stroke="var(--tinte)" stroke-width="1.5"/>'
-    + '<text x="150" y="186" class="zbeschriftung" text-anchor="middle">⌀ ' + z(d, "d") + '</text>'
+    + '<text x="150" y="186" class="zbeschriftung" text-anchor="middle">Ø ' + z(d, "d") + '</text>'
     + '</svg>';
 }
 
@@ -8219,7 +8273,7 @@ function rechnerWinkel(ziel) {
     + '<p class="hinweis">b ist die Fasenbreite am Rand, t die Tiefe in Achsrichtung. '
     + 'β ist der Winkel zwischen Fase und Stirnfläche. Bei 45° sind b und t gleich gross.</p>'
     + '<div class="zeitraumwahl">'
-    + '<label class="feld"><span>Bohrung ⌀ in mm</span>'
+    + '<label class="feld"><span>Bohrung Ø in mm</span>'
     + '<input type="number" id="f-d" inputmode="decimal" step="0.1" value="' + esc(fase.d)
     + '"></label>'
     + '<label class="feld"><span>Fasenbreite b in mm</span>'
@@ -8237,7 +8291,7 @@ function rechnerWinkel(ziel) {
     + '<section class="karte karte--ergebnis"><div class="ergebnisreihe">'
     + '<div class="ergebnis"><div class="ergebnis__titel">Tiefe t</div>'
     + '<div class="ergebnis__wert ergebnis__wert--klein">' + z(ft) + '<span>mm</span></div></div>'
-    + '<div class="ergebnis"><div class="ergebnis__titel">Fasen ⌀ aussen</div>'
+    + '<div class="ergebnis"><div class="ergebnis__titel">Fasen Ø aussen</div>'
     + '<div class="ergebnis__wert ergebnis__wert--klein">' + z(fdAussen) + '<span>mm</span></div></div>'
     + '<div class="ergebnis"><div class="ergebnis__titel">Fasenlänge</div>'
     + '<div class="ergebnis__wert ergebnis__wert--klein">' + z(fs) + '<span>mm</span></div></div>'
@@ -9562,9 +9616,9 @@ function bestellungDrucken(lieferant, posten) {
     ".blatt { width: 210mm; min-height: 297mm; margin: 8mm auto; background: #fff;",
     "         padding-bottom: 20mm; box-shadow: 0 2px 12px rgba(0,0,0,.15); overflow: hidden; }",
 
-    ".balken { background: #003884; color: #fff; height: 34mm; padding: 0 16mm;",
+    ".balken { background: #003884; color: #fff; height: 30mm; padding: 0 16mm;",
     "          display: flex; align-items: center; justify-content: space-between; gap: 8mm; }",
-    ".balken img { height: 27mm; width: auto; display: block; }",
+    ".balken img { height: 21mm; width: auto; display: block; }",
     ".balken .adresse { text-align: right; font-size: 11pt; line-height: 1.55;",
     "                   white-space: nowrap; }",
     ".balken .ort { font-weight: 700; }",
@@ -11056,7 +11110,7 @@ function spielDrehzahl(b) {
     antworten.sort(() => Math.random() - 0.5);
 
     document.getElementById("sp-frage").innerHTML =
-      'Vc = <strong>' + vc + '</strong> m/min &nbsp;·&nbsp; ⌀ <strong>' + d + '</strong> mm';
+      'Vc = <strong>' + vc + '</strong> m/min &nbsp;·&nbsp; Ø <strong>' + d + '</strong> mm';
 
     document.getElementById("sp-antworten").innerHTML = antworten.map((a) =>
       '<button class="knopf" data-a="' + a + '">' + zahlText(a) + '</button>').join("");
