@@ -2535,7 +2535,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "40.0.0";
+const APP_VERSION = "40.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -4081,6 +4081,24 @@ async function ladeMaschinen(auchInaktive) {
   const { data, error } = await zeitlimit(a, 10000, "Maschinen");
   if (error) throw error;
   return (data || []).filter((m) => parkErlaubt(m.park_id));
+}
+
+// Alle Maschinen, ohne Rücksicht auf die Parkzuweisung. Für die
+// Produktion ist der Filter richtig — man sieht nur die eigenen
+// Maschinen. Wohin eine Lieferung gehen soll, ist davon aber
+// unabhängig: dort müssen alle zur Auswahl stehen.
+async function ladeAlleMaschinen() {
+  const { data, error } = await zeitlimit(
+    db.from("machines").select("*").eq("is_active", true)
+      .order("sort_order").order("name"),
+    10000, "Maschinen");
+  if (error) throw error;
+  return data || [];
+}
+
+// Text, wie die Maschine in einer Bestellung steht
+function maschineZielText(m) {
+  return m.name + (m.machine_number ? " " + m.machine_number : "");
 }
 
 async function ladeLaufendeAuftraege() {
@@ -8350,6 +8368,9 @@ const best = {
   historieSuche: "",
   bezSuche: "",
   liefSuche: "",
+  // Alle Maschinen für die Zuweisung einer Lieferung, unabhängig
+  // von der Parkzuweisung der angemeldeten Person
+  alleMaschinen: [],
 };
 
 const BESTELLSTATUS = {
@@ -8575,17 +8596,40 @@ async function bestOffen(ziel, b, bereich) {
         return;
       }
 
+      // Die Zuweisung steht als erstes Feld — sie ändert sich am
+      // häufigsten, wenn eine Lieferung doch woanders hin soll.
+      if (!(best.alleMaschinen || []).length) {
+        try { best.alleMaschinen = await ladeAlleMaschinen(); } catch (f) {}
+      }
+      const zielListe = [["lager::Lager", "Lager"]].concat(
+        (best.alleMaschinen || []).map((m) => ["maschine::" + maschineZielText(m),
+          "Maschine: " + m.name + (m.machine_number ? " · " + m.machine_number : "")]));
+      const jetzt = (z.ziel_art || "lager") + "::" + (z.ziel_text || "Lager");
+      // Steht dort etwas anderes — eine Person oder freier Text —,
+      // bleibt es als Möglichkeit erhalten, statt still zu verschwinden.
+      if (!zielListe.some(([wert]) => wert === jetzt)) {
+        zielListe.unshift([jetzt, (z.ziel_text || "Lager") + "  (bisher)"]);
+      }
+
       const w = await dialogFelder({ titel: "Bestellung bearbeiten",
         felder: [
+          { name: "ziel", label: "Zuweisung", auswahl: zielListe, wert: jetzt },
           { name: "menge", label: "Menge", typ: "number", wert: z.quantity, pflicht: true },
           { name: "frist", label: "Bis wann", typ: "date", wert: z.needed_by || "" },
           { name: "notiz", label: "Notiz", wert: z.note || "" },
         ], bestaetigen: "Speichern" });
       if (!w) return;
+
+      const trenn = String(w.ziel || jetzt).indexOf("::");
+      const zielArtNeu = String(w.ziel).slice(0, trenn);
+      const zielTextNeu = String(w.ziel).slice(trenn + 2);
+
       const { error } = await db.from("order_items").update({
         quantity: Math.max(1, Math.round(w.menge)),
         needed_by: w.frist || null,
         note: w.notiz || null,
+        ziel_art: zielArtNeu,
+        ziel_text: zielTextNeu,
       }).eq("id", z.id);
       if (error) meldung(fehlertext(error), "fehler");
       else { meldung("Gespeichert."); seiteBestellungen(b); }
@@ -8901,19 +8945,16 @@ async function positionDialog(b) {
 
     if (zielArt === "maschine") {
       zielAuswahl.hidden = false;
-      zielAuswahl.innerHTML = '<option value="">Maschine wählen</option>'
-        + (prod.maschinen || []).map((m) => '<option value="' + esc(m.name)
-            + (m.machine_number ? " " + esc(m.machine_number) : "") + '">'
+      const liste = best.alleMaschinen || [];
+      zielAuswahl.innerHTML = '<option value="">'
+        + (liste.length ? "Maschine wählen" : "Wird geladen …") + '</option>'
+        + liste.map((m) => '<option value="' + esc(maschineZielText(m)) + '">'
             + esc(m.name) + (m.machine_number ? " · " + esc(m.machine_number) : "")
             + '</option>').join("");
 
-      if (!(prod.maschinen || []).length) {
+      if (!liste.length) {
         try {
-          // Die Parks müssen zuerst da sein: ohne sie kann nicht
-          // entschieden werden, welche Maschinen jemand sehen darf,
-          // und die Liste bliebe leer.
-          if (!(prod.parks || []).length) prod.parks = await ladeParks(false);
-          prod.maschinen = await ladeMaschinen(false);
+          best.alleMaschinen = await ladeAlleMaschinen();
           zielFuellen();
         } catch (f) { meldung(fehlertext(f), "fehler"); }
       }
