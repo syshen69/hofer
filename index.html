@@ -2504,6 +2504,7 @@ body.dunkel .pw-balken__nr { color: #10151c !important; }
 .blatt__kopf h2 { margin: 0; }
 .blatt__kopf .knopf { margin-left: auto; }
 .tabelle--kopf td:first-child { width: 190px; }
+.marken { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -2552,7 +2553,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "43.1.0";
+const APP_VERSION = "43.2.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -7887,6 +7888,18 @@ async function ladeHoco(suche) {
   return data || [];
 }
 
+// Alle HOCO Nummern, die auf der Planwand vorkommen. Daraus wird
+// gezeigt, wofür noch keine Stammdaten hinterlegt sind.
+async function ladeHocoAusAuftraegen() {
+  const { data, error } = await zeitlimit(
+    db.from("jobs").select("job_number").order("job_number").limit(1000),
+    12000, "Aufträge");
+  if (error) throw error;
+  const gesehen = {};
+  (data || []).forEach((j) => { if (j.job_number) gesehen[j.job_number] = true; });
+  return Object.keys(gesehen).sort();
+}
+
 async function ladeWaschgebinde() {
   const { data, error } = await zeitlimit(
     db.from("wash_containers").select("*").order("sortierung").order("name"),
@@ -8167,10 +8180,11 @@ async function ansichtHoco(ziel, b) {
   const darf = darfSchreiben();
   ziel.innerHTML = '<div class="laedt">Wird geladen …</div>';
 
-  let teile, gebinde, typen;
+  let teile, gebinde, typen, ausPlan = [];
   try {
     [teile, gebinde, typen] = await Promise.all([
       ladeHoco(prod.hocoSuche), ladeWaschgebinde(), ladeTypen()]);
+    try { ausPlan = await ladeHocoAusAuftraegen(); } catch (f) { /* geht auch ohne */ }
   } catch (f) {
     ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p>'
       + '<p class="klein">Wurde das SQL für die Einrichtblätter schon ausgeführt?</p></div>';
@@ -8257,6 +8271,27 @@ async function ansichtHoco(ziel, b) {
       : '<p class="hinweis">' + (prod.hocoSuche ? "Nichts gefunden." : "Noch keine HOCO Nr. angelegt.") + '</p>')
     + '</section>'
 
+    + (() => {
+        // Nummern, die auf der Planwand laufen, aber noch keine
+        // Stammdaten haben. Ein Klick legt sie an.
+        const bekannt = {};
+        teile.forEach((t) => { bekannt[t.hoco_nr] = true; });
+        const offen = ausPlan.filter((nr) => !bekannt[nr]);
+        if (!offen.length) return "";
+        return '<section class="karte"><div class="karte__kopf">'
+          + '<h2>Aus der Planwand, noch ohne Stammdaten</h2>'
+          + '<span class="marke">' + offen.length + '</span></div>'
+          + '<p class="klein">Diese Nummern kommen bei Aufträgen vor. Ohne Stammdaten '
+          + 'kann ein Einrichtblatt nichts übernehmen.</p>'
+          + '<div class="marken">'
+          + offen.slice(0, 60).map((nr) => '<button class="knopf knopf--klein"'
+              + ' data-hoco-anlegen="' + esc(nr) + '">+ ' + esc(nr) + '</button>').join("")
+          + '</div>'
+          + (offen.length > 60 ? '<p class="klein">… und ' + (offen.length - 60)
+              + ' weitere.</p>' : "")
+          + '</section>';
+      })()
+
     + '<section class="karte"><div class="karte__kopf"><h2>Waschgebinde</h2></div>'
     + (gebinde.length
       ? '<table class="tabelle"><tbody>' + gebinde.map((g) =>
@@ -8286,6 +8321,13 @@ async function ansichtHoco(ziel, b) {
     const w = await hocoDialog(null, gebindeWahl);
     if (w) neuLaden();
   };
+
+  ziel.querySelectorAll("[data-hoco-anlegen]").forEach((el) => {
+    el.onclick = async () => {
+      const w = await hocoDialog(null, gebindeWahl, el.dataset.hocoAnlegen);
+      if (w) neuLaden();
+    };
+  });
 
   ziel.querySelectorAll("[data-hoco-um]").forEach((el) => {
     el.onclick = async () => {
@@ -8347,11 +8389,12 @@ async function ansichtHoco(ziel, b) {
 }
 
 // Anlegen und Bearbeiten in einem Dialog
-async function hocoDialog(teil, gebindeWahl) {
+async function hocoDialog(teil, gebindeWahl, vorgabeNr) {
   const w = await dialogFelder({
     titel: teil ? "HOCO Nr. bearbeiten" : "Neue HOCO Nr.",
     felder: [
       ...(teil ? [] : [{ name: "nr", label: "HOCO Nr.", pflicht: true,
+                        wert: vorgabeNr || "",
                         platzhalter: "z. B. 10007-0414" }]),
       { name: "bez", label: "Artikelbezeichnung", wert: teil ? (teil.bezeichnung || "") : "" },
       { name: "mat", label: "Material", wert: teil ? (teil.material || "") : "",
