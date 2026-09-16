@@ -2542,7 +2542,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "41.0.0";
+const APP_VERSION = "41.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -7387,8 +7387,11 @@ async function ladeTypAufbau(typId) {
 
 // Vierstellig: Path-Nummer, Platznummer, dann die Unternummer.
 // Path 3, Platz 1, ohne Unternummer ergibt T3100.
-function toolNummer(pathNr, platzNr, unterNr) {
-  return "T" + (pathNr || 1) + (platzNr || 1) + String(unterNr || 0).padStart(2, "0");
+// Manche Maschinen führen auf Path 1 nur drei Stellen — dann bleibt
+// die Path-Stelle weg und daraus wird T100.
+function toolNummer(pathNr, platzNr, unterNr, mitPath) {
+  return "T" + (mitPath === false ? "" : (pathNr || 1))
+    + (platzNr || 1) + String(unterNr || 0).padStart(2, "0");
 }
 
 function werkzeugText(w) {
@@ -7478,15 +7481,15 @@ async function ansichtTypen(ziel, b) {
 
   let typen, arten;
   try {
-    typen = await ladeTypen();
-    arten = await ladeWerkzeugarten();
+    // Beides gleichzeitig holen. Nacheinander dauerte spürbar länger.
+    [typen, arten] = await Promise.all([ladeTypen(), ladeWerkzeugarten()]);
   } catch (f) {
     ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p>'
       + '<p class="klein">Wurde das SQL für die Einrichtblätter schon ausgeführt?</p></div>';
     return;
   }
 
-  const neuLaden = () => seiteProduktion(b);
+  const neuLaden = () => { prod.typen = null; seiteProduktion(b); };
 
   // ----- Übersicht aller Typen -----
   if (!prod.typOffen) {
@@ -7648,12 +7651,10 @@ async function ansichtTypen(ziel, b) {
         + ((p.type_slots || []).length
           ? (p.type_slots || []).map((s) => '<div class="platz">'
               + '<div class="platz__kopf">'
-              + '<strong>' + esc(s.bezeichnung) + '</strong>'
-              + ' <span class="klein">Platz ' + (s.platz_nr || 1)
-              + (s.tool_kinds || s.kind_id
-                  ? " · " + esc((arten.find((k) => k.id === s.kind_id) || {}).name || "ohne Art")
-                  : " · ohne Art")
-              + '</span>'
+              + '<strong>'
+              + esc((arten.find((k) => k.id === s.kind_id) || {}).name || "ohne Art")
+              + '</strong>'
+              + ' <span class="klein">Platz ' + (s.platz_nr || 1) + '</span>'
               + (darf ? '<span class="platz__aktionen">'
                   + '<button class="linkknopf" data-werkzeug-neu="' + esc(s.id) + '">+ Werkzeug</button>'
                   + '<button class="linkknopf" data-platz-um="' + esc(s.id) + '">Bearbeiten</button>'
@@ -7664,7 +7665,7 @@ async function ansichtTypen(ziel, b) {
               + ((s.slot_tools || []).length
                 ? '<table class="tabelle"><tbody>' + (s.slot_tools || []).map((w) =>
                     '<tr><td class="nowrap"><strong>'
-                    + esc(w.tool_nr || toolNummer(p.nummer, s.platz_nr, w.unter_nr))
+                    + esc(w.tool_nr || toolNummer(p.nummer, s.platz_nr, w.unter_nr, p.nr_mit_path))
                     + '</strong></td>'
                     + '<td>' + esc(werkzeugText(w))
                     + (w.hinweis ? '<div class="klein">' + esc(w.hinweis) + '</div>' : "")
@@ -7690,12 +7691,16 @@ async function ansichtTypen(ziel, b) {
       felder: [
         { name: "name", label: "Name", pflicht: true, wert: "Path " + (paths.length + 1) },
         { name: "nummer", label: "Nummer", typ: "number", wert: paths.length + 1,
-          hinweis: "Erste Stelle der Toolnummer" }],
+          hinweis: "Erste Stelle der Toolnummer" },
+        { name: "stellen", label: "Toolnummer", wert: "mit",
+          auswahl: [["mit", "vierstellig, z. B. T1100"], ["ohne", "dreistellig, z. B. T100"]],
+          hinweis: "Ohne Path-Stelle bei Maschinen, die nur drei Stellen führen" }],
       bestaetigen: "Anlegen" });
     if (!w) return;
     const { error } = await db.from("type_paths").insert({
       type_id: typ.id, name: w.name,
       nummer: Math.max(1, Math.round(Number(w.nummer) || 1)),
+      nr_mit_path: w.stellen !== "ohne",
       sortierung: paths.length + 1 });
     if (error) meldung(fehlertext(error), "fehler");
     else { meldung("Path angelegt."); neuLaden(); }
@@ -7707,10 +7712,15 @@ async function ansichtTypen(ziel, b) {
       const w = await dialogFelder({ titel: "Path bearbeiten",
         felder: [
           { name: "name", label: "Name", wert: p.name, pflicht: true },
-          { name: "nummer", label: "Nummer", typ: "number", wert: p.nummer || 1 }] });
+          { name: "nummer", label: "Nummer", typ: "number", wert: p.nummer || 1 },
+          { name: "stellen", label: "Toolnummer",
+            wert: p.nr_mit_path === false ? "ohne" : "mit",
+            auswahl: [["mit", "vierstellig, z. B. T1100"],
+                      ["ohne", "dreistellig, z. B. T100"]] }] });
       if (!w) return;
       const { error } = await db.from("type_paths").update({
-        name: w.name, nummer: Math.max(1, Math.round(Number(w.nummer) || 1)) }).eq("id", p.id);
+        name: w.name, nummer: Math.max(1, Math.round(Number(w.nummer) || 1)),
+        nr_mit_path: w.stellen !== "ohne" }).eq("id", p.id);
       if (error) meldung(fehlertext(error), "fehler");
       else { meldung("Gespeichert."); neuLaden(); }
     };
@@ -7737,16 +7747,18 @@ async function ansichtTypen(ziel, b) {
       const anzahl = (p.type_slots || []).length;
       const w = await dialogFelder({ titel: "Neuer Werkzeugplatz",
         felder: [
-          { name: "name", label: "Bezeichnung", pflicht: true,
-            platzhalter: "z. B. Front Bohrhalter" },
           { name: "art", label: "Art", auswahl: artenWahl, wert: "" },
           { name: "nummer", label: "Platznummer", typ: "number", wert: anzahl + 1,
             hinweis: "Zweite Stelle der Toolnummer" },
           { name: "hinweis", label: "Hinweis", wert: "" }],
         bestaetigen: "Anlegen" });
       if (!w) return;
+      // Die Bezeichnung wird nicht mehr abgefragt — sie ergibt sich
+      // aus der Art und der Platznummer.
+      const platzName = ((arten.find((k) => k.id === w.art) || {}).name || "Platz")
+        + " " + Math.max(1, Math.round(Number(w.nummer) || 1));
       const { error } = await db.from("type_slots").insert({
-        path_id: p.id, bezeichnung: w.name, kind_id: w.art || null,
+        path_id: p.id, bezeichnung: platzName, kind_id: w.art || null,
         platz_nr: Math.max(1, Math.round(Number(w.nummer) || 1)),
         hinweis: w.hinweis || null, sortierung: anzahl + 1 });
       if (error) meldung(fehlertext(error), "fehler");
@@ -7768,13 +7780,14 @@ async function ansichtTypen(ziel, b) {
       if (!g) return;
       const w = await dialogFelder({ titel: "Werkzeugplatz bearbeiten",
         felder: [
-          { name: "name", label: "Bezeichnung", wert: g.slot.bezeichnung, pflicht: true },
           { name: "art", label: "Art", auswahl: artenWahl, wert: g.slot.kind_id || "" },
           { name: "nummer", label: "Platznummer", typ: "number", wert: g.slot.platz_nr || 1 },
           { name: "hinweis", label: "Hinweis", wert: g.slot.hinweis || "" }] });
       if (!w) return;
+      const platzName = ((arten.find((k) => k.id === w.art) || {}).name || "Platz")
+        + " " + Math.max(1, Math.round(Number(w.nummer) || 1));
       const { error } = await db.from("type_slots").update({
-        bezeichnung: w.name, kind_id: w.art || null,
+        bezeichnung: platzName, kind_id: w.art || null,
         platz_nr: Math.max(1, Math.round(Number(w.nummer) || 1)),
         hinweis: w.hinweis || null }).eq("id", g.slot.id);
       if (error) meldung(fehlertext(error), "fehler");
@@ -7786,7 +7799,8 @@ async function ansichtTypen(ziel, b) {
     el.onclick = async () => {
       const ok = await doppeltNachfragen(
         { titel: "Werkzeugplatz löschen",
-          text: '"' + el.dataset.name + '" löschen? Die Werkzeuge darauf gehen mit.',
+          text: "Soll dieser Werkzeugplatz gelöscht werden? "
+              + "Die Werkzeuge darauf gehen mit.",
           bestaetigen: "Weiter zum Löschen", gefahr: true },
         { titel: "Wirklich endgültig löschen?",
           text: "Letzte Rückfrage.", bestaetigen: "Endgültig löschen", gefahr: true });
@@ -7805,7 +7819,8 @@ async function ansichtTypen(ziel, b) {
       if (!wahl) return;
 
       const anzahl = (g.slot.slot_tools || []).length;
-      const vorschlag = toolNummer(g.path.nummer, g.slot.platz_nr, anzahl);
+      const vorschlag = toolNummer(g.path.nummer, g.slot.platz_nr, anzahl,
+        g.path.nr_mit_path);
       const w = await dialogFelder({ titel: "Werkzeug hinzufügen",
         felder: [
           { name: "nr", label: "Toolnummer", wert: vorschlag,
@@ -7858,7 +7873,8 @@ async function ansichtTypen(ziel, b) {
         felder: [
           { name: "nr", label: "Toolnummer",
             wert: g.werkzeug.tool_nr
-              || toolNummer(g.path.nummer, g.slot.platz_nr, g.werkzeug.unter_nr) },
+              || toolNummer(g.path.nummer, g.slot.platz_nr, g.werkzeug.unter_nr,
+                            g.path.nr_mit_path) },
           { name: "hinweis", label: "Hinweis", wert: g.werkzeug.hinweis || "" }] });
       if (!w) return;
       const { error } = await db.from("slot_tools")
@@ -7884,8 +7900,11 @@ async function ansichtTypen(ziel, b) {
 
 async function ansichtMaschinen(ziel, b) {
   const darf = darfSchreiben();
-  // Nur für die Anzeige des Typnamens in der Liste
-  try { prod.typen = await ladeTypen(); } catch (f) { prod.typen = []; }
+  // Nur für die Anzeige des Typnamens in der Liste. Einmal geholt
+  // und gemerkt — sonst lädt jeder Aufruf der Seite neu.
+  if (!prod.typen) {
+    try { prod.typen = await ladeTypen(); } catch (f) { prod.typen = []; }
+  }
 
   ziel.innerHTML = prod.parks.map((p) => {
     const maschinen = prod.maschinen.filter((m) => m.park_id === p.id);
