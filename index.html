@@ -2487,6 +2487,13 @@ body.dunkel .pw-balken,
 body.dunkel .pw-zeile1,
 body.dunkel .pw-zeile2,
 body.dunkel .pw-balken__nr { color: #10151c !important; }
+/* ---------- Werkzeugplätze im Maschinentyp ---------- */
+.platz { border: 1px solid var(--linie); border-radius: var(--radius);
+         padding: 10px 12px; margin-bottom: 10px; background: var(--grund); }
+.platz__kopf { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+               margin-bottom: 4px; }
+.platz__aktionen { margin-left: auto; display: flex; gap: 10px; flex-wrap: wrap; }
+.platz .tabelle { margin-top: 6px; }
 </style>
 </head>
 <body>
@@ -2535,7 +2542,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "40.1.0";
+const APP_VERSION = "41.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -3974,6 +3981,7 @@ async function doppeltNachfragen(erste, zweite) {
 
 const prod = {
   ansicht: "erfassen",
+  typOffen: null,
   suche: "",
   trefferNr: 0,
   letzteSuche: "",
@@ -4176,7 +4184,7 @@ async function seiteProduktion(b) {
   b.innerHTML = '<h1 class="seitentitel">Produktion</h1>'
     + '<div class="reiter">'
     + (isMobil() ? [["erfassen", "Erfassen"]]
-        : [["erfassen", "Erfassen"], ["maschinen", "Maschinen"]])
+        : [["erfassen", "Erfassen"], ["maschinen", "Maschinen"], ["typen", "Typen"]])
         .map(([w, t]) => '<button class="reiter__knopf' + (prod.ansicht === w ? " aktiv" : "")
           + '" data-ansicht="' + w + '">' + t + '</button>').join("")
     + '</div>'
@@ -4201,7 +4209,9 @@ async function seiteProduktion(b) {
     return;
   }
 
-  if (prod.ansicht === "maschinen" && isMobil()) prod.ansicht = "erfassen";
+  if ((prod.ansicht === "maschinen" || prod.ansicht === "typen") && isMobil())
+    prod.ansicht = "erfassen";
+  if (prod.ansicht === "typen") { await ansichtTypen(ziel, b); reiterUebergang(ziel); return; }
   if (prod.ansicht === "maschinen") { await ansichtMaschinen(ziel, b); reiterUebergang(ziel); return; }
   // Übersicht gibt es nicht mehr; alter Verweis fällt auf Erfassen zurück
   if (prod.ansicht === "uebersicht") prod.ansicht = "erfassen";
@@ -7333,8 +7343,549 @@ async function ansichtUebersicht(ziel, b) {
 //  MASCHINEN VERWALTEN
 // =================================================================
 
-function ansichtMaschinen(ziel, b) {
+
+// =================================================================
+//  MASCHINENTYPEN
+//  Typ → Path → Werkzeugplatz → Werkzeug(e)
+//  Die Bestückung hängt am Typ. Jede Maschine bekommt einen Typ
+//  zugewiesen und erbt damit den ganzen Aufbau.
+// =================================================================
+
+async function ladeTypen() {
+  const { data, error } = await zeitlimit(
+    db.from("machine_types").select("*").order("name"), 10000, "Maschinentypen");
+  if (error) throw error;
+  return data || [];
+}
+
+async function ladeWerkzeugarten() {
+  const { data, error } = await zeitlimit(
+    db.from("tool_kinds").select("*").order("sortierung").order("name"),
+    10000, "Werkzeugarten");
+  if (error) throw error;
+  return data || [];
+}
+
+// Paths mit ihren Plätzen und den Werkzeugen darauf, in einem Zug
+async function ladeTypAufbau(typId) {
+  const { data, error } = await zeitlimit(
+    db.from("type_paths")
+      .select("*, type_slots(*, slot_tools(*, articles(article_number, name)))")
+      .eq("type_id", typId).order("sortierung"),
+    12000, "Aufbau des Typs");
+  if (error) throw error;
+  return (data || []).map((p) => {
+    p.type_slots = (p.type_slots || []).slice()
+      .sort((a, c) => (a.sortierung - c.sortierung) || (a.platz_nr - c.platz_nr));
+    p.type_slots.forEach((s) => {
+      s.slot_tools = (s.slot_tools || []).slice()
+        .sort((a, c) => (a.sortierung - c.sortierung) || (a.unter_nr - c.unter_nr));
+    });
+    return p;
+  });
+}
+
+// Vierstellig: Path-Nummer, Platznummer, dann die Unternummer.
+// Path 3, Platz 1, ohne Unternummer ergibt T3100.
+function toolNummer(pathNr, platzNr, unterNr) {
+  return "T" + (pathNr || 1) + (platzNr || 1) + String(unterNr || 0).padStart(2, "0");
+}
+
+function werkzeugText(w) {
+  if (w.articles) {
+    return w.articles.article_number
+      + (w.articles.name ? " · " + w.articles.name : "");
+  }
+  return w.frei_text || "— noch nichts zugewiesen —";
+}
+
+// ---------- Artikel auswählen, mit der Möglichkeit neu anzulegen ----------
+
+function artikelWaehlen(vorgabe) {
+  return new Promise((fertig) => {
+    const nr = "aw" + (++dialogZaehler) + "-";
+    const huelle = document.createElement("div");
+    huelle.className = "dialog-huelle";
+    huelle.innerHTML = '<div class="dialog"><h2>Werkzeug wählen</h2>'
+      + '<div class="suchleiste">'
+      + '<input type="text" id="' + nr + 'such" placeholder="Artikelnummer oder Bezeichnung"'
+      + ' autocomplete="off" value="' + esc(vorgabe || "") + '"></div>'
+      + '<div class="pd-treffer" id="' + nr + 'treffer"></div>'
+      + '<div class="dialog__knoepfe">'
+      + '<button class="knopf knopf--still" data-nein>Abbrechen</button>'
+      + '<button class="knopf" data-leer>Ohne Artikel, freier Text</button>'
+      + '</div></div>';
+    document.body.appendChild(huelle);
+
+    const zu = (wert) => { huelle.remove(); fertig(wert); };
+    huelle.querySelector("[data-nein]").onclick = () => zu(null);
+    huelle.onclick = (e) => { if (e.target === huelle) zu(null); };
+    huelle.querySelector("[data-leer]").onclick = async () => {
+      const w = await dialogFelder({ titel: "Freier Text",
+        felder: [{ name: "text", label: "Werkzeug", pflicht: true,
+                   wert: huelle.querySelector("#" + nr + "such").value }] });
+      if (w) zu({ frei_text: w.text });
+    };
+
+    const feld = huelle.querySelector("#" + nr + "such");
+    const box = huelle.querySelector("#" + nr + "treffer");
+
+    const suchen = async () => {
+      const t = feld.value.trim();
+      if (!t) { box.innerHTML = ""; return; }
+      box.innerHTML = '<div class="laedt">Wird gesucht …</div>';
+      try {
+        const liste = await sucheArtikel(t);
+        box.innerHTML = (liste.length
+          ? liste.slice(0, 8).map((a) => '<button class="pd-zeile" data-w="' + esc(a.id) + '">'
+              + '<strong>' + esc(a.article_number) + '</strong> ' + esc(a.name)
+              + '<span class="klein"> ' + esc(a.supplier_name || "ohne Lieferant") + '</span>'
+              + '</button>').join("")
+          : '<p class="hinweis">Kein Artikel gefunden.</p>')
+          + (darfSchreiben()
+              ? '<button class="pd-zeile pd-zeile--neu" data-neu>+ Artikel "'
+                + esc(t) + '" neu anlegen</button>' : "");
+
+        const neu = box.querySelector("[data-neu]");
+        if (neu) neu.onclick = async () => {
+          const a = await artikelSchnellAnlegen(feld.value.trim());
+          if (a) zu({ article_id: a.id });
+        };
+        box.querySelectorAll("[data-w]").forEach((el) => {
+          el.onclick = () => zu({ article_id: el.dataset.w });
+        });
+      } catch (f) {
+        box.innerHTML = '<p class="hinweis">' + esc(fehlertext(f)) + '</p>';
+      }
+    };
+
+    let taste = null;
+    feld.oninput = () => { clearTimeout(taste); taste = setTimeout(suchen, 300); };
+    feld.onkeydown = (e) => {
+      if (e.key === "Enter") { e.preventDefault(); clearTimeout(taste); suchen(); }
+      if (e.key === "Escape") zu(null);
+    };
+    feld.focus();
+    if (vorgabe) suchen();
+  });
+}
+
+// ---------- Die Seite ----------
+
+async function ansichtTypen(ziel, b) {
   const darf = darfSchreiben();
+  ziel.innerHTML = '<div class="laedt">Wird geladen …</div>';
+
+  let typen, arten;
+  try {
+    typen = await ladeTypen();
+    arten = await ladeWerkzeugarten();
+  } catch (f) {
+    ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p>'
+      + '<p class="klein">Wurde das SQL für die Einrichtblätter schon ausgeführt?</p></div>';
+    return;
+  }
+
+  const neuLaden = () => seiteProduktion(b);
+
+  // ----- Übersicht aller Typen -----
+  if (!prod.typOffen) {
+    ziel.innerHTML = '<section class="karte">'
+      + '<div class="karte__kopf"><h2>Maschinentypen</h2></div>'
+      + (typen.length
+        ? '<table class="tabelle"><tbody>' + typen.map((t) =>
+            '<tr><td><strong>' + esc(t.name) + '</strong>'
+            + (t.beschreibung ? '<div class="klein">' + esc(t.beschreibung) + '</div>' : "")
+            + '</td><td class="rechts nowrap">'
+            + '<button class="linkknopf" data-typ-auf="' + esc(t.id) + '">Aufbau</button> '
+            + (darf ? '<button class="linkknopf" data-typ-um="' + esc(t.id) + '">Bearbeiten</button> '
+                + '<button class="linkknopf linkknopf--gefahr" data-typ-weg="' + esc(t.id)
+                + '" data-name="' + esc(t.name) + '">Löschen</button>' : "")
+            + '</td></tr>').join("") + '</tbody></table>'
+        : '<p class="hinweis">Noch kein Typ angelegt.</p>')
+      + (darf ? '<button class="knopf knopf--klein" id="typ-neu">+ Maschinentyp</button>' : "")
+      + '</section>'
+
+      + '<section class="karte">'
+      + '<div class="karte__kopf"><h2>Arten von Werkzeugplätzen</h2></div>'
+      + (arten.length
+        ? '<table class="tabelle"><tbody>' + arten.map((k) =>
+            '<tr><td>' + esc(k.name) + '</td><td class="rechts nowrap">'
+            + (darf ? '<button class="linkknopf" data-art-um="' + esc(k.id) + '">Bearbeiten</button> '
+                + '<button class="linkknopf linkknopf--gefahr" data-art-weg="' + esc(k.id)
+                + '" data-name="' + esc(k.name) + '">Löschen</button>' : "")
+            + '</td></tr>').join("") + '</tbody></table>'
+        : '<p class="hinweis">Noch keine Art angelegt.</p>')
+      + (darf ? '<button class="knopf knopf--klein" id="art-neu">+ Art</button>' : "")
+      + '</section>';
+
+    ziel.querySelectorAll("[data-typ-auf]").forEach((el) => {
+      el.onclick = () => { prod.typOffen = el.dataset.typAuf; neuLaden(); };
+    });
+
+    if (!darf) return;
+
+    document.getElementById("typ-neu").onclick = async () => {
+      const w = await dialogFelder({ titel: "Neuer Maschinentyp",
+        felder: [
+          { name: "name", label: "Name", pflicht: true, platzhalter: "z. B. Star SR-32J" },
+          { name: "text", label: "Beschreibung", wert: "" }],
+        bestaetigen: "Anlegen" });
+      if (!w) return;
+      const { error } = await db.from("machine_types")
+        .insert({ name: w.name, beschreibung: w.text || null });
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Typ angelegt."); neuLaden(); }
+    };
+
+    ziel.querySelectorAll("[data-typ-um]").forEach((el) => {
+      el.onclick = async () => {
+        const t = typen.find((x) => x.id === el.dataset.typUm) || {};
+        const w = await dialogFelder({ titel: "Maschinentyp bearbeiten",
+          felder: [
+            { name: "name", label: "Name", wert: t.name, pflicht: true },
+            { name: "text", label: "Beschreibung", wert: t.beschreibung || "" }] });
+        if (!w) return;
+        const { error } = await db.from("machine_types")
+          .update({ name: w.name, beschreibung: w.text || null }).eq("id", t.id);
+        if (error) meldung(fehlertext(error), "fehler");
+        else { meldung("Gespeichert."); neuLaden(); }
+      };
+    });
+
+    ziel.querySelectorAll("[data-typ-weg]").forEach((el) => {
+      el.onclick = async () => {
+        const ok = await doppeltNachfragen(
+          { titel: "Typ löschen",
+            text: 'Soll der Typ "' + el.dataset.name + '" gelöscht werden? '
+                + "Paths, Plätze und Werkzeuge gehen mit. Maschinen mit diesem Typ "
+                + "bleiben erhalten, stehen danach aber ohne Typ da.",
+            bestaetigen: "Weiter zum Löschen", gefahr: true },
+          { titel: "Wirklich endgültig löschen?",
+            text: "Letzte Rückfrage. Danach ist der ganze Aufbau weg.",
+            bestaetigen: "Endgültig löschen", gefahr: true });
+        if (!ok) return;
+        const { error } = await db.from("machine_types").delete().eq("id", el.dataset.typWeg);
+        if (error) meldung(fehlertext(error), "fehler");
+        else { meldung("Typ gelöscht."); neuLaden(); }
+      };
+    });
+
+    document.getElementById("art-neu").onclick = async () => {
+      const w = await dialogFelder({ titel: "Neue Art",
+        felder: [{ name: "name", label: "Bezeichnung", pflicht: true,
+                   platzhalter: "z. B. Front Bohr-/Ausdrehwerkzeug" }],
+        bestaetigen: "Anlegen" });
+      if (!w) return;
+      const { error } = await db.from("tool_kinds")
+        .insert({ name: w.name, sortierung: arten.length + 1 });
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Art angelegt."); neuLaden(); }
+    };
+
+    ziel.querySelectorAll("[data-art-um]").forEach((el) => {
+      el.onclick = async () => {
+        const k = arten.find((x) => x.id === el.dataset.artUm) || {};
+        const w = await dialogFelder({ titel: "Art bearbeiten",
+          felder: [{ name: "name", label: "Bezeichnung", wert: k.name, pflicht: true }] });
+        if (!w) return;
+        const { error } = await db.from("tool_kinds").update({ name: w.name }).eq("id", k.id);
+        if (error) meldung(fehlertext(error), "fehler");
+        else { meldung("Gespeichert."); neuLaden(); }
+      };
+    });
+
+    ziel.querySelectorAll("[data-art-weg]").forEach((el) => {
+      el.onclick = async () => {
+        const ok = await doppeltNachfragen(
+          { titel: "Art löschen",
+            text: '"' + el.dataset.name + '" wirklich löschen? Plätze mit dieser Art '
+                + "bleiben erhalten, stehen danach aber ohne Art da.",
+            bestaetigen: "Weiter zum Löschen", gefahr: true },
+          { titel: "Wirklich endgültig löschen?",
+            text: "Letzte Rückfrage.", bestaetigen: "Endgültig löschen", gefahr: true });
+        if (!ok) return;
+        const { error } = await db.from("tool_kinds").delete().eq("id", el.dataset.artWeg);
+        if (error) meldung(fehlertext(error), "fehler");
+        else { meldung("Art gelöscht."); neuLaden(); }
+      };
+    });
+    return;
+  }
+
+  // ----- Aufbau eines Typs -----
+  const typ = typen.find((x) => x.id === prod.typOffen);
+  if (!typ) { prod.typOffen = null; neuLaden(); return; }
+
+  let paths;
+  try { paths = await ladeTypAufbau(typ.id); }
+  catch (f) {
+    ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  const artenWahl = [["", "ohne Art"]].concat(arten.map((k) => [k.id, k.name]));
+
+  ziel.innerHTML = '<button class="linkknopf" id="typ-zurueck">‹ alle Typen</button>'
+    + '<section class="karte"><div class="karte__kopf"><h2>' + esc(typ.name) + '</h2>'
+    + (darf ? '<div class="karte__aktionen">'
+        + '<button class="knopf knopf--klein" id="path-neu">+ Path</button></div>' : "")
+    + '</div>'
+    + (typ.beschreibung ? '<p class="klein">' + esc(typ.beschreibung) + '</p>' : "")
+    + (paths.length ? "" : '<p class="hinweis">Noch kein Path angelegt. '
+        + 'Die meisten Maschinen haben zwei oder drei.</p>')
+    + '</section>'
+
+    + paths.map((p) => '<section class="karte">'
+        + '<div class="karte__kopf"><h2>' + esc(p.name)
+        + ' <span class="klein">Nr. ' + (p.nummer || 1) + '</span></h2>'
+        + (darf ? '<div class="karte__aktionen">'
+            + '<button class="linkknopf" data-path-um="' + esc(p.id) + '">Bearbeiten</button>'
+            + '<button class="linkknopf linkknopf--gefahr" data-path-weg="' + esc(p.id)
+            + '" data-name="' + esc(p.name) + '">Löschen</button></div>' : "")
+        + '</div>'
+
+        + ((p.type_slots || []).length
+          ? (p.type_slots || []).map((s) => '<div class="platz">'
+              + '<div class="platz__kopf">'
+              + '<strong>' + esc(s.bezeichnung) + '</strong>'
+              + ' <span class="klein">Platz ' + (s.platz_nr || 1)
+              + (s.tool_kinds || s.kind_id
+                  ? " · " + esc((arten.find((k) => k.id === s.kind_id) || {}).name || "ohne Art")
+                  : " · ohne Art")
+              + '</span>'
+              + (darf ? '<span class="platz__aktionen">'
+                  + '<button class="linkknopf" data-werkzeug-neu="' + esc(s.id) + '">+ Werkzeug</button>'
+                  + '<button class="linkknopf" data-platz-um="' + esc(s.id) + '">Bearbeiten</button>'
+                  + '<button class="linkknopf linkknopf--gefahr" data-platz-weg="' + esc(s.id)
+                  + '" data-name="' + esc(s.bezeichnung) + '">Löschen</button></span>' : "")
+              + '</div>'
+              + (s.hinweis ? '<div class="klein">' + esc(s.hinweis) + '</div>' : "")
+              + ((s.slot_tools || []).length
+                ? '<table class="tabelle"><tbody>' + (s.slot_tools || []).map((w) =>
+                    '<tr><td class="nowrap"><strong>'
+                    + esc(w.tool_nr || toolNummer(p.nummer, s.platz_nr, w.unter_nr))
+                    + '</strong></td>'
+                    + '<td>' + esc(werkzeugText(w))
+                    + (w.hinweis ? '<div class="klein">' + esc(w.hinweis) + '</div>' : "")
+                    + '</td>'
+                    + (darf ? '<td class="rechts nowrap">'
+                        + '<button class="linkknopf" data-werkzeug-um="' + esc(w.id) + '">Bearbeiten</button> '
+                        + '<button class="linkknopf linkknopf--gefahr" data-werkzeug-weg="'
+                        + esc(w.id) + '">Löschen</button></td>' : "")
+                    + '</tr>').join("") + '</tbody></table>'
+                : '<p class="hinweis">Noch kein Werkzeug auf diesem Platz.</p>')
+              + '</div>').join("")
+          : '<p class="hinweis">Noch kein Werkzeugplatz auf diesem Path.</p>')
+
+        + (darf ? '<button class="knopf knopf--klein" data-platz-neu="' + esc(p.id)
+            + '">+ Werkzeugplatz</button>' : "")
+        + '</section>').join("");
+
+  document.getElementById("typ-zurueck").onclick = () => { prod.typOffen = null; neuLaden(); };
+  if (!darf) return;
+
+  document.getElementById("path-neu").onclick = async () => {
+    const w = await dialogFelder({ titel: "Neuer Path",
+      felder: [
+        { name: "name", label: "Name", pflicht: true, wert: "Path " + (paths.length + 1) },
+        { name: "nummer", label: "Nummer", typ: "number", wert: paths.length + 1,
+          hinweis: "Erste Stelle der Toolnummer" }],
+      bestaetigen: "Anlegen" });
+    if (!w) return;
+    const { error } = await db.from("type_paths").insert({
+      type_id: typ.id, name: w.name,
+      nummer: Math.max(1, Math.round(Number(w.nummer) || 1)),
+      sortierung: paths.length + 1 });
+    if (error) meldung(fehlertext(error), "fehler");
+    else { meldung("Path angelegt."); neuLaden(); }
+  };
+
+  ziel.querySelectorAll("[data-path-um]").forEach((el) => {
+    el.onclick = async () => {
+      const p = paths.find((x) => x.id === el.dataset.pathUm) || {};
+      const w = await dialogFelder({ titel: "Path bearbeiten",
+        felder: [
+          { name: "name", label: "Name", wert: p.name, pflicht: true },
+          { name: "nummer", label: "Nummer", typ: "number", wert: p.nummer || 1 }] });
+      if (!w) return;
+      const { error } = await db.from("type_paths").update({
+        name: w.name, nummer: Math.max(1, Math.round(Number(w.nummer) || 1)) }).eq("id", p.id);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Gespeichert."); neuLaden(); }
+    };
+  });
+
+  ziel.querySelectorAll("[data-path-weg]").forEach((el) => {
+    el.onclick = async () => {
+      const ok = await doppeltNachfragen(
+        { titel: "Path löschen",
+          text: '"' + el.dataset.name + '" löschen? Alle Plätze und Werkzeuge darauf gehen mit.',
+          bestaetigen: "Weiter zum Löschen", gefahr: true },
+        { titel: "Wirklich endgültig löschen?",
+          text: "Letzte Rückfrage.", bestaetigen: "Endgültig löschen", gefahr: true });
+      if (!ok) return;
+      const { error } = await db.from("type_paths").delete().eq("id", el.dataset.pathWeg);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Path gelöscht."); neuLaden(); }
+    };
+  });
+
+  ziel.querySelectorAll("[data-platz-neu]").forEach((el) => {
+    el.onclick = async () => {
+      const p = paths.find((x) => x.id === el.dataset.platzNeu) || {};
+      const anzahl = (p.type_slots || []).length;
+      const w = await dialogFelder({ titel: "Neuer Werkzeugplatz",
+        felder: [
+          { name: "name", label: "Bezeichnung", pflicht: true,
+            platzhalter: "z. B. Front Bohrhalter" },
+          { name: "art", label: "Art", auswahl: artenWahl, wert: "" },
+          { name: "nummer", label: "Platznummer", typ: "number", wert: anzahl + 1,
+            hinweis: "Zweite Stelle der Toolnummer" },
+          { name: "hinweis", label: "Hinweis", wert: "" }],
+        bestaetigen: "Anlegen" });
+      if (!w) return;
+      const { error } = await db.from("type_slots").insert({
+        path_id: p.id, bezeichnung: w.name, kind_id: w.art || null,
+        platz_nr: Math.max(1, Math.round(Number(w.nummer) || 1)),
+        hinweis: w.hinweis || null, sortierung: anzahl + 1 });
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Platz angelegt."); neuLaden(); }
+    };
+  });
+
+  const platzSuchen = (id) => {
+    for (const p of paths) {
+      const s = (p.type_slots || []).find((x) => x.id === id);
+      if (s) return { path: p, slot: s };
+    }
+    return null;
+  };
+
+  ziel.querySelectorAll("[data-platz-um]").forEach((el) => {
+    el.onclick = async () => {
+      const g = platzSuchen(el.dataset.platzUm);
+      if (!g) return;
+      const w = await dialogFelder({ titel: "Werkzeugplatz bearbeiten",
+        felder: [
+          { name: "name", label: "Bezeichnung", wert: g.slot.bezeichnung, pflicht: true },
+          { name: "art", label: "Art", auswahl: artenWahl, wert: g.slot.kind_id || "" },
+          { name: "nummer", label: "Platznummer", typ: "number", wert: g.slot.platz_nr || 1 },
+          { name: "hinweis", label: "Hinweis", wert: g.slot.hinweis || "" }] });
+      if (!w) return;
+      const { error } = await db.from("type_slots").update({
+        bezeichnung: w.name, kind_id: w.art || null,
+        platz_nr: Math.max(1, Math.round(Number(w.nummer) || 1)),
+        hinweis: w.hinweis || null }).eq("id", g.slot.id);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Gespeichert."); neuLaden(); }
+    };
+  });
+
+  ziel.querySelectorAll("[data-platz-weg]").forEach((el) => {
+    el.onclick = async () => {
+      const ok = await doppeltNachfragen(
+        { titel: "Werkzeugplatz löschen",
+          text: '"' + el.dataset.name + '" löschen? Die Werkzeuge darauf gehen mit.',
+          bestaetigen: "Weiter zum Löschen", gefahr: true },
+        { titel: "Wirklich endgültig löschen?",
+          text: "Letzte Rückfrage.", bestaetigen: "Endgültig löschen", gefahr: true });
+      if (!ok) return;
+      const { error } = await db.from("type_slots").delete().eq("id", el.dataset.platzWeg);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Platz gelöscht."); neuLaden(); }
+    };
+  });
+
+  ziel.querySelectorAll("[data-werkzeug-neu]").forEach((el) => {
+    el.onclick = async () => {
+      const g = platzSuchen(el.dataset.werkzeugNeu);
+      if (!g) return;
+      const wahl = await artikelWaehlen("");
+      if (!wahl) return;
+
+      const anzahl = (g.slot.slot_tools || []).length;
+      const vorschlag = toolNummer(g.path.nummer, g.slot.platz_nr, anzahl);
+      const w = await dialogFelder({ titel: "Werkzeug hinzufügen",
+        felder: [
+          { name: "nr", label: "Toolnummer", wert: vorschlag,
+            hinweis: "Path, Platz, Unternummer — änderbar" },
+          { name: "hinweis", label: "Hinweis", wert: "" }],
+        bestaetigen: "Hinzufügen" });
+      if (!w) return;
+
+      const { error } = await db.from("slot_tools").insert({
+        slot_id: g.slot.id, unter_nr: anzahl, tool_nr: w.nr || vorschlag,
+        article_id: wahl.article_id || null, frei_text: wahl.frei_text || null,
+        hinweis: w.hinweis || null, sortierung: anzahl + 1 });
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Werkzeug hinzugefügt."); neuLaden(); }
+    };
+  });
+
+  const werkzeugSuchen = (id) => {
+    for (const p of paths) {
+      for (const s of (p.type_slots || [])) {
+        const w = (s.slot_tools || []).find((x) => x.id === id);
+        if (w) return { path: p, slot: s, werkzeug: w };
+      }
+    }
+    return null;
+  };
+
+  ziel.querySelectorAll("[data-werkzeug-um]").forEach((el) => {
+    el.onclick = async () => {
+      const g = werkzeugSuchen(el.dataset.werkzeugUm);
+      if (!g) return;
+      const wahl = await auswahlDialog("Werkzeug bearbeiten", [
+        ["artikel", "Anderes Werkzeug zuweisen"],
+        ["daten", "Toolnummer und Hinweis ändern"],
+      ]);
+      if (!wahl) return;
+
+      if (wahl === "artikel") {
+        const a = await artikelWaehlen(g.werkzeug.frei_text || "");
+        if (!a) return;
+        const { error } = await db.from("slot_tools").update({
+          article_id: a.article_id || null, frei_text: a.frei_text || null,
+        }).eq("id", g.werkzeug.id);
+        if (error) meldung(fehlertext(error), "fehler");
+        else { meldung("Gespeichert."); neuLaden(); }
+        return;
+      }
+
+      const w = await dialogFelder({ titel: "Werkzeug bearbeiten",
+        felder: [
+          { name: "nr", label: "Toolnummer",
+            wert: g.werkzeug.tool_nr
+              || toolNummer(g.path.nummer, g.slot.platz_nr, g.werkzeug.unter_nr) },
+          { name: "hinweis", label: "Hinweis", wert: g.werkzeug.hinweis || "" }] });
+      if (!w) return;
+      const { error } = await db.from("slot_tools")
+        .update({ tool_nr: w.nr || null, hinweis: w.hinweis || null })
+        .eq("id", g.werkzeug.id);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Gespeichert."); neuLaden(); }
+    };
+  });
+
+  ziel.querySelectorAll("[data-werkzeug-weg]").forEach((el) => {
+    el.onclick = async () => {
+      const ok = await nachfragen({ titel: "Werkzeug entfernen",
+        text: "Soll dieses Werkzeug vom Platz genommen werden?",
+        bestaetigen: "Entfernen", gefahr: true });
+      if (!ok) return;
+      const { error } = await db.from("slot_tools").delete().eq("id", el.dataset.werkzeugWeg);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Werkzeug entfernt."); neuLaden(); }
+    };
+  });
+}
+
+async function ansichtMaschinen(ziel, b) {
+  const darf = darfSchreiben();
+  // Nur für die Anzeige des Typnamens in der Liste
+  try { prod.typen = await ladeTypen(); } catch (f) { prod.typen = []; }
 
   ziel.innerHTML = prod.parks.map((p) => {
     const maschinen = prod.maschinen.filter((m) => m.park_id === p.id);
@@ -7416,13 +7967,22 @@ function ansichtMaschinen(ziel, b) {
   ziel.querySelectorAll("[data-masch-um]").forEach((el) => {
     el.onclick = async () => {
       const m = prod.maschinen.find((x) => x.id === el.dataset.maschUm) || {};
+      // Der Typ bestimmt den ganzen Werkzeugaufbau. Gibt es noch
+      // keinen, bleibt das Feld einfach leer.
+      let typen = [];
+      try { typen = await ladeTypen(); } catch (f) { /* geht auch ohne */ }
+      const typWahl = [["", "kein Typ"]].concat(typen.map((t) => [t.id, t.name]));
+
       const w = await dialogFelder({ titel: "Maschine bearbeiten",
         felder: [
           { name: "name", label: "Name", wert: m.name, pflicht: true },
-          { name: "nummer", label: "Maschinennummer", wert: m.machine_number || "" }] });
+          { name: "nummer", label: "Maschinennummer", wert: m.machine_number || "" },
+          { name: "typ", label: "Typ", auswahl: typWahl, wert: m.type_id || "",
+            hinweis: "Legt fest, welche Werkzeugplätze die Maschine hat" }] });
       if (!w) return;
       const { error } = await db.from("machines")
-        .update({ name: w.name, machine_number: w.nummer || null }).eq("id", m.id);
+        .update({ name: w.name, machine_number: w.nummer || null,
+                  type_id: w.typ || null }).eq("id", m.id);
       if (error) meldung(fehlertext(error), "fehler");
       else { meldung("Gespeichert."); neuLaden(); }
     };
