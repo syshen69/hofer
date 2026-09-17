@@ -2167,11 +2167,14 @@ body.pw-seite .pw-rolle { max-height: calc(100dvh - var(--kopfhoehe) - 150px);
               justify-content: center; }
 }
 
-/* ---------- Handy: in der Tafel muss gewischt werden können ---------- */
-/* Die Balken sperren am Computer das Wischen, damit sich Ziehen und
-   Scrollen nicht in die Quere kommen. Auf dem Handy wird gar nicht
-   geschoben — dort muss das Wischen also erlaubt sein. */
-@media (max-width: 780px) {
+/* ---------- Mit dem Finger: in der Tafel muss gewischt werden können ----------
+   Die Balken sperren mit der Maus das Wischen, damit sich Ziehen und
+   Scrollen nicht in die Quere kommen. Mit dem Finger geht beides über
+   dieselbe Geste, deshalb muss dort gewischt werden dürfen.
+   Die Regel hing vorher an der Breite und griff auf Tablets nicht —
+   ein iPad ist breiter als 780 Pixel. Jetzt entscheidet das
+   Eingabegerät, nicht die Bildschirmgrösse. */
+@media (max-width: 780px), (hover: none) and (pointer: coarse) {
   .pw-balken, .pw-griff, .pw-ferien { touch-action: pan-x pan-y !important; }
   .pw-rolle { overflow: auto !important; -webkit-overflow-scrolling: touch; }
 }
@@ -2353,7 +2356,7 @@ body.dunkel .kopf__logo { filter: brightness(0) invert(1); }
 /* Weiter oben zwingt eine Regel die Tafel auf Bildschirmbreite —
    dann gibt es nichts zu wischen. Hier wird das zurückgenommen,
    damit die festen Spaltenbreiten wieder greifen. */
-@media (max-width: 780px) {
+@media (max-width: 780px), (hover: none) and (pointer: coarse) {
   .pw-rolle { overflow-x: auto !important; overflow-y: auto;
               -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
   .pw-tafel { width: max-content !important; min-width: 100% !important; }
@@ -2518,6 +2521,17 @@ body.dunkel .pw-balken__nr { color: #10151c !important; }
 .ordner__feld--leer { opacity: .5; }
 .ordner__name { font-weight: 700; }
 .ordner__zahl { font-size: .76rem; color: var(--gedaempft); }
+/* Symbole in den Kopfknöpfen: als Block zentriert, damit nichts an
+   der Schriftmetrik des Geräts hängt. Auf iPad und Android sassen
+   Emoji sonst leicht daneben. */
+.werkzeugleiste button svg,
+.kopf__einstellungen svg,
+.nav-klapp svg { display: block; margin: auto; }
+.werkzeugleiste button, .kopf__einstellungen {
+  display: flex; align-items: center; justify-content: center; }
+/* Das Logo ist jetzt ein Knopf zum Neuladen, sieht aber aus wie vorher */
+.kopf__logolink { background: none; border: 0; padding: 0; cursor: pointer; }
+.kopf__logolink:hover { opacity: .8; }
 </style>
 </head>
 <body>
@@ -2566,7 +2580,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "45.0.0";
+const APP_VERSION = "47.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -4864,6 +4878,23 @@ function farbeVon(wert) {
   return { ...f, material: zu ? zu.material : "", buchstabe: zu ? (zu.buchstabe || "") : "" };
 }
 
+// Materialgrösse: erst der Durchmesser, dann die Toleranz.
+// "Ø20h9", "20 h9", "Ø12g6" und "12" werden alle verstanden.
+function groesseZerlegen(text) {
+  const t = String(text || "").replace(",", ".").trim();
+  // Die Zahl muss vorne stehen, sonst ist es keine Grösse:
+  // "g6" allein wäre sonst als Durchmesser 6 gelesen worden.
+  const m = t.match(/^[Ø⌀\s]*(\d+(?:\.\d+)?)\s*([A-Za-z]{1,3}\s*\d{0,2})?/);
+  if (!m) return null;
+  const tol = (m[2] || "").replace(/\s+/g, "").trim();
+  return { dm: Number(m[1]), toleranz: tol || null };
+}
+
+function groesseBauen(dm, toleranz) {
+  if (dm === null || dm === undefined || dm === "") return "";
+  return "Ø" + dm + (toleranz ? " " + toleranz : "");
+}
+
 // Mischt eine Farbe mit Weiss. anteil 0 = unverändert, 1 = weiss.
 function aufhellen(hex, anteil) {
   const h = String(hex || "#888888").replace("#", "");
@@ -5637,7 +5668,7 @@ function balkenInfoVerhalten() {
 // Alles, was ein Auftrag an Angaben trägt, als ein Suchtext
 function auftragText(j) {
   return [
-    j.job_number, j.maschine, j.maschine_nr, j.park,
+    j.job_number, j.fa_nr, j.maschine, j.maschine_nr, j.park,
     j.plan_note, j.problem, j.color,
     (PLANSTATUS[j.plan_status || "geplant"] || {}).name,
     j.material_dm, j.material_toleranz, j.material_menge, j.material_liefertermin,
@@ -6434,6 +6465,7 @@ function planBalken(j, spalte, dauer, angeschnitten, vorlaufTage, dauerWahr) {
     + (!j.material_ok ? '<span class="pw-balken__fehlt" title="Material fehlt">M</span>' : "")
     + (j.plan_note ? '<span class="pw-balken__zeichen" title="Notiz">✎</span>' : "")
     + (j.drawing_url ? '<span class="pw-balken__zeichen">PDF</span>' : "")
+    + (j.wbg_url ? '<span class="pw-balken__zeichen">WBG</span>' : "")
     + '</div>'
     + '<div class="pw-zeile2">' + esc(zeileZwei) + '</div>'
     + '</div>'
@@ -6888,6 +6920,10 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
         + '<input id="pl-nr" type="text" autocapitalize="characters" value="'
         + esc(v ? (v.job_number || "") : "") + '"></label>'
         + '<p class="klein" id="pl-hoco-info"></p>')
+    + '<label class="feld"><span>FA Nr.</span>'
+    + '<input id="pl-fa-nr" type="text" autocomplete="off" value="'
+    + esc(auftrag ? (auftrag.fa_nr || "") : "") + '"'
+    + (darf ? "" : " readonly") + '></label>' 
     + '<label class="feld"><span>Maschine</span><select id="pl-maschine"'
     + (darf ? "" : " disabled") + '>'
     + maschinen.map((m) => '<option value="' + esc(m.id) + '"'
@@ -7019,6 +7055,20 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     + '</div>'
     + (darf ? '<span class="feldhinweis" id="pl-pdfstand"></span>' : "")
     + '</div>'
+
+    // Das Warenbegleitblatt liegt später den fertigen Teilen bei
+    + '<div class="feld"><span class="feldlabel">WBG</span>'
+    + '<div class="pdfreihe">'
+    + (auftrag && auftrag.wbg_url
+        ? '<button type="button" class="knopf knopf--klein pdflink" data-pdfzeigen="'
+          + esc(auftrag.wbg_url) + '">Ansehen</button>' : "")
+    + (darf
+        ? '<label class="knopf knopf--klein bildknopf">PDF wählen'
+          + '<input type="file" id="pl-wbg" accept="application/pdf" hidden></label>'
+        : "")
+    + '</div>'
+    + (darf ? '<span class="feldhinweis" id="pl-wbgstand"></span>' : "")
+    + '</div>'
     + '</div>'
 
     + '</div>'
@@ -7040,6 +7090,7 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
   // Die Kopie übernimmt auch die Zeichnung. Neu gesetzt werden
   // nur Beginn und Ende.
   let pdfAdresse = auftrag ? auftrag.drawing_url : (v ? (v.drawing_url || null) : null);
+  let wbgAdresse = auftrag ? auftrag.wbg_url : (v ? (v.wbg_url || null) : null);
 
   // Von, Bis und Dauer im Gleichklang halten
   const felderKoppeln = () => {
@@ -7092,9 +7143,11 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
       // Nur füllen, was noch leer ist — Eingetipptes bleibt stehen
       const dmFeld = huelle.querySelector("#pl-dm");
       const mengeFeld = huelle.querySelector("#pl-menge-mat");
-      if (dmFeld && !dmFeld.value && teil.material_groesse) {
-        const zahl = String(teil.material_groesse).replace(",", ".").match(/[\d.]+/);
-        if (zahl) dmFeld.value = zahl[0];
+      const tolFeld = huelle.querySelector("#pl-tol");
+      const zerlegt = groesseZerlegen(teil.material_groesse);
+      if (zerlegt) {
+        if (dmFeld && !dmFeld.value) dmFeld.value = zerlegt.dm;
+        if (tolFeld && !tolFeld.value && zerlegt.toleranz) tolFeld.value = zerlegt.toleranz;
       }
       if (mengeFeld && !mengeFeld.value && teil.material) mengeFeld.value = teil.material;
     };
@@ -7176,6 +7229,24 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     }
   };
 
+  const wbgFeld = $("pl-wbg");
+  if (wbgFeld) wbgFeld.onchange = async (e) => {
+    const datei = (e.target.files || [])[0];
+    if (!datei) return;
+    $("pl-wbgstand").textContent = "WBG wird hochgeladen …";
+    try {
+      const name = "wbg/" + Date.now() + "-"
+        + datei.name.replace(/[^a-zA-Z0-9.\-]/g, "_");
+      const r = await db.storage.from("zeichnungen").upload(name, datei,
+        { contentType: "application/pdf" });
+      if (r.error) throw r.error;
+      wbgAdresse = db.storage.from("zeichnungen").getPublicUrl(name).data.publicUrl;
+      $("pl-wbgstand").textContent = "WBG hochgeladen: " + datei.name;
+    } catch (f) {
+      $("pl-wbgstand").textContent = "Hochladen fehlgeschlagen: " + (f.message || f);
+    }
+  };
+
   const speichern = $("pl-ja");
   if (speichern) speichern.onclick = async () => {
     // Wer nicht planen darf, kann trotzdem den Zustand setzen
@@ -7194,6 +7265,7 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
       target_quantity: menge === "" ? null : Math.max(0, Math.round(Number(menge))),
       plan_note: ($("pl-notiz").value || "").trim() || null,
       drawing_url: pdfAdresse,
+      wbg_url: wbgAdresse,
       plan_status: planZustand,
       color: planFarbe,
       geplant_von: gewaehltePlaner.length ? gewaehltePlaner.join("/") : null,
@@ -7203,6 +7275,9 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
       material_toleranz: ($("pl-tol").value || "").trim() || null,
       material_menge: ($("pl-menge-mat").value || "").trim() || null,
       material_liefertermin: $("pl-liefer").value || null,
+      // Bei jedem Durchlauf eine andere — gehört an den Auftrag,
+      // nicht an die HOCO Nr.
+      fa_nr: (($("pl-fa-nr") || {}).value || "").trim() || null,
       machine_id: $("pl-maschine").value,
     };
 
@@ -7925,7 +8000,7 @@ async function ladeHocoAusAuftraegen() {
 // Aus Durchmesser und Toleranz des Auftrags wird die Materialgrösse
 function groesseAusAuftrag(j) {
   if (!j || !j.material_dm) return "";
-  return "Ø" + j.material_dm + (j.material_toleranz ? " " + j.material_toleranz : "");
+  return groesseBauen(j.material_dm, j.material_toleranz);
 }
 
 async function ladeBlaetter(hocoNr) {
@@ -8217,6 +8292,17 @@ async function ansichtHoco(ziel, b) {
     let blaetter = [];
     try { blaetter = await ladeBlaetter(t.hoco_nr); } catch (f) { /* zeigt dann keine */ }
 
+    // Die FA Nummern stehen an den Aufträgen. Hier werden sie zum
+    // Teil zusammengetragen, damit man sieht, wann es gelaufen ist.
+    let faListe = [];
+    try {
+      const r = await db.from("jobs")
+        .select("fa_nr, planned_from, plan_status")
+        .eq("job_number", t.hoco_nr)
+        .order("planned_from", { ascending: false }).limit(50);
+      faListe = (r.data || []).filter((x) => x.fa_nr);
+    } catch (f) { /* Beiwerk */ }
+
     ziel.innerHTML = '<button class="linkknopf" id="hoco-zurueck">‹ alle HOCO Nr.</button>'
       + '<section class="karte"><div class="karte__kopf">'
       + '<h2>' + esc(t.hoco_nr) + '</h2>'
@@ -8233,6 +8319,18 @@ async function ansichtHoco(ziel, b) {
         .map(([k, v]) => '<tr><td class="klein">' + k + '</td><td>'
           + (v ? esc(v) : '<span class="gedaempft">—</span>') + '</td></tr>').join("")
       + '</tbody></table></section>'
+
+      + (faListe.length
+        ? '<section class="karte"><div class="karte__kopf"><h2>FA Nummern</h2>'
+          + '<span class="marke">' + faListe.length + '</span></div>'
+          + '<table class="tabelle"><tbody>'
+          + faListe.map((x) => '<tr><td><strong>' + esc(x.fa_nr) + '</strong></td>'
+              + '<td class="klein">' + esc(x.planned_from ? kurzDatum(x.planned_from) : "")
+              + '</td><td class="klein rechts">'
+              + esc((PLANSTATUS[x.plan_status || "geplant"] || {}).name || "") + '</td>'
+              + '</tr>').join("")
+          + '</tbody></table></section>'
+        : "")
 
       + '<section class="karte"><div class="karte__kopf">'
       + '<h2>Einrichtblätter</h2></div>'
@@ -8539,12 +8637,34 @@ async function hocoDialog(teil, vorgabe) {
   // Beim Anlegen wird sie aus dem Auftrag übernommen, falls dort eine hängt.
   if (!teil && v.zeichnung_url) daten.zeichnung_url = v.zeichnung_url;
 
+  const nummer = teil ? teil.hoco_nr : (w.nr || "").trim();
+
   const { error } = teil
-    ? await db.from("hoco_parts").update(daten).eq("hoco_nr", teil.hoco_nr)
-    : await db.from("hoco_parts").insert({ ...daten, hoco_nr: (w.nr || "").trim() });
+    ? await db.from("hoco_parts").update(daten).eq("hoco_nr", nummer)
+    : await db.from("hoco_parts").insert({ ...daten, hoco_nr: nummer });
 
   if (error) { meldung(fehlertext(error), "fehler"); return false; }
-  meldung("Gespeichert.");
+
+  // Die Grösse auf die Aufträge übertragen, die noch nicht laufen.
+  // Was läuft oder fertig ist, bleibt so, wie es damals war —
+  // sonst würde sich Vergangenes rückwirkend ändern.
+  let nachgezogen = 0;
+  const g = groesseZerlegen(daten.material_groesse);
+  if (g) {
+    const u = await db.from("jobs")
+      .update({ material_dm: g.dm, material_toleranz: g.toleranz })
+      .eq("job_number", nummer)
+      .is("ended_at", null)
+      .in("plan_status", ["geplant", "ruesten"])
+      .select();
+    if (!u.error) nachgezogen = (u.data || []).length;
+  }
+
+  meldung(nachgezogen
+    ? "Gespeichert. " + nachgezogen
+      + (nachgezogen === 1 ? " geplanter Auftrag" : " geplante Aufträge")
+      + " nachgezogen."
+    : "Gespeichert.");
   return true;
 }
 
@@ -8802,6 +8922,8 @@ function betrachter(adresse, titel, istPdf) {
     + '<div class="betrachter__kopf">'
     + '<span class="betrachter__titel">' + esc(titel || "") + '</span>'
     + '<div class="betrachter__knoepfe">'
+    + '<button class="knopf knopf--klein" data-drucken>Drucken</button>'
+    + '<button class="knopf knopf--klein" data-speichern>Speichern</button>'
     + '<a class="knopf knopf--klein" href="' + esc(adresse) + '" target="_blank"'
     + ' rel="noopener">Neuer Tab</a>'
     + '<button class="knopf knopf--klein" data-zu>Schliessen</button>'
@@ -8818,6 +8940,55 @@ function betrachter(adresse, titel, istPdf) {
   const zu = () => huelle.remove();
   huelle.querySelector("[data-zu]").onclick = zu;
   dialogSchliessen(huelle, zu);
+
+  // Drucken: bei einem PDF über das eingebettete Fenster. Liegt die
+  // Datei auf einem anderen Server, verweigert der Browser den
+  // Zugriff darauf — dann bleibt der neue Tab als Weg.
+  huelle.querySelector("[data-drucken]").onclick = () => {
+    if (istPdf) {
+      const rahmen = huelle.querySelector("iframe");
+      try {
+        rahmen.contentWindow.focus();
+        rahmen.contentWindow.print();
+        return;
+      } catch (f) { /* andere Herkunft, also über den Umweg */ }
+      const w = window.open(adresse, "_blank");
+      if (!w) meldung("Zum Drucken bitte über \"Neuer Tab\" öffnen.", "warn");
+      return;
+    }
+    // Bild: in einem eigenen Fenster, sonst würde die ganze App
+    // mitgedruckt werden
+    const w = window.open("", "_blank");
+    if (!w) { meldung("Das Fenster wurde blockiert.", "warn"); return; }
+    w.document.write('<!doctype html><html><head><meta charset="utf-8">'
+      + '<title>' + esc(titel || "Bild") + '</title>'
+      + '<style>@page{margin:10mm}body{margin:0}'
+      + 'img{max-width:100%;height:auto;display:block}</style></head><body>'
+      + '<img src="' + esc(adresse) + '" onload="window.print()"></body></html>');
+    w.document.close();
+  };
+
+  // Speichern: erst versuchen, die Datei wirklich herunterzuladen.
+  // Klappt das wegen der Herkunft nicht, öffnet sie sich stattdessen.
+  huelle.querySelector("[data-speichern]").onclick = async () => {
+    const name = (titel || "Datei").replace(/[^A-Za-z0-9._-]+/g, "_")
+      + (istPdf ? ".pdf" : ".jpg");
+    try {
+      const antwort = await fetch(adresse);
+      if (!antwort.ok) throw new Error("nicht erreichbar");
+      const brocken = await antwort.blob();
+      const url = URL.createObjectURL(brocken);
+      const a = document.createElement("a");
+      a.href = url; a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    } catch (f) {
+      const a = document.createElement("a");
+      a.href = adresse; a.download = name; a.target = "_blank";
+      a.rel = "noopener";
+      document.body.appendChild(a); a.click(); a.remove();
+    }
+  };
 }
 
 // =================================================================
@@ -9753,6 +9924,10 @@ async function bestOffen(ziel, b, bereich) {
               + (perMail[name]
                   ? '<button class="knopf knopf--klein" data-bestellpdf="' + esc(name)
                     + '">PDF</button>' : "")
+              // Alle Positionen dieses Lieferanten auf einmal umstellen
+              + (darfSchreiben()
+                  ? '<button class="knopf knopf--klein" data-sammelstatus="' + esc(name)
+                    + '" data-block="' + esc(bl.status) + '">Status für alle</button>' : "")
               + '<span class="klein">' + gruppen[name].length + ' Position' 
               + (gruppen[name].length === 1 ? "" : "en") + '</span></div></div>' 
               + '<table class="tabelle tabelle--bestellungen"><tbody>'
@@ -9765,6 +9940,50 @@ async function bestOffen(ziel, b, bereich) {
         + (sucht ? 'Nichts gefunden zu "' + esc(best.offenSuche) + '".'
                 : "Keine offenen Bestellpositionen.")
         + '</p></div>');
+
+  ziel.querySelectorAll("[data-sammelstatus]").forEach((el) => {
+    el.onclick = async () => {
+      const name = el.dataset.sammelstatus;
+      const block = el.dataset.block;
+      const posten = gefiltert.filter((z) => {
+        const lief = (z.articles && z.articles.suppliers) || z.suppliers || null;
+        return (lief && lief.name) === name && z.status === block;
+      });
+      if (!posten.length) return;
+
+      const wahl = await auswahlDialog(
+        posten.length + (posten.length === 1 ? " Position" : " Positionen")
+          + " von " + name,
+        Object.keys(BESTELLSTATUS).filter((w) => w !== block)
+          .map((w) => ({ wert: w, text: BESTELLSTATUS[w] })));
+      if (!wahl) return;
+
+      // "Geliefert" führt über den Einlagerdialog, der je Position
+      // nach Menge und Lagerplatz fragt. Das lässt sich nicht
+      // sammeln, deshalb hier der klare Hinweis statt halber Arbeit.
+      if (wahl === "geliefert") {
+        meldung("Geliefert wird je Position gesetzt, weil dabei eingelagert wird.", "warn");
+        return;
+      }
+
+      const ok = await nachfragen({ titel: "Status für alle ändern",
+        text: "Sollen alle " + posten.length + " Positionen von " + name
+            + " auf \"" + (BESTELLSTATUS[wahl] || wahl) + "\" gesetzt werden?",
+        bestaetigen: "Ja, alle ändern" });
+      if (!ok) return;
+
+      const { error } = await db.from("order_items")
+        .update({ status: wahl })
+        .in("id", posten.map((z) => z.id));
+
+      if (error) meldung(fehlertext(error), "fehler");
+      else {
+        meldung(posten.length + (posten.length === 1 ? " Position" : " Positionen")
+          + " geändert.");
+        bestOffen(ziel, b, bereich);
+      }
+    };
+  });
 
   ziel.querySelectorAll("[data-bestellpdf]").forEach((el) => {
     el.onclick = () => {
@@ -10906,6 +11125,23 @@ function bestellungDrucken(lieferant, posten) {
       + '</tr>';
   }).join("");
 
+  // Der Fenstertitel wird beim Speichern als PDF zum Dateinamen.
+  // Deshalb: Bestellung_Lieferant_TT_MM_JJJJ_Kürzel
+  const sauber = (t) => String(t || "")
+    .replace(/[àáâä]/gi, "a").replace(/[èéêë]/gi, "e").replace(/[ìíîï]/gi, "i")
+    .replace(/[òóôö]/gi, "o").replace(/[ùúûü]/gi, "u").replace(/ß/g, "ss")
+    .replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+
+  const kuerzel = (vorname.charAt(0) + nachname.charAt(0)).toUpperCase()
+    || sauber(vollerName).slice(0, 2).toUpperCase();
+
+  const dateiname = ["Bestellung",
+    sauber(lieferant ? lieferant.name : "") || "Lieferant",
+    String(jetzt.getDate()).padStart(2, "0"),
+    String(jetzt.getMonth() + 1).padStart(2, "0"),
+    jetzt.getFullYear(),
+    kuerzel].filter((x) => x).join("_");
+
   const fenster = window.open("", "_blank");
   if (!fenster) {
     meldung("Das Fenster wurde blockiert. Bitte Pop-ups für diese Seite erlauben.", "warn");
@@ -10930,7 +11166,7 @@ function bestellungDrucken(lieferant, posten) {
 
     ".inhalt { padding: 0 16mm; }",
     ".kontakt { display: flex; justify-content: space-between; font-size: 11pt;",
-    "           color: #333; padding: 5mm 0 9mm; border-bottom: .4pt solid #dfe3e8;",
+    "           color: #333; padding: 5mm 0 9mm;",
     "           margin-bottom: 9mm; line-height: 1.6; }",
 
     ".oben { display: flex; justify-content: space-between; gap: 12mm; margin-bottom: 10mm; }",
@@ -11022,7 +11258,7 @@ function bestellungDrucken(lieferant, posten) {
 
   fenster.document.write('<!doctype html><html lang="de"><head>'
     + '<meta charset="utf-8">'
-    + '<title>Bestellung ' + esc(lieferant ? lieferant.name : "") + '</title>'
+    + '<title>' + esc(dateiname) + '</title>'
     + '<link rel="preconnect" href="https://fonts.googleapis.com">'
     + '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
     + '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?'
@@ -11031,6 +11267,12 @@ function bestellungDrucken(lieferant, posten) {
 
     + '<div class="leiste">'
     + '<button onclick="window.print()">Als PDF speichern</button>'
+    // Läuft die App im Vollbild, gibt es keine Leiste zum Schliessen.
+    // Klappt window.close() nicht, kommt ein Hinweis statt nichts.
+    + '<button onclick="window.close();setTimeout(function(){'
+    + 'document.body.innerHTML=\'<p style=&quot;padding:24px;font:14px sans-serif&quot;>'
+    + 'Dieses Fenster lässt sich nicht von selbst schliessen. '
+    + 'Bitte über den Tab schliessen.</p>\';},400)">Schliessen</button>'
     + '</div>'
 
     + '<div class="blatt">'
@@ -13495,7 +13737,10 @@ async function eierEinbauen() {
   knopf.id = "eier-knopf";
   knopf.className = "eier-knopf";
   knopf.title = "Eier im Lager";
-  knopf.innerHTML = "\u{1F95A}";
+  knopf.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none"'
+    + ' stroke="currentColor" stroke-width="1.8" aria-hidden="true">'
+    + '<path d="M12 3.5c3.1 0 5.5 4.6 5.5 8.6a5.5 5.5 0 0 1-11 0C6.5 8.1 8.9 3.5 12 3.5Z"/>'
+    + '</svg>';
   werkzeugleiste().appendChild(knopf);
   knopf.onclick = () => eierFensterUmschalten();
 
@@ -13824,7 +14069,15 @@ async function fahrzeugEinbauen() {
   knopf.id = "fahrzeug-knopf";
   knopf.className = "fahrzeug-knopf";
   knopf.title = "Fahrzeuge";
-  knopf.textContent = "🚗";
+  // Gezeichnet statt Emoji: ein Emoji wird vom Betriebssystem
+  // gesetzt und sitzt auf iPad und Android anders in der Zeile.
+  knopf.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none"'
+    + ' stroke="currentColor" stroke-width="1.8" stroke-linecap="round"'
+    + ' stroke-linejoin="round" aria-hidden="true">'
+    + '<path d="M4 15h16v-3.2a2 2 0 0 0-.4-1.2l-2-2.7A2 2 0 0 0 16 7H8a2 2 0 0 0-1.6.9'
+    + 'l-2 2.7A2 2 0 0 0 4 11.8V15Z"/>'
+    + '<circle cx="7.5" cy="15" r="1.8"/><circle cx="16.5" cy="15" r="1.8"/>'
+    + '<path d="M4 13h16"/></svg>';
   werkzeugleiste().prepend(knopf);
   knopf.onclick = () => fahrzeugPanelUmschalten();
 }
@@ -14591,8 +14844,8 @@ function zeichneGeruest() {
   WURZEL.innerHTML = ''
     + '<header class="kopf">'
     + '<button class="kopf__klapp" id="nav-klapp" title="Menü ein- oder ausklappen">☰</button>'
-    + '<a class="kopf__logolink" href="https://www.hoferco.ch/" target="_blank" rel="noopener">'
-    + '<img class="kopf__logo" src="./logo.png" alt="Hofer + Co."></a>' 
+    + '<button class="kopf__logolink" id="kopf-neuladen" title="Seite neu laden">'
+    + '<img class="kopf__logo" src="./logo.png" alt="Hofer + Co."></button>' 
     + (meineRolle() === "planwand"
         ? '<button class="kopf__admin' + (plan.pinOk ? " aktiv" : "") + '" id="kopf-admin"'
           + ' title="Bearbeiten freischalten">Bearbeiten</button>'
@@ -14606,7 +14859,13 @@ function zeichneGeruest() {
           + esc(((profil && (profil.full_name || profil.email)) || "?").charAt(0).toUpperCase())
           + '</span>')
     + '<span class="kopf__benutzer" data-benutzername>' + esc(anzeige) + '</span>'
-    + '<button class="kopf__einstellungen" id="kopf-einstellungen" title="Einstellungen">⚙</button>' 
+    + '<button class="kopf__einstellungen" id="kopf-einstellungen" title="Einstellungen">'
+    + '<svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor"'
+    + ' stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+    + '<circle cx="12" cy="12" r="3.2"/>'
+    + '<path d="M12 2.8v2.4M12 18.8v2.4M4.5 4.5l1.7 1.7M17.8 17.8l1.7 1.7'
+    + 'M2.8 12h2.4M18.8 12h2.4M4.5 19.5l1.7-1.7M17.8 6.2l1.7-1.7"/>'
+    + '</svg></button>' 
     + '</header>'
     + '<div class="rahmen"><nav class="nav" aria-label="Hauptnavigation">'
     + SEITEN.map((s) => '<a class="nav__punkt" data-nav="' + s.pfad + '" href="#/' + s.pfad + '">'
@@ -14652,6 +14911,11 @@ function zeichneGeruest() {
   const rueck = document.getElementById("rueck-knopf");
   if (rueck) rueck.onclick = schrittZurueck;
   knopfRueckgaengigZeigen();
+
+  // Das Logo lädt die Seite neu. Im Vollbild gibt es sonst keinen Weg,
+  // eine hängende Ansicht aufzufrischen.
+  const neuladen = document.getElementById("kopf-neuladen");
+  if (neuladen) neuladen.onclick = () => location.reload();
 
   const einstKnopf = document.getElementById("kopf-einstellungen");
   if (einstKnopf) einstKnopf.onclick = () => einstellungenOeffnen();
