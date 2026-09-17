@@ -2580,7 +2580,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "47.2.0";
+const APP_VERSION = "48.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -5020,13 +5020,25 @@ function farbenZurWahl() {
 let PLANER = [];
 
 async function planerLaden() {
+  PLANER = [];
   try {
     const { data, error } = await db.from("profiles")
       .select("id, full_name, email, initialen, ist_planer")
       .eq("is_active", true).eq("ist_planer", true).order("full_name");
     if (error) throw error;
     PLANER = (data || []).filter((u) => (u.initialen || "").trim());
-  } catch (f) { PLANER = []; }
+  } catch (f) {
+    // Fehlt die Spalte ist_planer in der Datenbank, schlug die ganze
+    // Abfrage fehl und die Liste blieb still leer — dann verschwand
+    // "Eingeplant von" aus dem Auftragsfenster, ohne dass jemand
+    // wusste warum. Jetzt gilt ersatzweise: wer ein Kürzel hat, plant.
+    try {
+      const r = await db.from("profiles")
+        .select("id, full_name, email, initialen")
+        .eq("is_active", true).order("full_name");
+      PLANER = (r.data || []).filter((u) => (u.initialen || "").trim());
+    } catch (g) { PLANER = []; }
+  }
 }
 
 // Kürzel der angemeldeten Person, falls sie selbst plant
@@ -6970,9 +6982,14 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     + (darf ? "" : " disabled") + '><span>Material da</span></label>'
     + '</div>'
 
+    + '<div class="feld"><span class="feldlabel">Eingeplant von</span>'
+    + (!PLANER.length
+        ? '<span class="feldhinweis">Niemand ist als Planer hinterlegt. '
+          + 'Das wird in den Einstellungen bei der Person angehakt, '
+          + 'zusammen mit einem Kürzel.</span>'
+        : "")
     + (PLANER.length
-        ? '<div class="feld"><span class="feldlabel">Eingeplant von</span>'
-          + '<div class="auf-planer">'
+        ? '<div class="auf-planer">'
           + PLANER.map((u) => {
               const kuerzel = (u.initialen || "").trim();
               const drin = gewaehltePlaner.indexOf(kuerzel) !== -1;
@@ -6981,8 +6998,9 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
                 + ' title="' + esc(u.full_name || u.email) + '">'
                 + esc(kuerzel) + '</button>';
             }).join("")
-          + '</div></div>'
+          + '</div>'
         : "")
+    + '</div>'
     + '</div>'
 
     // Spalte 2: Material
@@ -8280,7 +8298,24 @@ async function ansichtHoco(ziel, b) {
   let teile, typen, ausPlan = {};
   try {
     [teile, typen] = await Promise.all([ladeHoco(prod.hocoSuche), ladeTypen()]);
-    try { ausPlan = await ladeHocoAusAuftraegen(); } catch (f) { /* geht auch ohne */ }
+    try {
+      ausPlan = await ladeHocoAusAuftraegen();
+      // Jede Nummer, die auf der Planwand vorkommt, bekommt einen
+      // Eintrag — auch wenn ausser der Nummer noch nichts bekannt ist.
+      // Grösse und Zeichnung kommen aus dem jüngsten Auftrag.
+      const fehlen = Object.keys(ausPlan)
+        .filter((nr) => !teile.some((t) => t.hoco_nr === nr));
+      if (fehlen.length && darf) {
+        const neuZeilen = fehlen.map((nr) => ({
+          hoco_nr: nr,
+          material_groesse: groesseAusAuftrag(ausPlan[nr]) || null,
+          zeichnung_url: ausPlan[nr].drawing_url || null,
+        }));
+        const r = await db.from("hoco_parts")
+          .upsert(neuZeilen, { onConflict: "hoco_nr", ignoreDuplicates: true });
+        if (!r.error) teile = await ladeHoco(prod.hocoSuche);
+      }
+    } catch (f) { /* geht auch ohne */ }
   } catch (f) {
     ziel.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p>'
       + '<p class="klein">Wurde das SQL für die Einrichtblätter schon ausgeführt?</p></div>';
@@ -8302,7 +8337,7 @@ async function ansichtHoco(ziel, b) {
     let faListe = [], vomAuftrag = null;
     try {
       const r = await db.from("jobs")
-        .select("fa_nr, planned_from, plan_status, drawing_url")
+        .select("fa_nr, planned_from, plan_status, drawing_url, wbg_url")
         .eq("job_number", t.hoco_nr)
         .order("planned_from", { ascending: false }).limit(50);
       faListe = (r.data || []).filter((x) => x.fa_nr);
@@ -8343,18 +8378,6 @@ async function ansichtHoco(ziel, b) {
       + (darf ? '<span class="feldhinweis" id="hoco-pdfstand"></span>' : "")
       + '</section>'
 
-      + (faListe.length
-        ? '<section class="karte"><div class="karte__kopf"><h2>FA Nummern</h2>'
-          + '<span class="marke">' + faListe.length + '</span></div>'
-          + '<table class="tabelle"><tbody>'
-          + faListe.map((x) => '<tr><td><strong>' + esc(x.fa_nr) + '</strong></td>'
-              + '<td class="klein">' + esc(x.planned_from ? kurzDatum(x.planned_from) : "")
-              + '</td><td class="klein rechts">'
-              + esc((PLANSTATUS[x.plan_status || "geplant"] || {}).name || "") + '</td>'
-              + '</tr>').join("")
-          + '</tbody></table></section>'
-        : "")
-
       + '<section class="karte"><div class="karte__kopf">'
       + '<h2>Einrichtblätter</h2></div>'
       + (blaetter.length
@@ -8369,7 +8392,37 @@ async function ansichtHoco(ziel, b) {
         : '<p class="hinweis">Noch kein Einrichtblatt hinterlegt. '
           + 'Ein Blatt gilt je Maschinentyp — dasselbe Teil auf einem anderen Typ '
           + 'braucht ein eigenes.</p>')
-      + '</section>';
+      + '</section>'
+
+      + (faListe.length
+        ? '<section class="karte"><div class="karte__kopf"><h2>FA Nummern</h2>'
+          + '<span class="marke">' + faListe.length + '</span></div>'
+          + '<table class="tabelle"><tbody>'
+          + faListe.map((x) => '<tr><td><strong>' + esc(x.fa_nr) + '</strong></td>'
+              + '<td class="klein">' + esc(x.planned_from ? kurzDatum(x.planned_from) : "")
+              + '</td>'
+              // Die Anhänge des Auftrags: das Warenbegleitblatt gehört
+              // zum Durchlauf, ist also je FA Nr. ein anderes.
+              + '<td class="nowrap">'
+              + (x.wbg_url
+                  ? '<button class="linkknopf" data-fadatei="' + esc(x.wbg_url)
+                    + '" data-fatitel="WBG ' + esc(x.fa_nr) + '">WBG</button>' : "")
+              + (x.drawing_url
+                  ? ' <button class="linkknopf" data-fadatei="' + esc(x.drawing_url)
+                    + '" data-fatitel="Zeichnung ' + esc(x.fa_nr) + '">Zeichnung</button>' : "")
+              + (!x.wbg_url && !x.drawing_url
+                  ? '<span class="gedaempft klein">ohne Anhang</span>' : "")
+              + '</td>'
+              + '<td class="klein rechts">'
+              + esc((PLANSTATUS[x.plan_status || "geplant"] || {}).name || "") + '</td>'
+              + '</tr>').join("")
+          + '</tbody></table></section>'
+        : "");
+
+
+    ziel.querySelectorAll("[data-fadatei]").forEach((el) => {
+      el.onclick = () => betrachter(el.dataset.fadatei, el.dataset.fatitel, true);
+    });
 
     document.getElementById("hoco-zurueck").onclick = () => { prod.hocoOffen = null; neuLaden(); };
 
