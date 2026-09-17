@@ -2580,7 +2580,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "47.0.0";
+const APP_VERSION = "47.2.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -7138,7 +7138,12 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
         return;
       }
       nrInfo.textContent = [teil.bezeichnung, teil.material, teil.material_groesse]
-        .filter((x) => x).join(" · ");
+        .filter((x) => x).join(" · ")
+        + (teil.zeichnung_url && !pdfAdresse ? "  ·  Zeichnung wird übernommen" : "");
+
+      // Hängt an der HOCO Nr. eine Zeichnung und am Auftrag noch
+      // keine, wird sie übernommen. Eine bereits gewählte bleibt.
+      if (teil.zeichnung_url && !pdfAdresse) pdfAdresse = teil.zeichnung_url;
 
       // Nur füllen, was noch leer ist — Eingetipptes bleibt stehen
       const dmFeld = huelle.querySelector("#pl-dm");
@@ -8294,13 +8299,15 @@ async function ansichtHoco(ziel, b) {
 
     // Die FA Nummern stehen an den Aufträgen. Hier werden sie zum
     // Teil zusammengetragen, damit man sieht, wann es gelaufen ist.
-    let faListe = [];
+    let faListe = [], vomAuftrag = null;
     try {
       const r = await db.from("jobs")
-        .select("fa_nr, planned_from, plan_status")
+        .select("fa_nr, planned_from, plan_status, drawing_url")
         .eq("job_number", t.hoco_nr)
         .order("planned_from", { ascending: false }).limit(50);
       faListe = (r.data || []).filter((x) => x.fa_nr);
+      const mitZeichnung = (r.data || []).find((x) => x.drawing_url);
+      if (mitZeichnung) vomAuftrag = mitZeichnung.drawing_url;
     } catch (f) { /* Beiwerk */ }
 
     ziel.innerHTML = '<button class="linkknopf" id="hoco-zurueck">‹ alle HOCO Nr.</button>'
@@ -8314,11 +8321,27 @@ async function ansichtHoco(ziel, b) {
          ["Material", t.material],
          ["Materialgrösse", t.material_groesse],
          ["Zeichnungs Nr.", t.zeichnungs_nr],
-         ["Fabrik-Auftr. Nr.", t.fabrik_auftrag],
          ["Allgemeine Infos", t.infos]]
         .map(([k, v]) => '<tr><td class="klein">' + k + '</td><td>'
           + (v ? esc(v) : '<span class="gedaempft">—</span>') + '</td></tr>').join("")
-      + '</tbody></table></section>'
+      + '</tbody></table>'
+      + '<div class="pdfreihe">'
+      + (t.zeichnung_url
+          ? '<button class="knopf knopf--klein" data-zeichnung="' + esc(t.zeichnung_url)
+            + '">Zeichnung ansehen</button>' : "")
+      + (darf
+          ? '<label class="knopf knopf--klein bildknopf">'
+            + (t.zeichnung_url ? "Zeichnung ersetzen" : "Zeichnung wählen")
+            + '<input type="file" id="hoco-pdf" accept="application/pdf" hidden></label>'
+          : "")
+      // Hängt an einem Auftrag schon eine Zeichnung, lässt sie sich
+      // mit einem Klick übernehmen, statt sie neu zu suchen.
+      + (darf && !t.zeichnung_url && vomAuftrag
+          ? '<button class="knopf knopf--klein" data-zvonauftrag="' + esc(vomAuftrag)
+            + '">Zeichnung vom Auftrag übernehmen</button>' : "")
+      + '</div>'
+      + (darf ? '<span class="feldhinweis" id="hoco-pdfstand"></span>' : "")
+      + '</section>'
 
       + (faListe.length
         ? '<section class="karte"><div class="karte__kopf"><h2>FA Nummern</h2>'
@@ -8349,6 +8372,37 @@ async function ansichtHoco(ziel, b) {
       + '</section>';
 
     document.getElementById("hoco-zurueck").onclick = () => { prod.hocoOffen = null; neuLaden(); };
+
+    const pdfFeld = document.getElementById("hoco-pdf");
+    if (pdfFeld) pdfFeld.onchange = async (e) => {
+      const datei = (e.target.files || [])[0];
+      if (!datei) return;
+      const stand = document.getElementById("hoco-pdfstand");
+      stand.textContent = "Zeichnung wird hochgeladen …";
+      try {
+        const name = "hoco/" + t.hoco_nr.replace(/[^A-Za-z0-9.\-]/g, "_")
+          + "-" + Date.now() + ".pdf";
+        const r = await db.storage.from("zeichnungen").upload(name, datei,
+          { contentType: "application/pdf" });
+        if (r.error) throw r.error;
+        const adresse = db.storage.from("zeichnungen").getPublicUrl(name).data.publicUrl;
+        const u = await db.from("hoco_parts")
+          .update({ zeichnung_url: adresse }).eq("hoco_nr", t.hoco_nr);
+        if (u.error) throw u.error;
+        meldung("Zeichnung hinterlegt.");
+        neuLaden();
+      } catch (f) {
+        stand.textContent = "Hochladen fehlgeschlagen: " + (f.message || f);
+      }
+    };
+
+    const vonAuftrag = ziel.querySelector("[data-zvonauftrag]");
+    if (vonAuftrag) vonAuftrag.onclick = async () => {
+      const { error } = await db.from("hoco_parts")
+        .update({ zeichnung_url: vonAuftrag.dataset.zvonauftrag }).eq("hoco_nr", t.hoco_nr);
+      if (error) meldung(fehlertext(error), "fehler");
+      else { meldung("Zeichnung übernommen."); neuLaden(); }
+    };
 
     const zeichnungKnopf = ziel.querySelector("[data-zeichnung]");
     if (zeichnungKnopf) zeichnungKnopf.onclick = () =>
@@ -8620,7 +8674,6 @@ async function hocoDialog(teil, vorgabe) {
         wert: teil ? (teil.material_groesse || "") : (v.material_groesse || ""),
         platzhalter: "z. B. Ø20h9" },
       { name: "zeichnung", label: "Zeichnungs Nr.", wert: teil ? (teil.zeichnungs_nr || "") : "" },
-      { name: "fa", label: "Fabrik-Auftr. Nr.", wert: teil ? (teil.fabrik_auftrag || "") : "" },
       { name: "infos", label: "Allgemeine Infos", wert: teil ? (teil.infos || "") : "" },
     ], bestaetigen: teil ? "Speichern" : "Anlegen" });
   if (!w) return false;
@@ -8630,7 +8683,6 @@ async function hocoDialog(teil, vorgabe) {
     material: w.mat || null,
     material_groesse: w.groesse || null,
     zeichnungs_nr: w.zeichnung || null,
-    fabrik_auftrag: w.fa || null,
     infos: w.infos || null,
   };
   // Die Zeichnung gehört zum Teil und gilt für jeden Typ gleich.
@@ -8638,6 +8690,18 @@ async function hocoDialog(teil, vorgabe) {
   if (!teil && v.zeichnung_url) daten.zeichnung_url = v.zeichnung_url;
 
   const nummer = teil ? teil.hoco_nr : (w.nr || "").trim();
+
+  // Hängt an einem Auftrag mit dieser Nummer schon eine Zeichnung,
+  // wird sie übernommen — sie ist für jeden Typ dieselbe.
+  if (!teil && !v.zeichnung_url) {
+    try {
+      const r = await db.from("jobs").select("drawing_url")
+        .eq("job_number", nummer).not("drawing_url", "is", null)
+        .order("created_at", { ascending: false }).limit(1);
+      const gefunden = ((r.data || [])[0] || {}).drawing_url;
+      if (gefunden) v.zeichnung_url = gefunden;
+    } catch (f) { /* geht auch ohne */ }
+  }
 
   const { error } = teil
     ? await db.from("hoco_parts").update(daten).eq("hoco_nr", nummer)
