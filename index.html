@@ -2538,8 +2538,13 @@ body.dunkel .pw-balken__nr { color: #10151c !important; }
              border: 1px solid var(--marke); background: var(--marke); color: #fff;
              white-space: nowrap; }
 .pad-start:hover { filter: brightness(1.12); }
-@media (max-width: 720px) { .pad-start { height: 34px; padding: 0 12px;
-                                         font-size: .74rem; } }
+/* Auf dem Handy stört er nur: Pad Mode ist für die Tablets an den
+   Maschinen gedacht. Ab Tablet-Breite ist er wieder da. */
+/* Muss stärker sein als die Regel, die alle Knöpfe der
+   Werkzeugleiste auf display:flex setzt — sonst kommt er zurück. */
+@media (max-width: 720px) {
+  .werkzeugleiste .pad-start, .pad-start { display: none !important; }
+}
 
 body.pad-offen { overflow: hidden; }
 .pad { position: fixed; inset: 0; z-index: 70; background: #000; color: #f2f4f7;
@@ -2596,6 +2601,41 @@ body.pad-offen { overflow: hidden; }
 .pad-feld--leer .pad-feld__wert { font-size: 1.1rem; font-weight: 500; color: #6c7583; }
 .pad-feld--gross.pad-feld--leer .pad-feld__wert { font-size: 1.3rem; }
 .pad__hinweis { margin: 0; padding: 12px 18px 0; color: #8b95a3; }
+/* ---------- Auswahl beim Werkzeugwechsel ---------- */
+.wzgruppe { margin-bottom: 14px; }
+.wzgruppe__name { font-weight: 700; font-size: .82rem; color: var(--marke);
+                  letter-spacing: .06em; margin-bottom: 6px; }
+.wzgitter { display: grid; gap: 8px;
+            grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); }
+.wzkachel { border: 1px solid var(--linie-stark); background: var(--grund);
+            border-radius: 10px; padding: 10px 8px; cursor: pointer; font: inherit;
+            color: var(--tinte); display: flex; flex-direction: column; gap: 2px;
+            text-align: left; }
+.wzkachel__nr { font-weight: 700; font-size: .95rem; }
+.wzkachel__art { font-size: .7rem; color: var(--gedaempft);
+                 overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wzkachel.aktiv { background: var(--marke); border-color: var(--marke); color: #fff; }
+.wzkachel.aktiv .wzkachel__art { color: rgba(255,255,255,.85); }
+/* ---------- Werkzeugwechsel ---------- */
+.wz-path { margin-bottom: 12px; }
+.wz-path__name { font-size: .78rem; font-weight: 700; letter-spacing: .06em;
+                 color: var(--marke); margin-bottom: 5px; }
+.wz-gitter { display: grid; gap: 8px;
+             grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); }
+.wz-platz { background: var(--grund); border: 1px solid var(--linie-stark);
+            border-radius: var(--radius); padding: 9px 8px; cursor: pointer;
+            font: inherit; color: var(--tinte); text-align: left;
+            display: flex; flex-direction: column; gap: 2px; }
+.wz-platz__nr { font-weight: 700; font-size: .95rem; }
+.wz-platz__art { font-size: .7rem; color: var(--gedaempft); overflow: hidden;
+                 text-overflow: ellipsis; white-space: nowrap; }
+.wz-platz--an { background: var(--marke); border-color: var(--marke); color: #fff; }
+.wz-platz--an .wz-platz__art { color: rgba(255,255,255,.85); }
+.wz-marke { display: inline-block; border: 1px solid var(--linie-stark);
+            border-radius: 5px; padding: 1px 6px; margin: 0 4px 3px 0;
+            font-size: .82rem; font-weight: 600; }
+.wz-marke i { font-style: normal; font-weight: 400; color: var(--gedaempft);
+              font-size: .72rem; }
 </style>
 </head>
 <body>
@@ -2644,7 +2684,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "52.0.0";
+const APP_VERSION = "54.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -4843,6 +4883,13 @@ function auftragsKnoepfeBinden(raster, b) {
         bestaetigen: "Auftrag beenden",
       });
       if (!ok) return;
+
+      // Vor dem Abschliessen den Stand des Einrichtblatts als Daten
+      // festhalten. Danach zeigt dieser Auftrag immer, womit damals
+      // gearbeitet wurde — auch wenn der Typ später umgerüstet wird.
+      const maschineHier = (prod.maschinen || [])
+        .find((x) => x.id === el.dataset.maschine);
+      await blattStandSichern(j, maschineHier);
 
       const { error } = await db.from("jobs")
         .update({ ended_at: new Date().toISOString(), ended_by: profil.id,
@@ -8425,7 +8472,6 @@ async function padMaschine(h) {
         : (teil ? teil.material_groesse : ""))
     + feld("Material", (j && j.material_menge) || (teil ? teil.material : ""))
     + feld("Programm", programm)
-    + feld("Artikel", teil ? teil.bezeichnung : "")
     + feld("FA Nr.", j ? j.fa_nr : "")
     + '</div>'
 
@@ -8459,108 +8505,255 @@ async function padMaschine(h) {
   if (wechsel) wechsel.onclick = () => werkzeugWechselDialog(m, j);
 
   const hist = h.querySelector("[data-padhistorie]");
-  if (hist) hist.onclick = () => wechselHistorie(m);
+  if (hist) hist.onclick = () => wechselHistorie(m, j);
 }
 
 // ---------- Werkzeugwechsel ----------
 
 async function werkzeugWechselDialog(maschine, auftrag) {
-  // Zur Auswahl stehen die Werkzeugplätze des Maschinentyps
-  let plaetze = [];
-  try {
-    const paths = await ladeTypAufbau(maschine.type_id);
-    paths.forEach((p) => {
-      (p.type_slots || []).forEach((s) => {
-        plaetze.push({ nr: s.tool_nr || "", bez: p.name });
-      });
-    });
-  } catch (f) { /* dann eben von Hand */ }
+  // Alle Werkzeugplätze des Typs, nach Path sortiert. Angetippt
+  // werden alle, die in dieser Runde gewechselt wurden.
+  let paths = [];
+  try { paths = await ladeTypAufbau(maschine.type_id); }
+  catch (f) { meldung(fehlertext(f), "fehler"); return; }
 
-  const wahl = plaetze.length
-    ? await auswahlSuchen("Welches Werkzeug wurde gewechselt?",
-        plaetze.filter((x) => x.nr).map((x) => ({ wert: x.nr, text: x.nr + " · " + x.bez })))
-    : null;
+  const reihen = paths
+    .sort((x, y) => (x.nummer === 2 ? 99 : x.nummer) - (y.nummer === 2 ? 99 : y.nummer))
+    .map((p) => ({ name: p.name, plaetze: (p.type_slots || []).filter((s) => s.tool_nr) }))
+    .filter((p) => p.plaetze.length);
 
-  const w = await dialogFelder({ titel: "Werkzeugwechsel",
-    felder: [
-      { name: "tool", label: "Toolnummer", pflicht: true, wert: wahl || "" },
-      { name: "bez", label: "Werkzeug", wert: "" },
-      { name: "grund", label: "Grund",
-        auswahl: [["verschlissen", "Verschlissen"], ["bruch", "Bruch"],
-                  ["mass", "Mass nicht i.O."], ["ruesten", "Rüsten"],
-                  ["anderes", "Anderes"]], wert: "verschlissen" },
-      { name: "stk", label: "Stückzahl erreicht", typ: "number", wert: "" },
-      { name: "notiz", label: "Notiz", wert: "" },
-    ], bestaetigen: "Wechsel eintragen" });
-  if (!w) return;
+  if (!reihen.length) {
+    meldung("Für diesen Maschinentyp sind noch keine Werkzeugplätze angelegt.", "warn");
+    return;
+  }
 
-  const { error } = await db.from("tool_changes").insert({
-    machine_id: maschine.id,
-    job_id: auftrag ? auftrag.id : null,
-    hoco_nr: auftrag ? auftrag.job_number : null,
-    tool_nr: (w.tool || "").trim(),
-    bezeichnung: w.bez || null,
-    grund: w.grund || null,
-    stueckzahl: w.stk === "" || w.stk === undefined ? null : Math.round(Number(w.stk)),
-    notiz: w.notiz || null,
+  const gewaehlt = new Set();
+  const nr = "ww" + (++dialogZaehler) + "-";
+  const huelle = document.createElement("div");
+  huelle.className = "dialog-huelle";
+  huelle.innerHTML = '<div class="dialog dialog--breit">'
+    + '<h2>Werkzeugwechsel</h2>'
+    + '<p class="klein">Alle Werkzeuge antippen, die gewechselt wurden.</p>'
+    + reihen.map((p) => '<div class="wz-path">'
+        + '<div class="wz-path__name">' + esc(p.name) + '</div>'
+        + '<div class="wz-gitter">'
+        + p.plaetze.map((sl) => '<button type="button" class="wz-platz"'
+            + ' data-tool="' + esc(sl.tool_nr) + '">'
+            + '<span class="wz-platz__nr">' + esc(sl.tool_nr) + '</span>'
+            + '<span class="wz-platz__art">' + esc(sl.bezeichnung || "") + '</span>'
+            + '</button>').join("")
+        + '</div></div>').join("")
+    + '<div class="dialog__knoepfe">'
+    + '<button class="knopf knopf--still" data-nein>Abbrechen</button>'
+    + '<button class="knopf knopf--haupt" id="' + nr + 'weiter" disabled>Weiter</button>'
+    + '</div></div>';
+  document.body.appendChild(huelle);
+
+  const zu = () => huelle.remove();
+  huelle.querySelector("[data-nein]").onclick = zu;
+  dialogSchliessen(huelle, zu);
+
+  const weiter = huelle.querySelector("#" + nr + "weiter");
+  huelle.querySelectorAll("[data-tool]").forEach((el) => {
+    el.onclick = () => {
+      const t = el.dataset.tool;
+      if (gewaehlt.has(t)) gewaehlt.delete(t); else gewaehlt.add(t);
+      el.classList.toggle("wz-platz--an", gewaehlt.has(t));
+      weiter.disabled = gewaehlt.size === 0;
+      weiter.textContent = gewaehlt.size
+        ? "Weiter · " + gewaehlt.size : "Weiter";
+    };
   });
 
-  if (error) meldung(fehlertext(error), "fehler");
-  else meldung("Wechsel eingetragen.");
+  weiter.onclick = async () => {
+    const liste = [...gewaehlt];
+    zu();
+
+    const w = await dialogFelder({ titel: "Stückzahl beim Wechsel",
+      felder: [
+        { name: "stk", label: "Jetzige Stückzahl", typ: "number", pflicht: true,
+          wert: auftrag ? (auftrag.stand || 0) : "",
+          hinweis: liste.length + (liste.length === 1 ? " Werkzeug" : " Werkzeuge") },
+        { name: "notiz", label: "Notiz", wert: "" },
+      ], bestaetigen: "Wechsel eintragen" });
+    if (!w) return;
+
+    const stand = Math.max(0, Math.round(Number(w.stk) || 0));
+
+    // Wie viele Stück das Werkzeug gehalten hat: Abstand zur
+    // Stückzahl beim letzten Wechsel desselben Platzes.
+    const vorher = {};
+    try {
+      const r = await db.from("tool_changes")
+        .select("tool_nr, stueckzahl, gewechselt_am")
+        .eq("machine_id", maschine.id).in("tool_nr", liste)
+        .order("gewechselt_am", { ascending: false }).limit(200);
+      (r.data || []).forEach((z) => {
+        if (vorher[z.tool_nr] === undefined) vorher[z.tool_nr] = z.stueckzahl;
+      });
+    } catch (f) { /* dann bleibt die Spalte leer */ }
+
+    // Alle Zeilen einer Runde bekommen denselben Zeitpunkt
+    const zeitpunkt = new Date().toISOString();
+    const zeilen = liste.map((t) => ({
+      machine_id: maschine.id,
+      job_id: auftrag ? auftrag.id : null,
+      hoco_nr: auftrag ? auftrag.job_number : null,
+      tool_nr: t,
+      stueckzahl: stand,
+      gehalten_stk: (vorher[t] === undefined || vorher[t] === null)
+        ? null : Math.max(0, stand - vorher[t]),
+      notiz: w.notiz || null,
+      gewechselt_am: zeitpunkt,
+    }));
+
+    const { error } = await db.from("tool_changes").insert(zeilen);
+    if (error) { meldung(fehlertext(error), "fehler"); return; }
+    meldung(liste.length + (liste.length === 1 ? " Werkzeug" : " Werkzeuge")
+      + " bei " + zahlText(stand) + " Stück eingetragen.");
+  };
 }
 
-async function wechselHistorie(maschine) {
+async function wechselHistorie(maschine, auftrag) {
   let liste = [];
   try {
     const r = await zeitlimit(db.from("werkzeugwechsel").select("*")
       .eq("machine_id", maschine.id)
-      .order("gewechselt_am", { ascending: false }).limit(200),
+      .order("gewechselt_am", { ascending: false }).limit(300),
       12000, "Werkzeugwechsel");
     if (r.error) throw r.error;
     liste = r.data || [];
   } catch (f) { meldung(fehlertext(f), "fehler"); return; }
 
-  // Wie lange hat das vorherige Werkzeug gehalten? Das ergibt sich
-  // aus dem Abstand zum vorigen Wechsel derselben Toolnummer.
-  const vorher = {};
-  [...liste].reverse().forEach((z) => {
-    const alt = vorher[z.tool_nr];
-    if (alt) {
-      const tage = Math.round(
-        (new Date(z.gewechselt_am) - new Date(alt)) / 86400000);
-      z._gehalten = tage;
+  // Nach Runden gruppieren: alle Zeilen einer Runde teilen sich
+  // Zeitpunkt und Stückzahl.
+  const runden = [];
+  liste.forEach((z) => {
+    const schluessel = z.gewechselt_am + "|" + (z.stueckzahl === null ? "" : z.stueckzahl);
+    let r = runden.find((x) => x.schluessel === schluessel);
+    if (!r) {
+      r = { schluessel: schluessel, wann: z.gewechselt_am, stk: z.stueckzahl,
+            person: z.person, auftrag: z.auftrag_nr, notiz: z.notiz, zeilen: [] };
+      runden.push(r);
     }
-    vorher[z.tool_nr] = z.gewechselt_am;
+    r.zeilen.push(z);
   });
+
+  const tabelle = runden.length
+    ? '<table class="tabelle"><thead><tr><th>Stückzahl</th><th>Gewechselt</th>'
+      + '<th>Auftrag</th><th>Wann</th><th>Wer</th></tr></thead><tbody>'
+      + runden.map((r) => '<tr>'
+          + '<td class="nowrap"><strong>'
+          + (r.stk === null || r.stk === undefined ? "—" : zahlText(r.stk))
+          + '</strong></td>'
+          + '<td>' + r.zeilen.map((z) => '<span class="wz-marke">' + esc(z.tool_nr)
+              + (z.gehalten_stk !== null && z.gehalten_stk !== undefined
+                  ? ' <i>' + zahlText(z.gehalten_stk) + ' Stk</i>' : "")
+              + '</span>').join(" ")
+          + (r.notiz ? '<div class="klein">' + esc(r.notiz) + '</div>' : "")
+          + '</td>'
+          + '<td class="klein">' + esc(r.auftrag || "") + '</td>'
+          + '<td class="klein nowrap">' + esc(datumZeitKurz(r.wann)) + '</td>'
+          + '<td class="klein">' + esc(r.person || "") + '</td>'
+          + '</tr>').join("") + '</tbody></table>'
+    : '<p class="hinweis">Noch kein Wechsel eingetragen.</p>';
 
   const huelle = document.createElement("div");
   huelle.className = "dialog-huelle";
   huelle.innerHTML = '<div class="dialog dialog--breit">'
     + '<div class="blatt__kopf"><h2>Werkzeugwechsel · ' + esc(maschine.name) + '</h2>'
+    + (runden.length
+        ? '<button class="knopf knopf--klein" data-wzpdf>Als PDF ablegen</button>' : "")
     + '<button class="knopf knopf--still" data-zu>Schliessen</button></div>'
-    + (liste.length
-      ? '<table class="tabelle"><thead><tr><th>Tool</th><th>Werkzeug</th>'
-        + '<th>Grund</th><th class="rechts">Stk.</th><th class="rechts">gehalten</th>'
-        + '<th>wann</th><th>wer</th></tr></thead><tbody>'
-        + liste.map((z) => '<tr>'
-            + '<td class="nowrap"><strong>' + esc(z.tool_nr) + '</strong></td>'
-            + '<td>' + esc(z.bezeichnung || "") + '</td>'
-            + '<td>' + esc(z.grund || "") + '</td>'
-            + '<td class="rechts">' + (z.stueckzahl ? zahlText(z.stueckzahl) : "—") + '</td>'
-            + '<td class="rechts">' + (z._gehalten !== undefined
-                ? z._gehalten + " Tg." : "—") + '</td>'
-            + '<td class="klein nowrap">' + esc(datumZeitKurz(z.gewechselt_am)) + '</td>'
-            + '<td class="klein">' + esc(z.person || "") + '</td>'
-            + '</tr>').join("") + '</tbody></table>'
-      : '<p class="hinweis">Noch kein Wechsel eingetragen.</p>')
-    + '<p class="klein">Die Spalte „gehalten" rechnet den Abstand zum vorherigen '
-    + 'Wechsel derselben Toolnummer. Die Standzeit im Einrichtblatt bleibt davon '
+    + tabelle
+    + '<p class="klein">Die Zahl hinter einem Werkzeug sagt, wie viele Stück es seit '
+    + 'dem letzten Wechsel gehalten hat. Die Standzeit im Einrichtblatt bleibt davon '
     + 'unberührt und wird dort von Hand gepflegt.</p>'
     + '</div>';
   document.body.appendChild(huelle);
   const zu = () => huelle.remove();
   huelle.querySelector("[data-zu]").onclick = zu;
   dialogSchliessen(huelle, zu);
+
+  const pdfKnopf = huelle.querySelector("[data-wzpdf]");
+  if (pdfKnopf) pdfKnopf.onclick = () => historieAblegen(maschine, auftrag, runden);
+}
+
+// Die Historie als PDF in dieselbe Ablage wie die Warenbegleit-
+// blätter, und am Auftrag vermerkt — dort steht sie neben der WBG.
+async function historieAblegen(maschine, auftrag, runden) {
+  const fenster = window.open("", "_blank");
+  if (!fenster) { meldung("Das Fenster wurde blockiert.", "warn"); return; }
+
+  const titel = "Werkzeugwechsel_"
+    + (auftrag && auftrag.fa_nr ? auftrag.fa_nr : maschine.name).replace(/[^A-Za-z0-9]+/g, "_")
+    + "_" + isoDatum(new Date());
+
+  fenster.document.write('<!doctype html><html lang="de"><head><meta charset="utf-8">'
+    + '<title>' + esc(titel) + '</title><style>'
+    + '@page { size: A4; margin: 14mm }'
+    + 'body { font-family: Calibri, Arial, sans-serif; font-size: 10pt; margin: 0;'
+    + '       -webkit-print-color-adjust: exact; print-color-adjust: exact }'
+    + 'h1 { font-size: 15pt; margin: 0 0 2mm }'
+    + '.kopf { color: #445; font-size: 9pt; margin-bottom: 5mm }'
+    + 'table { width: 100%; border-collapse: collapse }'
+    + 'th { text-align: left; font-size: 8pt; letter-spacing: .06em; color: #003884;'
+    + '     border-bottom: 1pt solid #003884; padding: 0 2mm 1.5mm }'
+    + 'td { padding: 1.8mm 2mm; border-bottom: .4pt solid #dfe3e8; vertical-align: top }'
+    + '.nr { font-weight: 700; white-space: nowrap }'
+    + '.wz { display: inline-block; border: .5pt solid #9aa5b1; border-radius: 2mm;'
+    + '      padding: 0 1.5mm; margin: 0 1mm .8mm 0; font-size: 9pt }'
+    + '.wz i { font-style: normal; color: #667; font-size: 8pt }'
+    + '.leiste { position: fixed; top: 10px; right: 12px }'
+    + '.leiste button { font: inherit; padding: 7px 14px; margin-left: 6px;'
+    + '  border: 1px solid #003884; background: #003884; color: #fff; border-radius: 6px;'
+    + '  cursor: pointer }'
+    + '@media print { .leiste { display: none } }'
+    + '</style></head><body>'
+    + '<div class="leiste"><button onclick="window.print()">Drucken</button>'
+    + '<button onclick="window.close()">Schliessen</button></div>'
+    + '<h1>Werkzeugwechsel</h1>'
+    + '<div class="kopf">' + esc(maschine.name)
+    + (maschine.machine_number ? " · " + esc(maschine.machine_number) : "")
+    + (auftrag ? " · " + esc(auftrag.job_number || "") : "")
+    + (auftrag && auftrag.fa_nr ? " · FA " + esc(auftrag.fa_nr) : "")
+    + " · Stand " + esc(kurzDatum(isoDatum(new Date()))) + '</div>'
+    + '<table><thead><tr><th>Stückzahl</th><th>Gewechselte Werkzeuge</th>'
+    + '<th>Wann</th><th>Wer</th></tr></thead><tbody>'
+    + runden.map((r) => '<tr>'
+        + '<td class="nr">' + (r.stk === null || r.stk === undefined
+            ? "—" : zahlText(r.stk)) + '</td>'
+        + '<td>' + r.zeilen.map((z) => '<span class="wz">' + esc(z.tool_nr)
+            + (z.gehalten_stk !== null && z.gehalten_stk !== undefined
+                ? ' <i>' + zahlText(z.gehalten_stk) + ' Stk</i>' : "")
+            + '</span>').join("")
+        + (r.notiz ? '<div style="color:#667;font-size:9pt">' + esc(r.notiz) + '</div>' : "")
+        + '</td>'
+        + '<td>' + esc(datumZeitKurz(r.wann)) + '</td>'
+        + '<td>' + esc(r.person || "") + '</td>'
+        + '</tr>').join("")
+    + '</tbody></table></body></html>');
+  fenster.document.close();
+
+  // Zusätzlich in der Ablage hinterlegen, damit die Historie später
+  // neben der WBG steht — auch ohne das geöffnete Fenster.
+  if (!auftrag) return;
+  try {
+    const inhalt = "<!doctype html>" + fenster.document.documentElement.outerHTML;
+    const name = "wbg/wz-" + Date.now() + "-" + titel + ".html";
+    const r = await db.storage.from("zeichnungen")
+      .upload(name, new Blob([inhalt], { type: "text/html" }),
+        { contentType: "text/html" });
+    if (r.error) throw r.error;
+    const adresse = db.storage.from("zeichnungen").getPublicUrl(name).data.publicUrl;
+    const u = await db.from("jobs").update({ wz_historie_url: adresse })
+      .eq("id", auftrag.id);
+    if (u.error) throw u.error;
+    meldung("Historie abgelegt — sie steht jetzt beim Auftrag neben der WBG.");
+  } catch (f) {
+    meldung("Im Fenster kannst du sie als PDF speichern. Ablegen ging nicht: "
+      + fehlertext(f), "warn");
+  }
 }
 
 // =================================================================
@@ -8679,6 +8872,44 @@ async function blattHolenOderAnlegen(hocoNr, typId, jobId, maschineId) {
   return blatt;
 }
 
+// Beim Abschliessen eines Auftrags wird der Stand des Einrichtblatts
+// als Daten festgehalten. Kein PDF — daraus wird das Blatt später
+// genauso erzeugt wie sonst, nur eben aus dem eingefrorenen Stand.
+async function blattStandSichern(auftrag, maschine) {
+  if (!auftrag || !auftrag.job_number) return;
+  const typId = (maschine && maschine.type_id) || null;
+  if (!typId) return;
+
+  try {
+    const da = await db.from("setup_snapshots").select("id")
+      .eq("job_id", auftrag.id).limit(1);
+    if ((da.data || []).length) return;              // schon festgehalten
+
+    const blatt = await db.from("setup_sheets").select("*")
+      .eq("hoco_nr", auftrag.job_number).eq("type_id", typId)
+      .order("created_at").limit(1);
+    const b = (blatt.data || [])[0];
+    if (!b) return;                                   // nie eines erstellt
+
+    const zeilen = await db.from("setup_sheet_slots")
+      .select("*, articles(article_number, name)")
+      .eq("sheet_id", b.id).order("sortierung").order("unter_nr");
+
+    const typ = await db.from("machine_types").select("name").eq("id", typId).limit(1);
+
+    await db.from("setup_snapshots").insert({
+      job_id: auftrag.id,
+      fa_nr: auftrag.fa_nr || null,
+      hoco_nr: auftrag.job_number,
+      type_id: typId,
+      typ_name: ((typ.data || [])[0] || {}).name || null,
+      maschine: maschine ? maschine.name : null,
+      kopf: b,
+      plaetze: zeilen.data || [],
+    });
+  } catch (f) { /* der Abschluss darf daran nicht scheitern */ }
+}
+
 async function einrichtblattOeffnen(hocoNr, typId, jobId, maschineId) {
   if (!hocoNr) { meldung("Ohne HOCO Nr. geht das nicht.", "warn"); return; }
   if (!typId) {
@@ -8686,11 +8917,81 @@ async function einrichtblattOeffnen(hocoNr, typId, jobId, maschineId) {
     return;
   }
 
+  // Ist der Auftrag abgeschlossen und ein Stand festgehalten, wird
+  // das Blatt daraus erzeugt — nicht aus den heutigen Daten.
+  if (jobId) {
+    try {
+      const r = await db.from("setup_snapshots").select("*").eq("job_id", jobId).limit(1);
+      const stand = (r.data || [])[0];
+      if (stand) { blattFensterStand(stand); return; }
+    } catch (f) { /* dann eben die aktuelle Fassung */ }
+  }
+
   let blatt;
   try { blatt = await blattHolenOderAnlegen(hocoNr, typId, jobId, maschineId); }
   catch (f) { meldung(fehlertext(f), "fehler"); return; }
 
   blattFenster(blatt);
+}
+
+// Ein festgehaltener Stand: dieselbe Darstellung, aber nichts
+// änderbar — so wurde damals gearbeitet.
+function blattFensterStand(stand) {
+  const kopf = stand.kopf || {};
+  const zeilen = (stand.plaetze || []).slice()
+    .sort((a, c) => (a.sortierung - c.sortierung) || (a.unter_nr - c.unter_nr));
+
+  const gruppen = [];
+  zeilen.forEach((z) => {
+    const name = z.path_name || "ohne Path";
+    let g = gruppen.find((x) => x.name === name);
+    if (!g) { g = { name: name, zeilen: [] }; gruppen.push(g); }
+    g.zeilen.push(z);
+  });
+
+  const feld = (k, v) => '<tr><td class="klein">' + k + '</td><td>'
+    + (v ? esc(v) : '<span class="gedaempft">—</span>') + '</td></tr>';
+
+  const huelle = document.createElement("div");
+  huelle.className = "dialog-huelle";
+  huelle.innerHTML = '<div class="dialog dialog--breit">'
+    + '<div class="blatt__kopf"><h2>Einrichtblatt ' + esc(stand.hoco_nr || "") + '</h2>'
+    + '<span class="marke">' + esc(stand.typ_name || "") + '</span>'
+    + '<button class="knopf knopf--still" data-zu>Schliessen</button></div>'
+    + '<p class="hinweis">Stand bei Abschluss'
+    + (stand.fa_nr ? " von FA " + esc(stand.fa_nr) : "")
+    + (stand.maschine ? " auf " + esc(stand.maschine) : "")
+    + " vom " + esc(kurzDatum(stand.erstellt))
+    + ". So wurde damals gearbeitet — nicht änderbar.</p>"
+    + '<table class="tabelle tabelle--kopf"><tbody>'
+    + feld("Artikelbezeichnung", kopf.bezeichnung)
+    + feld("Material", [kopf.material, kopf.material_groesse].filter((x) => x).join(" · "))
+    + feld("Programm Nr.", kopf.programm_nr)
+    + feld("Stückzeit", kopf.stueckzeit_s ? kopf.stueckzeit_s + " Sek./Stk." : "")
+    + feld("Abgreifzange", kopf.abgreifzange)
+    + feld("Allgemeine Infos", kopf.infos)
+    + '</tbody></table>'
+    + gruppen.map((g) => '<section class="karte">'
+        + '<div class="karte__kopf"><h2>' + esc(g.name) + '</h2></div>'
+        + '<table class="tabelle"><thead><tr>'
+        + '<th>Tool</th><th>Tätigkeit</th><th>Masse</th><th>Werkzeug</th>'
+        + '<th>Hersteller</th></tr></thead><tbody>'
+        + g.zeilen.map((z) => '<tr>'
+            + '<td class="nowrap"><strong>' + esc(z.tool_nr || "—") + '</strong></td>'
+            + '<td>' + esc(z.taetigkeit || "") + '</td>'
+            + '<td>' + esc(z.masse || "") + '</td>'
+            + '<td>' + esc(z.articles
+                ? z.articles.article_number
+                  + (z.articles.name ? " · " + z.articles.name : "")
+                : (z.werkzeug || z.frei_text || "")) + '</td>'
+            + '<td>' + esc(z.hersteller || "") + '</td>'
+            + '</tr>').join("")
+        + '</tbody></table></section>').join("")
+    + '</div>';
+  document.body.appendChild(huelle);
+  const zu = () => huelle.remove();
+  huelle.querySelector("[data-zu]").onclick = zu;
+  dialogSchliessen(huelle, zu);
 }
 
 async function blattFenster(blatt) {
@@ -8910,7 +9211,7 @@ async function ansichtHoco(ziel, b) {
     let faListe = [], vomAuftrag = null;
     try {
       const r = await db.from("jobs")
-        .select("id, fa_nr, planned_from, plan_status, drawing_url, wbg_url")
+        .select("id, fa_nr, planned_from, plan_status, drawing_url, wbg_url, wz_historie_url")
         .eq("job_number", t.hoco_nr)
         .order("planned_from", { ascending: false }).limit(50);
       faListe = (r.data || []).filter((x) => x.fa_nr);
@@ -9001,11 +9302,19 @@ async function ansichtHoco(ziel, b) {
               + (x.drawing_url
                   ? ' <button class="linkknopf" data-fadatei="' + esc(x.drawing_url)
                     + '" data-fatitel="Zeichnung ' + esc(x.fa_nr) + '">Zeichnung</button>' : "")
+              + (x.wz_historie_url
+                  ? ' <button class="linkknopf" data-fadatei="' + esc(x.wz_historie_url)
+                    + '" data-fatitel="Werkzeugwechsel ' + esc(x.fa_nr)
+                    + '">Wechsel</button>' : "")
               + (darf
                   ? ' <label class="linkknopf bildknopf">'
                     + (x.wbg_url ? "WBG ersetzen" : "WBG wählen")
                     + '<input type="file" accept="application/pdf" hidden'
                     + ' data-wbgauftrag="' + esc(x.id) + '"></label>' : "")
+              // Die Werkzeugwechsel dieses Durchlaufs, am selben Ort
+              // wie die WBG
+              + ' <button class="linkknopf" data-wechselblatt="' + esc(x.id)
+              + '" data-fa="' + esc(x.fa_nr) + '">Wechsel</button>' 
               + (!x.wbg_url && !x.drawing_url && !darf
                   ? '<span class="gedaempft klein">ohne Anhang</span>' : "")
               + '</td>'
@@ -9022,6 +9331,19 @@ async function ansichtHoco(ziel, b) {
 
     // Das Warenbegleitblatt gehört zum einzelnen Durchlauf, also
     // je FA Nr. ein eigenes.
+    ziel.querySelectorAll("[data-wechselblatt]").forEach((el) => {
+      el.onclick = async () => {
+        let liste = [];
+        try { liste = await wechselDatenLaden({ job_id: el.dataset.wechselblatt }); }
+        catch (f) { meldung(fehlertext(f), "fehler"); return; }
+        if (!liste.length) {
+          meldung("Zu dieser FA Nr. ist noch kein Werkzeugwechsel eingetragen.", "warn");
+          return;
+        }
+        wechselBlattDrucken("Werkzeugwechsel FA " + el.dataset.fa, liste);
+      };
+    });
+
     ziel.querySelectorAll("[data-wbgauftrag]").forEach((el) => {
       el.onchange = async (e) => {
         const datei = (e.target.files || [])[0];
