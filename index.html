@@ -2580,7 +2580,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "48.1.0";
+const APP_VERSION = "49.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -2914,7 +2914,11 @@ function fehlertext(e) {
   const m = e.message || String(e);
   if (m.includes("Invalid login credentials")) return "E-Mail oder Passwort stimmt nicht.";
   if (m.includes("Email not confirmed")) return "Die E-Mail-Adresse wurde noch nicht bestätigt.";
-  if (m.includes("Password should be")) return "Das Passwort ist zu kurz (mindestens 8 Zeichen).";
+  if (m.includes("Password should be")) {
+    // Diese Schranke sitzt in Supabase selbst, nicht in der App.
+    return "Supabase lehnt das Passwort ab. Die Mindestlänge steht dort unter "
+      + "Authentication → Policies und lässt sich auf 1 setzen.";
+  }
   if (m.includes("row-level security")) return "Dafür fehlen dir die Rechte.";
   if (m.includes("Failed to fetch")) return "Keine Verbindung zum Server. WLAN prüfen.";
   if (m.includes("foreign key") || m.includes("violates foreign key"))
@@ -7155,9 +7159,8 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
           + "Anlegen geht unter Produktion → HOCO Nr.";
         return;
       }
-      nrInfo.textContent = [teil.bezeichnung, teil.material, teil.material_groesse]
-        .filter((x) => x).join(" · ")
-        + (teil.zeichnung_url && !pdfAdresse ? "  ·  Zeichnung wird übernommen" : "");
+      const uebernommen = [];
+      if (teil.zeichnung_url && !pdfAdresse) uebernommen.push("Zeichnung");
 
       // Hängt an der HOCO Nr. eine Zeichnung und am Auftrag noch
       // keine, wird sie übernommen. Eine bereits gewählte bleibt.
@@ -7172,7 +7175,34 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
         if (dmFeld && !dmFeld.value) dmFeld.value = zerlegt.dm;
         if (tolFeld && !tolFeld.value && zerlegt.toleranz) tolFeld.value = zerlegt.toleranz;
       }
-      if (mengeFeld && !mengeFeld.value && teil.material) mengeFeld.value = teil.material;
+      if (zerlegt && ((dmFeld && !dmFeld.value) || (tolFeld && !tolFeld.value))) {
+        uebernommen.push("Materialgrösse");
+      }
+      if (mengeFeld && !mengeFeld.value && teil.material) {
+        mengeFeld.value = teil.material;
+        uebernommen.push("Material");
+      }
+
+      // Die Farbe ergibt sich aus dem Material, falls sie dafür
+      // hinterlegt ist und noch keine eigene gewählt wurde.
+      if (teil.material && !auftrag) {
+        const passend = PLANFARBEN.find((fb) => {
+          const zu = FARBZUTEILUNG[fb.wert];
+          return zu && zu.material
+            && String(zu.material).toLowerCase() === String(teil.material).toLowerCase();
+        });
+        if (passend && planFarbe === "blau") {
+          planFarbe = passend.wert;
+          huelle.querySelectorAll("[data-plfarbe]").forEach((el) => {
+            el.classList.toggle("aktiv", el.dataset.plfarbe === passend.wert);
+          });
+          uebernommen.push("Farbe");
+        }
+      }
+
+      nrInfo.textContent = [teil.bezeichnung, teil.material, teil.material_groesse]
+        .filter((x) => x).join(" · ")
+        + (uebernommen.length ? "  ·  übernommen: " + uebernommen.join(", ") : "");
     };
     nrFeld.oninput = () => { clearTimeout(sucheTakt); sucheTakt = setTimeout(nachschlagen, 400); };
     if (nrFeld.value) nachschlagen();
@@ -8337,10 +8367,53 @@ async function ansichtHoco(ziel, b) {
     let faListe = [], vomAuftrag = null;
     try {
       const r = await db.from("jobs")
-        .select("fa_nr, planned_from, plan_status, drawing_url, wbg_url")
+        .select("id, fa_nr, planned_from, plan_status, drawing_url, wbg_url")
         .eq("job_number", t.hoco_nr)
         .order("planned_from", { ascending: false }).limit(50);
       faListe = (r.data || []).filter((x) => x.fa_nr);
+
+      // Dieselbe FA Nr. kann auf mehreren Aufträgen stehen, etwa wenn
+      // ein Los geteilt oder umgeplant wurde. Hängt bei einem davon
+      // eine WBG, bekommen die anderen sie auch — wieder nur, solange
+      // sie noch nicht laufen.
+      if (darf) {
+        const proFa = {};
+        (r.data || []).forEach((x) => {
+          if (x.fa_nr && x.wbg_url && !proFa[x.fa_nr]) proFa[x.fa_nr] = x.wbg_url;
+        });
+        const ohneWbg = (r.data || []).filter((x) => x.fa_nr && !x.wbg_url
+          && proFa[x.fa_nr]
+          && ["geplant", "ruesten"].indexOf(x.plan_status || "geplant") !== -1);
+
+        for (const x of ohneWbg) {
+          const u = await db.from("jobs").update({ wbg_url: proFa[x.fa_nr] })
+            .eq("id", x.id);
+          if (!u.error) x.wbg_url = proFa[x.fa_nr];
+        }
+        if (ohneWbg.length) {
+          meldung("WBG auf " + ohneWbg.length
+            + (ohneWbg.length === 1 ? " weiteren Auftrag" : " weitere Aufträge")
+            + " mit gleicher FA Nr. übertragen.");
+        }
+      }
+
+      // Aufträge, die noch nicht laufen, bekommen die Zeichnung aus
+      // den Stammdaten. Laufende und abgeschlossene bleiben, wie sie
+      // sind — dort soll sich rückwirkend nichts ändern.
+      if (t.zeichnung_url && darf) {
+        const offen = (r.data || []).filter((x) => !x.drawing_url
+          && ["geplant", "ruesten"].indexOf(x.plan_status || "geplant") !== -1);
+        if (offen.length) {
+          const u = await db.from("jobs").update({ drawing_url: t.zeichnung_url })
+            .in("id", offen.map((x) => x.id));
+          if (!u.error) {
+            offen.forEach((x) => { x.drawing_url = t.zeichnung_url; });
+            meldung("Zeichnung auf " + offen.length
+              + (offen.length === 1 ? " geplanten Auftrag" : " geplante Aufträge")
+              + " übertragen.");
+          }
+        }
+      }
       const mitZeichnung = (r.data || []).find((x) => x.drawing_url);
       if (mitZeichnung) vomAuftrag = mitZeichnung.drawing_url;
     } catch (f) { /* Beiwerk */ }
@@ -8410,7 +8483,12 @@ async function ansichtHoco(ziel, b) {
               + (x.drawing_url
                   ? ' <button class="linkknopf" data-fadatei="' + esc(x.drawing_url)
                     + '" data-fatitel="Zeichnung ' + esc(x.fa_nr) + '">Zeichnung</button>' : "")
-              + (!x.wbg_url && !x.drawing_url
+              + (darf
+                  ? ' <label class="linkknopf bildknopf">'
+                    + (x.wbg_url ? "WBG ersetzen" : "WBG wählen")
+                    + '<input type="file" accept="application/pdf" hidden'
+                    + ' data-wbgauftrag="' + esc(x.id) + '"></label>' : "")
+              + (!x.wbg_url && !x.drawing_url && !darf
                   ? '<span class="gedaempft klein">ohne Anhang</span>' : "")
               + '</td>'
               + '<td class="klein rechts">'
@@ -8422,6 +8500,29 @@ async function ansichtHoco(ziel, b) {
 
     ziel.querySelectorAll("[data-fadatei]").forEach((el) => {
       el.onclick = () => betrachter(el.dataset.fadatei, el.dataset.fatitel, true);
+    });
+
+    // Das Warenbegleitblatt gehört zum einzelnen Durchlauf, also
+    // je FA Nr. ein eigenes.
+    ziel.querySelectorAll("[data-wbgauftrag]").forEach((el) => {
+      el.onchange = async (e) => {
+        const datei = (e.target.files || [])[0];
+        if (!datei) return;
+        meldung("WBG wird hochgeladen …");
+        try {
+          const name = "wbg/" + Date.now() + "-"
+            + datei.name.replace(/[^a-zA-Z0-9.\-]/g, "_");
+          const r = await db.storage.from("zeichnungen").upload(name, datei,
+            { contentType: "application/pdf" });
+          if (r.error) throw r.error;
+          const adresse = db.storage.from("zeichnungen").getPublicUrl(name).data.publicUrl;
+          const u = await db.from("jobs").update({ wbg_url: adresse })
+            .eq("id", el.dataset.wbgauftrag);
+          if (u.error) throw u.error;
+          meldung("WBG hinterlegt.");
+          neuLaden();
+        } catch (f) { meldung(fehlertext(f), "fehler"); }
+      };
     });
 
     document.getElementById("hoco-zurueck").onclick = () => { prod.hocoOffen = null; neuLaden(); };
@@ -11791,7 +11892,9 @@ async function seiteEinstellungen(b) {
 
   document.getElementById("ps").onclick = async () => {
     const pw = document.getElementById("np").value;
-    if (pw.length < 8) return meldung("Mindestens 8 Zeichen.", "warn");
+    // Keine Längenvorgabe mehr — ein einzelnes Zeichen genügt.
+    // Leer bleibt trotzdem unzulässig, sonst hätte das Konto gar keines.
+    if (!pw) return meldung("Bitte ein Passwort eingeben.", "warn");
     const { error } = await db.auth.updateUser({ password: pw });
     if (error) meldung(fehlertext(error), "fehler");
     else {
@@ -11833,9 +11936,9 @@ async function seiteEinstellungen(b) {
         felder: [{ name: "pw", label: "Neues Passwort", typ: "password", pflicht: true }],
         bestaetigen: "Speichern",
       });
-      if (!w || (w.pw || "").length < 8) {
+      if (!w || !(w.pw || "")) {
         ohnePwFeld.checked = true;
-        return meldung("Mindestens 8 Zeichen. Nichts geändert.", "warn");
+        return meldung("Kein Passwort eingegeben. Nichts geändert.", "warn");
       }
 
       const r = await db.auth.updateUser({ password: w.pw });
