@@ -2532,6 +2532,70 @@ body.dunkel .pw-balken__nr { color: #10151c !important; }
 /* Das Logo ist jetzt ein Knopf zum Neuladen, sieht aber aus wie vorher */
 .kopf__logolink { background: none; border: 0; padding: 0; cursor: pointer; }
 .kopf__logolink:hover { opacity: .8; }
+/* ---------- Pad Mode ---------- */
+.pad-start { font: inherit; font-size: .82rem; font-weight: 700; letter-spacing: .04em;
+             height: 38px; padding: 0 16px; border-radius: 19px; cursor: pointer;
+             border: 1px solid var(--marke); background: var(--marke); color: #fff;
+             white-space: nowrap; }
+.pad-start:hover { filter: brightness(1.12); }
+@media (max-width: 720px) { .pad-start { height: 34px; padding: 0 12px;
+                                         font-size: .74rem; } }
+
+body.pad-offen { overflow: hidden; }
+.pad { position: fixed; inset: 0; z-index: 70; background: #000; color: #f2f4f7;
+       display: flex; flex-direction: column;
+       font-size: 1.05rem; overscroll-behavior: contain; }
+.pad__kopf { display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+             border-bottom: 1px solid #1c1f24; flex: none; }
+.pad__titel { font-size: 1.25rem; font-weight: 700; flex: 1; text-align: center; }
+.pad__zurueck, .pad__zu { background: none; border: 0; color: #f2f4f7;
+                          font-size: 1.7rem; line-height: 1; cursor: pointer;
+                          width: 44px; height: 44px; }
+.pad__zurueck--leer { display: inline-block; }
+.pad__laedt, .pad__leer, .pad__fehler { padding: 40px; text-align: center;
+                                        color: #98a2b0; }
+.pad__fehler { color: #ff8b7d; }
+
+.pad__kacheln { flex: 1; display: grid; gap: 16px; padding: 22px;
+                grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+                align-content: center; overflow-y: auto; }
+.pad-kachel { background: #14181d; border: 1px solid #262c34; border-radius: 16px;
+              color: inherit; font: inherit; cursor: pointer; padding: 22px 16px;
+              display: flex; flex-direction: column; align-items: center;
+              justify-content: center; gap: 8px; min-height: 120px;
+              font-size: 1.25rem; font-weight: 600; }
+.pad-kachel:active { background: #1d232b; }
+.pad-kachel--gross { min-height: 180px; font-size: 1.5rem; }
+.pad-kachel__zeichen { font-size: 2.6rem; color: #4d9bff; line-height: 1; }
+.pad-kachel__nr { font-size: .8rem; color: #8b95a3; font-weight: 500; }
+.pad-kachel__auftrag { font-size: .9rem; color: #4d9bff; font-weight: 500; }
+
+.pad__rolle { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch;
+              background: #fff; color: #111; }
+
+.pad__tafel { display: grid; gap: 12px; padding: 18px;
+              grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.pad-feld { background: #14181d; border: 1px solid #262c34; border-radius: 14px;
+            padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.pad-feld__name { font-size: .78rem; color: #8b95a3; text-transform: uppercase;
+                  letter-spacing: .08em; }
+.pad-feld__wert { font-size: 1.6rem; font-weight: 700; }
+.pad-feld--gross { grid-column: span 2; }
+.pad-feld--gross .pad-feld__wert { font-size: 2.4rem; }
+
+.pad__knoepfe { display: grid; gap: 12px; padding: 0 18px 22px;
+                grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.pad-knopf { background: #14181d; border: 1px solid #2f3742; border-radius: 14px;
+             color: #f2f4f7; font: inherit; font-size: 1.1rem; font-weight: 600;
+             padding: 18px 12px; cursor: pointer; }
+.pad-knopf:active { background: #1d232b; }
+.pad-knopf--marke { background: #0b4fa8; border-color: #0b4fa8; }
+.pad-knopf--aus { opacity: .35; cursor: default; }
+
+@media (max-width: 560px) { .pad-feld--gross { grid-column: span 1; } }
+.pad-feld--leer .pad-feld__wert { font-size: 1.1rem; font-weight: 500; color: #6c7583; }
+.pad-feld--gross.pad-feld--leer .pad-feld__wert { font-size: 1.3rem; }
+.pad__hinweis { margin: 0; padding: 12px 18px 0; color: #8b95a3; }
 </style>
 </head>
 <body>
@@ -2580,7 +2644,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "50.0.0";
+const APP_VERSION = "52.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -2944,6 +3008,10 @@ function fehlertext(e) {
   const m = e.message || String(e);
   if (m.includes("Invalid login credentials")) return "E-Mail oder Passwort stimmt nicht.";
   if (m.includes("Email not confirmed")) return "Die E-Mail-Adresse wurde noch nicht bestätigt.";
+  if (m.includes("idx_jobs_fa_eindeutig")) {
+    return "Diese FA Nr. ist schon auf einem anderen Auftrag. "
+      + "Jede Nummer gibt es nur einmal.";
+  }
   if (m.includes("Password should be")) {
     // Diese Schranke sitzt in Supabase selbst, nicht in der App.
     return "Supabase lehnt das Passwort ab. Die Mindestlänge steht dort unter "
@@ -5389,6 +5457,15 @@ async function ansichtPlanwand(ziel, b) {
   // Aufträge und Ferien laden, danach zeichnen
   try {
     plan.auftraege = await ladePlanAuftraege();
+    // Aufträge, die nur mit einer HOCO Nr. angelegt wurden, holen
+    // sich hier Material, Grösse und Zeichnung aus den Stammdaten.
+    try {
+      const wieViele = await stammdatenAufPlanwand();
+      if (wieViele) {
+        meldung(wieViele + (wieViele === 1 ? " Auftrag" : " Aufträge")
+          + " aus den Stammdaten ergänzt.");
+      }
+    } catch (g) { /* Beiwerk, die Wand steht auch ohne */ }
   } catch (f) {
     document.getElementById("pw-inhalt").innerHTML =
       '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p>'
@@ -7099,8 +7176,12 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     + '<div class="pdfreihe" id="pl-pdfreihe">'
     + (auftrag && auftrag.drawing_url
         ? '<button type="button" class="knopf knopf--klein pdflink" data-pdfzeigen="'
-          + esc(auftrag.drawing_url) + '">Ansehen</button>' : "")
-    + (darf
+          + esc(auftrag.drawing_url) + '">Ansehen</button>'
+          + (darf ? '<button type="button" class="knopf knopf--klein knopf--gefahr"'
+              + ' id="pl-pdfweg" title="Zeichnung entfernen">✕</button>' : "")
+        : "")
+    // Wählen erscheint nur, solange keine dranhängt
+    + (darf && !(auftrag && auftrag.drawing_url)
         ? '<label class="knopf knopf--klein bildknopf">PDF wählen'
           + '<input type="file" id="pl-pdf" accept="application/pdf" hidden></label>'
         : "")
@@ -7113,8 +7194,11 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     + '<div class="pdfreihe">'
     + (auftrag && auftrag.wbg_url
         ? '<button type="button" class="knopf knopf--klein pdflink" data-pdfzeigen="'
-          + esc(auftrag.wbg_url) + '">Ansehen</button>' : "")
-    + (darf
+          + esc(auftrag.wbg_url) + '">Ansehen</button>'
+          + (darf ? '<button type="button" class="knopf knopf--klein knopf--gefahr"'
+              + ' id="pl-wbgweg" title="WBG entfernen">✕</button>' : "")
+        : "")
+    + (darf && !(auftrag && auftrag.wbg_url)
         ? '<label class="knopf knopf--klein bildknopf">PDF wählen'
           + '<input type="file" id="pl-wbg" accept="application/pdf" hidden></label>'
         : "")
@@ -7248,7 +7332,8 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
         }
       }
 
-      nrInfo.textContent = [teil.bezeichnung, teil.material, teil.material_groesse]
+      nrInfo.textContent = [teil.bezeichnung, teil.material, teil.material_groesse,
+        teil.zeichnungs_nr ? "Zeichnung " + teil.zeichnungs_nr : ""]
         .filter((x) => x).join(" · ")
         + (uebernommen.length ? "  ·  übernommen: " + uebernommen.join(", ") : "");
     };
@@ -7348,6 +7433,26 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     }
   };
 
+  // Anhang wieder entfernen — die Datei selbst bleibt in der Ablage
+  const wegBinden = (id, setzen, stand) => {
+    const el = $(id);
+    if (!el) return;
+    el.onclick = async () => {
+      const ok = await nachfragen({ titel: "Anhang entfernen",
+        text: "Soll das PDF von diesem Auftrag genommen werden?",
+        bestaetigen: "Entfernen", gefahr: true });
+      if (!ok) return;
+      setzen(null);
+      const reihe = el.parentElement;
+      reihe.querySelectorAll("[data-pdfzeigen]").forEach((x) => x.remove());
+      el.remove();
+      const feld = $(stand);
+      if (feld) feld.textContent = "Entfernt. Wird beim Speichern übernommen.";
+    };
+  };
+  wegBinden("pl-pdfweg", (v) => { pdfAdresse = v; }, "pl-pdfstand");
+  wegBinden("pl-wbgweg", (v) => { wbgAdresse = v; }, "pl-wbgstand");
+
   const speichern = $("pl-ja");
   if (speichern) speichern.onclick = async () => {
     // Wer nicht planen darf, kann trotzdem den Zustand setzen
@@ -7381,6 +7486,23 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
       fa_nr: (($("pl-fa-nr") || {}).value || "").trim() || null,
       machine_id: $("pl-maschine").value,
     };
+
+    // Die FA Nr. gibt es genau einmal. Steht sie schon auf einem
+    // anderen Auftrag, wird hier abgebrochen, bevor die Datenbank
+    // es mit einer unverständlichen Meldung tut.
+    if (daten.fa_nr) {
+      try {
+        const r = await db.from("jobs").select("id, job_number, machine_id")
+          .eq("fa_nr", daten.fa_nr).limit(2);
+        const fremd = (r.data || []).filter((x) => !auftrag || x.id !== auftrag.id);
+        if (fremd.length) {
+          meldung('Die FA Nr. ' + daten.fa_nr + " ist schon bei "
+            + fremd[0].job_number + " vergeben. Jede Nummer gibt es nur einmal.",
+            "fehler");
+          return;
+        }
+      } catch (f) { /* dann greift die Datenbank */ }
+    }
 
     let fehler;
     let festId = null;
@@ -8113,12 +8235,385 @@ async function ladeBlaetter(hocoNr) {
 }
 
 
+
+// =================================================================
+//  PAD MODE
+//  Eigene Oberfläche für die Tablets an den Maschinen. Schwarzer
+//  Hintergrund wegen OLED, grosse Kacheln, wenig Text.
+//  Aufbau: Start → Parks → Maschinen → Dashboard.
+// =================================================================
+
+const pad = { wo: "start", parkId: null, maschineId: null, daten: {} };
+
+function padOeffnen() {
+  if (document.getElementById("pad")) return;
+  const h = document.createElement("div");
+  h.id = "pad";
+  h.className = "pad";
+  document.body.appendChild(h);
+  document.body.classList.add("pad-offen");
+  pad.wo = "start";
+  padZeichnen();
+}
+
+function padSchliessen() {
+  const h = document.getElementById("pad");
+  if (h) h.remove();
+  document.body.classList.remove("pad-offen");
+}
+
+function padKopf(titel, zurueck) {
+  return '<div class="pad__kopf">'
+    + (zurueck
+        ? '<button class="pad__zurueck" data-padzurueck>‹</button>'
+        : '<span class="pad__zurueck pad__zurueck--leer"></span>')
+    + '<span class="pad__titel">' + esc(titel) + '</span>'
+    + '<button class="pad__zu" data-padzu>✕</button>'
+    + '</div>';
+}
+
+async function padZeichnen() {
+  const h = document.getElementById("pad");
+  if (!h) return;
+  h.innerHTML = '<div class="pad__laedt">Wird geladen …</div>';
+
+  try {
+    if (pad.wo === "start") await padStart(h);
+    else if (pad.wo === "planwand") await padPlanwand(h);
+    else if (pad.wo === "parks") await padParks(h);
+    else if (pad.wo === "maschinen") await padMaschinen(h);
+    else if (pad.wo === "maschine") await padMaschine(h);
+  } catch (f) {
+    h.innerHTML = padKopf("Fehler", pad.wo !== "start")
+      + '<div class="pad__fehler">' + esc(fehlertext(f)) + '</div>';
+  }
+
+  h.querySelectorAll("[data-padzu]").forEach((el) => { el.onclick = padSchliessen; });
+  h.querySelectorAll("[data-padzurueck]").forEach((el) => {
+    el.onclick = () => {
+      if (pad.wo === "maschine") pad.wo = "maschinen";
+      else if (pad.wo === "maschinen") pad.wo = "parks";
+      else pad.wo = "start";
+      padZeichnen();
+    };
+  });
+}
+
+// ---------- Start ----------
+
+async function padStart(h) {
+  h.innerHTML = padKopf("Pad Mode", false)
+    + '<div class="pad__kacheln">'
+    + '<button class="pad-kachel pad-kachel--gross" data-padwo="planwand">'
+    + '<span class="pad-kachel__zeichen">▦</span><span>Planwand</span></button>'
+    + '<button class="pad-kachel pad-kachel--gross" data-padwo="parks">'
+    + '<span class="pad-kachel__zeichen">⚙</span><span>Maschinen</span></button>'
+    + '</div>';
+
+  h.querySelectorAll("[data-padwo]").forEach((el) => {
+    el.onclick = () => { pad.wo = el.dataset.padwo; padZeichnen(); };
+  });
+}
+
+// ---------- Planwand ----------
+
+async function padPlanwand(h) {
+  h.innerHTML = padKopf("Planwand", true)
+    + '<div class="pad__rolle" id="pad-planwand"></div>';
+  const ziel = document.getElementById("pad-planwand");
+  // Dieselbe Planwand wie sonst, nur in den Pad-Rahmen gezeichnet.
+  // Der Rahmen scrollt in beide Richtungen wie am Handy.
+  await seitePlanwand(ziel);
+}
+
+// ---------- Parks ----------
+
+async function padParks(h) {
+  const parks = await ladeParks(false);
+  h.innerHTML = padKopf("Maschinenparks", true)
+    + '<div class="pad__kacheln">'
+    + (parks.length
+      ? parks.map((p) => '<button class="pad-kachel" data-park="' + esc(p.id) + '">'
+          + '<span>' + esc(p.name) + '</span></button>').join("")
+      : '<p class="pad__leer">Keine Parks angelegt.</p>')
+    + '</div>';
+
+  h.querySelectorAll("[data-park]").forEach((el) => {
+    el.onclick = () => { pad.parkId = el.dataset.park; pad.wo = "maschinen"; padZeichnen(); };
+  });
+}
+
+// ---------- Maschinen eines Parks ----------
+
+async function padMaschinen(h) {
+  const [maschinen, laufend] = await Promise.all([
+    ladeAlleMaschinen(), ladeLaufendeAuftraege()]);
+  const eigene = maschinen.filter((m) => m.park_id === pad.parkId);
+
+  h.innerHTML = padKopf("Maschinen", true)
+    + '<div class="pad__kacheln">'
+    + (eigene.length
+      ? eigene.map((m) => {
+          const j = laufend[m.id];
+          return '<button class="pad-kachel pad-kachel--maschine" data-maschine="'
+            + esc(m.id) + '">'
+            + '<span class="pad-kachel__nr">' + esc(m.machine_number || "") + '</span>'
+            + '<span>' + esc(m.name) + '</span>'
+            + '<span class="pad-kachel__auftrag">'
+            + (j ? esc(j.job_number) : "kein Auftrag") + '</span>'
+            + '</button>';
+        }).join("")
+      : '<p class="pad__leer">Keine Maschinen in diesem Park.</p>')
+    + '</div>';
+
+  h.querySelectorAll("[data-maschine]").forEach((el) => {
+    el.onclick = () => { pad.maschineId = el.dataset.maschine; pad.wo = "maschine"; padZeichnen(); };
+  });
+}
+
+// ---------- Dashboard einer Maschine ----------
+
+async function padMaschine(h) {
+  const [maschinen, laufend] = await Promise.all([
+    ladeAlleMaschinen(), ladeLaufendeAuftraege()]);
+  const m = maschinen.find((x) => x.id === pad.maschineId);
+  if (!m) { pad.wo = "maschinen"; padZeichnen(); return; }
+
+  const j = laufend[m.id] || null;
+  let teil = null;
+  if (j && j.job_number) {
+    try { teil = await ladeHocoEins(j.job_number); } catch (f) { /* Beiwerk */ }
+  }
+
+  // Programmnummer je Typ, falls hinterlegt
+  let programm = "";
+  if (j && teil && m.type_id) {
+    try {
+      const r = await db.from("hoco_type_data").select("programm_nr")
+        .eq("hoco_nr", j.job_number).eq("type_id", m.type_id).limit(1);
+      programm = ((r.data || [])[0] || {}).programm_nr || "";
+    } catch (f) { /* Beiwerk */ }
+  }
+
+  // Alle Felder und Knöpfe stehen immer da. Fehlt etwas, steht
+  // "keine vorhanden" statt eines leeren Platzes — so sieht die
+  // Maschine an der Wand immer gleich aus.
+  const feld = (k, v, gross) => '<div class="pad-feld' + (gross ? " pad-feld--gross" : "")
+    + (v ? "" : " pad-feld--leer") + '">'
+    + '<span class="pad-feld__name">' + k + '</span>'
+    + '<span class="pad-feld__wert">' + (v ? esc(v) : "keine vorhanden") + '</span></div>';
+
+  // Die Zeichnung kommt vom Auftrag, sonst aus den Stammdaten der
+  // HOCO Nr. — sie ist für jeden Durchlauf dieselbe.
+  const zeichnung = (j && j.drawing_url) || (teil && teil.zeichnung_url) || "";
+
+  // Die WBG gehört zu genau einer FA Nr. und damit zu genau einem
+  // Auftrag. Sie von einem anderen Durchlauf zu holen wäre falsch —
+  // deshalb gibt es hier keine Ausweichsuche.
+  const wbg = (j && j.wbg_url) || "";
+
+  h.innerHTML = padKopf(m.name + (m.machine_number ? " · " + m.machine_number : ""), true)
+    + (j ? "" : '<p class="pad__hinweis">Auf dieser Maschine läuft gerade kein Auftrag.</p>')
+    + '<div class="pad__tafel">'
+    + feld("HOCO Nr.", j ? j.job_number : "", true)
+    + feld("Stückzahl", j
+        ? zahlText(j.stand || 0)
+          + (j.target_quantity ? " / " + zahlText(j.target_quantity) : "")
+        : "", true)
+    + feld("Durchmesser", j && j.material_dm
+        ? "Ø" + j.material_dm + (j.material_toleranz ? " " + j.material_toleranz : "")
+        : (teil ? teil.material_groesse : ""))
+    + feld("Material", (j && j.material_menge) || (teil ? teil.material : ""))
+    + feld("Programm", programm)
+    + feld("Artikel", teil ? teil.bezeichnung : "")
+    + feld("FA Nr.", j ? j.fa_nr : "")
+    + '</div>'
+
+    + '<div class="pad__knoepfe">'
+    + '<button class="pad-knopf" data-padpdf="' + esc(zeichnung)
+    + '" data-padtitel="Zeichnung">Zeichnung</button>'
+    + '<button class="pad-knopf" data-padpdf="' + esc(wbg)
+    + '" data-padtitel="WBG">WBG</button>'
+    + '<button class="pad-knopf" data-padblatt>Einrichtblatt</button>'
+    + '<button class="pad-knopf pad-knopf--marke" data-padwechsel>Werkzeugwechsel</button>'
+    + '<button class="pad-knopf" data-padhistorie>Historie</button>'
+    + '</div>';
+
+  h.querySelectorAll("[data-padpdf]").forEach((el) => {
+    el.onclick = () => {
+      if (!el.dataset.padpdf) {
+        meldung(el.dataset.padtitel + ": keine vorhanden.", "warn");
+        return;
+      }
+      betrachter(el.dataset.padpdf, el.dataset.padtitel, true);
+    };
+  });
+
+  const blatt = h.querySelector("[data-padblatt]");
+  if (blatt) blatt.onclick = () => {
+    if (!j) { meldung("Ohne laufenden Auftrag gibt es kein Einrichtblatt.", "warn"); return; }
+    einrichtblattOeffnen(j.job_number, m.type_id, j.id, m.id);
+  };
+
+  const wechsel = h.querySelector("[data-padwechsel]");
+  if (wechsel) wechsel.onclick = () => werkzeugWechselDialog(m, j);
+
+  const hist = h.querySelector("[data-padhistorie]");
+  if (hist) hist.onclick = () => wechselHistorie(m);
+}
+
+// ---------- Werkzeugwechsel ----------
+
+async function werkzeugWechselDialog(maschine, auftrag) {
+  // Zur Auswahl stehen die Werkzeugplätze des Maschinentyps
+  let plaetze = [];
+  try {
+    const paths = await ladeTypAufbau(maschine.type_id);
+    paths.forEach((p) => {
+      (p.type_slots || []).forEach((s) => {
+        plaetze.push({ nr: s.tool_nr || "", bez: p.name });
+      });
+    });
+  } catch (f) { /* dann eben von Hand */ }
+
+  const wahl = plaetze.length
+    ? await auswahlSuchen("Welches Werkzeug wurde gewechselt?",
+        plaetze.filter((x) => x.nr).map((x) => ({ wert: x.nr, text: x.nr + " · " + x.bez })))
+    : null;
+
+  const w = await dialogFelder({ titel: "Werkzeugwechsel",
+    felder: [
+      { name: "tool", label: "Toolnummer", pflicht: true, wert: wahl || "" },
+      { name: "bez", label: "Werkzeug", wert: "" },
+      { name: "grund", label: "Grund",
+        auswahl: [["verschlissen", "Verschlissen"], ["bruch", "Bruch"],
+                  ["mass", "Mass nicht i.O."], ["ruesten", "Rüsten"],
+                  ["anderes", "Anderes"]], wert: "verschlissen" },
+      { name: "stk", label: "Stückzahl erreicht", typ: "number", wert: "" },
+      { name: "notiz", label: "Notiz", wert: "" },
+    ], bestaetigen: "Wechsel eintragen" });
+  if (!w) return;
+
+  const { error } = await db.from("tool_changes").insert({
+    machine_id: maschine.id,
+    job_id: auftrag ? auftrag.id : null,
+    hoco_nr: auftrag ? auftrag.job_number : null,
+    tool_nr: (w.tool || "").trim(),
+    bezeichnung: w.bez || null,
+    grund: w.grund || null,
+    stueckzahl: w.stk === "" || w.stk === undefined ? null : Math.round(Number(w.stk)),
+    notiz: w.notiz || null,
+  });
+
+  if (error) meldung(fehlertext(error), "fehler");
+  else meldung("Wechsel eingetragen.");
+}
+
+async function wechselHistorie(maschine) {
+  let liste = [];
+  try {
+    const r = await zeitlimit(db.from("werkzeugwechsel").select("*")
+      .eq("machine_id", maschine.id)
+      .order("gewechselt_am", { ascending: false }).limit(200),
+      12000, "Werkzeugwechsel");
+    if (r.error) throw r.error;
+    liste = r.data || [];
+  } catch (f) { meldung(fehlertext(f), "fehler"); return; }
+
+  // Wie lange hat das vorherige Werkzeug gehalten? Das ergibt sich
+  // aus dem Abstand zum vorigen Wechsel derselben Toolnummer.
+  const vorher = {};
+  [...liste].reverse().forEach((z) => {
+    const alt = vorher[z.tool_nr];
+    if (alt) {
+      const tage = Math.round(
+        (new Date(z.gewechselt_am) - new Date(alt)) / 86400000);
+      z._gehalten = tage;
+    }
+    vorher[z.tool_nr] = z.gewechselt_am;
+  });
+
+  const huelle = document.createElement("div");
+  huelle.className = "dialog-huelle";
+  huelle.innerHTML = '<div class="dialog dialog--breit">'
+    + '<div class="blatt__kopf"><h2>Werkzeugwechsel · ' + esc(maschine.name) + '</h2>'
+    + '<button class="knopf knopf--still" data-zu>Schliessen</button></div>'
+    + (liste.length
+      ? '<table class="tabelle"><thead><tr><th>Tool</th><th>Werkzeug</th>'
+        + '<th>Grund</th><th class="rechts">Stk.</th><th class="rechts">gehalten</th>'
+        + '<th>wann</th><th>wer</th></tr></thead><tbody>'
+        + liste.map((z) => '<tr>'
+            + '<td class="nowrap"><strong>' + esc(z.tool_nr) + '</strong></td>'
+            + '<td>' + esc(z.bezeichnung || "") + '</td>'
+            + '<td>' + esc(z.grund || "") + '</td>'
+            + '<td class="rechts">' + (z.stueckzahl ? zahlText(z.stueckzahl) : "—") + '</td>'
+            + '<td class="rechts">' + (z._gehalten !== undefined
+                ? z._gehalten + " Tg." : "—") + '</td>'
+            + '<td class="klein nowrap">' + esc(datumZeitKurz(z.gewechselt_am)) + '</td>'
+            + '<td class="klein">' + esc(z.person || "") + '</td>'
+            + '</tr>').join("") + '</tbody></table>'
+      : '<p class="hinweis">Noch kein Wechsel eingetragen.</p>')
+    + '<p class="klein">Die Spalte „gehalten" rechnet den Abstand zum vorherigen '
+    + 'Wechsel derselben Toolnummer. Die Standzeit im Einrichtblatt bleibt davon '
+    + 'unberührt und wird dort von Hand gepflegt.</p>'
+    + '</div>';
+  document.body.appendChild(huelle);
+  const zu = () => huelle.remove();
+  huelle.querySelector("[data-zu]").onclick = zu;
+  dialogSchliessen(huelle, zu);
+}
+
 // =================================================================
 //  EINRICHTBLATT
 //  Ein Blatt gilt je HOCO Nr. und Maschinentyp. Es übernimmt beim
 //  Anlegen die Stammdaten des Teils und das Raster des Typs und ist
 //  danach frei änderbar, ohne dass Stammdaten oder Typ sich ändern.
 // =================================================================
+
+// Überträgt die Stammdaten auf alle Aufträge, die noch nicht
+// laufen. Gefüllt wird nur, was am Auftrag leer ist — Eingetipptes
+// bleibt stehen, und bei laufenden oder fertigen Aufträgen wird
+// nichts angefasst.
+async function stammdatenAufPlanwand() {
+  if (!darfSchreiben()) return 0;
+
+  const offen = (plan.auftraege || []).filter((j) => j.job_number
+    && ["geplant", "ruesten"].indexOf(j.plan_status || "geplant") !== -1
+    && (!j.material_dm || !j.material_toleranz || !j.material_menge || !j.drawing_url));
+  if (!offen.length) return 0;
+
+  const nummern = [...new Set(offen.map((j) => j.job_number))];
+  let teile = [];
+  try {
+    const r = await db.from("hoco_parts").select("*").in("hoco_nr", nummern);
+    if (r.error) throw r.error;
+    teile = r.data || [];
+  } catch (f) { return 0; }
+  if (!teile.length) return 0;
+
+  const karte = {};
+  teile.forEach((t) => { karte[t.hoco_nr] = t; });
+
+  let geaendert = 0;
+  for (const j of offen) {
+    const t = karte[j.job_number];
+    if (!t) continue;
+
+    const neu = {};
+    const g = groesseZerlegen(t.material_groesse);
+    if (g) {
+      if (!j.material_dm) neu.material_dm = g.dm;
+      if (!j.material_toleranz && g.toleranz) neu.material_toleranz = g.toleranz;
+    }
+    if (!j.material_menge && t.material) neu.material_menge = t.material;
+    if (!j.drawing_url && t.zeichnung_url) neu.drawing_url = t.zeichnung_url;
+    if (!Object.keys(neu).length) continue;
+
+    const u = await db.from("jobs").update(neu).eq("id", j.id);
+    if (!u.error) { Object.assign(j, neu); geaendert++; }
+  }
+  return geaendert;
+}
 
 async function ladeHocoEins(hocoNr) {
   const { data } = await db.from("hoco_parts").select("*").eq("hoco_nr", hocoNr).limit(1);
@@ -8419,31 +8914,6 @@ async function ansichtHoco(ziel, b) {
         .eq("job_number", t.hoco_nr)
         .order("planned_from", { ascending: false }).limit(50);
       faListe = (r.data || []).filter((x) => x.fa_nr);
-
-      // Dieselbe FA Nr. kann auf mehreren Aufträgen stehen, etwa wenn
-      // ein Los geteilt oder umgeplant wurde. Hängt bei einem davon
-      // eine WBG, bekommen die anderen sie auch — wieder nur, solange
-      // sie noch nicht laufen.
-      if (darf) {
-        const proFa = {};
-        (r.data || []).forEach((x) => {
-          if (x.fa_nr && x.wbg_url && !proFa[x.fa_nr]) proFa[x.fa_nr] = x.wbg_url;
-        });
-        const ohneWbg = (r.data || []).filter((x) => x.fa_nr && !x.wbg_url
-          && proFa[x.fa_nr]
-          && ["geplant", "ruesten"].indexOf(x.plan_status || "geplant") !== -1);
-
-        for (const x of ohneWbg) {
-          const u = await db.from("jobs").update({ wbg_url: proFa[x.fa_nr] })
-            .eq("id", x.id);
-          if (!u.error) x.wbg_url = proFa[x.fa_nr];
-        }
-        if (ohneWbg.length) {
-          meldung("WBG auf " + ohneWbg.length
-            + (ohneWbg.length === 1 ? " weiteren Auftrag" : " weitere Aufträge")
-            + " mit gleicher FA Nr. übertragen.");
-        }
-      }
 
       // Aufträge, die noch nicht laufen, bekommen die Zeichnung aus
       // den Stammdaten. Laufende und abgeschlossene bleiben, wie sie
@@ -13998,30 +14468,15 @@ function werkzeugleiste() {
   return leiste;
 }
 
-async function eierEinbauen() {
-  if (document.getElementById("eier-knopf")) return;
-
+async function padKnopfEinbauen() {
+  if (document.getElementById("pad-knopf")) return;
   const knopf = document.createElement("button");
-  knopf.id = "eier-knopf";
-  knopf.className = "eier-knopf";
-  knopf.title = "Eier im Lager";
-  knopf.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none"'
-    + ' stroke="currentColor" stroke-width="1.8" aria-hidden="true">'
-    + '<path d="M12 3.5c3.1 0 5.5 4.6 5.5 8.6a5.5 5.5 0 0 1-11 0C6.5 8.1 8.9 3.5 12 3.5Z"/>'
-    + '</svg>';
+  knopf.id = "pad-knopf";
+  knopf.className = "pad-start";
+  knopf.title = "Oberfläche für das Tablet an der Maschine";
+  knopf.textContent = "Pad Mode";
   werkzeugleiste().appendChild(knopf);
-  knopf.onclick = () => eierFensterUmschalten();
-
-  await eierStandLaden();
-
-  // Andere Geräte live mitbekommen
-  if (db && typeof db.channel === "function" && !eier.kanal) {
-    eier.kanal = db.channel("eier-" + Date.now())
-      .on("postgres_changes", { event: "*", schema: "public", table: "eier_zaehler" }, (n) => {
-        if (n.new) { eier.wert = Number(n.new.wert) || 0; eierAnzeigen(); }
-      })
-      .subscribe();
-  }
+  knopf.onclick = () => padOeffnen();
 }
 
 async function eierStandLaden() {
@@ -15247,7 +15702,7 @@ function zeichneGeruest() {
   if (!location.hash) location.hash = "#/dashboard";
   Promise.all([farbzuteilungLaden(), planerLaden()]).then(() => zeichneSeite());
   fahrzeugEinbauen();
-  eierEinbauen();
+  padKnopfEinbauen();
   chatEinbauen();
   if (!window._escZurueck) { window._escZurueck = true; escapeZurueck(); }
 }
