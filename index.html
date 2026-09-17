@@ -2506,6 +2506,18 @@ body.dunkel .pw-balken__nr { color: #10151c !important; }
 .tabelle--kopf td:first-child { width: 190px; }
 .marken { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .zeile--offen td { background: var(--grund); }
+/* ---------- Ordner bei den HOCO Nummern ---------- */
+.pfad { margin-bottom: 10px; font-size: .86rem; color: var(--gedaempft); }
+.ordner { display: grid; gap: 10px; margin-top: 10px;
+          grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+.ordner__feld { display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+                padding: 12px 14px; border: 1px solid var(--linie);
+                border-radius: var(--radius); background: var(--flaeche);
+                cursor: pointer; font: inherit; text-align: left; color: var(--tinte); }
+.ordner__feld:hover { border-color: var(--marke); background: var(--marke-hell); }
+.ordner__feld--leer { opacity: .5; }
+.ordner__name { font-weight: 700; }
+.ordner__zahl { font-size: .76rem; color: var(--gedaempft); }
 </style>
 </head>
 <body>
@@ -2554,7 +2566,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "44.1.0";
+const APP_VERSION = "45.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -3996,6 +4008,8 @@ const prod = {
   typOffen: null,
   hocoOffen: null,
   hocoSuche: "",
+  hocoBereich: null,
+  hocoKunde: null,
   suche: "",
   trefferNr: 0,
   letzteSuche: "",
@@ -8250,18 +8264,27 @@ async function ansichtHoco(ziel, b) {
     return;
   }
 
-  // ----- Übersicht -----
-  // Eine einzige Liste. Nummern aus der Planwand, für die es noch
-  // keine Stammdaten gibt, stehen mit dabei — mit dem, was am
-  // Auftrag hinterlegt ist, damit man sieht, was übernommen wird.
+  // ----- Übersicht mit Ordnern -----
+  // Aufbau: Nummernbereich je 100 → Kunde → Teile.
+  // Die HOCO Nr. ist aufgebaut als Kunde-Teil, etwa 10007-0381.
+  // Die ersten fünf Stellen sind die Kundennummer, daraus ergeben
+  // sich beide Ordnerebenen.
+  const kundeVon = (nr) => {
+    const teil = String(nr || "").split("-")[0].replace(/\D/g, "");
+    return teil || "?";
+  };
+  const bereichVon = (kunde) => {
+    const z = parseInt(kunde, 10);
+    if (isNaN(z)) return null;
+    return Math.floor(z / 100) * 100;
+  };
+
   const bekannt = {};
   teile.forEach((t) => { bekannt[t.hoco_nr] = true; });
 
   const suchText = (prod.hocoSuche || "").trim().toLowerCase();
   const nurPlan = Object.keys(ausPlan)
     .filter((nr) => !bekannt[nr])
-    .filter((nr) => !suchText || nr.toLowerCase().includes(suchText))
-    .sort()
     .map((nr) => ({
       hoco_nr: nr, ohneStamm: true,
       // Am Auftrag steht nur die Grösse. Die Materialart gehört an
@@ -8270,43 +8293,160 @@ async function ansichtHoco(ziel, b) {
       material_groesse: groesseAusAuftrag(ausPlan[nr]),
     }));
 
-  const liste = teile.concat(nurPlan)
+  const alle = teile.concat(nurPlan)
     .sort((x, y) => String(x.hoco_nr).localeCompare(String(y.hoco_nr)));
 
-  ziel.innerHTML = '<section class="karte">'
-    + '<div class="karte__kopf"><h2>HOCO Nr.</h2>'
-    + '<span class="marke">' + liste.length + '</span>'
+  const zeileHtml = (t) => '<tr' + (t.ohneStamm ? ' class="zeile--offen"' : "") + '>'
+    + '<td>' + (t.ohneStamm
+        ? '<strong>' + esc(t.hoco_nr) + '</strong>'
+        : '<button class="linkknopf" data-hoco-auf="' + esc(t.hoco_nr) + '">'
+          + '<strong>' + esc(t.hoco_nr) + '</strong></button>') + '</td>'
+    + '<td>' + (t.ohneStamm
+        ? '<span class="gedaempft">noch nicht hinterlegt</span>'
+        : esc(t.bezeichnung || "")) + '</td>'
+    + '<td' + (t.ohneStamm ? ' class="gedaempft"' : "") + '>'
+    + esc([t.material, t.material_groesse].filter((x) => x).join(" · ")) + '</td>'
+    + '<td class="rechts nowrap">'
+    + (darf
+        ? (t.ohneStamm
+            ? '<button class="linkknopf" data-hoco-anlegen="' + esc(t.hoco_nr)
+              + '">Stammdaten anlegen</button>'
+            : '<button class="linkknopf" data-hoco-um="' + esc(t.hoco_nr) + '">Bearbeiten</button> '
+              + '<button class="linkknopf linkknopf--gefahr" data-hoco-weg="' + esc(t.hoco_nr)
+              + '">Löschen</button>')
+        : "")
+    + '</td></tr>';
+
+  const tabelle = (liste) => '<table class="tabelle"><thead><tr>'
+    + '<th>HOCO Nr.</th><th>Bezeichnung</th><th>Material</th><th></th>'
+    + '</tr></thead><tbody>' + liste.map(zeileHtml).join("") + '</tbody></table>';
+
+  const kopf = (titel, anzahl) => '<div class="karte__kopf">'
+    + '<h2>' + titel + '</h2>'
+    + (anzahl === null ? "" : '<span class="marke">' + anzahl + '</span>')
     + (darf ? '<div class="karte__aktionen">'
         + '<button class="knopf knopf--klein" id="hoco-neu">+ HOCO Nr.</button></div>' : "")
     + '</div>'
     + '<div class="suchleiste"><input type="text" id="hoco-such" placeholder="Suchen"'
-    + ' autocomplete="off" value="' + esc(prod.hocoSuche || "") + '"></div>'
-    + (liste.length
-      ? '<table class="tabelle"><thead><tr><th>HOCO Nr.</th><th>Bezeichnung</th>'
-        + '<th>Material</th><th></th></tr></thead><tbody>'
-        + liste.map((t) => '<tr' + (t.ohneStamm ? ' class="zeile--offen"' : "") + '>'
-          + '<td>' + (t.ohneStamm
-              ? '<strong>' + esc(t.hoco_nr) + '</strong>'
-              : '<button class="linkknopf" data-hoco-auf="' + esc(t.hoco_nr) + '">'
-                + '<strong>' + esc(t.hoco_nr) + '</strong></button>') + '</td>'
-          + '<td>' + (t.ohneStamm
-              ? '<span class="gedaempft">noch nicht hinterlegt</span>'
-              : esc(t.bezeichnung || "")) + '</td>'
-          + '<td' + (t.ohneStamm ? ' class="gedaempft"' : "") + '>'
-          + esc([t.material, t.material_groesse].filter((x) => x).join(" · ")) + '</td>'
-          + '<td class="rechts nowrap">'
-          + (darf
-              ? (t.ohneStamm
-                  ? '<button class="linkknopf" data-hoco-anlegen="' + esc(t.hoco_nr)
-                    + '">Stammdaten anlegen</button>'
-                  : '<button class="linkknopf" data-hoco-um="' + esc(t.hoco_nr) + '">Bearbeiten</button> '
-                    + '<button class="linkknopf linkknopf--gefahr" data-hoco-weg="' + esc(t.hoco_nr)
-                    + '">Löschen</button>')
-              : "")
-          + '</td></tr>').join("") + '</tbody></table>'
-      : '<p class="hinweis">' + (prod.hocoSuche ? "Nichts gefunden."
-          : "Noch keine HOCO Nr. und noch kein Auftrag auf der Planwand.") + '</p>')
-    + '</section>';
+    + ' autocomplete="off" value="' + esc(prod.hocoSuche || "") + '"></div>';
+
+  // Wird gesucht, sind Ordner nur im Weg: dann alle Treffer flach
+  if (suchText) {
+    const treffer = alle.filter((t) =>
+      String(t.hoco_nr).toLowerCase().includes(suchText)
+      || String(t.bezeichnung || "").toLowerCase().includes(suchText)
+      || String(t.material || "").toLowerCase().includes(suchText));
+    ziel.innerHTML = '<section class="karte">'
+      + kopf("Suche", treffer.length)
+      + (treffer.length ? tabelle(treffer) : '<p class="hinweis">Nichts gefunden.</p>')
+      + '</section>';
+
+  // Ebene 3: die Teile eines Kunden
+  } else if (prod.hocoKunde) {
+    const liste = alle.filter((t) => kundeVon(t.hoco_nr) === prod.hocoKunde);
+    ziel.innerHTML = '<div class="pfad">'
+      + '<button class="linkknopf" data-pfad="alle">Alle Bereiche</button> › '
+      + '<button class="linkknopf" data-pfad="bereich">'
+      + esc(String(prod.hocoBereich)) + " – " + esc(String(prod.hocoBereich + 99))
+      + '</button> › <strong>Kunde ' + esc(prod.hocoKunde) + '</strong></div>'
+      + '<section class="karte">'
+      + kopf("Kunde " + esc(prod.hocoKunde), liste.length)
+      + (liste.length ? tabelle(liste) : '<p class="hinweis">Keine Nummer in diesem Ordner.</p>')
+      + '</section>';
+
+  // Ebene 2: die Kunden eines Bereichs
+  } else if (prod.hocoBereich !== null && prod.hocoBereich !== undefined) {
+    const drin = alle.filter((t) => bereichVon(kundeVon(t.hoco_nr)) === prod.hocoBereich);
+    const kunden = {};
+    drin.forEach((t) => {
+      const k = kundeVon(t.hoco_nr);
+      if (!kunden[k]) kunden[k] = { anzahl: 0, offen: 0 };
+      kunden[k].anzahl++;
+      if (t.ohneStamm) kunden[k].offen++;
+    });
+    const namen = Object.keys(kunden).sort();
+
+    ziel.innerHTML = '<div class="pfad">'
+      + '<button class="linkknopf" data-pfad="alle">Alle Bereiche</button> › '
+      + '<strong>' + esc(String(prod.hocoBereich)) + " – "
+      + esc(String(prod.hocoBereich + 99)) + '</strong></div>'
+      + '<section class="karte">'
+      + kopf("Kunden " + esc(String(prod.hocoBereich)) + " – "
+          + esc(String(prod.hocoBereich + 99)), namen.length)
+      + (namen.length
+        ? '<div class="ordner">' + namen.map((k) => '<button class="ordner__feld"'
+            + ' data-kunde="' + esc(k) + '">'
+            + '<span class="ordner__name">' + esc(k) + '</span>'
+            + '<span class="ordner__zahl">' + kunden[k].anzahl + ' Nummern'
+            + (kunden[k].offen ? " · " + kunden[k].offen + " offen" : "")
+            + '</span></button>').join("") + '</div>'
+        : '<p class="hinweis">Kein Kunde in diesem Bereich.</p>')
+      + '</section>';
+
+  // Ebene 1: die Bereiche
+  } else {
+    const bereiche = {};
+    alle.forEach((t) => {
+      const b2 = bereichVon(kundeVon(t.hoco_nr));
+      const schluessel = b2 === null ? "?" : b2;
+      if (!bereiche[schluessel]) bereiche[schluessel] = { anzahl: 0, offen: 0, kunden: {} };
+      bereiche[schluessel].anzahl++;
+      bereiche[schluessel].kunden[kundeVon(t.hoco_nr)] = true;
+      if (t.ohneStamm) bereiche[schluessel].offen++;
+    });
+
+    // Immer alle Bereiche von 10000 bis 11000 zeigen, auch leere —
+    // so weiss man, wo eine neue Nummer hingehört.
+    const fest = [];
+    for (let v = 10000; v < 11000; v += 100) fest.push(v);
+    Object.keys(bereiche).forEach((k) => {
+      const z = parseInt(k, 10);
+      if (!isNaN(z) && fest.indexOf(z) === -1) fest.push(z);
+    });
+    fest.sort((a, c) => a - c);
+
+    ziel.innerHTML = '<section class="karte">'
+      + kopf("HOCO Nr.", alle.length)
+      + '<div class="ordner">'
+      + fest.map((v) => {
+          const d = bereiche[v] || { anzahl: 0, offen: 0, kunden: {} };
+          return '<button class="ordner__feld' + (d.anzahl ? "" : " ordner__feld--leer") + '"'
+            + ' data-bereich="' + v + '">'
+            + '<span class="ordner__name">' + v + " – " + (v + 99) + '</span>'
+            + '<span class="ordner__zahl">'
+            + (d.anzahl
+                ? Object.keys(d.kunden).length + " Kunden · " + d.anzahl + " Nummern"
+                  + (d.offen ? " · " + d.offen + " offen" : "")
+                : "leer")
+            + '</span></button>';
+        }).join("")
+      + '</div>'
+      + (bereiche["?"]
+          ? '<p class="klein">' + bereiche["?"].anzahl
+            + ' Nummern lassen sich keinem Bereich zuordnen. Über die Suche findest du sie.</p>'
+          : "")
+      + '</section>';
+  }
+
+  ziel.querySelectorAll("[data-bereich]").forEach((el) => {
+    el.onclick = () => {
+      prod.hocoBereich = Number(el.dataset.bereich);
+      prod.hocoKunde = null;
+      neuLaden();
+    };
+  });
+
+  ziel.querySelectorAll("[data-kunde]").forEach((el) => {
+    el.onclick = () => { prod.hocoKunde = el.dataset.kunde; neuLaden(); };
+  });
+
+  ziel.querySelectorAll("[data-pfad]").forEach((el) => {
+    el.onclick = () => {
+      if (el.dataset.pfad === "alle") { prod.hocoBereich = null; prod.hocoKunde = null; }
+      else prod.hocoKunde = null;
+      neuLaden();
+    };
+  });
 
   const such = document.getElementById("hoco-such");
   let taste = null;
