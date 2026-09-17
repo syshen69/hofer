@@ -2580,7 +2580,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "49.1.0";
+const APP_VERSION = "50.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -2589,6 +2589,36 @@ const APP_VERSION = "49.1.0";
 // Schliesst ein Fenster mit Escape und beim Klick daneben.
 // Wichtig: nur wenn Druck UND Loslassen daneben passieren, sonst
 // bricht das Markieren von Text im Fenster die Eingabe ab.
+// Escape geht eine Ebene zurück, wenn kein Fenster offen ist:
+// vom Teil zum Kunden, vom Kunden zum Bereich, vom Bereich zur
+// Übersicht — und beim Typ vom Aufbau zur Liste.
+function escapeZurueck() {
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    // Ein offenes Fenster hat Vorrang, das schliesst sich selbst
+    if (document.querySelector(".dialog-huelle")) return;
+    // In einem Eingabefeld ist Escape zum Verwerfen da
+    const a = document.activeElement;
+    if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return;
+
+    // zeichneSeite baut die aktuelle Seite neu auf und kennt den
+    // Container selbst — seiteProduktion braucht ihn als Argument.
+    if (prod.hocoOffen) { prod.hocoOffen = null; zeichneSeite(); return; }
+    if (prod.hocoKunde) { prod.hocoKunde = null; zeichneSeite(); return; }
+    if (prod.hocoBereich) { prod.hocoBereich = null; zeichneSeite(); return; }
+    if (prod.typOffen) { prod.typOffen = null; zeichneSeite(); return; }
+
+    // Sonst: von einem Unterreiter zurück auf den ersten
+    const wo = location.hash.replace(/^#\/?/, "").split("/")[0];
+    if (wo === "produktion" && prod.ansicht && prod.ansicht !== "erfassen") {
+      prod.ansicht = "erfassen"; zeichneSeite(); return;
+    }
+    if (wo === "bestellungen" && best.ansicht && best.ansicht !== "offen") {
+      best.ansicht = "offen"; zeichneSeite(); return;
+    }
+  });
+}
+
 function dialogSchliessen(huelle, zu) {
   let startAussen = false;
 
@@ -7066,7 +7096,7 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     + '</textarea></label>'
 
     + '<div class="feld"><span class="feldlabel">Zeichnung</span>'
-    + '<div class="pdfreihe">'
+    + '<div class="pdfreihe" id="pl-pdfreihe">'
     + (auftrag && auftrag.drawing_url
         ? '<button type="button" class="knopf knopf--klein pdflink" data-pdfzeigen="'
           + esc(auftrag.drawing_url) + '">Ansehen</button>' : "")
@@ -7164,7 +7194,25 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
 
       // Hängt an der HOCO Nr. eine Zeichnung und am Auftrag noch
       // keine, wird sie übernommen. Eine bereits gewählte bleibt.
-      if (teil.zeichnung_url && !pdfAdresse) pdfAdresse = teil.zeichnung_url;
+      if (teil.zeichnung_url && !pdfAdresse) {
+        pdfAdresse = teil.zeichnung_url;
+
+        // Sichtbar machen, dass jetzt eine dranhängt. Ohne das sah
+        // das Fenster genauso aus wie vorher, und man musste raten,
+        // ob etwas übernommen wurde.
+        const reihe = huelle.querySelector("#pl-pdfreihe");
+        if (reihe && !reihe.querySelector("[data-pdfzeigen]")) {
+          const knopf = document.createElement("button");
+          knopf.type = "button";
+          knopf.className = "knopf knopf--klein pdflink";
+          knopf.dataset.pdfzeigen = pdfAdresse;
+          knopf.textContent = "Ansehen";
+          knopf.onclick = () => betrachter(pdfAdresse, "Zeichnung", true);
+          reihe.prepend(knopf);
+        }
+        const stand = huelle.querySelector("#pl-pdfstand");
+        if (stand) stand.textContent = "Zeichnung aus den Stammdaten übernommen";
+      }
 
       // Nur füllen, was noch leer ist — Eingetipptes bleibt stehen
       const dmFeld = huelle.querySelector("#pl-dm");
@@ -15201,6 +15249,7 @@ function zeichneGeruest() {
   fahrzeugEinbauen();
   eierEinbauen();
   chatEinbauen();
+  if (!window._escZurueck) { window._escZurueck = true; escapeZurueck(); }
 }
 
 window.addEventListener("hashchange", () => {
