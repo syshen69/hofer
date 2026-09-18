@@ -2544,6 +2544,9 @@ body.dunkel .pw-balken__nr { color: #10151c !important; }
    Werkzeugleiste auf display:flex setzt — sonst kommt er zurück. */
 @media (max-width: 720px) {
   .werkzeugleiste .pad-start, .pad-start { display: none !important; }
+  /* Administratoren sehen ihn überall — sie richten damit ein */
+  body.ist-admin .werkzeugleiste .pad-start,
+  body.ist-admin .pad-start { display: flex !important; }
 }
 
 body.pad-offen { overflow: hidden; }
@@ -2636,6 +2639,25 @@ body.pad-offen { overflow: hidden; }
             font-size: .82rem; font-weight: 600; }
 .wz-marke i { font-style: normal; font-weight: 400; color: var(--gedaempft);
               font-size: .72rem; }
+.pad-knopf--da { background: #0e2e57; border-color: #1b4d8f; color: #dce9ff; }
+.pad-knopf--leer { background: #101215; border-color: #23282f; color: #5d6773; }
+.pad-feld--tippbar { cursor: pointer; border-color: #1b4d8f; }
+.pad-feld--tippbar:active { background: #1d232b; }
+.pad-feld--tippbar .pad-feld__name { color: #4d9bff; }
+/* ---------- Leiste im Pad Mode ---------- */
+.pad__leiste { display: flex; gap: 8px; padding: 10px 14px; flex: none;
+               overflow-x: auto; border-bottom: 1px solid #1c1f24; }
+.pad-reiter { flex: none; background: #0e2e57; border: 1px solid #1b4d8f;
+              color: #b9d2f5; border-radius: 12px; font: inherit;
+              font-size: .98rem; font-weight: 600; padding: 11px 18px;
+              cursor: pointer; white-space: nowrap; }
+.pad-reiter--an { background: #1268e0; border-color: #1268e0; color: #fff; }
+.pad-reiter--leer { background: #101215; border-color: #23282f; color: #5d6773; }
+
+.pad__datei { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.pad__dateikopf { display: flex; gap: 8px; padding: 8px 14px; flex: none; }
+.pad__datei iframe { flex: 1; width: 100%; border: 0; background: #fff; }
+.pad-knopf--klein { font-size: .9rem; padding: 9px 16px; }
 </style>
 </head>
 <body>
@@ -2684,7 +2706,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "54.0.0";
+const APP_VERSION = "55.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -8242,10 +8264,20 @@ async function ladeHoco(suche) {
     abfrage = abfrage.or("hoco_nr.ilike.%" + t + "%,bezeichnung.ilike.%" + t
       + "%,material.ilike.%" + t + "%");
   }
-  const { data, error } = await zeitlimit(
-    abfrage.order("hoco_nr").limit(200), 12000, "HOCO Nummern");
-  if (error) throw error;
-  return data || [];
+  // Seitenweise alles holen. Eine feste Grenze von 200 hat bei
+  // vielen Nummern einfach den Rest weggelassen.
+  const alle = [];
+  const stufe = 1000;
+  for (let seite = 0; seite < 20; seite++) {
+    const r = await zeitlimit(
+      abfrage.order("hoco_nr").range(seite * stufe, seite * stufe + stufe - 1),
+      12000, "HOCO Nummern");
+    if (r.error) throw r.error;
+    const teil = r.data || [];
+    alle.push(...teil);
+    if (teil.length < stufe) break;
+  }
+  return alle;
 }
 
 // Alle HOCO Nummern, die auf der Planwand vorkommen. Daraus wird
@@ -8333,6 +8365,7 @@ async function padZeichnen() {
   } catch (f) {
     h.innerHTML = padKopf("Fehler", pad.wo !== "start")
       + '<div class="pad__fehler">' + esc(fehlertext(f)) + '</div>';
+    meldung(fehlertext(f), "fehler");
   }
 
   h.querySelectorAll("[data-padzu]").forEach((el) => { el.onclick = padSchliessen; });
@@ -8414,7 +8447,12 @@ async function padMaschinen(h) {
     + '</div>';
 
   h.querySelectorAll("[data-maschine]").forEach((el) => {
-    el.onclick = () => { pad.maschineId = el.dataset.maschine; pad.wo = "maschine"; padZeichnen(); };
+    el.onclick = () => {
+      pad.maschineId = el.dataset.maschine;
+      pad.wo = "maschine";
+      pad.reiter = "uebersicht";
+      padZeichnen();
+    };
   });
 }
 
@@ -8445,9 +8483,11 @@ async function padMaschine(h) {
   // Alle Felder und Knöpfe stehen immer da. Fehlt etwas, steht
   // "keine vorhanden" statt eines leeren Platzes — so sieht die
   // Maschine an der Wand immer gleich aus.
-  const feld = (k, v, gross) => '<div class="pad-feld' + (gross ? " pad-feld--gross" : "")
-    + (v ? "" : " pad-feld--leer") + '">'
-    + '<span class="pad-feld__name">' + k + '</span>'
+  const feld = (k, v, gross, marke) => '<div class="pad-feld'
+    + (gross ? " pad-feld--gross" : "") + (v ? "" : " pad-feld--leer")
+    + (marke ? " pad-feld--tippbar" : "") + '"'
+    + (marke ? ' data-padfeld="' + marke + '"' : "") + '>'
+    + '<span class="pad-feld__name">' + k + (marke ? ' · antippen' : "") + '</span>'
     + '<span class="pad-feld__wert">' + (v ? esc(v) : "keine vorhanden") + '</span></div>';
 
   // Die Zeichnung kommt vom Auftrag, sonst aus den Stammdaten der
@@ -8459,53 +8499,159 @@ async function padMaschine(h) {
   // deshalb gibt es hier keine Ausweichsuche.
   const wbg = (j && j.wbg_url) || "";
 
-  h.innerHTML = padKopf(m.name + (m.machine_number ? " · " + m.machine_number : ""), true)
-    + (j ? "" : '<p class="pad__hinweis">Auf dieser Maschine läuft gerade kein Auftrag.</p>')
-    + '<div class="pad__tafel">'
+  // Leiste mit allen Sprüngen. Der offene Reiter ist kräftig blau,
+  // die anderen bleiben gedämpft — steckt nichts dahinter, grau.
+  if (!pad.reiter) pad.reiter = "uebersicht";
+  const reiter = [
+    ["uebersicht", "Übersicht", true],
+    ["zeichnung", "Zeichnung", !!zeichnung],
+    ["wbg", "WBG", !!wbg],
+    ["blatt", "Einrichtblatt", !!(j && m.type_id)],
+    ["wechsel", "Werkzeugwechsel", !!m.type_id],
+    ["historie", "Historie", true],
+  ];
+
+  const leiste = '<div class="pad__leiste">'
+    + reiter.map(([wert, text, da]) => '<button class="pad-reiter'
+        + (pad.reiter === wert ? " pad-reiter--an" : "")
+        + (da ? "" : " pad-reiter--leer") + '" data-padreiter="' + wert + '">'
+        + text + '</button>').join("")
+    + '</div>';
+
+  const tafel = '<div class="pad__tafel">'
     + feld("HOCO Nr.", j ? j.job_number : "", true)
     + feld("Stückzahl", j
         ? zahlText(j.stand || 0)
           + (j.target_quantity ? " / " + zahlText(j.target_quantity) : "")
-        : "", true)
+        : "", true, j ? "stand" : "")
     + feld("Durchmesser", j && j.material_dm
         ? "Ø" + j.material_dm + (j.material_toleranz ? " " + j.material_toleranz : "")
         : (teil ? teil.material_groesse : ""))
     + feld("Material", (j && j.material_menge) || (teil ? teil.material : ""))
     + feld("Programm", programm)
     + feld("FA Nr.", j ? j.fa_nr : "")
-    + '</div>'
-
-    + '<div class="pad__knoepfe">'
-    + '<button class="pad-knopf" data-padpdf="' + esc(zeichnung)
-    + '" data-padtitel="Zeichnung">Zeichnung</button>'
-    + '<button class="pad-knopf" data-padpdf="' + esc(wbg)
-    + '" data-padtitel="WBG">WBG</button>'
-    + '<button class="pad-knopf" data-padblatt>Einrichtblatt</button>'
-    + '<button class="pad-knopf pad-knopf--marke" data-padwechsel>Werkzeugwechsel</button>'
-    + '<button class="pad-knopf" data-padhistorie>Historie</button>'
     + '</div>';
 
-  h.querySelectorAll("[data-padpdf]").forEach((el) => {
+  // Zeichnung und WBG werden im Pad selbst angezeigt, damit die
+  // Leiste oben stehen bleibt.
+  const datei = pad.reiter === "zeichnung" ? zeichnung
+    : (pad.reiter === "wbg" ? wbg : "");
+
+  h.innerHTML = padKopf(m.name + (m.machine_number ? " · " + m.machine_number : ""), true)
+    + leiste
+    + (pad.reiter === "zeichnung" || pad.reiter === "wbg"
+      ? (datei
+          ? '<div class="pad__datei">'
+            + '<div class="pad__dateikopf">'
+            + '<button class="pad-knopf pad-knopf--klein" data-paddruck>Drucken</button>'
+            + '<button class="pad-knopf pad-knopf--klein" data-padspeichern>Speichern</button>'
+            + '</div>'
+            + '<iframe src="' + esc(datei) + '" title="Ansicht"></iframe>'
+            + '</div>'
+          : '<p class="pad__hinweis">' + (pad.reiter === "wbg"
+              ? "Für diesen Auftrag ist keine WBG hinterlegt."
+              : "Keine Zeichnung hinterlegt.") + '</p>')
+      : (j ? "" : '<p class="pad__hinweis">Auf dieser Maschine läuft gerade kein Auftrag.</p>')
+        + tafel);
+
+  h.querySelectorAll("[data-padreiter]").forEach((el) => {
     el.onclick = () => {
-      if (!el.dataset.padpdf) {
-        meldung(el.dataset.padtitel + ": keine vorhanden.", "warn");
+      const wert = el.dataset.padreiter;
+      // Die drei Fenster bleiben Fenster — die Leiste bleibt dahinter
+      // stehen und der Reiter springt zurück auf die Übersicht.
+      if (wert === "blatt") {
+        if (!j) { meldung("Auf dieser Maschine läuft kein Auftrag — ohne HOCO Nr. "
+          + "gibt es kein Einrichtblatt.", "warn"); return; }
+        if (!m.type_id) { meldung("Dieser Maschine ist kein Typ zugewiesen. Das wird "
+          + "unter Produktion → Maschinen eingestellt.", "warn"); return; }
+        einrichtblattOeffnen(j.job_number, m.type_id, j.id, m.id);
         return;
       }
-      betrachter(el.dataset.padpdf, el.dataset.padtitel, true);
+      if (wert === "wechsel") {
+        if (!m.type_id) { meldung("Dieser Maschine ist kein Typ zugewiesen — ohne Typ "
+          + "gibt es keine Werkzeugplätze.", "warn"); return; }
+        werkzeugWechselDialog(m, j);
+        return;
+      }
+      if (wert === "historie") { wechselHistorie(m, j); return; }
+
+      // Grauer Reiter: es gibt nichts zu öffnen. Statt wortlos die
+      // Ansicht zu wechseln, sagt eine Meldung warum.
+      if (wert === "zeichnung" && !zeichnung) {
+        meldung("Keine Zeichnung hinterlegt — weder am Auftrag noch bei der "
+          + "HOCO Nr. Hochladen geht im Auftragsfenster auf der Planwand "
+          + "oder unter Produktion → HOCO Nr.", "warn");
+        return;
+      }
+      if (wert === "wbg" && !wbg) {
+        meldung(j
+          ? "Für diesen Auftrag ist keine WBG hinterlegt. Hochladen geht im "
+            + "Auftragsfenster auf der Planwand."
+          : "Ohne laufenden Auftrag gibt es keine WBG.", "warn");
+        return;
+      }
+
+      pad.reiter = wert;
+      padZeichnen();
     };
   });
 
-  const blatt = h.querySelector("[data-padblatt]");
-  if (blatt) blatt.onclick = () => {
-    if (!j) { meldung("Ohne laufenden Auftrag gibt es kein Einrichtblatt.", "warn"); return; }
-    einrichtblattOeffnen(j.job_number, m.type_id, j.id, m.id);
+  // Lädt die Datei nicht — abgelaufener Link, kein Netz, Format
+  // nicht darstellbar —, bleibt der Rahmen leer. Dann sagen wir es.
+  const rahmenPruefen = h.querySelector("#pad-datei");
+  if (rahmenPruefen) {
+    let geladen = false;
+    rahmenPruefen.addEventListener("load", () => { geladen = true; });
+    rahmenPruefen.addEventListener("error", () => {
+      meldung("Die Datei liess sich nicht öffnen. Über Neuer Tab geht es "
+        + "vielleicht trotzdem.", "fehler");
+    });
+    setTimeout(() => {
+      if (!geladen && document.getElementById("pad-datei")) {
+        meldung("Die Datei braucht ungewöhnlich lange oder lässt sich hier nicht "
+          + "anzeigen. Probier Neuer Tab.", "warn");
+      }
+    }, 9000);
+  }
+
+  const druck = h.querySelector("[data-paddruck]");
+  if (druck) druck.onclick = () => {
+    const rahmen = h.querySelector("iframe");
+    try { rahmen.contentWindow.focus(); rahmen.contentWindow.print(); }
+    catch (f) { window.open(datei, "_blank"); }
+  };
+  const tab = h.querySelector("[data-padtab]");
+  if (tab) tab.onclick = () => {
+    const w = window.open(datei, "_blank");
+    if (!w) meldung("Das Fenster wurde blockiert. Bitte Pop-ups erlauben.", "warn");
   };
 
-  const wechsel = h.querySelector("[data-padwechsel]");
-  if (wechsel) wechsel.onclick = () => werkzeugWechselDialog(m, j);
+  const sichern = h.querySelector("[data-padspeichern]");
+  if (sichern) sichern.onclick = () => {
+    const a = document.createElement("a");
+    a.href = datei; a.download = (pad.reiter === "wbg" ? "WBG" : "Zeichnung") + ".pdf";
+    a.target = "_blank"; a.rel = "noopener";
+    document.body.appendChild(a); a.click(); a.remove();
+  };
 
-  const hist = h.querySelector("[data-padhistorie]");
-  if (hist) hist.onclick = () => wechselHistorie(m, j);
+  const standFeld = h.querySelector('[data-padfeld="stand"]');
+  if (standFeld) standFeld.onclick = async () => {
+    if (!j) return;
+    const w = await dialogFelder({ titel: "Stückzahl eintragen",
+      felder: [{ name: "stk", label: "Zählerstand, gesamt seit Auftragsbeginn",
+                 typ: "number", pflicht: true, wert: j.stand || 0,
+                 hinweis: j.target_quantity
+                   ? "Ziel " + zahlText(j.target_quantity) + " Stück" : "" }],
+      bestaetigen: "Eintragen" });
+    if (!w) return;
+    try {
+      await speichereStand(m.id, isoDatum(new Date()),
+        Math.max(0, Math.round(Number(w.stk) || 0)), j.id);
+      meldung("Stückzahl eingetragen.");
+      padZeichnen();
+    } catch (f) { meldung(fehlertext(f), "fehler"); }
+  };
+
 }
 
 // ---------- Werkzeugwechsel ----------
@@ -15883,6 +16029,8 @@ function zeichneGeruest() {
   // Die Einstellungen kommen vom Konto. Erst jetzt, nach dem
   // Anmelden, stehen sie fest — also hier noch einmal anwenden.
   document.body.classList.toggle("dunkel", einstellung("dunkel"));
+  // Administratoren sehen den Pad-Knopf auf jedem Gerät
+  document.body.classList.toggle("ist-admin", istAdmin());
   if (einstellung("navschmal")) document.body.classList.add("nav--schmal");
 
   const anzeige = (profil && (profil.full_name || profil.email)) || "";
