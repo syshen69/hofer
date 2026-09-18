@@ -2899,7 +2899,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "61.0.0";
+const APP_VERSION = "61.2.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -7935,7 +7935,14 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     // Stammdaten der HOCO Nr. schreiben. Gefüllt wird nur, was dort
     // noch leer ist — Gepflegtes wird nicht überschrieben.
     const hocoNummer = daten.job_number || (auftrag && auftrag.job_number);
-    if (hocoNummer) {
+
+    // Ein abgeschlossener Auftrag ändert die Stammdaten nicht mehr.
+    // Was dort steht, soll der letzte Stand sein, nicht ein alter
+    // Durchlauf, an dem später noch etwas korrigiert wurde.
+    const istFertig = (daten.plan_status === "fertig")
+      || (auftrag && (auftrag.ended_at || auftrag.plan_status === "fertig"));
+
+    if (hocoNummer && !istFertig) {
       try {
         const alt = await db.from("hoco_parts").select("*")
           .eq("hoco_nr", hocoNummer).limit(1);
@@ -7954,6 +7961,23 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
           if (!teilJetzt.zeichnung_url && daten.drawing_url) {
             nach.zeichnung_url = daten.drawing_url;
           }
+
+          // Steht dort schon etwas anderes, wird nicht stillschweigend
+          // überschrieben — eine Korrektur am einzelnen Auftrag würde
+          // sonst das Teil für alle ändern. Also kurz nachfragen.
+          if (teilJetzt.material && daten.material_bez
+              && teilJetzt.material.trim() !== daten.material_bez.trim()) {
+            const uebernehmen = await nachfragen({
+              titel: "Material auch beim Teil ändern?",
+              text: "Bei " + hocoNummer + " steht \"" + teilJetzt.material
+                  + "\". Am Auftrag hast du \"" + daten.material_bez
+                  + "\" eingetragen. Soll das Teil mitgeändert werden? "
+                  + "Es gilt dann für alle künftigen Aufträge.",
+              bestaetigen: "Ja, beim Teil ändern",
+              abbrechen: "Nein, nur dieser Auftrag" });
+            if (uebernehmen) nach.material = daten.material_bez;
+          }
+
           if (Object.keys(nach).length) {
             await db.from("hoco_parts").update(nach).eq("hoco_nr", hocoNummer);
           }
@@ -8670,16 +8694,26 @@ async function ladeHoco(suche) {
 async function ladeHocoAusAuftraegen() {
   const { data, error } = await zeitlimit(
     db.from("jobs")
-      .select("job_number, material_bez, drawing_url")
+      .select("job_number, material_bez, drawing_url, plan_status, ended_at")
       .order("created_at", { ascending: false }).limit(1000),
     12000, "Aufträge");
   if (error) throw error;
-  // Je Nummer der jüngste Auftrag — daraus kommen Durchmesser,
-  // Material und Zeichnung, wenn noch keine Stammdaten da sind.
-  const karte = {};
+  // Je Nummer der jüngste Auftrag, der noch nicht abgeschlossen ist.
+  // Ein fertiger Durchlauf soll die Stammdaten nicht mehr bestimmen —
+  // dort zählt der letzte Stand. Gibt es nur fertige, wird eben der
+  // jüngste davon genommen, sonst stünde gar nichts da.
+  const karte = {}, ersatz = {};
   (data || []).forEach((j) => {
-    if (!j.job_number || karte[j.job_number]) return;
-    karte[j.job_number] = j;
+    if (!j.job_number) return;
+    const fertig = j.ended_at || j.plan_status === "fertig";
+    if (fertig) {
+      if (!ersatz[j.job_number]) ersatz[j.job_number] = j;
+      return;
+    }
+    if (!karte[j.job_number]) karte[j.job_number] = j;
+  });
+  Object.keys(ersatz).forEach((nr) => {
+    if (!karte[nr]) karte[nr] = ersatz[nr];
   });
   return karte;
 }
