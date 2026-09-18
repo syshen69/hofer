@@ -392,7 +392,8 @@ a:focus-visible {
   left: 12px;
   right: 12px;
   bottom: calc(var(--navhoehe) + 14px);
-  z-index: 60;
+  /* muss über dem Pad Mode liegen, sonst sieht man dort keine Meldung */
+  z-index: 90;
   display: grid;
   gap: 8px;
   pointer-events: none;
@@ -2178,6 +2179,14 @@ body.pw-seite .pw-rolle { max-height: calc(100dvh - var(--kopfhoehe) - 150px);
   .pw-balken, .pw-griff, .pw-ferien { touch-action: pan-x pan-y !important; }
   .pw-rolle { overflow: auto !important; -webkit-overflow-scrolling: touch; }
 }
+/* Im Pad Mode und auf jedem Gerät mit Berührungseingabe. Die Klasse
+   setzt die App selbst — die Medienabfrage allein reicht nicht, weil
+   ein iPad mit Tastatur sich als Computer meldet. */
+.pad .pw-balken, .pad .pw-griff, .pad .pw-ferien,
+body.tippgeraet .pw-balken, body.tippgeraet .pw-griff, body.tippgeraet .pw-ferien {
+  touch-action: pan-x pan-y !important; }
+.pad .pw-rolle, body.tippgeraet .pw-rolle {
+  overflow: auto !important; -webkit-overflow-scrolling: touch; }
 
 /* ---------- Suchfenster ---------- */
 .su-zeitgitter { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
@@ -2550,7 +2559,7 @@ body.dunkel .pw-balken__nr { color: #10151c !important; }
 }
 
 body.pad-offen { overflow: hidden; }
-.pad { position: fixed; inset: 0; z-index: 70; background: #000; color: #f2f4f7;
+.pad { position: fixed; inset: 0; z-index: 70; background: #0f1216; color: #f2f4f7;
        display: flex; flex-direction: column;
        font-size: 1.05rem; overscroll-behavior: contain; }
 .pad__kopf { display: flex; align-items: center; gap: 12px; padding: 10px 14px;
@@ -2664,6 +2673,90 @@ body.pad-offen { overflow: hidden; }
 .dialog--auftrag .pdfreihe .knopf--gefahr,
 .dialog--auftrag .pdfreihe .bildknopf { flex: 0 0 auto; }
 .dialog--auftrag .pdfreihe .knopf--gefahr { padding-left: 12px; padding-right: 12px; }
+/* Überschrittener Termin: die ganze Zeile fällt auf, nicht nur das Datum */
+.bz-zeile--spaet td { background: rgba(192, 57, 43, .09); }
+.bz-zeile--spaet .bz-artikel strong { color: var(--gefahr); }
+body.dunkel .bz-zeile--spaet td { background: rgba(255, 120, 105, .14); }
+/* Ziel und überschrittene Frist bei den Bestellungen */
+.bz-ziel { font-size: .8rem; font-weight: 600; color: var(--marke); margin-top: 2px; }
+.bz-spaet { color: var(--gefahr); font-weight: 700; }
+tr.bz-zeile--spaet td { background: var(--gefahr-hell, rgba(200,40,30,.08)); }
+body.dunkel tr.bz-zeile--spaet td { background: rgba(255,90,80,.12); }
+/* ---------- Pad Mode, zweiter Anlauf ---------- */
+.pad--dunkel { background: #0b0d10; }
+.pad__start { flex: 1; display: flex; flex-direction: column; align-items: center;
+              justify-content: center; gap: 30px; padding: 24px; }
+.pad__logo { width: min(560px, 82%); height: auto; border-radius: 16px;
+             box-shadow: 0 10px 40px rgba(0,0,0,.45); }
+.pad__start .pad__kacheln { flex: none; width: min(700px, 100%); padding: 0; }
+
+.pad-kachel--bild { padding: 0; overflow: hidden; gap: 0; min-height: 150px; }
+.pad-kachel--bild img { width: 100%; height: 96px; object-fit: cover; display: block;
+                        opacity: .85; }
+.pad-kachel--bild span { padding: 14px 10px; }
+
+.pad__titel--links { text-align: left; flex: none; font-size: 1.15rem; }
+.pad__nr { color: #8b95a3; font-weight: 500; font-size: .92rem; }
+.pad__sprunge { flex: 1; display: flex; gap: 8px; justify-content: flex-end;
+                overflow-x: auto; }
+.pad__trenner { width: 1px; background: #262c34; flex: none; margin: 4px 4px; }
+.pad-sprung { flex: none; background: #14181d; border: 1px solid #2f3742;
+              color: #c9d5e4; border-radius: 11px; font: inherit; font-size: .95rem;
+              font-weight: 600; padding: 10px 15px; cursor: pointer;
+              white-space: nowrap; }
+.pad-sprung--an { background: #1268e0; border-color: #1268e0; color: #fff; }
+.pad-sprung--leer { background: #101215; border-color: #23282f; color: #5d6773; }
+
+/* Dashboard: füllt die Fläche, grosse Zahlen */
+.pad__raster { flex: 1; display: grid; gap: 14px; padding: 16px;
+               grid-template-columns: repeat(6, 1fr);
+               grid-template-rows: 1.35fr 1fr; min-height: 0; }
+.pad-karte { background: linear-gradient(160deg, #161b22, #10141a);
+             border: 1px solid #262c34; border-radius: 18px; padding: 18px 22px;
+             display: flex; flex-direction: column; justify-content: center;
+             gap: 6px; min-width: 0; overflow: hidden; }
+.pad-karte--haupt { grid-column: span 4; }
+.pad-karte--zahl { grid-column: span 2;
+                   background: linear-gradient(160deg, #0e2e57, #0a1c36);
+                   border-color: #1b4d8f; }
+.pad-karte--breit { grid-column: span 3; }
+.pad-karte--klein { grid-column: span 1; }
+.pad-karte__name { font-size: .8rem; color: #8b95a3; text-transform: uppercase;
+                   letter-spacing: .1em; }
+.pad-karte__wert { font-size: clamp(1.6rem, 4.4vw, 3.4rem); font-weight: 800;
+                   line-height: 1.05; letter-spacing: -.02em;
+                   overflow: hidden; text-overflow: ellipsis; }
+.pad-karte--klein .pad-karte__wert { font-size: clamp(1.1rem, 2.2vw, 1.8rem); }
+.pad-karte--breit .pad-karte__wert { font-size: clamp(1.3rem, 3vw, 2.4rem); }
+.pad-karte__wert--leer { font-size: 1.05rem !important; font-weight: 500;
+                         color: #5d6773; }
+.pad-karte__unten { font-size: 1rem; color: #9aa5b3; }
+.pad-karte[data-padfeld] { cursor: pointer; }
+.pad-karte[data-padfeld]:active { filter: brightness(1.25); }
+
+.pad__balken { position: relative; height: 26px; margin: 0 16px 18px;
+               background: #14181d; border: 1px solid #262c34; border-radius: 13px;
+               overflow: hidden; }
+.pad__balken__fuellung { position: absolute; inset: 0 auto 0 0;
+                         background: linear-gradient(90deg, #0b4fa8, #1e86ff); }
+.pad__balken span { position: relative; display: block; text-align: center;
+                    line-height: 24px; font-size: .84rem; font-weight: 700; }
+
+.pad__datei { flex: 1; min-height: 0; }
+.pad__datei iframe { width: 100%; height: 100%; border: 0; background: #fff; }
+
+/* Wischen auf der Planwand im Pad, wie am Handy */
+.pad--wischen .pw-balken, .pad--wischen .pw-griff, .pad--wischen .pw-ferien {
+  touch-action: pan-x pan-y !important; }
+.pad--wischen .pw-rolle { overflow: auto !important;
+                          -webkit-overflow-scrolling: touch; }
+
+@media (max-width: 900px) {
+  .pad__raster { grid-template-columns: repeat(2, 1fr); grid-template-rows: none; }
+  .pad-karte--haupt, .pad-karte--zahl, .pad-karte--breit { grid-column: span 2; }
+  .pad-karte--klein { grid-column: span 1; }
+  .pad__sprunge { justify-content: flex-start; }
+}
 </style>
 </head>
 <body>
@@ -2712,7 +2805,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "55.3.0";
+const APP_VERSION = "56.2.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -5240,6 +5333,19 @@ function isMobil() {
   return window.matchMedia("(max-width: 720px)").matches;
 }
 
+// Wird mit dem Finger bedient — Handy oder Tablet. Die Breite reicht
+// dafür nicht: ein iPad ist breiter als 720 Pixel, hat aber keine
+// Maus. Alles, was am Finger hängt, richtet sich hiernach.
+function istTippgeraet() {
+  // Ein iPad meldet mit angeschlossener Tastatur oder Maus "hover:
+  // hover" und "pointer: fine" — dann galt es bisher als Computer
+  // und das Wischen war aus. Die Anzahl der Berührungspunkte ist
+  // das verlässlichere Merkmal.
+  return (navigator.maxTouchPoints || 0) > 0
+    || window.matchMedia("(hover: none) and (pointer: coarse)").matches
+    || isMobil();
+}
+
 // Wer bekommt den Bearbeiten-Knopf überhaupt zu sehen? Administratoren
 // nicht: sie dürfen ohnehin immer. Auf dem Handy sieht ihn niemand.
 function darfBearbeitenKnopf() {
@@ -5708,7 +5814,9 @@ function griffVerhalten(b) {
 // nächsten Abschnitt nachgeladen und bleibt dabei an derselben
 // Stelle stehen.
 function zeitWischen(b) {
-  if (!isMobil()) return;
+  // Galt bisher nur unter 720 Pixel — damit war das Wischen auf
+  // jedem Tablet aus, obwohl es dort am meisten gebraucht wird.
+  if (!istTippgeraet()) return;
   const rolle = document.querySelector(".pw-rolle");
   if (!rolle) return;
   if (rolle.dataset.wischt === "1") return;
@@ -5866,7 +5974,7 @@ function balkenInfoVerhalten() {
 // Alles, was ein Auftrag an Angaben trägt, als ein Suchtext
 function auftragText(j) {
   return [
-    j.job_number, j.fa_nr, j.maschine, j.maschine_nr, j.park,
+    j.job_number, j.fa_nr, j.maschine, j.maschine_nr, j.park, j.material_bez,
     j.plan_note, j.problem, j.color,
     (PLANSTATUS[j.plan_status || "geplant"] || {}).name,
     j.material_dm, j.material_toleranz, j.material_menge, j.material_liefertermin,
@@ -6717,6 +6825,7 @@ function ferienVerhalten(b) {
       if (e.target.closest("[data-fgriff]")) return;
       gestartet = true;
       const sx = e.clientX, sy = e.clientY;
+      startX = sx; startY = sy;
       halten = setTimeout(() => {
         zieht = true;
         el.classList.add("pw-balken--zieht");
@@ -6728,11 +6837,25 @@ function ferienVerhalten(b) {
         document.body.appendChild(schatten);
         schatten.style.left = sx + "px";
         schatten.style.top = sy + "px";
+        // Erst jetzt den Zeiger einfangen. Vorher hätte der Browser
+        // das Wischen abgebrochen, sobald man einen Balken berührt —
+        // und genau das war der Grund, warum die Tafel am Tablet
+        // nicht scrollte.
+        try { el.setPointerCapture(e.pointerId); } catch (f2) { /* egal */ }
       }, 400);
-      try { el.setPointerCapture(e.pointerId); } catch (f2) { /* egal */ }
     });
 
     el.addEventListener("pointermove", (e) => {
+      // Bewegt sich der Finger, bevor das Halten greift, ist es ein
+      // Wischen. Dann den Vorgang abbrechen und die Tafel scrollen
+      // lassen.
+      if (gestartet && !zieht) {
+        if (Math.abs(e.clientX - startX) > 8 || Math.abs(e.clientY - startY) > 8) {
+          clearTimeout(halten);
+          gestartet = false;
+        }
+        return;
+      }
       if (!gestartet || !zieht) return;
       e.preventDefault();
       if (schatten) {
@@ -6778,12 +6901,61 @@ function ferienVerhalten(b) {
   });
 }
 
+// Wischen auf der Tafel: waagrecht streichen blättert den Zeitraum.
+// Der Browser scrollt nur, solange die Tafel breiter ist als das
+// Fenster — bei uns passt sie hinein, deshalb machen wir es selbst.
+function wischVerhalten(b) {
+  const rolle = document.querySelector(".pw-rolle");
+  if (!rolle || rolle._wisch) return;
+  rolle._wisch = true;
+
+  let x0 = 0, y0 = 0, zeit = 0, aktiv = false;
+
+  rolle.addEventListener("touchstart", (e) => {
+    if (e.touches.length !== 1) { aktiv = false; return; }
+    aktiv = true;
+    x0 = e.touches[0].clientX;
+    y0 = e.touches[0].clientY;
+    zeit = Date.now();
+  }, { passive: true });
+
+  rolle.addEventListener("touchend", (e) => {
+    if (!aktiv) return;
+    aktiv = false;
+    // Wird gerade ein Balken gezogen, gehört die Geste dem Ziehen
+    if (document.querySelector(".pw-balken--zieht")) return;
+    // Gibt es einen Puffer, blättert schon das Scrollen der Tafel.
+    // Beides zusammen würde sich gegenseitig zurückschieben.
+    if (plan.puffer) return;
+
+    const t = (e.changedTouches || [])[0];
+    if (!t) return;
+    const dx = t.clientX - x0, dy = t.clientY - y0;
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
+    if (Date.now() - zeit > 800) return;
+
+    // Rollt die Tafel wirklich nennenswert, erst den Rest ausrollen
+    // lassen. Die paar Pixel Puffer links und rechts zählen nicht —
+    // sonst würde das Wischen nie durchkommen.
+    const gesamt = rolle.scrollWidth - rolle.clientWidth;
+    if (gesamt > 80) {
+      const rest = dx < 0 ? gesamt - rolle.scrollLeft : rolle.scrollLeft;
+      if (rest > 12) return;
+    }
+
+    plan.start = arbeitstagePlus(plan.start, (dx < 0 ? 1 : -1) * Math.max(2, plan.tage));
+    zeichnePlanwand(b);
+  }, { passive: true });
+}
+
 function balkenVerhalten(b) {
   const tafel = document.querySelector(".pw-tafel");
+  wischVerhalten(b);
   if (!tafel || !darfPlanen()) return;
 
   tafel.querySelectorAll("[data-auftrag]").forEach((el) => {
     let halten = null, zieht = false, schatten = null, gestartet = false;
+    let startX = 0, startY = 0;
 
     const aufraeumen = () => {
       clearTimeout(halten);
@@ -6805,7 +6977,11 @@ function balkenVerhalten(b) {
     el.addEventListener("pointerdown", (e) => {
       if (e.button !== undefined && e.button !== 0) return;
       gestartet = true;
-      const startX = e.clientX, startY = e.clientY;
+      // Ohne das "const" hier bleiben die äusseren Werte stehen —
+      // vorher standen sie auf 0 und jede kleinste Bewegung galt
+      // sofort als Wischen.
+      startX = e.clientX;
+      startY = e.clientY;
 
       halten = setTimeout(() => {
         zieht = true;
@@ -6821,14 +6997,23 @@ function balkenVerhalten(b) {
         document.body.appendChild(schatten);
         schatten.style.left = startX + "px";
         schatten.style.top = startY + "px";
+        // Erst mit dem Ziehen einfangen — sonst bricht der Browser
+        // beim Berühren eines Balkens das Wischen ab.
+        try { el.setPointerCapture(e.pointerId); } catch (f) { /* egal */ }
       }, 400);
-
-      try { el.setPointerCapture(e.pointerId); } catch (f) { /* egal */ }
     });
 
     el.addEventListener("pointermove", (e) => {
       if (!gestartet) return;
-      if (!zieht) return;
+      // Fährt der Finger los, bevor das Halten greift, ist es ein
+      // Wischen — dann lassen wir die Tafel scrollen.
+      if (!zieht) {
+        if (Math.abs(e.clientX - startX) > 8 || Math.abs(e.clientY - startY) > 8) {
+          clearTimeout(halten);
+          gestartet = false;
+        }
+        return;
+      }
       e.preventDefault();
 
       if (schatten) {
@@ -7208,6 +7393,17 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
         '<option value="' + t + '">').join("")
     + '</datalist></label>'
     + '</div>'
+    + '<label class="feld"><span>Materialbezeichnung</span>'
+    + '<input id="pl-mat-bez" type="text" list="pl-matliste" value="'
+    + esc(auftrag ? (auftrag.material_bez || "")
+        : (v ? (v.material_bez || "") : "")) + '"'
+    + (darf ? "" : " readonly") + ' placeholder="z. B. CW614N"></label>'
+    + '<datalist id="pl-matliste">'
+    + PLANFARBEN.map((fb) => {
+        const zu = FARBZUTEILUNG[fb.wert];
+        return zu && zu.material ? '<option value="' + esc(zu.material) + '">' : "";
+      }).join("")
+    + '</datalist>'
     + '<label class="feld"><span>Menge vorhanden oder bestellt</span>'
     + '<input id="pl-menge-mat" type="text" value="'
     + esc(auftrag ? (auftrag.material_menge || "") : (v ? (v.material_menge || "") : ""))
@@ -7385,8 +7581,9 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
       if (zerlegt && ((dmFeld && !dmFeld.value) || (tolFeld && !tolFeld.value))) {
         uebernommen.push("Materialgrösse");
       }
-      if (mengeFeld && !mengeFeld.value && teil.material) {
-        mengeFeld.value = teil.material;
+      const bezFeld = huelle.querySelector("#pl-mat-bez");
+      if (bezFeld && !bezFeld.value && teil.material) {
+        bezFeld.value = teil.material;
         uebernommen.push("Material");
       }
 
@@ -7554,6 +7751,7 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
       material_ok: $("pl-material").checked,
       material_dm: $("pl-dm").value === "" ? null : Number($("pl-dm").value),
       material_toleranz: ($("pl-tol").value || "").trim() || null,
+      material_bez: (($("pl-mat-bez") || {}).value || "").trim() || null,
       material_menge: ($("pl-menge-mat").value || "").trim() || null,
       material_liefertermin: $("pl-liefer").value || null,
       // Bei jedem Durchlauf eine andere — gehört an den Auftrag,
@@ -7622,6 +7820,40 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     }
 
     if (fehler) { meldung(fehlertext(fehler), "fehler"); return; }
+
+    // Rückweg: Material, Durchmesser und Toleranz vom Auftrag in die
+    // Stammdaten der HOCO Nr. schreiben. Gefüllt wird nur, was dort
+    // noch leer ist — Gepflegtes wird nicht überschrieben.
+    const hocoNummer = daten.job_number || (auftrag && auftrag.job_number);
+    if (hocoNummer) {
+      try {
+        const alt = await db.from("hoco_parts").select("*")
+          .eq("hoco_nr", hocoNummer).limit(1);
+        const teilJetzt = (alt.data || [])[0];
+        const groesse = groesseBauen(daten.material_dm, daten.material_toleranz);
+
+        if (!teilJetzt) {
+          await db.from("hoco_parts").upsert([{
+            hoco_nr: hocoNummer,
+            material: daten.material_bez || null,
+            material_groesse: groesse || null,
+            zeichnung_url: daten.drawing_url || null,
+          }], { onConflict: "hoco_nr", ignoreDuplicates: true });
+        } else {
+          const nach = {};
+          if (!teilJetzt.material && daten.material_bez) {
+            nach.material = daten.material_bez;
+          }
+          if (!teilJetzt.material_groesse && groesse) nach.material_groesse = groesse;
+          if (!teilJetzt.zeichnung_url && daten.drawing_url) {
+            nach.zeichnung_url = daten.drawing_url;
+          }
+          if (Object.keys(nach).length) {
+            await db.from("hoco_parts").update(nach).eq("hoco_nr", hocoNummer);
+          }
+        }
+      } catch (f) { /* die Stammdaten holen es beim nächsten Öffnen nach */ }
+    }
 
     // Der eingetragene Beginn gilt. Was ihm im Weg liegt, rückt nach
     // hinten, damit die Reihe wieder sauber aneinander steht.
@@ -8375,7 +8607,7 @@ function padOeffnen() {
   if (document.getElementById("pad")) return;
   const h = document.createElement("div");
   h.id = "pad";
-  h.className = "pad";
+  h.className = "pad" + (einstellung("dunkel") ? " pad--dunkel" : "");
   document.body.appendChild(h);
   document.body.classList.add("pad-offen");
   pad.wo = "start";
@@ -8429,13 +8661,15 @@ async function padZeichnen() {
 // ---------- Start ----------
 
 async function padStart(h) {
-  h.innerHTML = padKopf("Pad Mode", false)
+  h.innerHTML = padKopf("", false)
+    + '<div class="pad__start">'
+    + '<img class="pad__logo" src="./login.png" alt="Hofer + Co.">'
     + '<div class="pad__kacheln">'
     + '<button class="pad-kachel pad-kachel--gross" data-padwo="planwand">'
     + '<span class="pad-kachel__zeichen">▦</span><span>Planwand</span></button>'
     + '<button class="pad-kachel pad-kachel--gross" data-padwo="parks">'
     + '<span class="pad-kachel__zeichen">⚙</span><span>Maschinen</span></button>'
-    + '</div>';
+    + '</div></div>';
 
   h.querySelectorAll("[data-padwo]").forEach((el) => {
     el.onclick = () => { pad.wo = el.dataset.padwo; padZeichnen(); };
@@ -8449,7 +8683,9 @@ async function padPlanwand(h) {
     + '<div class="pad__rolle" id="pad-planwand"></div>';
   const ziel = document.getElementById("pad-planwand");
   // Dieselbe Planwand wie sonst, nur in den Pad-Rahmen gezeichnet.
-  // Der Rahmen scrollt in beide Richtungen wie am Handy.
+  // Der Rahmen scrollt und wischt in beide Richtungen wie am Handy —
+  // dafür sorgt die Klasse, die touch-action freigibt.
+  ziel.classList.add("pad--wischen");
   await seitePlanwand(ziel);
 }
 
@@ -8460,7 +8696,9 @@ async function padParks(h) {
   h.innerHTML = padKopf("Maschinenparks", true)
     + '<div class="pad__kacheln">'
     + (parks.length
-      ? parks.map((p) => '<button class="pad-kachel" data-park="' + esc(p.id) + '">'
+      ? parks.map((p) => '<button class="pad-kachel pad-kachel--bild" data-park="'
+          + esc(p.id) + '">'
+          + '<img src="./login.png" alt="">'
           + '<span>' + esc(p.name) + '</span></button>').join("")
       : '<p class="pad__leer">Keine Parks angelegt.</p>')
     + '</div>';
@@ -8546,66 +8784,87 @@ async function padMaschine(h) {
   // deshalb gibt es hier keine Ausweichsuche.
   const wbg = (j && j.wbg_url) || "";
 
-  // Leiste mit allen Sprüngen. Der offene Reiter ist kräftig blau,
-  // die anderen bleiben gedämpft — steckt nichts dahinter, grau.
   if (!pad.reiter) pad.reiter = "uebersicht";
-  const reiter = [
-    ["uebersicht", "Übersicht", true],
-    ["zeichnung", "Zeichnung", !!zeichnung],
-    ["wbg", "WBG", !!wbg],
-    ["blatt", "Einrichtblatt", !!(j && m.type_id)],
-    ["wechsel", "Werkzeugwechsel", !!m.type_id],
-    ["historie", "Historie", true],
-  ];
-
-  const leiste = '<div class="pad__leiste">'
-    + reiter.map(([wert, text, da]) => '<button class="pad-reiter'
-        + (pad.reiter === wert ? " pad-reiter--an" : "")
-        + (da ? "" : " pad-reiter--leer") + '" data-padreiter="' + wert + '">'
-        + text + '</button>').join("")
-    + '</div>';
-
-  const tafel = '<div class="pad__tafel">'
-    + feld("HOCO Nr.", j ? j.job_number : "", true)
-    + feld("Stückzahl", j
-        ? zahlText(j.stand || 0)
-          + (j.target_quantity ? " / " + zahlText(j.target_quantity) : "")
-        : "", true, j ? "stand" : "")
-    + feld("Durchmesser", j && j.material_dm
-        ? "Ø" + j.material_dm + (j.material_toleranz ? " " + j.material_toleranz : "")
-        : (teil ? teil.material_groesse : ""))
-    + feld("Material", (j && j.material_menge) || (teil ? teil.material : ""))
-    + feld("Programm", programm)
-    + feld("FA Nr.", j ? j.fa_nr : "")
-    + '</div>';
-
-  // Zeichnung und WBG werden im Pad selbst angezeigt, damit die
-  // Leiste oben stehen bleibt.
   const datei = pad.reiter === "zeichnung" ? zeichnung
     : (pad.reiter === "wbg" ? wbg : "");
 
-  h.innerHTML = padKopf(m.name + (m.machine_number ? " · " + m.machine_number : ""), true)
-    + leiste
-    + (pad.reiter === "zeichnung" || pad.reiter === "wbg"
-      ? (datei
-          ? '<div class="pad__datei">'
-            + '<div class="pad__dateikopf">'
-            + '<button class="pad-knopf pad-knopf--klein" data-paddruck>Drucken</button>'
-            + '<button class="pad-knopf pad-knopf--klein" data-padspeichern>Speichern</button>'
-            + '</div>'
-            + '<iframe src="' + esc(datei) + '" title="Ansicht"></iframe>'
-            + '</div>'
-          : '<p class="pad__hinweis">' + (pad.reiter === "wbg"
-              ? "Für diesen Auftrag ist keine WBG hinterlegt."
-              : "Keine Zeichnung hinterlegt.") + '</p>')
-      : (j ? "" : '<p class="pad__hinweis">Auf dieser Maschine läuft gerade kein Auftrag.</p>')
-        + tafel);
+  // Die Sprünge sitzen in der Kopfzeile, neben Name und Nummer.
+  // Dadurch bleibt für die Zeichnung die ganze Fläche übrig.
+  const sprung = (wert, text, da) => '<button class="pad-sprung'
+    + (pad.reiter === wert ? " pad-sprung--an" : "")
+    + (da ? "" : " pad-sprung--leer") + '" data-padreiter="' + wert + '">'
+    + text + '</button>';
+
+  const kopf = '<div class="pad__kopf">'
+    + '<button class="pad__zurueck" data-padzurueck>‹</button>'
+    + '<span class="pad__titel pad__titel--links">'
+    + esc(m.name) + (m.machine_number
+        ? ' <span class="pad__nr">' + esc(m.machine_number) + '</span>' : "")
+    + '</span>'
+    + '<div class="pad__sprunge">'
+    + (pad.reiter === "uebersicht" ? "" : sprung("uebersicht", "Übersicht", true))
+    + sprung("zeichnung", "Zeichnung", !!zeichnung)
+    + sprung("wbg", "WBG", !!wbg)
+    + sprung("blatt", "Einrichtblatt", !!(j && m.type_id))
+    + sprung("wechsel", "Wechsel", !!m.type_id)
+    + sprung("historie", "Historie", true)
+    + (datei
+        ? '<span class="pad__trenner"></span>'
+          + '<button class="pad-sprung" data-paddruck>Drucken</button>'
+          + '<button class="pad-sprung" data-padspeichern>Speichern</button>'
+          + '<button class="pad-sprung" data-padtab>Neuer Tab</button>'
+        : "")
+    + '</div>'
+    + '<button class="pad__zu" data-padzu>✕</button>'
+    + '</div>';
+
+  const kachel = (name, wert, stil) => '<div class="pad-karte pad-karte--' + stil + '"'
+    + (wert.tipp ? ' data-padfeld="' + wert.tipp + '"' : "") + '>'
+    + '<span class="pad-karte__name">' + name + (wert.tipp ? " · antippen" : "") + '</span>'
+    + '<span class="pad-karte__wert' + (wert.text ? "" : " pad-karte__wert--leer") + '">'
+    + (wert.text ? esc(wert.text) : "keine vorhanden") + '</span>'
+    + (wert.unten ? '<span class="pad-karte__unten">' + esc(wert.unten) + '</span>' : "")
+    + '</div>';
+
+  const uebersicht = '<div class="pad__raster">'
+    + kachel("HOCO Nr.", { text: j ? j.job_number : "",
+        unten: teil && teil.bezeichnung ? teil.bezeichnung : "" }, "haupt")
+    + kachel("Stückzahl", { text: j ? zahlText(j.stand || 0) : "",
+        unten: j && j.target_quantity ? "von " + zahlText(j.target_quantity) : "",
+        tipp: j ? "stand" : "" }, "zahl")
+    + kachel("Material", { text: (j && j.material_bez) || (teil ? teil.material : ""),
+        unten: j && j.material_dm
+          ? "Ø" + j.material_dm + (j.material_toleranz ? " " + j.material_toleranz : "")
+          : (teil ? teil.material_groesse : "") }, "breit")
+    + kachel("Programm", { text: programm }, "klein")
+    + kachel("FA Nr.", { text: j ? j.fa_nr : "" }, "klein")
+    + '</div>'
+    + (j && j.target_quantity
+        ? '<div class="pad__balken"><div class="pad__balken__fuellung" style="width:'
+          + Math.min(100, Math.round((j.stand || 0) / j.target_quantity * 100))
+          + '%"></div><span>'
+          + Math.min(100, Math.round((j.stand || 0) / j.target_quantity * 100))
+          + ' %</span></div>'
+        : "");
+
+  h.innerHTML = kopf
+    + (datei
+      ? '<div class="pad__datei"><iframe id="pad-datei" src="' + esc(datei)
+        + '" title="Ansicht"></iframe></div>'
+      : (j ? "" : '<p class="pad__hinweis">Auf dieser Maschine läuft gerade kein '
+          + 'Auftrag.</p>') + uebersicht);
+
+  h.querySelectorAll("[data-padzu]").forEach((el) => { el.onclick = padSchliessen; });
+  h.querySelectorAll("[data-padzurueck]").forEach((el) => {
+    el.onclick = () => {
+      if (pad.reiter !== "uebersicht") { pad.reiter = "uebersicht"; padZeichnen(); return; }
+      pad.wo = "maschinen"; padZeichnen();
+    };
+  });
 
   h.querySelectorAll("[data-padreiter]").forEach((el) => {
     el.onclick = () => {
       const wert = el.dataset.padreiter;
-      // Die drei Fenster bleiben Fenster — die Leiste bleibt dahinter
-      // stehen und der Reiter springt zurück auf die Übersicht.
       if (wert === "blatt") {
         if (!j) { meldung("Auf dieser Maschine läuft kein Auftrag — ohne HOCO Nr. "
           + "gibt es kein Einrichtblatt.", "warn"); return; }
@@ -8622,12 +8881,9 @@ async function padMaschine(h) {
       }
       if (wert === "historie") { wechselHistorie(m, j); return; }
 
-      // Grauer Reiter: es gibt nichts zu öffnen. Statt wortlos die
-      // Ansicht zu wechseln, sagt eine Meldung warum.
       if (wert === "zeichnung" && !zeichnung) {
-        meldung("Keine Zeichnung hinterlegt — weder am Auftrag noch bei der "
-          + "HOCO Nr. Hochladen geht im Auftragsfenster auf der Planwand "
-          + "oder unter Produktion → HOCO Nr.", "warn");
+        meldung("Keine Zeichnung hinterlegt — weder am Auftrag noch bei der HOCO Nr.",
+          "warn");
         return;
       }
       if (wert === "wbg" && !wbg) {
@@ -8643,24 +8899,6 @@ async function padMaschine(h) {
     };
   });
 
-  // Lädt die Datei nicht — abgelaufener Link, kein Netz, Format
-  // nicht darstellbar —, bleibt der Rahmen leer. Dann sagen wir es.
-  const rahmenPruefen = h.querySelector("#pad-datei");
-  if (rahmenPruefen) {
-    let geladen = false;
-    rahmenPruefen.addEventListener("load", () => { geladen = true; });
-    rahmenPruefen.addEventListener("error", () => {
-      meldung("Die Datei liess sich nicht öffnen. Über Neuer Tab geht es "
-        + "vielleicht trotzdem.", "fehler");
-    });
-    setTimeout(() => {
-      if (!geladen && document.getElementById("pad-datei")) {
-        meldung("Die Datei braucht ungewöhnlich lange oder lässt sich hier nicht "
-          + "anzeigen. Probier Neuer Tab.", "warn");
-      }
-    }, 9000);
-  }
-
   const druck = h.querySelector("[data-paddruck]");
   if (druck) druck.onclick = () => {
     const rahmen = h.querySelector("iframe");
@@ -8672,7 +8910,6 @@ async function padMaschine(h) {
     const w = window.open(datei, "_blank");
     if (!w) meldung("Das Fenster wurde blockiert. Bitte Pop-ups erlauben.", "warn");
   };
-
   const sichern = h.querySelector("[data-padspeichern]");
   if (sichern) sichern.onclick = () => {
     const a = document.createElement("a");
@@ -8965,7 +9202,7 @@ async function stammdatenAufPlanwand() {
 
   const offen = (plan.auftraege || []).filter((j) => j.job_number
     && ["geplant", "ruesten"].indexOf(j.plan_status || "geplant") !== -1
-    && (!j.material_dm || !j.material_toleranz || !j.material_menge || !j.drawing_url));
+    && (!j.material_dm || !j.material_toleranz || !j.material_bez || !j.drawing_url));
   if (!offen.length) return 0;
 
   const nummern = [...new Set(offen.map((j) => j.job_number))];
@@ -8991,7 +9228,7 @@ async function stammdatenAufPlanwand() {
       if (!j.material_dm) neu.material_dm = g.dm;
       if (!j.material_toleranz && g.toleranz) neu.material_toleranz = g.toleranz;
     }
-    if (!j.material_menge && t.material) neu.material_menge = t.material;
+    if (!j.material_bez && t.material) neu.material_bez = t.material;
     if (!j.drawing_url && t.zeichnung_url) neu.drawing_url = t.zeichnung_url;
     if (!Object.keys(neu).length) continue;
 
@@ -10594,6 +10831,7 @@ const gcode = {
   winkel: "45",
   radius: "0.2",
   radienAn: true,
+  ohneA: false,
   vorschub: "0.03",
   vorschubFein: "0.02",
   ueberlauf: "0.5",
@@ -10730,8 +10968,69 @@ function baueGcode(g) {
   return zeilen.join("\n");
 }
 
+// Dieselbe Kontur, aber ohne A-Programmierung: jeder Punkt ist
+// ausgerechnet. Ein Radius wird dabei in einen G2-Bogen aufgelöst.
+// Steuerungen, die ",A" und ",R" nicht kennen, fahren damit gleich.
+function baueGcodeEinfach(g) {
+  const dm = parseFloat(g.dm) || 0;
+  const z0 = parseFloat(g.zStart) || 0;
+  const fase = parseFloat(g.fase) || 0;
+  const winkel = parseFloat(g.winkel) || 45;
+  const rad = g.radienAn ? (parseFloat(g.radius) || 0) : 0;
+  const f = (parseFloat(g.vorschub) || 0.03).toFixed(2);
+  const ff = (parseFloat(g.vorschubFein) || 0.02).toFixed(2);
+  const ueber = parseFloat(g.ueberlauf) || 0.5;
+  const laenge = parseFloat(g.laenge) || 2;
+
+  const anfahrDm = (dm + 2).toFixed(2);
+  const tiefe = fase / Math.tan(bogenGrad(winkel));
+  const dmNachFase = dm - 2 * fase;
+
+  // Der Radius sitzt am Übergang von der Stirnfläche in die Fase.
+  // Sein Anfang liegt auf der Stirnfläche, sein Ende auf der Fase.
+  const halb = bogenGrad(winkel) / 2;
+  const abstand = rad > 0 ? rad * Math.tan(halb) : 0;
+  const zeilen = [];
+
+  if (g.richtung === "stirn") {
+    const zRadEnde = z0 + abstand * Math.sin(bogenGrad(winkel));
+    const dmRadEnde = dmNachFase - 2 * (tiefe - abstand * Math.cos(bogenGrad(winkel)))
+      * Math.tan(bogenGrad(winkel));
+
+    zeilen.push("G0X" + anfahrDm + "Z" + z0.toFixed(3));
+    zeilen.push("G1X-0.500F" + f);
+    zeilen.push("G1X0.000");
+    if (rad > 0) {
+      zeilen.push("G1X" + (2 * abstand).toFixed(3) + "F" + ff);
+      zeilen.push("G3X" + (2 * (abstand + rad * Math.sin(bogenGrad(winkel)))).toFixed(3)
+        + "Z" + (z0 + rad * (1 - Math.cos(bogenGrad(winkel)))).toFixed(3)
+        + "R" + rad.toFixed(3) + "F" + ff);
+    }
+    zeilen.push("G1X" + dmNachFase.toFixed(3) + "Z" + (z0 + tiefe).toFixed(3) + "F" + ff);
+    zeilen.push("G1X" + dm.toFixed(3) + "Z" + (z0 + tiefe).toFixed(3) + "F" + f);
+    zeilen.push("G1Z" + (z0 + laenge).toFixed(3) + "F" + f);
+  } else {
+    zeilen.push("G0X" + anfahrDm + "Z" + (z0 + laenge).toFixed(3));
+    zeilen.push("G1X" + dm.toFixed(3) + "F" + f);
+    zeilen.push("G1Z" + (z0 + tiefe).toFixed(3) + "F" + f);
+    zeilen.push("G1X" + dmNachFase.toFixed(3) + "Z" + z0.toFixed(3) + "F" + ff);
+    if (rad > 0) {
+      zeilen.push("G2X" + Math.max(0, dmNachFase - 2 * abstand).toFixed(3)
+        + "Z" + z0.toFixed(3) + "R" + rad.toFixed(3) + "F" + ff);
+    }
+    zeilen.push("G1X-0.500F" + ff);
+    zeilen.push("G0X" + anfahrDm);
+  }
+
+  zeilen.push("G0X" + (dm + 4).toFixed(2) + "Z" + (z0 + laenge + ueber).toFixed(3));
+  return zeilen.join("\n");
+}
+
 function rechnerGcode(ziel) {
-  const text = baueGcode(gcode);
+  const text = gcode.ohneA ? baueGcodeEinfach(gcode) : baueGcode(gcode);
+  const fassung = gcode.ohneA
+    ? "Alle Punkte ausgerechnet — läuft auf jeder Steuerung"
+    : "Mit A- und R-Programmierung — kurz, braucht eine Steuerung, die das kennt";
 
   ziel.innerHTML = ''
     + '<section class="karte"><h2>Was soll gedreht werden?</h2>'
@@ -10760,6 +11059,12 @@ function rechnerGcode(ziel) {
     + '<label class="schalter"><input type="checkbox" id="g-radan"'
     + (gcode.radienAn ? " checked" : "") + '>'
     + '<span>Übergänge verrunden</span></label>'
+
+    // Manche Steuerungen kennen ",A" und ",R" nicht. Dann rechnet
+    // die App jeden Punkt aus und gibt reine G1- und G2-Sätze aus.
+    + '<label class="schalter"><input type="checkbox" id="g-ohnea"'
+    + (gcode.ohneA ? " checked" : "") + '>'
+    + '<span>Ohne A-Programmierung, alle Punkte ausgerechnet</span></label>'
     + (gcode.radienAn
       ? '<label class="feld"><span>Radius in mm</span>'
         + '<input type="number" id="g-radius" step="0.05" value="' + esc(gcode.radius) + '"></label>'
@@ -10778,6 +11083,7 @@ function rechnerGcode(ziel) {
 
     + '<section class="karte"><div class="karte__kopf"><h2>Programm</h2>'
     + '<button class="linkknopf" id="g-kopieren">Kopieren</button></div>'
+    + '<p class="klein">' + esc(fassung) + '</p>'
     + '<pre class="gcode">' + esc(text) + '</pre>'
     + '<p class="hinweis">Fanuc-Schreibweise mit Winkel- und Radiusangaben. '
     + 'Bitte vor dem ersten Lauf am Simulator prüfen. Werkzeugaufruf, Drehzahl und '
@@ -10796,6 +11102,9 @@ function rechnerGcode(ziel) {
   ziel.querySelectorAll("[data-gr]").forEach((el) => {
     el.onclick = () => { gcode.richtung = el.dataset.gr; rechnerGcode(ziel); };
   });
+
+  const ohneA = document.getElementById("g-ohnea");
+  if (ohneA) ohneA.onchange = () => { gcode.ohneA = ohneA.checked; rechnerGcode(ziel); };
 
   const radAn = document.getElementById("g-radan");
   if (radAn) radAn.onchange = () => { gcode.radienAn = radAn.checked; rechnerGcode(ziel); };
@@ -11097,7 +11406,7 @@ async function bestOffen(ziel, b, bereich) {
   const zeileHtml = (z) => {
     const a2 = z.articles || {};
     const spaet = z.needed_by && z.needed_by < heute;
-    return '<tr><td class="bz-artikel">'
+    return '<tr' + (spaet ? ' class="bz-zeile--spaet"' : "") + '><td class="bz-artikel">'
       + '<strong>' + esc(a2.article_number || "?") + '</strong> ' + esc(a2.name || "")
       + '<button class="kopiersymbol" data-bkopie="' + esc(a2.article_number || "")
       + '" title="Artikelnummer kopieren">'
@@ -11109,11 +11418,15 @@ async function bestOffen(ziel, b, bereich) {
       + '</svg></button>'
       + (a2.description ? '<div class="klein bz-beschreibung">' + esc(a2.description)
           + '</div>' : "")
+      // Wohin die Ware nach dem Eintreffen soll — direkt am Artikel,
+      // damit man es beim Auspacken sofort sieht
+      + (z.ziel_text
+          ? '<div class="bz-ziel">zu ' + zielZeichen(z.ziel_art) + ' '
+            + esc(z.ziel_text) + '</div>' : "")
       + '<div class="klein">'
-      + (z.needed_by ? '<span class="' + (spaet ? "minus stark" : "") + '">bis '
-          + kurzDatum(z.needed_by) + '</span>' : "")
+      + (z.needed_by ? '<span class="' + (spaet ? "bz-spaet" : "") + '">bis '
+          + kurzDatum(z.needed_by) + (spaet ? " · überfällig" : "") + '</span>' : "")
       + (z.note ? ' · ' + esc(z.note) : "")
-      + (z.ziel_text ? ' · ' + zielZeichen(z.ziel_art) + ' ' + esc(z.ziel_text) : "")
       + ' · von ' + esc((z.profiles && (z.profiles.full_name || z.profiles.email)) || "unbekannt")
       + '</div></td>'
       + '<td class="bz-menge stark">' + zahlText(z.quantity) + '</td>'
@@ -11140,7 +11453,9 @@ async function bestOffen(ziel, b, bereich) {
   ziel.innerHTML = '<div class="suchleiste">'
     + '<input type="search" id="bo-suche" placeholder="Suchen"'
     + ' value="' + esc(best.offenSuche) + '" autocomplete="off"></div>'
-    + (darfSchreiben()
+    // Neue Positionen entstehen im Reiter Offen. In Bestellt und
+    // Teilweise geliefert wäre der Knopf nur verwirrend.
+    + (darfSchreiben() && bereich === "offen"
       ? '<button class="knopf knopf--haupt knopf--breit" id="b-neu">+ Neue Position</button>' : "")
 
     + bloecke.map((bl) => {
@@ -12393,6 +12708,13 @@ function bestellungDrucken(lieferant, posten) {
     jetzt.getFullYear(),
     kuerzel].filter((x) => x).join("_");
 
+
+  // Nur Empfänger und Betreff. Text und Signatur kommen aus dem
+  // Schnellbaustein in Outlook — von hier aus liesse sich ohnehin
+  // nur reiner Text mitgeben, ohne Logo und ohne Verlinkung.
+  const mailAdresse = "mailto:"
+    + encodeURIComponent((lieferant && lieferant.email) || "")
+    + "?subject=" + encodeURIComponent("Bestellung " + heuteText + " – Hofer + Co.");
   const fenster = window.open("", "_blank");
   if (!fenster) {
     meldung("Das Fenster wurde blockiert. Bitte Pop-ups für diese Seite erlauben.", "warn");
@@ -12448,7 +12770,9 @@ function bestellungDrucken(lieferant, posten) {
     ".leiste button { font: inherit; font-size: 10pt; padding: 7px 14px; cursor: pointer;",
     "                 border: 1px solid #003884; background: #003884; color: #fff;",
     "                 border-radius: 6px; }",
-    "@media print { .leiste { display: none; }",
+    ".mailhinweis { max-width: 210mm; margin: 6mm auto 0; padding: 0 4mm;",
+    "               color: #55606e; font-size: 9.5pt; line-height: 1.5; }",
+    "@media print { .leiste, .mailhinweis { display: none; }",
     "  body { background: #fff; }",
     "  .blatt { margin: 0; box-shadow: none; min-height: auto; } }",
   ].join("");
@@ -12517,7 +12841,12 @@ function bestellungDrucken(lieferant, posten) {
     + '<style>' + stil + '</style></head><body>'
 
     + '<div class="leiste">'
+    + '<button onclick="window.print()">Drucken</button>'
     + '<button onclick="window.print()">Als PDF speichern</button>'
+    + (lieferant && lieferant.email
+        ? '<button onclick="location.href=' + esc(JSON.stringify(mailAdresse))
+          + '">Per Mail</button>'
+        : "")
     // Läuft die App im Vollbild, gibt es keine Leiste zum Schliessen.
     // Klappt window.close() nicht, kommt ein Hinweis statt nichts.
     + '<button onclick="window.close();setTimeout(function(){'
@@ -12526,6 +12855,10 @@ function bestellungDrucken(lieferant, posten) {
     + 'Bitte über den Tab schliessen.</p>\';},400)">Schliessen</button>'
     + '</div>'
 
+    + (lieferant && lieferant.email
+        ? '<p class="mailhinweis">Per Mail öffnet Outlook mit Empfänger und Betreff. '
+          + 'Text und Signatur kommen aus dem Schnellbaustein, die Bestellung vorher '
+          + 'als PDF speichern und anhängen.</p>' : "")
     + '<div class="blatt">'
 
     + '<div class="balken">'
@@ -16078,6 +16411,8 @@ function zeichneGeruest() {
   document.body.classList.toggle("dunkel", einstellung("dunkel"));
   // Administratoren sehen den Pad-Knopf auf jedem Gerät
   document.body.classList.toggle("ist-admin", istAdmin());
+  // Steuert die Touch-Freigabe auf der Planwand
+  document.body.classList.toggle("tippgeraet", istTippgeraet());
   if (einstellung("navschmal")) document.body.classList.add("nav--schmal");
 
   const anzeige = (profil && (profil.full_name || profil.email)) || "";
