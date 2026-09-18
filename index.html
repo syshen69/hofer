@@ -2658,6 +2658,12 @@ body.pad-offen { overflow: hidden; }
 .pad__dateikopf { display: flex; gap: 8px; padding: 8px 14px; flex: none; }
 .pad__datei iframe { flex: 1; width: 100%; border: 0; background: #fff; }
 .pad-knopf--klein { font-size: .9rem; padding: 9px 16px; }
+/* Das Entfernen-Kreuz gehört neben "Ansehen", nicht darunter */
+.dialog--auftrag .pdfreihe { flex-wrap: nowrap; align-items: stretch; }
+.dialog--auftrag .pdfreihe .knopf { flex: 1 1 auto; min-width: 0; }
+.dialog--auftrag .pdfreihe .knopf--gefahr,
+.dialog--auftrag .pdfreihe .bildknopf { flex: 0 0 auto; }
+.dialog--auftrag .pdfreihe .knopf--gefahr { padding-left: 12px; padding-right: 12px; }
 </style>
 </head>
 <body>
@@ -2706,7 +2712,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "55.1.0";
+const APP_VERSION = "55.3.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -7599,6 +7605,19 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
       if (!fehler && neuerSatz) {
         plan.auftraege.push(Object.assign({}, daten, { id: neuerSatz.id }));
         festId = neuerSatz.id;
+
+        // Für eine neue HOCO Nr. gleich einen Stammdatenplatz anlegen.
+        // Vorher entstand er erst, wenn jemand den Reiter HOCO Nr.
+        // geöffnet hat — bis dahin fand das Einrichtblatt nichts.
+        try {
+          await db.from("hoco_parts").upsert([{
+            hoco_nr: nr,
+            material_groesse: groesseBauen(daten.material_dm, daten.material_toleranz)
+              || null,
+            material: daten.material_menge || null,
+            zeichnung_url: daten.drawing_url || null,
+          }], { onConflict: "hoco_nr", ignoreDuplicates: true });
+        } catch (f) { /* die Nummer kommt spätestens im HOCO-Reiter dazu */ }
       }
     }
 
@@ -7649,8 +7668,11 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
       }
     }
 
-    // Für das Zurücknehmen den ganzen Datensatz sichern
+    // Für das Zurücknehmen den ganzen Datensatz sichern — samt der
+    // erfassten Stückzahlen. Die hingen bisher nur am Auftrag und
+    // waren nach dem Zurücknehmen weg.
     const sicherung = await db.from("jobs").select("*").eq("id", auftrag.id).single();
+    const zahlen = await db.from("production_records").select("*").eq("job_id", auftrag.id);
 
     await db.from("production_records").delete().eq("job_id", auftrag.id);
     const { error } = await db.from("jobs").delete().eq("id", auftrag.id);
@@ -7673,11 +7695,36 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
           for (const v of vorherNachrueck) {
             await db.from("jobs").update({ planned_from: v.von }).eq("id", v.id);
           }
-          await db.from("jobs").insert(sicherung.data);
+
+          const zurueckJob = await db.from("jobs").insert(sicherung.data);
+          if (zurueckJob.error) {
+            meldung("Der Auftrag liess sich nicht zurückholen: "
+              + fehlertext(zurueckJob.error), "fehler");
+            return;
+          }
+
+          // Erst der Auftrag, dann die Zahlen — sie zeigen auf ihn.
+          // upsert statt insert: steht auf derselben Maschine am
+          // selben Tag inzwischen ein anderer Eintrag, würde ein
+          // reines insert daran scheitern und die Zahlen wären weg.
+          if ((zahlen.data || []).length) {
+            const zurueckZahlen = await db.from("production_records")
+              .upsert(zahlen.data, { onConflict: "machine_id,record_date" });
+            if (zurueckZahlen.error) {
+              meldung("Der Auftrag ist zurück, die Stückzahlen nicht: "
+                + fehlertext(zurueckZahlen.error), "fehler");
+            } else {
+              meldung("Auftrag und " + zahlen.data.length
+                + " Stückzahleinträge zurückgeholt.");
+            }
+          }
           planAktualisieren(b);
         });
       }
-      meldung("Auftrag gelöscht. Mit Strg+Z zurücknehmen.");
+      meldung((zahlen.data || []).length
+        ? "Auftrag und " + (zahlen.data || []).length
+          + " Stückzahleinträge gelöscht. Mit Strg+Z zurücknehmen."
+        : "Auftrag gelöscht. Mit Strg+Z zurücknehmen.");
       planAktualisieren(b);
     }
   };
