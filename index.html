@@ -2690,10 +2690,6 @@ body.dunkel tr.bz-zeile--spaet td { background: rgba(255,90,80,.12); }
              box-shadow: 0 10px 40px rgba(0,0,0,.45); }
 .pad__start .pad__kacheln { flex: none; width: min(700px, 100%); padding: 0; }
 
-.pad-kachel--bild { padding: 0; overflow: hidden; gap: 0; min-height: 150px; }
-.pad-kachel--bild img { width: 100%; height: 96px; object-fit: cover; display: block;
-                        opacity: .85; }
-.pad-kachel--bild span { padding: 14px 10px; }
 
 .pad__titel--links { text-align: left; flex: none; font-size: 1.15rem; }
 .pad__nr { color: #8b95a3; font-weight: 500; font-size: .92rem; }
@@ -2802,6 +2798,11 @@ body.dunkel tr.bz-zeile--spaet td { background: rgba(255,90,80,.12); }
 /* Regler für die Zeilenhöhe */
 .pw-zoom--hoehe input[type="range"] { max-width: 120px; }
 #pw-hoehewert { min-width: 42px; text-align: right; }
+/* Die beiden Balkenzeilen dicht aneinander — der Abstand kam von
+   der Zeilenhöhe und vom gap der ersten Zeile, beides zurückgenommen */
+.pw-balken__inhalt { gap: 0 !important; line-height: 1.05; }
+.pw-zeile1 { line-height: 1.05; margin: 0; }
+.pw-zeile2 { line-height: 1.05; margin: -1px 0 0; }
 </style>
 </head>
 <body>
@@ -2850,7 +2851,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "56.2.0";
+const APP_VERSION = "60.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -8743,11 +8744,10 @@ async function padPlanwand(h) {
 async function padParks(h) {
   const parks = await ladeParks(false);
   h.innerHTML = padKopf("Maschinenparks", true)
+    + '<img class="pad__bildoben" src="./login.png" alt="Hofer + Co.">'
     + '<div class="pad__kacheln">'
     + (parks.length
-      ? parks.map((p) => '<button class="pad-kachel pad-kachel--bild" data-park="'
-          + esc(p.id) + '">'
-          + '<img src="./login.png" alt="">'
+      ? parks.map((p) => '<button class="pad-kachel" data-park="' + esc(p.id) + '">'
           + '<span>' + esc(p.name) + '</span></button>').join("")
       : '<p class="pad__leer">Keine Parks angelegt.</p>')
     + '</div>';
@@ -13200,7 +13200,9 @@ async function seiteEinstellungen(b) {
         + '<button class="knopf" id="pin-speichern">Pin speichern</button></section>'
       : "")
     + '<section class="karte"><h2>Über die App</h2>'
-    + '<p class="klein">Version ' + esc(APP_VERSION) + ' · angemeldet als ' + esc(ich.email || "") + '</p></section>';
+    + '<p class="klein">Version ' + esc(APP_VERSION) + ' · angemeldet als '
+    + esc(ich.email || "")
+    + ' · <span id="dateistand">Dateistand wird geprüft …</span></p></section>';
 
   const teilFarben = () =>
     '<section class="karte"><h2>Farben und Material</h2>'
@@ -13251,6 +13253,25 @@ async function seiteEinstellungen(b) {
         : einst.reiter === "nutzer" ? teilNutzer()
         : teilAllgemein())
     + '</div>';
+
+  // Zeigt, welche Datei der Server gerade ausliefert. Damit lässt
+  // sich unterscheiden, ob ein Upload nicht angekommen ist oder ob
+  // der Browser eine alte Fassung festhält.
+  const standFeld = b.querySelector("#dateistand");
+  if (standFeld) {
+    (async () => {
+      try {
+        const r = await fetch("./index.html?stand=" + Date.now(),
+          { method: "HEAD", cache: "no-store" });
+        const wann = r.headers.get("last-modified");
+        standFeld.textContent = wann
+          ? "Datei vom " + new Date(wann).toLocaleString("de-CH")
+          : "Dateistand unbekannt";
+      } catch (f) {
+        standFeld.textContent = "Dateistand nicht abrufbar";
+      }
+    })();
+  }
 
   // Reiter wechseln
   b.querySelectorAll("[data-einst]").forEach((el) => {
