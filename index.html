@@ -2827,6 +2827,30 @@ body.dunkel tr.bz-zeile--spaet td { background: rgba(255,90,80,.12); }
 .pw-tafel--flach .pw-balken__planer { font-size: 8.5px; }
 .pw-tafel--flach .pw-balken__fehlt,
 .pw-tafel--flach .pw-balken__zeichen { display: none; }
+/* ---------- Balken ohne Rahmen, volle Zeilenhöhe ----------
+   Die Schicht sass mit ein paar Pixeln Abstand in der Zeile und die
+   Balken hatten einen Rand. Beides weg: der Balken füllt die Zeile
+   aus, und der gewonnene Platz gehört dem Text. */
+.pw-balken-schicht { inset: 0 !important; }
+.pw-balken { border: 0 !important; border-radius: 0 !important;
+             box-shadow: none !important;
+             padding-top: 0 !important; padding-bottom: 0 !important;
+             align-items: stretch; }
+/* Die Farbe bleibt als schmaler Streifen links stehen — sie ist die
+   einzige schnelle Materialkennung auf der Wand. */
+.pw-balken::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+                     width: 4px; background: var(--voll, #003884); }
+.pw-balken { position: relative; padding-left: 9px !important; }
+.pw-balken--laeuft { box-shadow: inset 0 0 0 2px rgba(0, 0, 0, .55) !important; }
+.pw-balken--offen::before { background: repeating-linear-gradient(
+    180deg, var(--voll, #003884) 0 4px, transparent 4px 8px); }
+
+/* Die beiden Textzeilen knapp nebeneinander, ohne sich zu berühren */
+.pw-balken__inhalt { justify-content: center; gap: 1px !important; }
+.pw-zeile1 { line-height: 1.12; margin: 0; }
+.pw-zeile2 { line-height: 1.12; margin: 0; }
+.pw-tafel--flach .pw-zeile2 { margin-top: 0; }
+.pw-tafel--flach .pw-balken__inhalt { gap: 0 !important; }
 </style>
 </head>
 <body>
@@ -2875,7 +2899,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "60.4.0";
+const APP_VERSION = "61.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
