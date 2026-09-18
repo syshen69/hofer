@@ -2799,6 +2799,9 @@ body.dunkel tr.bz-zeile--spaet td { background: rgba(255,90,80,.12); }
 @media (max-width: 900px) {
   .pad__sprungkacheln { grid-template-columns: repeat(2, 1fr); }
 }
+/* Regler für die Zeilenhöhe */
+.pw-zoom--hoehe input[type="range"] { max-width: 120px; }
+#pw-hoehewert { min-width: 42px; text-align: right; }
 </style>
 </head>
 <body>
@@ -5509,10 +5512,13 @@ function masseBerechnen(b) {
   // steht. Eng gefasst, damit die Schrift lesbar bleibt.
   plan.skala = Math.max(0.82, Math.min(1.1, plan.spalte / 44));
 
-  // Senkrechter Massstab bleibt fest. Sonst würden beim Verkürzen des
-  // Zeitraums die Zeilen mitwachsen und man sähe plötzlich weniger
-  // Maschinen — genau das soll nicht passieren.
-  plan.vskala = 1;
+  // Senkrechter Massstab hängt nur am eigenen Regler, nicht am
+  // Zeitraum. Sonst würden beim Verkürzen die Zeilen mitwachsen und
+  // man sähe plötzlich weniger Maschinen.
+  if (!plan.vskala) {
+    plan.vskala = (Number(einstellungWert("pwhoehe", 100)) || 100) / 100;
+  }
+  plan.vskala = Math.max(0.6, Math.min(1.8, plan.vskala));
 
   plan.knapp = plan.spalte < 30;
   plan.sehrKnapp = plan.spalte < 18;
@@ -5568,6 +5574,15 @@ async function ansichtPlanwand(ziel, b) {
     + (plan.tageWunsch || 15) + '">'
     + '<input type="number" id="pw-zoomwert" min="5" max="200" value="'
     + (plan.tageWunsch || 15) + '">'
+    + '</div>'
+    // Zeilenhöhe getrennt vom Zeitraum: wie viele Maschinen auf den
+    // Bildschirm passen, entscheidet dieser Regler.
+    + '<div class="pw-zoom pw-zoom--hoehe">'
+    + '<span class="klein">Höhe</span>'
+    + '<input type="range" id="pw-hoehe" min="60" max="180" step="5" value="'
+    + Math.round((plan.vskala || 1) * 100) + '">'
+    + '<span class="klein" id="pw-hoehewert">'
+    + Math.round((plan.vskala || 1) * 100) + ' %</span>'
     + '</div>'
     + '</div>'
     + '<div class="pw-eckknoepfe">'
@@ -5655,6 +5670,24 @@ async function ansichtPlanwand(ziel, b) {
   }
 
   const regler = document.getElementById("pw-regler");
+  const hoehe = document.getElementById("pw-hoehe");
+  if (hoehe) {
+    const zeigen = () => {
+      const w = Number(hoehe.value) / 100;
+      plan.vskala = w;
+      const tafel = document.querySelector(".pw-tafel");
+      if (tafel) tafel.style.setProperty("--pw-v", w.toFixed(2));
+      const anzeige = document.getElementById("pw-hoehewert");
+      if (anzeige) anzeige.textContent = hoehe.value + " %";
+    };
+    // Beim Ziehen sofort sehen, gespeichert wird erst beim Loslassen
+    hoehe.oninput = zeigen;
+    hoehe.onchange = () => {
+      zeigen();
+      einstellungSetzenWert("pwhoehe", Number(hoehe.value));
+    };
+  }
+
   const zahlfeld = document.getElementById("pw-zoomwert");
 
   const zoomSetzen = (wert) => {
@@ -6705,6 +6738,7 @@ function zeichnePlanwand(b) {
   document.getElementById("pw-inhalt").innerHTML =
     '<div class="pw-rolle"><div class="pw-tafel" style="--pw-tage:' + tage.length
     + ';--pw-s:' + (plan.skala || 1)
+    + ';--pw-v:' + (plan.vskala || 1).toFixed(2)
     + ';--pw-spalte:' + (plan.spalte || 40) + 'px'
     + ';--pw-name:' + (plan.namensbreite || 108) + 'px">'
     + '<div class="pw-kopfblock">' + monatZeile + kwZeile + kopf + '</div>'
