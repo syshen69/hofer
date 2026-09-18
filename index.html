@@ -2757,6 +2757,48 @@ body.dunkel tr.bz-zeile--spaet td { background: rgba(255,90,80,.12); }
   .pad-karte--klein { grid-column: span 1; }
   .pad__sprunge { justify-content: flex-start; }
 }
+/* ---------- Pad Mode: hell und dunkel ----------
+   Schwarz nur, wenn der dunkle Modus in den Einstellungen an ist. */
+.pad { --pfl: #ffffff; --pkarte: #f4f6f9; --prand: #d9dee5; --ptext: #16202c;
+       --pgedaempft: #5f6b7a; --pblau: #0b4fa8; --pblauhell: #e7f0fb;
+       background: var(--pfl); color: var(--ptext); }
+.pad--dunkel { --pfl: #0b0d10; --pkarte: #14181d; --prand: #262c34;
+               --ptext: #f2f4f7; --pgedaempft: #8b95a3; --pblau: #1268e0;
+               --pblauhell: #0e2e57; }
+.pad__kopf { border-bottom: 1px solid var(--prand); }
+.pad__zurueck, .pad__zu { color: var(--ptext); }
+.pad__laedt, .pad__leer, .pad__hinweis { color: var(--pgedaempft); }
+.pad-kachel { background: var(--pkarte); border-color: var(--prand); color: var(--ptext); }
+.pad-kachel__nr { color: var(--pgedaempft); }
+.pad-kachel__auftrag { color: var(--pblau); }
+.pad-kachel__zeichen { color: var(--pblau); }
+.pad-sprung { background: var(--pkarte); border-color: var(--prand); color: var(--ptext); }
+
+.pad__bildoben { display: block; width: min(420px, 70%); height: auto;
+                 margin: 16px auto 4px; border-radius: 12px; }
+
+/* Werte oben, Sprünge als Kacheln unten — zusammen füllen sie die Seite */
+.pad__raster { flex: 1 1 auto; grid-template-rows: 1fr; }
+.pad-karte { background: var(--pkarte); border-color: var(--prand); }
+.pad-karte--zahl { background: var(--pblauhell); border-color: var(--pblau); }
+.pad-karte__name { color: var(--pgedaempft); }
+.pad-karte__unten { color: var(--pgedaempft); }
+.pad-karte__wert--leer { color: var(--pgedaempft); }
+
+.pad__sprungkacheln { flex: 0 0 auto; display: grid; gap: 14px; padding: 0 16px 16px;
+                      grid-template-columns: repeat(5, 1fr); }
+.pad-sprungkachel { background: var(--pblau); border: 1px solid var(--pblau);
+                    color: #fff; border-radius: 18px; font: inherit;
+                    font-size: 1.15rem; font-weight: 700; padding: 26px 12px;
+                    cursor: pointer; }
+.pad-sprungkachel:active { filter: brightness(1.15); }
+.pad-sprungkachel--leer { background: var(--pkarte); border-color: var(--prand);
+                          color: var(--pgedaempft); }
+.pad__balken { background: var(--pkarte); border-color: var(--prand); }
+
+@media (max-width: 900px) {
+  .pad__sprungkacheln { grid-template-columns: repeat(2, 1fr); }
+}
 </style>
 </head>
 <body>
@@ -5477,6 +5519,7 @@ function masseBerechnen(b) {
 }
 
 async function seitePlanwand(b) {
+  plan.behaelter = b;
   if (plan.adminModus === false && einstellung("pwadmin")) plan.adminModus = true;
   // Diese Seite darf die ganze Fensterbreite nutzen.
   b.classList.add("inhalt--breit");
@@ -5901,9 +5944,7 @@ function balkenInfoVerhalten() {
 
       const zustand = PLANSTATUS[j.plan_status || "geplant"] || PLANSTATUS.geplant;
       const material = [];
-      material.push(j.material_dm
-        ? "Ø" + j.material_dm + (j.material_toleranz ? " " + j.material_toleranz : "")
-        : "Ø –");
+      material.push(j.material_bez || "Material –");
       material.push(j.material_menge || "Menge –");
       material.push(j.material_liefertermin ? "bis " + j.material_liefertermin : "Termin –");
 
@@ -5977,7 +6018,7 @@ function auftragText(j) {
     j.job_number, j.fa_nr, j.maschine, j.maschine_nr, j.park, j.material_bez,
     j.plan_note, j.problem, j.color,
     (PLANSTATUS[j.plan_status || "geplant"] || {}).name,
-    j.material_dm, j.material_toleranz, j.material_menge, j.material_liefertermin,
+    j.material_bez, j.material_menge, j.material_liefertermin,
     j.target_quantity, j.stand, j.planned_from,
     j.fa_erstellt ? "FA erstellt" : "FA fehlt",
     j.material_ok ? "Material vorhanden" : "Material fehlt",
@@ -6177,6 +6218,20 @@ function sucheLeisteZeigen(b, ziel) {
 
   const weiter = document.getElementById("su-weiter");
   if (weiter) weiter.onclick = () => sucheZumTreffer(plan.trefferNr + 1, b);
+
+  // Enter springt zum nächsten Treffer, Umschalt+Enter zurück.
+  // Gilt, solange die Suche läuft und kein Fenster offen ist.
+  if (!document._suTaste) {
+    document._suTaste = true;
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" || !plan.sucheAktiv) return;
+      if (document.querySelector(".dialog-huelle")) return;
+      const a = document.activeElement;
+      if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return;
+      e.preventDefault();
+      sucheZumTreffer(plan.trefferNr + (e.shiftKey ? -1 : 1), plan.behaelter);
+    });
+  }
   const zurueck = document.getElementById("su-zurueck");
   if (zurueck) zurueck.onclick = () => sucheZumTreffer(plan.trefferNr - 1, b);
   document.getElementById("su-ende").onclick = () => sucheBeenden();
@@ -6740,10 +6795,7 @@ function planBalken(j, spalte, dauer, angeschnitten, vorlaufTage, dauerWahr) {
   } else {
     const teile2 = [];
     if (j.target_quantity) teile2.push(zahlText(j.target_quantity) + " Stk");
-    if (j.material_dm) {
-      teile2.push("Ø" + j.material_dm
-        + (j.material_toleranz ? " " + j.material_toleranz : ""));
-    }
+
     zeileZwei = teile2.join("   ");
   }
 
@@ -7377,33 +7429,13 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     // Spalte 2: Material
     + '<div class="auf-spalte">'
     + '<div class="auf-blocktitel">Material</div>'
-    + '<div class="auf-zweier">'
-    + '<label class="feld"><span>Ø in mm</span>'
-    + '<input id="pl-dm" inputmode="decimal" type="number" step="0.1" min="0" value="'
-    + esc(auftrag && auftrag.material_dm !== null && auftrag.material_dm !== undefined
-        ? auftrag.material_dm
-        : (v && v.material_dm !== null && v.material_dm !== undefined ? v.material_dm : ""))
+    // Alles in einem Feld, so wie es an der Stange steht
+    + '<label class="feld"><span>Material</span>'
+    + '<input id="pl-mat-bez" type="text" list="pl-matliste" autocomplete="off"'
+    + ' placeholder="z. B. X10CrNiS18-9 rd 011 mm h8" value="'
+    + esc(auftrag ? (auftrag.material_bez || "") : (v ? (v.material_bez || "") : ""))
     + '"></label>'
-    + '<label class="feld"><span>Toleranz</span>'
-    + '<input id="pl-tol" type="text" list="pl-tol-liste" value="'
-    + esc(auftrag ? (auftrag.material_toleranz || "")
-        : (v ? (v.material_toleranz || "") : "")) + '">'
-    + '<datalist id="pl-tol-liste">'
-    + ['h6', 'h7', 'h8', 'h9', 'h10', 'h11', 'h12', 'h13'].map((t) =>
-        '<option value="' + t + '">').join("")
-    + '</datalist></label>'
-    + '</div>'
-    + '<label class="feld"><span>Materialbezeichnung</span>'
-    + '<input id="pl-mat-bez" type="text" list="pl-matliste" value="'
-    + esc(auftrag ? (auftrag.material_bez || "")
-        : (v ? (v.material_bez || "") : "")) + '"'
-    + (darf ? "" : " readonly") + ' placeholder="z. B. CW614N"></label>'
-    + '<datalist id="pl-matliste">'
-    + PLANFARBEN.map((fb) => {
-        const zu = FARBZUTEILUNG[fb.wert];
-        return zu && zu.material ? '<option value="' + esc(zu.material) + '">' : "";
-      }).join("")
-    + '</datalist>'
+    + '<div class="auf-zweier">'
     + '<label class="feld"><span>Menge vorhanden oder bestellt</span>'
     + '<input id="pl-menge-mat" type="text" value="'
     + esc(auftrag ? (auftrag.material_menge || "") : (v ? (v.material_menge || "") : ""))
@@ -7569,18 +7601,9 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
         if (stand) stand.textContent = "Zeichnung aus den Stammdaten übernommen";
       }
 
-      // Nur füllen, was noch leer ist — Eingetipptes bleibt stehen
-      const dmFeld = huelle.querySelector("#pl-dm");
-      const mengeFeld = huelle.querySelector("#pl-menge-mat");
-      const tolFeld = huelle.querySelector("#pl-tol");
-      const zerlegt = groesseZerlegen(teil.material_groesse);
-      if (zerlegt) {
-        if (dmFeld && !dmFeld.value) dmFeld.value = zerlegt.dm;
-        if (tolFeld && !tolFeld.value && zerlegt.toleranz) tolFeld.value = zerlegt.toleranz;
-      }
-      if (zerlegt && ((dmFeld && !dmFeld.value) || (tolFeld && !tolFeld.value))) {
-        uebernommen.push("Materialgrösse");
-      }
+      // Nur füllen, was noch leer ist — Eingetipptes bleibt stehen.
+      // Das Material steht in einem Feld, so wie es an der Stange
+      // steht: X10CrNiS18-9 rd 011 mm h8
       const bezFeld = huelle.querySelector("#pl-mat-bez");
       if (bezFeld && !bezFeld.value && teil.material) {
         bezFeld.value = teil.material;
@@ -7604,7 +7627,7 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
         }
       }
 
-      nrInfo.textContent = [teil.bezeichnung, teil.material, teil.material_groesse,
+      nrInfo.textContent = [teil.bezeichnung, teil.material,
         teil.zeichnungs_nr ? "Zeichnung " + teil.zeichnungs_nr : ""]
         .filter((x) => x).join(" · ")
         + (uebernommen.length ? "  ·  übernommen: " + uebernommen.join(", ") : "");
@@ -7749,8 +7772,6 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
       geplant_von: gewaehltePlaner.length ? gewaehltePlaner.join("/") : null,
       fa_erstellt: $("pl-fa").checked,
       material_ok: $("pl-material").checked,
-      material_dm: $("pl-dm").value === "" ? null : Number($("pl-dm").value),
-      material_toleranz: ($("pl-tol").value || "").trim() || null,
       material_bez: (($("pl-mat-bez") || {}).value || "").trim() || null,
       material_menge: ($("pl-menge-mat").value || "").trim() || null,
       material_liefertermin: $("pl-liefer").value || null,
@@ -7810,8 +7831,7 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
         try {
           await db.from("hoco_parts").upsert([{
             hoco_nr: nr,
-            material_groesse: groesseBauen(daten.material_dm, daten.material_toleranz)
-              || null,
+
             material: daten.material_menge || null,
             zeichnung_url: daten.drawing_url || null,
           }], { onConflict: "hoco_nr", ignoreDuplicates: true });
@@ -7830,13 +7850,10 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
         const alt = await db.from("hoco_parts").select("*")
           .eq("hoco_nr", hocoNummer).limit(1);
         const teilJetzt = (alt.data || [])[0];
-        const groesse = groesseBauen(daten.material_dm, daten.material_toleranz);
-
         if (!teilJetzt) {
           await db.from("hoco_parts").upsert([{
             hoco_nr: hocoNummer,
             material: daten.material_bez || null,
-            material_groesse: groesse || null,
             zeichnung_url: daten.drawing_url || null,
           }], { onConflict: "hoco_nr", ignoreDuplicates: true });
         } else {
@@ -7844,7 +7861,6 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
           if (!teilJetzt.material && daten.material_bez) {
             nach.material = daten.material_bez;
           }
-          if (!teilJetzt.material_groesse && groesse) nach.material_groesse = groesse;
           if (!teilJetzt.zeichnung_url && daten.drawing_url) {
             nach.zeichnung_url = daten.drawing_url;
           }
@@ -8564,7 +8580,7 @@ async function ladeHoco(suche) {
 async function ladeHocoAusAuftraegen() {
   const { data, error } = await zeitlimit(
     db.from("jobs")
-      .select("job_number, material_dm, material_toleranz, material_menge, drawing_url")
+      .select("job_number, material_bez, drawing_url")
       .order("created_at", { ascending: false }).limit(1000),
     12000, "Aufträge");
   if (error) throw error;
@@ -8580,8 +8596,7 @@ async function ladeHocoAusAuftraegen() {
 
 // Aus Durchmesser und Toleranz des Auftrags wird die Materialgrösse
 function groesseAusAuftrag(j) {
-  if (!j || !j.material_dm) return "";
-  return groesseBauen(j.material_dm, j.material_toleranz);
+  return (j && j.material_bez) || "";
 }
 
 async function ladeBlaetter(hocoNr) {
@@ -8802,15 +8817,8 @@ async function padMaschine(h) {
         ? ' <span class="pad__nr">' + esc(m.machine_number) + '</span>' : "")
     + '</span>'
     + '<div class="pad__sprunge">'
-    + (pad.reiter === "uebersicht" ? "" : sprung("uebersicht", "Übersicht", true))
-    + sprung("zeichnung", "Zeichnung", !!zeichnung)
-    + sprung("wbg", "WBG", !!wbg)
-    + sprung("blatt", "Einrichtblatt", !!(j && m.type_id))
-    + sprung("wechsel", "Wechsel", !!m.type_id)
-    + sprung("historie", "Historie", true)
     + (datei
-        ? '<span class="pad__trenner"></span>'
-          + '<button class="pad-sprung" data-paddruck>Drucken</button>'
+        ? '<button class="pad-sprung" data-paddruck>Drucken</button>'
           + '<button class="pad-sprung" data-padspeichern>Speichern</button>'
           + '<button class="pad-sprung" data-padtab>Neuer Tab</button>'
         : "")
@@ -8833,11 +8841,20 @@ async function padMaschine(h) {
         unten: j && j.target_quantity ? "von " + zahlText(j.target_quantity) : "",
         tipp: j ? "stand" : "" }, "zahl")
     + kachel("Material", { text: (j && j.material_bez) || (teil ? teil.material : ""),
-        unten: j && j.material_dm
-          ? "Ø" + j.material_dm + (j.material_toleranz ? " " + j.material_toleranz : "")
-          : (teil ? teil.material_groesse : "") }, "breit")
+        unten: "" }, "breit")
     + kachel("Programm", { text: programm }, "klein")
-    + kachel("FA Nr.", { text: j ? j.fa_nr : "" }, "klein")
+    + '</div>'
+
+    // Die Sprünge als grosse Kacheln — mit dem Finger gut zu treffen
+    + '<div class="pad__sprungkacheln">'
+    + [["zeichnung", "Zeichnung", !!zeichnung],
+       ["wbg", "WBG", !!wbg],
+       ["blatt", "Einrichtblatt", !!(j && m.type_id)],
+       ["wechsel", "Werkzeugwechsel", !!m.type_id],
+       ["historie", "Historie", true]]
+      .map(([wert, text, da]) => '<button class="pad-sprungkachel'
+        + (da ? "" : " pad-sprungkachel--leer") + '" data-padreiter="' + wert + '">'
+        + text + '</button>').join("")
     + '</div>'
     + (j && j.target_quantity
         ? '<div class="pad__balken"><div class="pad__balken__fuellung" style="width:'
@@ -9202,7 +9219,7 @@ async function stammdatenAufPlanwand() {
 
   const offen = (plan.auftraege || []).filter((j) => j.job_number
     && ["geplant", "ruesten"].indexOf(j.plan_status || "geplant") !== -1
-    && (!j.material_dm || !j.material_toleranz || !j.material_bez || !j.drawing_url));
+    && (!j.material_bez || !j.drawing_url));
   if (!offen.length) return 0;
 
   const nummern = [...new Set(offen.map((j) => j.job_number))];
@@ -9223,11 +9240,6 @@ async function stammdatenAufPlanwand() {
     if (!t) continue;
 
     const neu = {};
-    const g = groesseZerlegen(t.material_groesse);
-    if (g) {
-      if (!j.material_dm) neu.material_dm = g.dm;
-      if (!j.material_toleranz && g.toleranz) neu.material_toleranz = g.toleranz;
-    }
     if (!j.material_bez && t.material) neu.material_bez = t.material;
     if (!j.drawing_url && t.zeichnung_url) neu.drawing_url = t.zeichnung_url;
     if (!Object.keys(neu).length) continue;
@@ -9267,7 +9279,6 @@ async function blattHolenOderAnlegen(hocoNr, typId, jobId, maschineId) {
     job_id: jobId || null, machine_id: maschineId || null,
     bezeichnung: teil ? teil.bezeichnung : null,
     material: teil ? teil.material : null,
-    material_groesse: teil ? teil.material_groesse : null,
     zeichnungs_nr: teil ? teil.zeichnungs_nr : null,
     infos: teil ? teil.infos : null,
   };
@@ -9395,7 +9406,7 @@ function blattFensterStand(stand) {
     + ". So wurde damals gearbeitet — nicht änderbar.</p>"
     + '<table class="tabelle tabelle--kopf"><tbody>'
     + feld("Artikelbezeichnung", kopf.bezeichnung)
-    + feld("Material", [kopf.material, kopf.material_groesse].filter((x) => x).join(" · "))
+    + feld("Material", kopf.material)
     + feld("Programm Nr.", kopf.programm_nr)
     + feld("Stückzeit", kopf.stueckzeit_s ? kopf.stueckzeit_s + " Sek./Stk." : "")
     + feld("Abgreifzange", kopf.abgreifzange)
@@ -9466,7 +9477,7 @@ async function blattFenster(blatt) {
 
       + '<table class="tabelle tabelle--kopf"><tbody>'
       + kopfFeld("Artikelbezeichnung", blatt.bezeichnung)
-      + kopfFeld("Material", [blatt.material, blatt.material_groesse].filter((x) => x).join(" · "))
+      + kopfFeld("Material", blatt.material)
       + kopfFeld("Programm Nr.", blatt.programm_nr)
       + kopfFeld("Stückzeit", blatt.stueckzeit_s ? blatt.stueckzeit_s + " Sek./Stk." : "")
       + kopfFeld("Maschinenlaufzeit", blatt.laufzeit_min ? blatt.laufzeit_min + " Min." : "")
@@ -9509,7 +9520,6 @@ async function blattFenster(blatt) {
         felder: [
           { name: "bez", label: "Artikelbezeichnung", wert: blatt.bezeichnung || "" },
           { name: "mat", label: "Material", wert: blatt.material || "" },
-          { name: "groesse", label: "Materialgrösse", wert: blatt.material_groesse || "" },
           { name: "prog", label: "Programm Nr.", wert: blatt.programm_nr || "" },
           { name: "zeit", label: "Stückzeit in Sekunden", typ: "number",
             wert: blatt.stueckzeit_s || "" },
@@ -9521,7 +9531,6 @@ async function blattFenster(blatt) {
       if (!w) return;
       const daten = {
         bezeichnung: w.bez || null, material: w.mat || null,
-        material_groesse: w.groesse || null,
         programm_nr: w.prog || null,
         stueckzeit_s: w.zeit === "" || w.zeit === undefined ? null : Number(w.zeit),
         laufzeit_min: w.lauf === "" || w.lauf === undefined ? null : Number(w.lauf),
@@ -9612,7 +9621,7 @@ async function ansichtHoco(ziel, b) {
       if (fehlen.length && darf) {
         const neuZeilen = fehlen.map((nr) => ({
           hoco_nr: nr,
-          material_groesse: groesseAusAuftrag(ausPlan[nr]) || null,
+          material: groesseAusAuftrag(ausPlan[nr]) || null,
           zeichnung_url: ausPlan[nr].drawing_url || null,
         }));
         const r = await db.from("hoco_parts")
@@ -9676,7 +9685,6 @@ async function ansichtHoco(ziel, b) {
       + '<table class="tabelle"><tbody>'
       + [["Artikelbezeichnung", t.bezeichnung],
          ["Material", t.material],
-         ["Materialgrösse", t.material_groesse],
          ["Zeichnungs Nr.", t.zeichnungs_nr],
          ["Allgemeine Infos", t.infos]]
         .map(([k, v]) => '<tr><td class="klein">' + k + '</td><td>'
@@ -9866,7 +9874,7 @@ async function ansichtHoco(ziel, b) {
       // Am Auftrag steht nur die Grösse. Die Materialart gehört an
       // die HOCO Nr. und wird dort einmal hinterlegt.
       material: "",
-      material_groesse: groesseAusAuftrag(ausPlan[nr]),
+      material: groesseAusAuftrag(ausPlan[nr]),
     }));
 
   const alle = teile.concat(nurPlan)
@@ -9881,7 +9889,7 @@ async function ansichtHoco(ziel, b) {
         ? '<span class="gedaempft">noch nicht hinterlegt</span>'
         : esc(t.bezeichnung || "")) + '</td>'
     + '<td' + (t.ohneStamm ? ' class="gedaempft"' : "") + '>'
-    + esc([t.material, t.material_groesse].filter((x) => x).join(" · ")) + '</td>'
+          + esc(t.material || "") + '</td>'
     + '<td class="rechts nowrap">'
     + (darf
         ? (t.ohneStamm
@@ -10049,7 +10057,7 @@ async function ansichtHoco(ziel, b) {
       // Durchmesser, Material und Zeichnung kommen aus dem Auftrag
       const w = await hocoDialog(null, {
         hoco_nr: nr,
-        material_groesse: groesseAusAuftrag(j),
+        material: groesseAusAuftrag(j),
         zeichnung_url: j.drawing_url || null,
       });
       if (w) neuLaden();
@@ -10093,10 +10101,8 @@ async function hocoDialog(teil, vorgabe) {
       { name: "bez", label: "Artikelbezeichnung", wert: teil ? (teil.bezeichnung || "") : "" },
       { name: "mat", label: "Material",
         wert: teil ? (teil.material || "") : (v.material || ""),
-        platzhalter: "z. B. CW400J" },
-      { name: "groesse", label: "Materialgrösse",
-        wert: teil ? (teil.material_groesse || "") : (v.material_groesse || ""),
-        platzhalter: "z. B. Ø20h9" },
+        platzhalter: "z. B. X10CrNiS18-9 rd 011 mm h8",
+        hinweis: "Alles in einem Feld, so wie es an der Stange steht" },
       { name: "zeichnung", label: "Zeichnungs Nr.", wert: teil ? (teil.zeichnungs_nr || "") : "" },
       { name: "infos", label: "Allgemeine Infos", wert: teil ? (teil.infos || "") : "" },
     ], bestaetigen: teil ? "Speichern" : "Anlegen" });
@@ -10105,7 +10111,6 @@ async function hocoDialog(teil, vorgabe) {
   const daten = {
     bezeichnung: w.bez || null,
     material: w.mat || null,
-    material_groesse: w.groesse || null,
     zeichnungs_nr: w.zeichnung || null,
     infos: w.infos || null,
   };
@@ -10133,14 +10138,13 @@ async function hocoDialog(teil, vorgabe) {
 
   if (error) { meldung(fehlertext(error), "fehler"); return false; }
 
-  // Die Grösse auf die Aufträge übertragen, die noch nicht laufen.
+  // Das Material auf die Aufträge übertragen, die noch nicht laufen.
   // Was läuft oder fertig ist, bleibt so, wie es damals war —
   // sonst würde sich Vergangenes rückwirkend ändern.
   let nachgezogen = 0;
-  const g = groesseZerlegen(daten.material_groesse);
-  if (g) {
+  if (daten.material) {
     const u = await db.from("jobs")
-      .update({ material_dm: g.dm, material_toleranz: g.toleranz })
+      .update({ material_bez: daten.material })
       .eq("job_number", nummer)
       .is("ended_at", null)
       .in("plan_status", ["geplant", "ruesten"])
