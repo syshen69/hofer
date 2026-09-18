@@ -2798,11 +2798,35 @@ body.dunkel tr.bz-zeile--spaet td { background: rgba(255,90,80,.12); }
 /* Regler für die Zeilenhöhe */
 .pw-zoom--hoehe input[type="range"] { max-width: 120px; }
 #pw-hoehewert { min-width: 42px; text-align: right; }
-/* Die beiden Balkenzeilen dicht aneinander — der Abstand kam von
-   der Zeilenhöhe und vom gap der ersten Zeile, beides zurückgenommen */
-.pw-balken__inhalt { gap: 0 !important; line-height: 1.05; }
-.pw-zeile1 { line-height: 1.05; margin: 0; }
-.pw-zeile2 { line-height: 1.05; margin: -1px 0 0; }
+/* Die beiden Balkenzeilen so dicht wie möglich. Die Zeilenhöhe
+   sitzt knapp unter eins — darunter würden Unterlängen wie beim g
+   abgeschnitten. Der Rest kommt über den negativen Abstand. */
+.pw-balken__inhalt { gap: 0 !important; line-height: 1; }
+.pw-zeile1 { line-height: 1; margin: 0; padding: 0; }
+.pw-zeile2 { line-height: 1; margin: -2px 0 0; padding: 0; }
+.pw-balken__nr { line-height: 1; }
+/* ---------- Balkentext bei jeder Zeilenhöhe lesbar ----------
+   Die Schrift folgt dem kleineren der beiden Massstäbe, damit sie
+   bei niedrigen Zeilen nicht aus dem Balken läuft. Nach unten ist
+   sie begrenzt, sonst wäre sie nicht mehr zu entziffern. */
+.pw-tafel { --pw-t: min(var(--pw-s, 1), var(--pw-v, 1)); }
+.pw-zeile1 { font-size: max(9.5px, calc(0.82rem * var(--pw-t))); }
+.pw-zeile2 { font-size: max(9px, calc(0.74rem * var(--pw-t))); }
+.pw-balken__nr { font-size: inherit; }
+.pw-balken__planer { font-size: max(8.5px, calc(0.7rem * var(--pw-t))); }
+.pw-balken__statusgross { font-size: max(12px, calc(1.35rem * var(--pw-v, 1))); }
+.pw-balken__fehlt { font-size: max(8px, calc(0.6rem * var(--pw-t))); }
+
+/* Auch bei flachen Zeilen bleiben beide Textzeilen stehen. Dafür
+   rücken Polster und Schrift zusammen, statt eine Zeile zu opfern. */
+.pw-tafel--flach .pw-balken { padding-top: 0; padding-bottom: 0; }
+.pw-tafel--flach .pw-balken__aussen { gap: 3px; }
+.pw-tafel--flach .pw-zeile1 { font-size: 9.5px; }
+.pw-tafel--flach .pw-zeile2 { font-size: 8.5px; margin-top: -2px; }
+.pw-tafel--flach .pw-balken__statusgross { font-size: 13px; }
+.pw-tafel--flach .pw-balken__planer { font-size: 8.5px; }
+.pw-tafel--flach .pw-balken__fehlt,
+.pw-tafel--flach .pw-balken__zeichen { display: none; }
 </style>
 </head>
 <body>
@@ -2851,7 +2875,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "60.1.0";
+const APP_VERSION = "60.4.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -5677,7 +5701,11 @@ async function ansichtPlanwand(ziel, b) {
       const w = Number(hoehe.value) / 100;
       plan.vskala = w;
       const tafel = document.querySelector(".pw-tafel");
-      if (tafel) tafel.style.setProperty("--pw-v", w.toFixed(2));
+      if (tafel) {
+        tafel.style.setProperty("--pw-v", w.toFixed(2));
+        // Unter 80 Prozent bleibt nur Platz für eine Textzeile
+        tafel.classList.toggle("pw-tafel--flach", w < 0.8);
+      }
       const anzeige = document.getElementById("pw-hoehewert");
       if (anzeige) anzeige.textContent = hoehe.value + " %";
     };
@@ -6737,7 +6765,10 @@ function zeichnePlanwand(b) {
   const heuteSpalte = tage.indexOf(heute);
 
   document.getElementById("pw-inhalt").innerHTML =
-    '<div class="pw-rolle"><div class="pw-tafel" style="--pw-tage:' + tage.length
+    '<div class="pw-rolle"><div class="pw-tafel'
+    // Unter 80 Prozent Zeilenhöhe passt nur noch eine Textzeile
+    + ((plan.vskala || 1) < 0.8 ? " pw-tafel--flach" : "")
+    + '" style="--pw-tage:' + tage.length
     + ';--pw-s:' + (plan.skala || 1)
     + ';--pw-v:' + (plan.vskala || 1).toFixed(2)
     + ';--pw-spalte:' + (plan.spalte || 40) + 'px'
