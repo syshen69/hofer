@@ -2956,6 +2956,15 @@ body.dunkel .pw-name__nr { color: #a9b6c6 !important; }
 .pw-name:not(.pw-name--kopf):not(.pw-name--fein) { white-space: normal; }
 .pw-name__text { overflow: visible; text-overflow: clip;
                  line-height: 1.15; word-break: break-word; }
+/* ---------- Zeilen umsortieren ---------- */
+.pw-name--fassbar { cursor: grab; touch-action: none; }
+.pw-name__griff { color: var(--gedaempft); font-size: .8em; letter-spacing: -.22em;
+                  margin-right: 6px; opacity: 0; transition: opacity .12s; }
+.pw-name--fassbar:hover .pw-name__griff { opacity: .8; }
+.pw-name--zieht { background: var(--marke) !important; }
+.pw-name--zieht .pw-name__text, .pw-name--zieht .pw-name__nr,
+.pw-name--zieht .pw-name__griff { color: #fff !important; opacity: 1; }
+.pw-zeile--ziel { box-shadow: inset 0 3px 0 0 var(--marke); }
 </style>
 </head>
 <body>
@@ -3004,7 +3013,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "65.5.0";
+const APP_VERSION = "66.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -6909,9 +6918,12 @@ function zeichnePlanwand(b) {
               return planBalken(j, von, sichtbar.length, angeschnitten, vorlauf, belegt.length);
             }).join("");
 
-          return '<div class="pw-zeile">'
-            + '<div class="pw-name" title="' + esc(m.name)
+          return '<div class="pw-zeile" data-mzeile="' + esc(m.id) + '">'
+            + '<div class="pw-name' + (darfPlanen() ? " pw-name--fassbar" : "")
+            + '" data-msort="' + esc(m.id) + '" data-mpark="' + esc(m.park_id || "")
+            + '" title="' + esc(m.name)
             + (m.machine_number ? " " + esc(m.machine_number) : "") + '">'
+            + (darfPlanen() ? '<span class="pw-name__griff">⋮⋮</span>' : "")
             + '<span class="pw-name__text">' + esc(m.name) + '</span>'
             + (m.machine_number
                 ? '<span class="pw-name__nr">' + esc(m.machine_number) + '</span>' : "")
@@ -7010,6 +7022,7 @@ function zeichnePlanwand(b) {
   }
 
   balkenVerhalten(b);
+  zeilenVerschieben(b);
   griffVerhalten(b);
   zellenVerhalten(b);
   ferienVerhalten(b);
@@ -7288,6 +7301,96 @@ function wischVerhalten(b) {
     plan.start = arbeitstagePlus(plan.start, (dx < 0 ? 1 : -1) * Math.max(2, plan.tage));
     zeichnePlanwand(b);
   }, { passive: true });
+}
+
+// Zeilen umsortieren: auf dem Namen lange drücken, dann nach oben
+// oder unten ziehen. Die Reihenfolge steht als sort_order an der
+// Maschine und gilt innerhalb des Parks.
+function zeilenVerschieben(b) {
+  if (!darfPlanen()) return;
+  const tafel = document.querySelector(".pw-tafel");
+  if (!tafel) return;
+
+  tafel.querySelectorAll("[data-msort]").forEach((el) => {
+    let halten = null, zieht = false, markiert = null;
+
+    const aufraeumen = () => {
+      clearTimeout(halten);
+      zieht = false;
+      el.classList.remove("pw-name--zieht");
+      tafel.querySelectorAll(".pw-zeile--ziel")
+        .forEach((z) => z.classList.remove("pw-zeile--ziel"));
+      markiert = null;
+    };
+
+    el.addEventListener("pointerdown", (e) => {
+      if (e.button && e.button !== 0) return;
+      halten = setTimeout(() => {
+        zieht = true;
+        el.classList.add("pw-name--zieht");
+        try { el.setPointerCapture(e.pointerId); } catch (f) { /* egal */ }
+      }, 380);
+    });
+
+    el.addEventListener("pointermove", (e) => {
+      if (!zieht) { clearTimeout(halten); return; }
+      if (e.cancelable) e.preventDefault();
+      const unter = document.elementFromPoint(e.clientX, e.clientY);
+      const zeile = unter && unter.closest("[data-mzeile]");
+      if (markiert && markiert !== zeile) markiert.classList.remove("pw-zeile--ziel");
+      if (zeile && zeile.dataset.mzeile !== el.dataset.msort) {
+        zeile.classList.add("pw-zeile--ziel");
+        markiert = zeile;
+      }
+    });
+
+    el.addEventListener("touchmove", (e) => {
+      if (zieht && e.cancelable) e.preventDefault();
+    }, { passive: false });
+
+    el.addEventListener("pointerup", async () => {
+      if (!zieht) { clearTimeout(halten); return; }
+      const ziel = markiert;
+      aufraeumen();
+      if (!ziel) return;
+
+      const vonId = el.dataset.msort, aufId = ziel.dataset.mzeile;
+      if (vonId === aufId) return;
+
+      // Nur innerhalb desselben Parks umsortieren
+      const park = el.dataset.mpark;
+      const eigene = (prod.maschinen || []).filter((m) => (m.park_id || "") === park);
+      const reihe = eigene.map((m) => m.id);
+      const vonNr = reihe.indexOf(vonId), aufNr = reihe.indexOf(aufId);
+      if (vonNr < 0 || aufNr < 0) {
+        meldung("Zeilen lassen sich nur innerhalb desselben Parks verschieben.", "warn");
+        return;
+      }
+
+      reihe.splice(aufNr, 0, reihe.splice(vonNr, 1)[0]);
+
+      try {
+        for (let i = 0; i < reihe.length; i++) {
+          const m = eigene.find((x) => x.id === reihe[i]);
+          if (!m || m.sort_order === i + 1) continue;
+          const r = await db.from("machines").update({ sort_order: i + 1 }).eq("id", m.id);
+          if (r.error) throw r.error;
+          m.sort_order = i + 1;
+        }
+        // Die Liste im Speicher neu ordnen, sonst bleibt die Wand
+        // stehen, obwohl die Datenbank schon geändert ist.
+        try { prod.maschinen = await ladeMaschinen(false); }
+        catch (g) {
+          (prod.maschinen || []).sort((x, y) =>
+            (x.sort_order || 0) - (y.sort_order || 0));
+        }
+        meldung("Reihenfolge geändert.");
+        planAktualisieren(b);
+      } catch (f) { meldung(fehlertext(f), "fehler"); }
+    });
+
+    el.addEventListener("pointercancel", () => { if (!zieht) aufraeumen(); });
+  });
 }
 
 function balkenVerhalten(b) {
