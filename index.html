@@ -3041,6 +3041,39 @@ body.dunkel .pw-name:not(.pw-name--kopf):not(.pw-name--fein) .pw-name__text {
            padding: 10px 14px; background: var(--grund); }
 .gc-kopf summary { cursor: pointer; font-weight: 700; }
 .gc-kopf textarea { font-family: ui-monospace, Consolas, monospace; font-size: .86rem; }
+/* ---------- Solaranlage ---------- */
+.solar-fluss { width: 100%; max-width: 420px; height: auto; display: block;
+               margin: 4px auto 0; }
+.solar-knoten { fill: var(--flaeche); stroke: var(--linie-stark); stroke-width: 1.6; }
+.solar-knoten--sonne { fill: #ffd94020; stroke: #e6a800; stroke-width: 2; }
+.solar-strahl { stroke: #e6a800; stroke-width: 2; stroke-linecap: round; }
+.solar-dach { fill: none; stroke: var(--linie-stark); stroke-width: 1.6;
+              stroke-linejoin: round; }
+.solar-mast { fill: none; stroke: var(--linie-stark); stroke-width: 2;
+              stroke-linecap: round; }
+.solar-name { font-size: 11.5px; fill: var(--gedaempft); text-anchor: middle; }
+.solar-wert { font-size: 15px; font-weight: 800; fill: var(--tinte);
+              text-anchor: middle; }
+.solar-wert--bezug { fill: var(--gefahr); }
+.solar-pfeil { fill: none; stroke-linecap: round; }
+.solar-pfeil--gruen { stroke: #1e8449; }
+.solar-pfeil--rot { stroke: #c0392b; }
+.solar-pfeil--blau { stroke: #1268e0; }
+.solar-eigen { font-size: 12px; fill: var(--marke); text-anchor: middle;
+               font-weight: 700; }
+
+.solar-verlauf { width: 100%; height: auto; display: block; margin-top: 6px; }
+.solar-kurve--prod { fill: rgba(230, 168, 0, .35); stroke: #e6a800; stroke-width: 1.4; }
+.solar-kurve--verb { fill: rgba(18, 104, 224, .18); stroke: #1268e0; stroke-width: 1.4; }
+.solar-achse { font-size: 10px; fill: var(--gedaempft); }
+
+.solar-tag { display: grid; gap: 10px; margin-top: 10px;
+             grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+.solar-tag div { background: var(--grund); border-radius: var(--radius);
+                 padding: 8px 10px; font-weight: 700; }
+.solar-tag span { display: block; font-size: .72rem; font-weight: 500;
+                  color: var(--gedaempft); text-transform: uppercase;
+                  letter-spacing: .06em; }
 </style>
 </head>
 <body>
@@ -3089,7 +3122,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "68.0.0";
+const APP_VERSION = "69.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -3840,6 +3873,177 @@ async function ladeTodos() {
 
 // ---------- Seite ----------
 
+
+// =================================================================
+//  SOLARANLAGE
+//  Zeigt, was die Anlage gerade erzeugt, was der Betrieb zieht und
+//  ob gerade eingespeist oder bezogen wird. Die Werte kommen aus
+//  der Tabelle solar_werte, gefüllt von aussen.
+// =================================================================
+
+async function solarLaden() {
+  const seit = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+  const { data, error } = await zeitlimit(
+    db.from("solar_werte").select("*").gte("gemessen", seit)
+      .order("gemessen", { ascending: true }).limit(600),
+    10000, "Solarwerte");
+  if (error) throw error;
+  return data || [];
+}
+
+function solarKw(w) {
+  const z = Number(w) || 0;
+  if (Math.abs(z) >= 1000) return (z / 1000).toFixed(2).replace(".", ",") + " kW";
+  return Math.round(z) + " W";
+}
+
+// Der Fluss: Sonne → Betrieb → Netz. Die Pfeilstärke zeigt, wie
+// viel gerade wohin läuft.
+function solarFluss(j) {
+  const prod = Number(j.produktion_w) || 0;
+  const verb = Number(j.verbrauch_w) || 0;
+  const netz = Number(j.netz_w) || 0;
+  const bezug = netz > 0;
+  const eigen = Math.max(0, Math.min(prod, verb));
+  const anteil = verb > 0 ? Math.round((eigen / verb) * 100) : 0;
+  const gross = Math.max(1, prod, verb, Math.abs(netz));
+
+  // Zwischen zwei und sieben Pixeln, im Verhältnis zum grössten Wert
+  const dick = (w) => (2 + (Math.abs(w) / gross) * 5).toFixed(1);
+
+  return '<svg viewBox="0 0 440 190" class="solar-fluss">'
+    + '<defs>'
+    + '<marker id="sp-gruen" viewBox="0 0 8 8" refX="6.5" refY="4" markerWidth="4"'
+    + ' markerHeight="4" orient="auto"><path d="M0 0l8 4-8 4z" fill="#1e8449"/></marker>'
+    + '<marker id="sp-rot" viewBox="0 0 8 8" refX="6.5" refY="4" markerWidth="4"'
+    + ' markerHeight="4" orient="auto"><path d="M0 0l8 4-8 4z" fill="#c0392b"/></marker>'
+    + '<marker id="sp-blau" viewBox="0 0 8 8" refX="6.5" refY="4" markerWidth="4"'
+    + ' markerHeight="4" orient="auto"><path d="M0 0l8 4-8 4z" fill="#1268e0"/></marker>'
+    + '</defs>'
+
+    // Pfeile zuerst, damit die Knoten darüberliegen
+    + (eigen > 0
+      ? '<path d="M96 62h56" class="solar-pfeil solar-pfeil--gruen" stroke-width="'
+        + dick(eigen) + '" marker-end="url(#sp-gruen)"/>' : "")
+    + (Math.abs(netz) > 2
+      ? (bezug
+          ? '<path d="M344 62h-56" class="solar-pfeil solar-pfeil--rot" stroke-width="'
+            + dick(netz) + '" marker-end="url(#sp-rot)"/>'
+          : '<path d="M288 62h56" class="solar-pfeil solar-pfeil--blau" stroke-width="'
+            + dick(netz) + '" marker-end="url(#sp-blau)"/>')
+      : "")
+
+    // Anlage
+    + '<circle cx="62" cy="62" r="24" class="solar-knoten solar-knoten--sonne"/>'
+    + '<path d="M62 46v-8M62 78v8M46 62h-8M78 62h8M50 50l-6-6M74 74l6 6M74 50l6-6M50 74l-6 6"'
+    + ' class="solar-strahl"/>'
+    + '<text x="62" y="116" class="solar-name">Anlage</text>'
+    + '<text x="62" y="136" class="solar-wert">' + solarKw(prod) + '</text>'
+
+    // Betrieb
+    + '<path d="M188 46l32-22 32 22" class="solar-dach"/>'
+    + '<rect x="192" y="46" width="56" height="42" rx="4" class="solar-knoten"/>'
+    + '<text x="220" y="116" class="solar-name">Betrieb</text>'
+    + '<text x="220" y="136" class="solar-wert">' + solarKw(verb) + '</text>'
+
+    // Netz
+    + '<path d="M378 34v58M360 46h36M364 60h28M368 74h20" class="solar-mast"/>'
+    + '<text x="378" y="116" class="solar-name">'
+    + (bezug ? "Bezug aus dem Netz" : "Einspeisung") + '</text>'
+    + '<text x="378" y="136" class="solar-wert' + (bezug ? " solar-wert--bezug" : "")
+    + '">' + solarKw(Math.abs(netz)) + '</text>'
+
+    + '<text x="220" y="172" class="solar-eigen">' + anteil
+    + ' % des Verbrauchs kommt gerade vom Dach</text>'
+    + '</svg>';
+}
+
+// Tagesverlauf: Erzeugung und Verbrauch als Flächen
+function solarVerlauf(reihe) {
+  if (reihe.length < 2) return "";
+  const b = 320, h = 90;
+  const werte = reihe.map((r) => ({
+    t: new Date(r.gemessen).getTime(),
+    p: Number(r.produktion_w) || 0,
+    v: Number(r.verbrauch_w) || 0,
+  }));
+  const t0 = werte[0].t, t1 = werte[werte.length - 1].t || t0 + 1;
+  const gross = Math.max(1, ...werte.map((w) => Math.max(w.p, w.v)));
+  const x = (t) => (((t - t0) / (t1 - t0 || 1)) * b).toFixed(1);
+  const y = (w) => (h - (w / gross) * (h - 6)).toFixed(1);
+
+  const flaeche = (feld) => 'M0,' + h + " "
+    + werte.map((w) => x(w.t) + "," + y(w[feld])).join(" L")
+    + " L" + b + "," + h + "Z";
+
+  return '<svg viewBox="0 0 ' + b + ' ' + (h + 16) + '" class="solar-verlauf">'
+    + '<path d="' + flaeche("p") + '" class="solar-kurve solar-kurve--prod"/>'
+    + '<path d="' + flaeche("v") + '" class="solar-kurve solar-kurve--verb"/>'
+    + '<text x="0" y="' + (h + 13) + '" class="solar-achse">'
+    + uhrzeit(reihe[0].gemessen) + '</text>'
+    + '<text x="' + b + '" y="' + (h + 13) + '" text-anchor="end" class="solar-achse">'
+    + uhrzeit(reihe[reihe.length - 1].gemessen) + '</text>'
+    + '<text x="' + (b / 2) + '" y="' + (h + 13) + '" text-anchor="middle"'
+    + ' class="solar-achse">Spitze ' + solarKw(gross) + '</text>'
+    + '</svg>';
+}
+
+function uhrzeit(iso) {
+  try {
+    return new Date(iso).toLocaleTimeString("de-CH",
+      { hour: "2-digit", minute: "2-digit" });
+  } catch (f) { return ""; }
+}
+
+async function solarKachel(ziel) {
+  let reihe = [];
+  try { reihe = await solarLaden(); }
+  catch (f) {
+    // Genau sagen, woran es liegt — sonst sucht man im Dunkeln
+    const text = fehlertext(f);
+    ziel.innerHTML = '<section class="karte"><h2>Solaranlage</h2>'
+      + '<p class="hinweis">' + esc(text) + '</p>'
+      + '<p class="klein">'
+      + (/relation|does not exist|schema cache/i.test(text)
+          ? "Die Tabelle solar_werte fehlt. Bitte solar.sql im SQL-Editor ausführen."
+          : (/permission|policy|row-level/i.test(text)
+              ? "Die Leseregel greift nicht. In solar.sql steht die Regel dafür — "
+                + "bitte die Datei noch einmal ausführen."
+              : "Falls das SQL schon gelaufen ist, schick mir diese Meldung."))
+      + '</p></section>';
+    return;
+  }
+
+  if (!reihe.length) {
+    ziel.innerHTML = '<section class="karte"><h2>Solaranlage</h2>'
+      + '<p class="hinweis">Noch keine Werte eingetroffen. Sobald etwas in die '
+      + 'Tabelle geschrieben wird, erscheint hier die Anzeige.</p></section>';
+    return;
+  }
+
+  const j = reihe[reihe.length - 1];
+  const alt = Math.round((Date.now() - new Date(j.gemessen).getTime()) / 60000);
+
+  ziel.innerHTML = '<section class="karte solar">'
+    + '<div class="karte__kopf"><h2>Solaranlage</h2>'
+    + '<span class="klein">' + (alt < 2 ? "gerade eben"
+        : "vor " + alt + " Min.") + '</span></div>'
+    + solarFluss(j)
+    + solarVerlauf(reihe)
+    + '<div class="solar-tag">'
+    + (j.ertrag_tag_kwh !== null && j.ertrag_tag_kwh !== undefined
+        ? '<div><span>Ertrag heute</span>'
+          + Number(j.ertrag_tag_kwh).toFixed(1).replace(".", ",") + ' kWh</div>' : "")
+    + (j.eingespeist_tag_kwh !== null && j.eingespeist_tag_kwh !== undefined
+        ? '<div><span>Eingespeist</span>'
+          + Number(j.eingespeist_tag_kwh).toFixed(1).replace(".", ",") + ' kWh</div>' : "")
+    + (j.bezug_tag_kwh !== null && j.bezug_tag_kwh !== undefined
+        ? '<div><span>Bezogen</span>'
+          + Number(j.bezug_tag_kwh).toFixed(1).replace(".", ",") + ' kWh</div>' : "")
+    + '</div>'
+    + '</section>';
+}
+
 async function seiteDashboard(b) {
   const name = (profil && (profil.full_name || profil.email.split("@")[0])) || "";
 
@@ -3852,12 +4056,22 @@ async function seiteDashboard(b) {
 
     + '<p class="gruss">' + esc(begruessung()) + (name ? ", " + esc(name) : "") + '</p>'
 
+    + '<div id="db-solar"></div>'
     + '<div id="db-probleme"></div>'
     + '<div id="db-vorbereitung"></div>'
     + '<div id="db-einkauf"></div>'
     + '<div id="db-notizen"></div>'
     + '<div id="db-status"></div>'
     + '<div id="db-geburtstage"></div>';
+
+  // Solaranlage — stört den Rest nicht, wenn es sie noch nicht gibt
+  const solarZiel = document.getElementById("db-solar");
+  if (solarZiel) {
+    solarKachel(solarZiel).catch((f) => {
+      solarZiel.innerHTML = '<section class="karte"><h2>Solaranlage</h2>'
+        + '<p class="hinweis">' + esc(fehlertext(f)) + '</p></section>';
+    });
+  }
 
   // Uhr
   const uhrEl = document.getElementById("uhr");
