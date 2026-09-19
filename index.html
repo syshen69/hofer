@@ -2856,6 +2856,19 @@ body.dunkel tr.bz-zeile--spaet td { background: rgba(255,90,80,.12); }
 .pw-tafel--zieht .pw-balken-schicht,
 .pw-tafel--zieht .pw-balken,
 .pw-tafel--zieht .pw-griff { pointer-events: none !important; }
+/* ---------- Schatten beim Verschieben ----------
+   Er sass mittig unter dem Zeiger und hat genau die Stelle verdeckt,
+   auf die man zielt. Jetzt schwebt er darüber und ist durchsichtig,
+   damit die Zielzelle sichtbar bleibt. */
+.pw-schatten { transform: translate(-50%, -175%) !important;
+               opacity: .6; backdrop-filter: none;
+               background: color-mix(in srgb, var(--marke) 75%, transparent);
+               box-shadow: 0 4px 12px rgba(0, 0, 0, .25);
+               padding: 5px 10px; font-size: .78rem; }
+/* Falls color-mix fehlt, bleibt die Deckkraft als Rückfall */
+@supports not (background: color-mix(in srgb, red 50%, transparent)) {
+  .pw-schatten { opacity: .5; }
+}
 </style>
 </head>
 <body>
@@ -2904,7 +2917,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "61.3.0";
+const APP_VERSION = "61.4.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
