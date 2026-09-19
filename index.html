@@ -3035,6 +3035,7 @@ body.dunkel .pw-name:not(.pw-name--kopf):not(.pw-name--fein) .pw-name__nr {
   color: var(--tinte) !important; }
 body.dunkel .pw-name:not(.pw-name--kopf):not(.pw-name--fein) .pw-name__text {
   color: #a9b6c6; }
+.fo-mnr { font-weight: 800; color: var(--tinte); font-size: 1.05em; }
 </style>
 </head>
 <body>
@@ -3083,7 +3084,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "67.1.0";
+const APP_VERSION = "67.2.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -17271,7 +17272,16 @@ async function seiteFortschritt(b) {
     .filter((x) => fort.nur === "alle"
       || (fort.nur === "verzug" && x.r.tage < -0.5)
       || (fort.nur === "vorsprung" && x.r.tage > 0.5))
-    .sort((a, c) => a.r.tage - c.r.tage);
+    // Dieselbe Reihenfolge wie auf der Planwand: erst der Park, dann
+    // die Maschine in ihrer dortigen Anordnung, dann der Starttag.
+    .sort((a, c) => {
+      const pa = (parks.findIndex((p) => p.id === a.j.park_id) + 1) || 99;
+      const pc = (parks.findIndex((p) => p.id === c.j.park_id) + 1) || 99;
+      if (pa !== pc) return pa - pc;
+      const ma = a.j.maschine_reihenfolge || 0, mc = c.j.maschine_reihenfolge || 0;
+      if (ma !== mc) return ma - mc;
+      return String(a.j.planned_from || "").localeCompare(String(c.j.planned_from || ""));
+    });
 
   const schlimmste = Math.max(2, ...liste.map((x) => Math.abs(x.r.tage)));
   const imVerzug = liste.filter((x) => x.r.tage < -0.5).length;
@@ -17325,7 +17335,10 @@ async function seiteFortschritt(b) {
         + liste.map((x) => '<div class="fo-zeile" data-fojob="' + esc(x.j.id) + '">'
             + '<div class="fo-wer">'
             + '<strong>' + esc(x.j.job_number || "") + '</strong>'
-            + '<span class="klein">' + esc(x.j.maschine || "")
+            + '<span class="klein">'
+            + (x.j.maschine_nr
+                ? '<b class="fo-mnr">' + esc(x.j.maschine_nr) + '</b> ' : "")
+            + esc(x.j.maschine || "")
             + (x.r.art === "nichtgestartet"
                 ? " · noch nicht gestartet"
                 : " · " + zahlText(x.j.stand || 0) + " von "
