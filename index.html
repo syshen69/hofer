@@ -2867,6 +2867,27 @@ body.dunkel tr.bz-zeile--spaet td { background: rgba(255,90,80,.12); }
 @supports not (background: color-mix(in srgb, red 50%, transparent)) {
   .pw-schatten { opacity: .5; }
 }
+/* ---------- Heute-Linie ----------
+   Sie rechnete noch mit einer festen Namensspalte von 108 Pixeln
+   und einer festen Spaltenbreite. Die Tafel füllt aber die Breite,
+   die Tage teilen sich den Rest — deshalb sass die Linie daneben. */
+.pw-heutelinie { left: calc(var(--pw-name, 108px)
+                   + (100% - var(--pw-name, 108px))
+                     * (var(--heute) + 0.5) / var(--pw-tage, 15)) !important;
+                 width: 2px; background: var(--gefahr); opacity: .9;
+                 box-shadow: 0 0 0 1px rgba(255, 255, 255, .35); }
+/* Ein kleiner Kopf oben, damit die Linie auch im Gewimmel auffällt */
+/* Am Wochenende sitzt sie auf der Kante, nicht in der Spaltenmitte */
+.pw-heutelinie--rand { left: calc(var(--pw-name, 108px)
+                        + (100% - var(--pw-name, 108px))
+                          * var(--heute) / var(--pw-tage, 15)) !important; }
+.pw-heutelinie::before { content: ""; position: absolute; top: 0; left: -3px;
+                         width: 8px; height: 8px; border-radius: 50%;
+                         background: var(--gefahr); }
+
+/* ---------- Zeilenbeschriftung ---------- */
+.pw-name { font-size: calc(0.98rem * var(--pw-v)) !important; font-weight: 700; }
+.pw-name__nr { font-size: calc(0.84rem * var(--pw-v)); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -2915,7 +2936,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "62.2.0";
+const APP_VERSION = "62.3.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -6865,7 +6886,15 @@ function zeichnePlanwand(b) {
           + '<div class="pw-balken-schicht">' + balken + '</div></div></div>';
       }).join("");
 
-  const heuteSpalte = tage.indexOf(heute);
+  // Fällt heute auf ein Wochenende, steht es nicht in der Tafel.
+  // Dann sitzt die Linie am linken Rand des nächsten Arbeitstags,
+  // statt ganz zu fehlen.
+  let heuteSpalte = tage.indexOf(heute);
+  let heuteAmRand = false;
+  if (heuteSpalte < 0) {
+    const naechster = tage.findIndex((t) => t > heute);
+    if (naechster >= 0) { heuteSpalte = naechster; heuteAmRand = true; }
+  }
 
   document.getElementById("pw-inhalt").innerHTML =
     '<div class="pw-rolle"><div class="pw-tafel'
@@ -6879,7 +6908,8 @@ function zeichnePlanwand(b) {
     + '<div class="pw-kopfblock">' + monatZeile + kwZeile + kopf + '</div>'
     + zeilen + ferienZeilen
     + (heuteSpalte >= 0
-        ? '<div class="pw-heutelinie" style="--heute:' + heuteSpalte + '"></div>' : "")
+        ? '<div class="pw-heutelinie' + (heuteAmRand ? " pw-heutelinie--rand" : "")
+          + '" style="--heute:' + heuteSpalte + '"></div>' : "")
     + '</div></div>'
     + '<p class="pw-legende">Balken antippen öffnet den Auftrag. '
     + 'Langes Drücken verschiebt ihn, an den Rändern ziehen ändert die Dauer. '
