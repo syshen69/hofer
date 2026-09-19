@@ -2915,7 +2915,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "62.0.0";
+const APP_VERSION = "62.2.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -5302,29 +5302,40 @@ function leuchtend(hex) {
 
   // Sättigung anheben, Helligkeit auf ein kräftiges Mittel bringen.
   // Fast farblose Töne — Weiss, Grau — bleiben, wie sie sind.
-  const sNeu = saettigung < 0.12 ? saettigung : Math.min(1, saettigung * 1.45 + 0.15);
-  const lNeu = saettigung < 0.12 ? Math.max(helle, 0.82)
-    : Math.min(0.72, Math.max(0.56, helle * 0.35 + 0.45));
+  const sNeu = saettigung < 0.12 ? saettigung : Math.min(0.78, saettigung * 1.15 + 0.08);
+  let lNeu = saettigung < 0.12 ? Math.max(helle, 0.82)
+    : Math.min(0.74, Math.max(0.58, helle * 0.3 + 0.5));
 
-  const c = (1 - Math.abs(2 * lNeu - 1)) * sNeu;
-  const x = c * (1 - Math.abs(((farbton / 60) % 2) - 1));
-  const m = lNeu - c / 2;
-  let rr = 0, gg = 0, bb = 0;
-  if (farbton < 60) { rr = c; gg = x; }
-  else if (farbton < 120) { rr = x; gg = c; }
-  else if (farbton < 180) { gg = c; bb = x; }
-  else if (farbton < 240) { gg = x; bb = c; }
-  else if (farbton < 300) { rr = x; bb = c; }
-  else { rr = c; bb = x; }
+  // Aus Ton, Sättigung und Helligkeit wieder eine Farbe machen
+  const bauen = (l) => {
+    const c = (1 - Math.abs(2 * l - 1)) * sNeu;
+    const x = c * (1 - Math.abs(((farbton / 60) % 2) - 1));
+    const m = l - c / 2;
+    let rr = 0, gg = 0, bb = 0;
+    if (farbton < 60) { rr = c; gg = x; }
+    else if (farbton < 120) { rr = x; gg = c; }
+    else if (farbton < 180) { gg = c; bb = x; }
+    else if (farbton < 240) { gg = x; bb = c; }
+    else if (farbton < 300) { rr = x; bb = c; }
+    else { rr = c; bb = x; }
+    const zahl = (v) => Math.max(0, Math.min(255, Math.round((v + m) * 255)));
+    return [zahl(rr), zahl(gg), zahl(bb)];
+  };
 
-  const zahl = (v) => Math.round((v + m) * 255);
-  const hintergrund = "#" + [zahl(rr), zahl(gg), zahl(bb)]
-    .map((v) => Math.max(0, Math.min(255, v)).toString(16).padStart(2, "0")).join("");
+  // Die Schrift bleibt überall schwarz. Deshalb wird die Farbe nur so
+  // kräftig, wie es dafür reicht — ist sie zu dunkel, wird sie
+  // schrittweise aufgehellt, bis Schwarz darauf sicher lesbar ist.
+  const wahrgenommen = ([r2, g2, b2]) => 0.299 * r2 + 0.587 * g2 + 0.114 * b2;
+  let ton = bauen(lNeu);
+  let schutz = 0;
+  while (wahrgenommen(ton) < 168 && lNeu < 0.94 && schutz++ < 40) {
+    lNeu += 0.02;
+    ton = bauen(lNeu);
+  }
 
-  // Schrift nach Helligkeit: auf kräftigem Grund braucht es Weiss,
-  // auf hellem Schwarz. Sonst wäre die Nummer nicht zu lesen.
-  const wahrgenommen = 0.299 * zahl(rr) + 0.587 * zahl(gg) + 0.114 * zahl(bb);
-  return { hg: hintergrund, vg: wahrgenommen > 150 ? "#10151c" : "#ffffff" };
+  const hintergrund = "#" + ton
+    .map((v) => v.toString(16).padStart(2, "0")).join("");
+  return { hg: hintergrund, vg: "#10151c" };
 }
 
 // Mischt eine Farbe mit Weiss. anteil 0 = unverändert, 1 = weiss.
