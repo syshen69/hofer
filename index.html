@@ -3015,6 +3015,26 @@ body.dunkel .pw-name__nr { color: #a9b6c6 !important; }
   .fo-zeile { grid-template-columns: 1fr 90px; gap: 8px; }
   .fo-balken { grid-column: 1 / -1; }
 }
+/* Nummer vorn und grösser, der Name daneben etwas ruhiger.
+   Reicht die Breite nicht, rutscht der Name auf die zweite Zeile,
+   statt abgeschnitten zu werden. */
+.pw-name:not(.pw-name--kopf):not(.pw-name--fein) {
+  flex-wrap: wrap; align-content: center; row-gap: 0; }
+.pw-name:not(.pw-name--kopf):not(.pw-name--fein) .pw-name__text {
+  min-width: 0; flex: 1 1 auto; }
+.pw-name:not(.pw-name--kopf):not(.pw-name--fein) .pw-name__nr {
+  order: -1; margin: 0 8px 0 0;
+  font-size: calc(1.1rem * var(--pw-v)) !important;
+  font-weight: 800 !important;
+  color: var(--tinte) !important; }
+.pw-name:not(.pw-name--kopf):not(.pw-name--fein) .pw-name__text {
+  font-size: calc(0.9rem * var(--pw-v));
+  font-weight: 600;
+  color: #4a5666; }
+body.dunkel .pw-name:not(.pw-name--kopf):not(.pw-name--fein) .pw-name__nr {
+  color: var(--tinte) !important; }
+body.dunkel .pw-name:not(.pw-name--kopf):not(.pw-name--fein) .pw-name__text {
+  color: #a9b6c6; }
 </style>
 </head>
 <body>
@@ -3063,7 +3083,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "67.0.0";
+const APP_VERSION = "67.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -5776,7 +5796,7 @@ function masseBerechnen(b) {
 
   // Die Namensspalte wächst mit der Zeilenhöhe mit, sonst wird der
   // Maschinenname bei grosser Schrift abgeschnitten.
-  const nameGross = Math.round(200 * Math.max(1, plan.vskala || 1));
+  const nameGross = Math.round(230 * Math.max(1, plan.vskala || 1));
   let namensbreite = Math.min(nameGross, Math.floor(gesamt / 4));
   plan.spalte = Math.max(9, (gesamt - namensbreite) / plan.tage);
 
@@ -6974,9 +6994,11 @@ function zeichnePlanwand(b) {
             + '" title="' + esc(m.name)
             + (m.machine_number ? " " + esc(m.machine_number) : "") + '">'
             + (darfPlanen() ? '<span class="pw-name__griff">⋮⋮</span>' : "")
-            + '<span class="pw-name__text">' + esc(m.name) + '</span>'
+            // Die Nummer steht vorn und ist die auffälligere Angabe —
+            // danach wird an der Maschine gesucht, nicht nach dem Namen.
             + (m.machine_number
                 ? '<span class="pw-name__nr">' + esc(m.machine_number) + '</span>' : "")
+            + '<span class="pw-name__text">' + esc(m.name) + '</span>' 
             + '</div>'
             + '<div class="pw-spuren">' + zellen
             + '<div class="pw-balken-schicht">' + balken + '</div></div></div>';
