@@ -3015,15 +3015,16 @@ body.dunkel .pw-name__nr { color: #a9b6c6 !important; }
   .fo-zeile { grid-template-columns: 1fr 90px; gap: 8px; }
   .fo-balken { grid-column: 1 / -1; }
 }
-/* Nummer vorn und grösser, der Name daneben etwas ruhiger.
-   Reicht die Breite nicht, rutscht der Name auf die zweite Zeile,
-   statt abgeschnitten zu werden. */
+/* Nummer vorn und grösser, der Name mit kleinem Abstand daneben.
+   Beides bleibt auf einer Zeile; die Spalte wird so breit gerechnet,
+   dass die längste Beschriftung hineinpasst. */
 .pw-name:not(.pw-name--kopf):not(.pw-name--fein) {
-  flex-wrap: wrap; align-content: center; row-gap: 0; }
+  flex-wrap: nowrap; white-space: nowrap; gap: 0;
+  justify-content: flex-start; }
 .pw-name:not(.pw-name--kopf):not(.pw-name--fein) .pw-name__text {
-  min-width: 0; flex: 1 1 auto; }
+  min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
 .pw-name:not(.pw-name--kopf):not(.pw-name--fein) .pw-name__nr {
-  order: -1; margin: 0 8px 0 0;
+  order: -1; margin: 0 6px 0 0; flex: none;
   font-size: calc(1.1rem * var(--pw-v)) !important;
   font-weight: 800 !important;
   color: var(--tinte) !important; }
@@ -3084,7 +3085,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "67.2.0";
+const APP_VERSION = "67.3.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -5307,6 +5308,8 @@ function auftragsKnoepfeBinden(raster, b) {
 //  die sich mit langem Drücken verschieben lassen.
 // =================================================================
 
+let planMessung = { };
+
 const plan = {
   sucheAktiv: false,
   trefferListe: [],
@@ -5795,10 +5798,33 @@ function masseBerechnen(b) {
   const breite = (b && b.clientWidth) || window.innerWidth;
   const gesamt = Math.max(280, breite) - 8;
 
-  // Die Namensspalte wächst mit der Zeilenhöhe mit, sonst wird der
-  // Maschinenname bei grosser Schrift abgeschnitten.
-  const nameGross = Math.round(230 * Math.max(1, plan.vskala || 1));
-  let namensbreite = Math.min(nameGross, Math.floor(gesamt / 4));
+  // Die Spalte wird genau so breit wie die längste Beschriftung —
+  // Nummer und Name zusammen, in den Grössen, in denen sie wirklich
+  // gezeichnet werden. Gemessen wird mit derselben Schrift.
+  const nameGross = (() => {
+    const v = Math.max(0.6, plan.vskala || 1);
+    const grund = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const schrift = getComputedStyle(document.body).fontFamily || "sans-serif";
+    const mess = (planMessung.getContext
+      ? planMessung : (planMessung = document.createElement("canvas"))).getContext("2d");
+
+    let breiteste = 0;
+    (prod.maschinen || []).forEach((m) => {
+      mess.font = "800 " + (1.1 * grund * v).toFixed(1) + "px " + schrift;
+      const a = m.machine_number ? mess.measureText(m.machine_number).width + 7 : 0;
+      mess.font = "600 " + (0.9 * grund * v).toFixed(1) + "px " + schrift;
+      const c = mess.measureText(m.name || "").width;
+      breiteste = Math.max(breiteste, a + c);
+    });
+
+    // Polster links und rechts, dazu der Griff zum Verschieben.
+    // Die kleine Zugabe fängt ab, dass die Messung auf der Leinwand
+    // Laufweite und Schriftglättung nicht genau abbildet.
+    const polster = 16 * v + (darfPlanen() ? 20 : 0) + 12;
+    return Math.max(110, Math.ceil(breiteste * 1.06 + polster));
+  })();
+
+  let namensbreite = Math.min(nameGross, Math.floor(gesamt / 3));
   plan.spalte = Math.max(9, (gesamt - namensbreite) / plan.tage);
 
   if (plan.spalte < 22) {
@@ -5975,6 +6001,7 @@ async function ansichtPlanwand(ziel, b) {
     const zeigen = () => {
       const w = Number(hoehe.value) / 100;
       plan.vskala = w;
+      plan.breiteFest = false;
       const tafel = document.querySelector(".pw-tafel");
       if (tafel) {
         tafel.style.setProperty("--pw-v", w.toFixed(2));
@@ -6895,6 +6922,12 @@ function neuZeichnen(b) {
 }
 
 function zeichnePlanwand(b) {
+  // Die Spaltenbreite hängt an den Maschinennamen. Beim ersten Lauf
+  // sind die noch nicht geladen, deshalb hier noch einmal rechnen.
+  if (prod.maschinen && prod.maschinen.length && !plan.breiteFest) {
+    plan.breiteFest = true;
+    masseBerechnen(b);
+  }
   // Auf dem Handy wird links und rechts je ein Bildschirm mehr
   // gezeichnet. Sonst ist die Tafel kaum breiter als das Display,
   // man ist dauernd am Rand und es zittert beim Wischen.
