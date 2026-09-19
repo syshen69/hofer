@@ -2917,6 +2917,7 @@ body.dunkel tr.bz-zeile--spaet td { background: rgba(255,90,80,.12); }
 @media (max-width: 720px) {
   #pw-inhalt .pw-rolle { height: calc(100dvh - var(--pw-oben, 200px) - 8px); }
 }
+.grav-zug { fill: var(--marke-hell); stroke: var(--gefahr); stroke-width: 1; }
 </style>
 </head>
 <body>
@@ -2965,7 +2966,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "63.2.0";
+const APP_VERSION = "64.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -11017,7 +11018,7 @@ function seiteRechner(b) {
   b.innerHTML = '<h1 class="seitentitel">Rechner</h1>'
     + '<div class="reiter">'
     + [["drehzahl", "Drehzahl"], ["winkel", "Winkel und Fase"], ["gcode", "G-Code"],
-       ["cachse", "C-Achse G12.1"]]
+       ["cachse", "C-Achse G12.1"], ["gravur", "Gravur"]]
         .map(([w, t]) => '<button class="reiter__knopf' + (rech.ansicht === w ? " aktiv" : "")
           + '" data-rech="' + w + '">' + t + '</button>').join("")
     + '</div><div id="rech-inhalt"></div>';
@@ -11030,6 +11031,7 @@ function seiteRechner(b) {
   if (rech.ansicht === "winkel") rechnerWinkel(ziel);
   else if (rech.ansicht === "gcode") rechnerGcode(ziel);
   else if (rech.ansicht === "cachse") rechnerCachse(ziel);
+  else if (rech.ansicht === "gravur") rechnerGravur(ziel);
   else rechnerDrehzahl(ziel, b);
   reiterUebergang(ziel);
 }
@@ -11500,6 +11502,380 @@ function rechnerCachse(ziel) {
   if (kopieren) kopieren.onclick = async () => {
     try {
       await navigator.clipboard.writeText(caxisGcode());
+      meldung("G-Code kopiert.");
+    } catch (f) { meldung("Kopieren ging nicht. Bitte von Hand markieren.", "warn"); }
+  };
+}
+
+
+// =================================================================
+//  GRAVUR: TEXT ALS G-CODE
+//  Der Text wird mit der gewählten Schrift auf eine unsichtbare
+//  Leinwand gezeichnet, die Umrisse werden daraus abgetastet und in
+//  Bahnen umgerechnet. Dadurch lässt sich jede Schrift benutzen,
+//  die auf dem Rechner installiert ist.
+//
+//  Stirnseite  → G12.1, X und C wie X und Y
+//  Mantel      → G07.1, Z und C, C im Winkel über den Umfang
+// =================================================================
+
+const gravur = {
+  text: "HOFER",
+  schrift: "Arial",
+  fett: false,
+  kursiv: false,
+  hoehe: 4,          // Zeichenhöhe in mm
+  laufweite: 0,      // zusätzlicher Abstand je Zeichen
+  flaeche: "stirn",  // stirn oder mantel
+  dm: 20,            // Durchmesser des Teils
+  radius: 8,         // Abstand der Textmitte von der Achse, Stirnseite
+  winkel: 0,         // Drehung auf der Stirnseite
+  zStart: 0,
+  tiefe: 0.2,
+  schnitte: 1,
+  vorschub: 80,
+  eilgang: 1,        // Abhebehöhe zwischen den Zügen
+  drehzahl: 6000,
+  werkzeug: 0.4,     // Spitzendurchmesser, nur für die Warnung
+  glaetten: 0.02,    // Toleranz beim Vereinfachen in mm
+};
+
+const GRAVUR_SCHRIFTEN = [
+  "Arial", "Arial Black", "Bahnschrift", "Calibri", "Cambria", "Candara",
+  "Comic Sans MS", "Consolas", "Constantia", "Corbel", "Courier New",
+  "Ebrima", "Franklin Gothic Medium", "Gabriola", "Georgia", "Impact",
+  "Ink Free", "Lucida Console", "Lucida Sans Unicode", "Malgun Gothic",
+  "Microsoft Sans Serif", "Palatino Linotype", "Segoe Print", "Segoe Script",
+  "Segoe UI", "Sitka", "Sylfaen", "Tahoma", "Times New Roman",
+  "Trebuchet MS", "Verdana",
+];
+
+// ---------- Umrisse aus der Schrift holen ----------
+
+// Zeichnet den Text gross auf eine Leinwand und liest die Umrisse
+// mit Marching Squares aus. Zurück kommen Linienzüge in Millimetern.
+function gravurKonturen() {
+  const text = (gravur.text || "").trim();
+  if (!text) return { zuege: [], breite: 0, hoehe: 0 };
+
+  // Gross rendern, damit die Kanten fein genug werden
+  const px = 220;                       // Zeichenhöhe auf der Leinwand
+  const stil = (gravur.kursiv ? "italic " : "") + (gravur.fett ? "bold " : "");
+  const schriftart = stil + px + 'px "' + gravur.schrift + '", sans-serif';
+
+  const mess = document.createElement("canvas").getContext("2d");
+  mess.font = schriftart;
+  const m = mess.measureText(text);
+  const extra = gravur.laufweite > 0
+    ? (text.length - 1) * (gravur.laufweite / gravur.hoehe) * px : 0;
+  const breitePx = Math.ceil(m.width + extra) + 20;
+  const obenPx = Math.ceil(m.actualBoundingBoxAscent || px * 0.8);
+  const untenPx = Math.ceil(m.actualBoundingBoxDescent || px * 0.25);
+  const hoehePx = obenPx + untenPx + 20;
+
+  const c = document.createElement("canvas");
+  c.width = breitePx; c.height = hoehePx;
+  const g = c.getContext("2d");
+  g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
+  g.fillStyle = "#000";
+  g.font = schriftart;
+  g.textBaseline = "alphabetic";
+
+  if (extra > 0) {
+    // Buchstabe für Buchstabe, damit die Laufweite wirkt
+    let x = 10;
+    for (const zeichen of text) {
+      g.fillText(zeichen, x, obenPx + 10);
+      x += g.measureText(zeichen).width + (gravur.laufweite / gravur.hoehe) * px;
+    }
+  } else {
+    g.fillText(text, 10, obenPx + 10);
+  }
+
+  const bild = g.getImageData(0, 0, c.width, c.height).data;
+  const dunkel = (x, y) => {
+    if (x < 0 || y < 0 || x >= c.width || y >= c.height) return 0;
+    return bild[(y * c.width + x) * 4] < 128 ? 1 : 0;
+  };
+
+  // Marching Squares: Kanten zwischen hell und dunkel einsammeln
+  const kanten = new Map();
+  const schluessel = (x, y) => x + "," + y;
+  const merken = (a, b) => {
+    const k = schluessel(a[0], a[1]);
+    if (!kanten.has(k)) kanten.set(k, []);
+    kanten.get(k).push(b);
+  };
+
+  for (let y = 0; y < c.height - 1; y++) {
+    for (let x = 0; x < c.width - 1; x++) {
+      const fall = dunkel(x, y) * 8 + dunkel(x + 1, y) * 4
+        + dunkel(x + 1, y + 1) * 2 + dunkel(x, y + 1);
+      if (fall === 0 || fall === 15) continue;
+      const o = [x + 0.5, y], r = [x + 1, y + 0.5];
+      const u = [x + 0.5, y + 1], l = [x, y + 0.5];
+      const strich = {
+        1: [[l, u]], 2: [[u, r]], 3: [[l, r]], 4: [[r, o]],
+        5: [[l, o], [u, r]], 6: [[u, o]], 7: [[l, o]],
+        8: [[o, l]], 9: [[o, u]], 10: [[o, r], [u, l]], 11: [[o, r]],
+        12: [[r, l]], 13: [[r, u]], 14: [[u, l]],
+      }[fall] || [];
+      strich.forEach(([a, b]) => merken(a, b));
+    }
+  }
+
+  // Kanten zu geschlossenen Zügen verketten
+  const zuege = [];
+  const offen = new Map(kanten);
+  while (offen.size) {
+    const start = offen.keys().next().value;
+    let jetzt = start;
+    const zug = [];
+    let schutz = 0;
+    while (offen.has(jetzt) && schutz++ < 200000) {
+      const liste = offen.get(jetzt);
+      const naechste = liste.pop();
+      if (!liste.length) offen.delete(jetzt);
+      zug.push(naechste);
+      jetzt = schluessel(naechste[0], naechste[1]);
+    }
+    if (zug.length > 8) zuege.push(zug);
+  }
+
+  // In Millimeter umrechnen und vereinfachen
+  const skala = gravur.hoehe / px;
+  const fein = zuege.map((z) => vereinfachen(
+    z.map(([x, y]) => [x * skala, -y * skala]),
+    Math.max(0.005, gravur.glaetten)));
+
+  // Auf die Mitte legen
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  fein.forEach((z) => z.forEach(([x, y]) => {
+    minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+  }));
+  const mx = (minX + maxX) / 2, my = (minY + maxY) / 2;
+  const mittig = fein.map((z) => z.map(([x, y]) => [x - mx, y - my]));
+
+  return { zuege: mittig, breite: maxX - minX, hoehe: maxY - minY };
+}
+
+// Douglas-Peucker: entfernt Punkte, die kaum von der Linie abweichen
+function vereinfachen(punkte, toleranz) {
+  if (punkte.length < 3) return punkte;
+  const abstand = (p, a, b) => {
+    const dx = b[0] - a[0], dy = b[1] - a[1];
+    const l = dx * dx + dy * dy;
+    if (!l) return Math.hypot(p[0] - a[0], p[1] - a[1]);
+    let t = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy));
+  };
+  const lauf = (von, bis) => {
+    let weit = 0, wo = von;
+    for (let i = von + 1; i < bis; i++) {
+      const d = abstand(punkte[i], punkte[von], punkte[bis]);
+      if (d > weit) { weit = d; wo = i; }
+    }
+    if (weit > toleranz) {
+      return lauf(von, wo).slice(0, -1).concat(lauf(wo, bis));
+    }
+    return [punkte[von], punkte[bis]];
+  };
+  return lauf(0, punkte.length - 1);
+}
+
+// ---------- G-Code ----------
+
+function gravurGcode() {
+  const { zuege, breite } = gravurKonturen();
+  if (!zuege.length) return "( Kein Text )";
+
+  const z = [];
+  const f = gravur.vorschub;
+  const mantel = gravur.flaeche === "mantel";
+  const rad = gravur.dm / 2;
+
+  z.push("( GRAVUR  " + gravur.text + " )");
+  z.push("( Schrift " + gravur.schrift + (gravur.fett ? " fett" : "")
+    + (gravur.kursiv ? " kursiv" : "") + ", Hoehe " + gravur.hoehe + " mm )");
+  z.push("( " + zuege.length + " Zuege, "
+    + zuege.reduce((a, x) => a + x.length, 0) + " Punkte )");
+  z.push("M3S" + Math.round(gravur.drehzahl) + "  ( Gravierstichel )");
+
+  // Auf der Stirnseite dreht der Text um die Achse, auf dem Mantel
+  // wird die Breite in einen Winkel umgerechnet.
+  const w = (gravur.winkel * Math.PI) / 180;
+  const lage = ([x, y]) => {
+    if (!mantel) {
+      const px = x * Math.cos(w) - y * Math.sin(w);
+      const py = x * Math.sin(w) + y * Math.cos(w) + gravur.radius;
+      return { a: px, b: py };
+    }
+    // Mantel: x läuft um den Umfang, y in Z
+    return { a: (x / (Math.PI * gravur.dm)) * 360, b: y };
+  };
+
+  if (mantel) {
+    z.push("G0Z" + (gravur.zStart + 5).toFixed(3) + "C0.");
+    z.push("G0X" + (gravur.dm + 2 * gravur.eilgang).toFixed(3));
+    z.push("G07.1C" + rad.toFixed(3) + "  ( Zylinderinterpolation ein )");
+  } else {
+    z.push("G0X" + (gravur.dm + 4).toFixed(3) + "C0.");
+    z.push("G0Z" + (gravur.zStart + gravur.eilgang).toFixed(3));
+    z.push("G12.1  ( Polarinterpolation ein )");
+  }
+
+  const schnitte = Math.max(1, Math.round(gravur.schnitte));
+  for (let s = 1; s <= schnitte; s++) {
+    const tiefe = (gravur.tiefe / schnitte) * s;
+    z.push("( Schnitt " + s + " von " + schnitte + " )");
+
+    zuege.forEach((zug, i) => {
+      const erst = lage(zug[0]);
+      if (mantel) {
+        z.push("G0X" + (gravur.dm + 2 * gravur.eilgang).toFixed(3));
+        z.push("G0C" + erst.a.toFixed(3) + "Z" + (gravur.zStart + erst.b).toFixed(3));
+        z.push("G1X" + (gravur.dm - 2 * tiefe).toFixed(3) + "F" + f);
+      } else {
+        z.push("G0Z" + (gravur.zStart + gravur.eilgang).toFixed(3));
+        z.push("G0X" + (erst.a * 2).toFixed(3) + "C" + erst.b.toFixed(3));
+        z.push("G1Z" + (gravur.zStart - tiefe).toFixed(3) + "F" + f);
+      }
+
+      zug.slice(1).forEach((p) => {
+        const q = lage(p);
+        z.push(mantel
+          ? "G1C" + q.a.toFixed(3) + "Z" + (gravur.zStart + q.b).toFixed(3)
+          : "G1X" + (q.a * 2).toFixed(3) + "C" + q.b.toFixed(3));
+      });
+
+      // Zug schliessen
+      const zurueck = lage(zug[0]);
+      z.push(mantel
+        ? "G1C" + zurueck.a.toFixed(3) + "Z" + (gravur.zStart + zurueck.b).toFixed(3)
+        : "G1X" + (zurueck.a * 2).toFixed(3) + "C" + zurueck.b.toFixed(3));
+    });
+  }
+
+  if (mantel) {
+    z.push("G0X" + (gravur.dm + 2 * gravur.eilgang).toFixed(3));
+    z.push("G13.1  ( Zylinderinterpolation aus )");
+  } else {
+    z.push("G0Z" + (gravur.zStart + gravur.eilgang + 5).toFixed(3));
+    z.push("G13.1  ( Polarinterpolation aus )");
+  }
+  z.push("M5");
+  return z.join("\n");
+}
+
+// ---------- Zeichnung ----------
+
+function gravurBild() {
+  const { zuege, breite, hoehe } = gravurKonturen();
+  if (!zuege.length) {
+    return '<svg viewBox="0 0 400 180" class="cax-bild">'
+      + '<text x="200" y="95" text-anchor="middle" class="cax-text">Kein Text</text></svg>';
+  }
+  const rand = Math.max(breite, hoehe) * 0.12 + 1;
+  const b = breite + rand * 2, h = hoehe + rand * 2;
+  const s = Math.min(400 / b, 180 / h);
+  const p = ([x, y]) => (200 + x * s).toFixed(1) + "," + (90 - y * s).toFixed(1);
+
+  return '<svg viewBox="0 0 400 180" class="cax-bild">'
+    + zuege.map((z) => '<polygon points="' + z.map(p).join(" ")
+        + '" class="grav-zug"/>').join("")
+    + '<text x="200" y="174" text-anchor="middle" class="cax-legende">'
+    + breite.toFixed(2) + ' × ' + hoehe.toFixed(2) + ' mm</text>'
+    + '</svg>';
+}
+
+// ---------- Seite ----------
+
+function rechnerGravur(ziel) {
+  const zahl = (name, text, schritt) =>
+    '<label class="feld"><span>' + text + '</span>'
+    + '<input type="number" data-grav="' + name + '" step="' + (schritt || "0.1")
+    + '" value="' + gravur[name] + '"></label>';
+
+  const mantel = gravur.flaeche === "mantel";
+
+  ziel.innerHTML = '<div class="karte">'
+    + '<label class="feld"><span>Text</span>'
+    + '<input type="text" data-grav="text" value="' + esc(gravur.text) + '"></label>'
+
+    + '<div class="cax-raster">'
+    + '<div class="cax-bildfeld">' + gravurBild() + '</div>'
+    + '<div class="cax-felder">'
+    + '<label class="feld"><span>Schrift</span><select data-grav="schrift">'
+    + GRAVUR_SCHRIFTEN.map((sn) => '<option value="' + esc(sn) + '"'
+        + (gravur.schrift === sn ? " selected" : "") + '>' + esc(sn) + '</option>').join("")
+    + '</select><span class="feldhinweis" id="grav-vorhanden"></span></label>'
+    + '<div class="feld"><span class="feldlabel">Schnitt</span>'
+    + '<label class="schalter schalter--eng"><input type="checkbox" data-grav="fett"'
+    + (gravur.fett ? " checked" : "") + '><span>Fett</span></label>'
+    + '<label class="schalter schalter--eng"><input type="checkbox" data-grav="kursiv"'
+    + (gravur.kursiv ? " checked" : "") + '><span>Kursiv</span></label></div>'
+    + zahl("hoehe", "Zeichenhöhe in mm")
+    + zahl("laufweite", "Laufweite in mm", "0.05")
+    + '<label class="feld"><span>Fläche</span><select data-grav="flaeche">'
+    + '<option value="stirn"' + (!mantel ? " selected" : "") + '>Stirnseite (G12.1)</option>'
+    + '<option value="mantel"' + (mantel ? " selected" : "") + '>Mantel (G07.1)</option>'
+    + '</select></label>'
+    + zahl("dm", "Durchmesser des Teils")
+    + (mantel ? "" : zahl("radius", "Abstand von der Achse") + zahl("winkel", "Drehung in Grad", "1"))
+    + zahl("zStart", "Z an der Fläche")
+    + zahl("tiefe", "Gravurtiefe", "0.05")
+    + zahl("schnitte", "Schnitte", "1")
+    + zahl("vorschub", "Vorschub mm/min", "1")
+    + zahl("drehzahl", "Drehzahl Stichel", "100")
+    + zahl("eilgang", "Abhebehöhe", "0.5")
+    + zahl("werkzeug", "Stichelspitze Ø", "0.05")
+    + zahl("glaetten", "Glättung in mm", "0.005")
+    + '</div></div>'
+
+    + '<p class="klein">Die Umrisse werden aus der gewählten Schrift abgetastet, '
+    + 'darum steht jede Schrift zur Verfügung, die auf diesem Rechner installiert ist. '
+    + 'Gefahren wird auf der Kontur, nicht versetzt — mit einem Gravierstichel ist '
+    + 'das richtig. X ist im Durchmesser programmiert. '
+    + (mantel
+        ? 'Auf dem Mantel läuft die Breite über den Umfang, C ist der Winkel.'
+        : 'Auf der Stirnseite sind X und C wie X und Y zu lesen.')
+    + ' Grössere Glättung bedeutet weniger Zeilen, aber eckigere Rundungen.</p>'
+    + '<pre class="gcode">' + esc(gravurGcode()) + '</pre>'
+    + '<button class="knopf knopf--klein" id="grav-kopieren">G-Code kopieren</button>'
+    + '</div>';
+
+  // Ist die Schrift auf diesem Rechner überhaupt da?
+  const hinweis = document.getElementById("grav-vorhanden");
+  if (hinweis) {
+    let da = true;
+    try { da = document.fonts.check('16px "' + gravur.schrift + '"'); }
+    catch (f) { da = true; }
+    hinweis.textContent = da ? ""
+      : "Diese Schrift ist hier nicht installiert — es wird ersatzweise "
+        + "eine andere gezeichnet.";
+  }
+
+  ziel.querySelectorAll("[data-grav]").forEach((el) => {
+    const auslesen = () => {
+      const name = el.dataset.grav;
+      gravur[name] = el.type === "checkbox" ? el.checked
+        : (el.type === "number" ? Number(el.value) : el.value);
+      rechnerGravur(ziel);
+    };
+    if (el.type === "text") {
+      let taste = null;
+      el.oninput = () => { clearTimeout(taste); taste = setTimeout(auslesen, 500); };
+    } else {
+      el.onchange = auslesen;
+    }
+  });
+
+  const kopieren = document.getElementById("grav-kopieren");
+  if (kopieren) kopieren.onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(gravurGcode());
       meldung("G-Code kopiert.");
     } catch (f) { meldung("Kopieren ging nicht. Bitte von Hand markieren.", "warn"); }
   };
