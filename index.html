@@ -2792,6 +2792,81 @@ body.dunkel tr.bz-zeile--spaet td { background: rgba(255,90,80,.12); }
   .pad__sprungkacheln { grid-template-columns: repeat(2, 1fr); }
   .pad__sprunge { justify-content: flex-start; }
 }
+/* ---------- Solaranlage ---------- */
+.solar { background: linear-gradient(140deg, #0f1b2e 0%, #132844 55%, #0d1826 100%);
+         color: #eef4ff; border: 0; overflow: hidden; position: relative; }
+.solar::after { content: ""; position: absolute; top: -60px; right: -40px;
+                width: 220px; height: 220px; border-radius: 50%;
+                background: radial-gradient(circle, rgba(255,201,64,.22), transparent 70%);
+                pointer-events: none; }
+.solar h2 { color: #fff; }
+.solar .karte__kopf .klein { color: #8fa6c6; }
+.solar-alt { color: #ffb15e !important; font-weight: 700; }
+
+.sol { position: relative; }
+.sol__karten { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+               position: relative; z-index: 2; }
+
+.sol-kachel { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1);
+              border-radius: 16px; padding: 14px 12px; display: flex;
+              flex-direction: column; align-items: center; gap: 4px; }
+.sol-sym { width: 30px; height: 30px; fill: none; stroke-width: 1.7;
+           margin-bottom: 2px; }
+.sol-kachel--sonne .sol-sym { stroke: #ffc940; }
+.sol-kachel--haus .sol-sym { stroke: #7fb2ff; }
+.sol-kachel--bezug .sol-sym { stroke: #ff6b5e; }
+.sol-kachel--speisung .sol-sym { stroke: #3ddc84; }
+.sol-kachel--sonne { box-shadow: inset 0 0 0 1px rgba(255,201,64,.25); }
+.sol-kachel--bezug { box-shadow: inset 0 0 0 1px rgba(255,107,94,.3); }
+.sol-kachel--speisung { box-shadow: inset 0 0 0 1px rgba(61,220,132,.3); }
+.sol-kachel__name { font-size: .72rem; letter-spacing: .1em; text-transform: uppercase;
+                    color: #8fa6c6; }
+.sol-kachel__wert { font-size: 1.5rem; font-weight: 800; letter-spacing: -.02em;
+                    line-height: 1.1; }
+
+.sol-fluss { width: 100%; height: 40px; display: block; margin: -6px 0 2px; }
+.sol-linie { fill: none; stroke-linecap: round; stroke-dasharray: 2 12;
+             animation: solFliessen var(--tempo, 3s) linear infinite; }
+.sol-linie--sonne { stroke: #ffc940; }
+.sol-linie--bezug { stroke: #ff6b5e; }
+.sol-linie--speisung { stroke: #3ddc84; }
+@keyframes solFliessen { to { stroke-dashoffset: -28; } }
+@media (prefers-reduced-motion: reduce) { .sol-linie { animation: none; } }
+
+.sol-ring { width: 88px; height: 88px; margin: 2px auto 0; position: relative; }
+.sol-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.sol-ring__spur { fill: none; stroke: rgba(255,255,255,.1); stroke-width: 7; }
+.sol-ring__voll { fill: none; stroke: #ffc940; stroke-width: 7; stroke-linecap: round;
+                  filter: drop-shadow(0 0 6px rgba(255,201,64,.55)); }
+.sol-ring__mitte { position: absolute; inset: 0; display: flex; align-items: center;
+                   justify-content: center; gap: 1px; }
+.sol-ring__mitte strong { font-size: 1.6rem; font-weight: 800; }
+.sol-ring__mitte span { font-size: .8rem; color: #8fa6c6; align-self: flex-start;
+                        margin-top: 6px; }
+.sol-ring__text { text-align: center; margin: 2px 0 0; font-size: .74rem;
+                  letter-spacing: .1em; text-transform: uppercase; color: #8fa6c6; }
+
+.solar-tag { display: grid; gap: 8px; margin-top: 14px;
+             grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
+.solar-tag div { background: rgba(255,255,255,.06); border-radius: 12px;
+                 padding: 8px 10px; font-weight: 700; font-size: 1rem; }
+.solar-tag span { display: block; font-size: .66rem; font-weight: 500;
+                  color: #8fa6c6; text-transform: uppercase; letter-spacing: .08em; }
+
+@media (max-width: 560px) {
+  .sol__karten { grid-template-columns: 1fr; }
+  .sol-fluss { display: none; }
+}
+/* Der Ansehen-Knopf sitzt rechts in der Statuszeile */
+.statuszeile { position: relative; }
+.statuszeile__knopf { margin-left: auto; background: rgba(0,0,0,.08);
+                      border: 1px solid rgba(0,0,0,.14); border-radius: 999px;
+                      font: inherit; font-size: .78rem; font-weight: 700;
+                      padding: 5px 14px; cursor: pointer; color: inherit;
+                      white-space: nowrap; }
+.statuszeile__knopf:hover { background: rgba(0,0,0,.16); }
+body.dunkel .statuszeile__knopf { background: rgba(255,255,255,.12);
+                                  border-color: rgba(255,255,255,.2); }
 </style>
 </head>
 <body>
@@ -2840,7 +2915,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "71.0.0";
+const APP_VERSION = "71.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -3903,10 +3978,13 @@ async function seiteDashboard(b) {
   });
 }
 
-function statuszeile(anzahl, text, art) {
+function statuszeile(anzahl, text, art, knopf) {
   return '<div class="statuszeile statuszeile--' + art + '">'
     + '<span class="statuszeile__zahl">' + zahlText(anzahl) + '</span>'
-    + '<span>' + esc(text) + '</span></div>';
+    + '<span>' + esc(text) + '</span>'
+    + (knopf ? '<button class="statuszeile__knopf" data-vorb="' + knopf
+        + '">Ansehen</button>' : "")
+    + '</div>';
 }
 
 // Gemeldete Probleme von der Planwand, damit man sie beim Start sieht.
@@ -3978,24 +4056,17 @@ async function zeichneVorbereitung(b) {
   const bald = liste.filter((j) => (!j.fa_erstellt || !j.material_ok)
     && j.planned_from <= grenze);
 
-  ziel.innerHTML = '<section class="karte" data-zu="planwand">'
+  // Kein Sprung mehr beim Klick auf die Kachel — der Weg zum Auftrag
+  // führt über "Ansehen" und die Liste darin.
+  ziel.innerHTML = '<section class="karte">'
     + '<h2>Vorbereitung</h2>'
     + '<div class="statusliste">'
-    + statuszeile(ohneFa.length, "Aufträge ohne FA", ohneFa.length ? "warn" : "gut")
+    + statuszeile(ohneFa.length, "Aufträge ohne FA",
+        ohneFa.length ? "warn" : "gut", ohneFa.length ? "fa" : "")
     + statuszeile(ohneMaterial.length, "Aufträge ohne Material",
-        ohneMaterial.length ? "warn" : "gut")
+        ohneMaterial.length ? "warn" : "gut", ohneMaterial.length ? "material" : "")
     + '</div>'
-    // Die Aufzählung steckt jetzt in einem Fenster — auf der Startseite
-    // zählen die Zahlen, nicht eine halbe Liste.
-    + (ohneFa.length || ohneMaterial.length
-      ? '<div class="vorb-knoepfe">'
-        + (ohneFa.length
-            ? '<button class="knopf knopf--klein" data-vorb="fa">'
-              + ohneFa.length + ' ohne FA ansehen</button>' : "")
-        + (ohneMaterial.length
-            ? '<button class="knopf knopf--klein" data-vorb="material">'
-              + ohneMaterial.length + ' ohne Material ansehen</button>' : "")
-        + '</div>'
+    + (ohneFa.length || ohneMaterial.length ? ""
       : '<p class="hinweis">Alles vorbereitet.</p>')
     + '</section>';
 
