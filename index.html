@@ -2934,6 +2934,8 @@ body.dunkel tr.bz-zeile--spaet td { background: rgba(255,90,80,.12); }
 .dxf-steuer input[type="range"] { flex: 1; }
 .dxf-masse { margin: 10px 0 4px; font-size: .92rem; font-weight: 600;
              color: var(--marke); }
+.grav-gefahren { fill: none; stroke: var(--gefahr); stroke-width: 2.6; opacity: .45; }
+.grav-werkzeug { fill: rgba(200, 40, 30, .3); stroke: var(--gefahr); stroke-width: 1.4; }
 </style>
 </head>
 <body>
@@ -2982,7 +2984,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "65.2.0";
+const APP_VERSION = "65.3.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -11557,6 +11559,8 @@ const gravur = {
   glaetten: 0.02,    // Toleranz beim Vereinfachen in mm
   art: "stichel",    // stichel oder fraeser
   ausraeumen: false, // beim Fräser die Buchstaben ganz ausräumen
+  schritt: 0,        // Stellung des Werkzeugs in der Vorschau, 0…1
+  laeuft: false,
 };
 
 const GRAVUR_SCHRIFTEN = [
@@ -11894,20 +11898,64 @@ function gravurBild() {
   const zuege = gravurBahnen(roh.zuege);
   const breite = roh.breite, hoehe = roh.hoehe;
   if (!zuege.length) {
-    return '<svg viewBox="0 0 400 180" class="cax-bild">'
-      + '<text x="200" y="95" text-anchor="middle" class="cax-text">Kein Text</text></svg>';
+    return '<svg viewBox="0 0 400 200" class="cax-bild" id="grav-bild">'
+      + '<text x="200" y="100" text-anchor="middle" class="cax-text">Kein Text</text></svg>';
   }
   const rand = Math.max(breite, hoehe) * 0.12 + 1;
-  const b = breite + rand * 2, h = hoehe + rand * 2;
-  const s = Math.min(400 / b, 180 / h);
-  const p = ([x, y]) => (200 + x * s).toFixed(1) + "," + (90 - y * s).toFixed(1);
+  const b2 = breite + rand * 2, h2 = hoehe + rand * 2;
+  const s2 = Math.min(400 / b2, 170 / h2);
+  const p = ([x, y]) => (200 + x * s2).toFixed(1) + "," + (90 - y * s2).toFixed(1);
 
-  return '<svg viewBox="0 0 400 180" class="cax-bild">'
+  // Alle Züge hintereinander, damit sich das Werkzeug durchschieben lässt
+  const alle = [];
+  zuege.forEach((z, nr) => z.forEach((q) => alle.push({ p: q, zug: nr })));
+  const i = Math.min(alle.length - 1,
+    Math.max(0, Math.round(gravur.schritt * (alle.length - 1))));
+  const jetzt = alle[i];
+  const rW = Math.max(1.5, (gravur.werkzeug / 2) * s2);
+
+  // Schon gefahren: ganze Züge davor, im laufenden bis hierher
+  let gezaehlt = 0;
+  const gefahren = zuege.map((z, nr) => {
+    const start = gezaehlt;
+    gezaehlt += z.length;
+    if (nr > jetzt.zug) return "";
+    const bis = nr < jetzt.zug ? z.length : (i - start + 1);
+    if (bis < 2) return "";
+    return '<polyline points="' + z.slice(0, bis).map(p).join(" ")
+      + '" class="grav-gefahren"/>';
+  }).join("");
+
+  return '<svg viewBox="0 0 400 200" class="cax-bild" id="grav-bild">'
     + zuege.map((z) => '<polygon points="' + z.map(p).join(" ")
         + '" class="grav-zug"/>').join("")
-    + '<text x="200" y="174" text-anchor="middle" class="cax-legende">'
-    + breite.toFixed(2) + ' × ' + hoehe.toFixed(2) + ' mm</text>'
+    + gefahren
+    + '<circle cx="' + (200 + jetzt.p[0] * s2).toFixed(1)
+    + '" cy="' + (90 - jetzt.p[1] * s2).toFixed(1)
+    + '" r="' + rW.toFixed(1) + '" class="grav-werkzeug"/>'
+    + '<text x="200" y="192" text-anchor="middle" class="cax-legende">'
+    + breite.toFixed(2) + ' × ' + hoehe.toFixed(2) + ' mm · '
+    + zuege.length + ' Züge</text>'
     + '</svg>';
+}
+
+// Nur das Bild neu zeichnen, damit der Ablauf flüssig läuft
+function gravurNurBildNeu() {
+  const alt = document.getElementById("grav-bild");
+  if (!alt) return;
+  const huelle = document.createElement("div");
+  huelle.innerHTML = gravurBild();
+  alt.replaceWith(huelle.firstElementChild);
+}
+
+function gravurAblauf() {
+  if (!gravur.laeuft) return;
+  gravur.schritt += 0.003;
+  if (gravur.schritt > 1) gravur.schritt = 0;
+  const schieber = document.getElementById("grav-schieber");
+  if (schieber) schieber.value = Math.round(gravur.schritt * 1000);
+  gravurNurBildNeu();
+  requestAnimationFrame(gravurAblauf);
 }
 
 // ---------- Seite ----------
@@ -11925,7 +11973,13 @@ function rechnerGravur(ziel) {
     + '<input type="text" data-grav="text" value="' + esc(gravur.text) + '"></label>'
 
     + '<div class="cax-raster">'
-    + '<div class="cax-bildfeld">' + gravurBild() + '</div>'
+    + '<div class="cax-bildfeld">' + gravurBild()
+    + '<div class="dxf-steuer">'
+    + '<button class="knopf knopf--klein" id="grav-los">'
+    + (gravur.laeuft ? "Halt" : "Ablauf zeigen") + '</button>'
+    + '<input type="range" id="grav-schieber" min="0" max="1000" value="'
+    + Math.round(gravur.schritt * 1000) + '">'
+    + '</div></div>'
     + '<div class="cax-felder">'
     + '<label class="feld"><span>Schrift</span><select data-grav="schrift">'
     + GRAVUR_SCHRIFTEN.map((sn) => '<option value="' + esc(sn) + '"'
@@ -12008,6 +12062,8 @@ function rechnerGravur(ziel) {
       const name = el.dataset.grav;
       gravur[name] = el.type === "checkbox" ? el.checked
         : (el.type === "number" ? Number(el.value) : el.value);
+      gravur.laeuft = false;
+      gravur.schritt = 0;
       rechnerGravur(ziel);
     };
     if (el.type === "text") {
@@ -12017,6 +12073,19 @@ function rechnerGravur(ziel) {
       el.onchange = auslesen;
     }
   });
+
+  const schieber = document.getElementById("grav-schieber");
+  if (schieber) schieber.oninput = () => {
+    gravur.schritt = Number(schieber.value) / 1000;
+    gravurNurBildNeu();
+  };
+
+  const los = document.getElementById("grav-los");
+  if (los) los.onclick = () => {
+    gravur.laeuft = !gravur.laeuft;
+    los.textContent = gravur.laeuft ? "Halt" : "Ablauf zeigen";
+    if (gravur.laeuft) gravurAblauf();
+  };
 
   const kopieren = document.getElementById("grav-kopieren");
   if (kopieren) kopieren.onclick = async () => {
