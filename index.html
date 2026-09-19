@@ -2936,6 +2936,26 @@ body.dunkel tr.bz-zeile--spaet td { background: rgba(255,90,80,.12); }
              color: var(--marke); }
 .grav-gefahren { fill: none; stroke: var(--gefahr); stroke-width: 2.6; opacity: .45; }
 .grav-werkzeug { fill: rgba(200, 40, 30, .3); stroke: var(--gefahr); stroke-width: 1.4; }
+/* ---------- Maschinenbeschriftung ----------
+   Der Name stand in der gedämpften Grundfarbe und war auf der
+   hellen Spalte schwer zu lesen. Jetzt dunkel, kräftig und etwas
+   grösser; die Nummer daneben bleibt leiser, aber ebenfalls lesbar. */
+.pw-name:not(.pw-name--kopf):not(.pw-name--fein) {
+  color: var(--tinte) !important;
+  font-size: calc(1.05rem * var(--pw-v)) !important;
+  font-weight: 800 !important;
+  letter-spacing: -.01em; }
+.pw-name:not(.pw-name--kopf):not(.pw-name--fein) span,
+.pw-name__nr {
+  color: #4a5666 !important;
+  font-size: calc(0.86rem * var(--pw-v)) !important;
+  font-weight: 600 !important; }
+body.dunkel .pw-name:not(.pw-name--kopf):not(.pw-name--fein) span,
+body.dunkel .pw-name__nr { color: #a9b6c6 !important; }
+/* Der Name darf umbrechen, bevor er abgeschnitten wird */
+.pw-name:not(.pw-name--kopf):not(.pw-name--fein) { white-space: normal; }
+.pw-name__text { overflow: visible; text-overflow: clip;
+                 line-height: 1.15; word-break: break-word; }
 </style>
 </head>
 <body>
@@ -2984,7 +3004,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "65.4.0";
+const APP_VERSION = "65.5.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -5695,11 +5715,14 @@ function masseBerechnen(b) {
   const breite = (b && b.clientWidth) || window.innerWidth;
   const gesamt = Math.max(280, breite) - 8;
 
-  let namensbreite = Math.min(158, Math.floor(gesamt / 5));
+  // Die Namensspalte wächst mit der Zeilenhöhe mit, sonst wird der
+  // Maschinenname bei grosser Schrift abgeschnitten.
+  const nameGross = Math.round(200 * Math.max(1, plan.vskala || 1));
+  let namensbreite = Math.min(nameGross, Math.floor(gesamt / 4));
   plan.spalte = Math.max(9, (gesamt - namensbreite) / plan.tage);
 
   if (plan.spalte < 22) {
-    namensbreite = Math.min(namensbreite, 96);
+    namensbreite = Math.min(namensbreite, 120);
     plan.spalte = Math.max(9, (gesamt - namensbreite) / plan.tage);
   }
 
