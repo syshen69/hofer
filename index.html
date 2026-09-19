@@ -2495,10 +2495,8 @@ body.dunkel .pw-parkflaeche { background: #22303f; }
 
 /* Im dunklen Modus bleiben die Balken hell — schwarze Schrift auf
    heller Fläche ist auf der Wand in beiden Modi am besten lesbar. */
-body.dunkel .pw-balken,
-body.dunkel .pw-zeile1,
-body.dunkel .pw-zeile2,
-body.dunkel .pw-balken__nr { color: #10151c !important; }
+/* Die Schriftfarbe kommt jetzt je Balken aus der Helligkeit der
+   Farbe — der dunkle Modus darf sie nicht überschreiben. */
 /* ---------- Werkzeugplätze im Maschinentyp ---------- */
 .platz { border: 1px solid var(--linie); border-radius: var(--radius);
          padding: 10px 12px; margin-bottom: 10px; background: var(--grund); }
@@ -2917,7 +2915,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "61.4.0";
+const APP_VERSION = "62.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -5277,6 +5275,58 @@ function groesseBauen(dm, toleranz) {
   return "Ø" + dm + (toleranz ? " " + toleranz : "");
 }
 
+// Macht eine Farbe kräftig und leuchtend: Sättigung hoch, Helligkeit
+// auf einen Wert, bei dem sie noch strahlt, aber Text darauf lesbar
+// bleibt. Zurück kommt der Hintergrund und die passende Schriftfarbe.
+function leuchtend(hex) {
+  const h = String(hex || "#888888").replace("#", "");
+  const voll = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const r = parseInt(voll.slice(0, 2), 16) / 255;
+  const g = parseInt(voll.slice(2, 4), 16) / 255;
+  const b = parseInt(voll.slice(4, 6), 16) / 255;
+
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let farbton = 0;
+  const helle = (max + min) / 2;
+  const spanne = max - min;
+  let saettigung = spanne === 0 ? 0
+    : spanne / (1 - Math.abs(2 * helle - 1));
+
+  if (spanne !== 0) {
+    if (max === r) farbton = ((g - b) / spanne) % 6;
+    else if (max === g) farbton = (b - r) / spanne + 2;
+    else farbton = (r - g) / spanne + 4;
+    farbton *= 60;
+    if (farbton < 0) farbton += 360;
+  }
+
+  // Sättigung anheben, Helligkeit auf ein kräftiges Mittel bringen.
+  // Fast farblose Töne — Weiss, Grau — bleiben, wie sie sind.
+  const sNeu = saettigung < 0.12 ? saettigung : Math.min(1, saettigung * 1.45 + 0.15);
+  const lNeu = saettigung < 0.12 ? Math.max(helle, 0.82)
+    : Math.min(0.72, Math.max(0.56, helle * 0.35 + 0.45));
+
+  const c = (1 - Math.abs(2 * lNeu - 1)) * sNeu;
+  const x = c * (1 - Math.abs(((farbton / 60) % 2) - 1));
+  const m = lNeu - c / 2;
+  let rr = 0, gg = 0, bb = 0;
+  if (farbton < 60) { rr = c; gg = x; }
+  else if (farbton < 120) { rr = x; gg = c; }
+  else if (farbton < 180) { gg = c; bb = x; }
+  else if (farbton < 240) { gg = x; bb = c; }
+  else if (farbton < 300) { rr = x; bb = c; }
+  else { rr = c; bb = x; }
+
+  const zahl = (v) => Math.round((v + m) * 255);
+  const hintergrund = "#" + [zahl(rr), zahl(gg), zahl(bb)]
+    .map((v) => Math.max(0, Math.min(255, v)).toString(16).padStart(2, "0")).join("");
+
+  // Schrift nach Helligkeit: auf kräftigem Grund braucht es Weiss,
+  // auf hellem Schwarz. Sonst wäre die Nummer nicht zu lesen.
+  const wahrgenommen = 0.299 * zahl(rr) + 0.587 * zahl(gg) + 0.114 * zahl(bb);
+  return { hg: hintergrund, vg: wahrgenommen > 150 ? "#10151c" : "#ffffff" };
+}
+
 // Mischt eine Farbe mit Weiss. anteil 0 = unverändert, 1 = weiss.
 function aufhellen(hex, anteil) {
   const h = String(hex || "#888888").replace("#", "");
@@ -6861,8 +6911,9 @@ function planBalken(j, spalte, dauer, angeschnitten, vorlaufTage, dauerWahr) {
   // trägt, wird die Balkenfläche aufgehellt und die volle Farbe als
   // Streifen an den linken Rand gelegt — so bleibt sie erkennbar.
   const voll = fertig ? "#6b7280" : f.hex;
-  const hg = fertig ? "#d9dce0" : aufhellen(f.hex, 0.62);
-  const vg = "#10151c";
+  const ton = fertig ? { hg: "#d9dce0", vg: "#10151c" } : leuchtend(f.hex);
+  const hg = ton.hg;
+  const vg = ton.vg;
   const laeuft = st === "laeuft";
   const randKlasse = laeuft ? " pw-balken--laeuft" : "";
 
