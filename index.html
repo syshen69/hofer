@@ -2984,7 +2984,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "65.3.0";
+const APP_VERSION = "65.4.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -11165,6 +11165,8 @@ const caxis = {
   sicher: 2,         // Sicherheitsabstand
   zStart: 0,         // Stirnfläche
   richtung: "gleich",
+  schritt: 0,        // Stellung des Fräsers in der Vorschau, 0…1
+  laeuft: false,
 };
 
 // ---------- Geometrie ----------
@@ -11359,6 +11361,55 @@ function caxisGcode() {
 
 // ---------- Zeichnung ----------
 
+// Die Bahn als durchgehende Punktfolge — daraus lässt sich der
+// Fräser Schritt für Schritt durchschieben.
+function caxisPunkte() {
+  const { bahn } = caxisBahn(caxis.form);
+  if (!bahn.length) return [];
+  if (bahn[0].art === "punkte") return bahn[0].punkte.slice();
+
+  const punkte = [];
+  bahn.forEach((st, i) => {
+    if (st.art === "gerade") {
+      punkte.push(st.von, st.bis);
+    } else {
+      // Aussenecke: den Bogen in kleine Schritte zerlegen
+      const vorher = punkte[punkte.length - 1];
+      const naechste = bahn[(i + 1) % bahn.length];
+      const nach = naechste.art === "gerade" ? naechste.von : null;
+      if (!vorher || !nach) return;
+      const w1 = Math.atan2(vorher[1] - st.mitte[1], vorher[0] - st.mitte[0]);
+      let w2 = Math.atan2(nach[1] - st.mitte[1], nach[0] - st.mitte[0]);
+      while (w2 < w1) w2 += 2 * Math.PI;
+      const n = Math.max(3, Math.round(((w2 - w1) * 180) / Math.PI / 6));
+      for (let k = 1; k <= n; k++) {
+        const w = w1 + ((w2 - w1) * k) / n;
+        punkte.push([st.mitte[0] + st.r * Math.cos(w),
+                     st.mitte[1] + st.r * Math.sin(w)]);
+      }
+    }
+  });
+  return punkte;
+}
+
+function caxisNurBildNeu() {
+  const alt = document.getElementById("cax-bild");
+  if (!alt) return;
+  const huelle = document.createElement("div");
+  huelle.innerHTML = caxisBild();
+  alt.replaceWith(huelle.firstElementChild);
+}
+
+function caxisAblauf() {
+  if (!caxis.laeuft) return;
+  caxis.schritt += 0.004;
+  if (caxis.schritt > 1) caxis.schritt = 0;
+  const schieber = document.getElementById("cax-schieber");
+  if (schieber) schieber.value = Math.round(caxis.schritt * 1000);
+  caxisNurBildNeu();
+  requestAnimationFrame(caxisAblauf);
+}
+
 function caxisBild() {
   const { bahn, aussen } = caxisBahn(caxis.form);
   const gr = Math.max(aussen, 1) * 1.25;
@@ -11436,9 +11487,24 @@ function caxisBild() {
       + caxis.torxA + ' · B ' + caxis.torxB + '</text>';
   }
 
-  return '<svg viewBox="0 0 300 300" class="cax-bild">'
+  // Fräser an seiner Stelle und der schon gefahrene Weg
+  const folge = caxisPunkte();
+  let werkzeug = "";
+  if (folge.length) {
+    const i = Math.min(folge.length - 1,
+      Math.max(0, Math.round(caxis.schritt * (folge.length - 1))));
+    const [wx, wy] = folge[i];
+    werkzeug = '<polyline points="' + folge.slice(0, i + 1).map(p).join(" ")
+      + '" class="dxf-gefahren"/>'
+      + '<circle cx="' + (150 + wx * s).toFixed(1)
+      + '" cy="' + (150 - wy * s).toFixed(1)
+      + '" r="' + Math.max(2.5, (caxis.fraeser / 2) * s).toFixed(1)
+      + '" class="dxf-fraeser"/>';
+  }
+
+  return '<svg viewBox="0 0 300 300" class="cax-bild" id="cax-bild">'
     + '<circle cx="150" cy="150" r="2" class="cax-mitte"/>'
-    + teil + form + mass
+    + teil + form + werkzeug + mass
     + '<text x="8" y="292" class="cax-legende">— Teil</text>'
     + '<text x="70" y="292" class="cax-legende cax-legende--bahn">— Fräsermitte</text>'
     + '</svg>';
@@ -11470,7 +11536,13 @@ function rechnerCachse(ziel) {
     + '</div>'
 
     + '<div class="cax-raster">'
-    + '<div class="cax-bildfeld">' + caxisBild() + '</div>'
+    + '<div class="cax-bildfeld">' + caxisBild()
+    + '<div class="dxf-steuer">'
+    + '<button class="knopf knopf--klein" id="cax-los">'
+    + (caxis.laeuft ? "Halt" : "Ablauf zeigen") + '</button>'
+    + '<input type="range" id="cax-schieber" min="0" max="1000" value="'
+    + Math.round(caxis.schritt * 1000) + '">'
+    + '</div></div>'
     + '<div class="cax-felder">'
     + formfelder
     + zahl("eckR", "Eckenradius am Teil")
@@ -11508,15 +11580,35 @@ function rechnerCachse(ziel) {
     + '</div>';
 
   ziel.querySelectorAll("[data-caxform]").forEach((el) => {
-    el.onclick = () => { caxis.form = el.dataset.caxform; rechnerCachse(ziel); };
+    el.onclick = () => {
+      caxis.form = el.dataset.caxform;
+      caxis.laeuft = false;
+      caxis.schritt = 0;
+      rechnerCachse(ziel);
+    };
   });
   ziel.querySelectorAll("[data-cax]").forEach((el) => {
     el.onchange = () => {
       const name = el.dataset.cax;
       caxis[name] = el.type === "number" ? Number(el.value) : el.value;
+      caxis.laeuft = false;
+      caxis.schritt = 0;
       rechnerCachse(ziel);
     };
   });
+  const schieber = document.getElementById("cax-schieber");
+  if (schieber) schieber.oninput = () => {
+    caxis.schritt = Number(schieber.value) / 1000;
+    caxisNurBildNeu();
+  };
+
+  const los = document.getElementById("cax-los");
+  if (los) los.onclick = () => {
+    caxis.laeuft = !caxis.laeuft;
+    los.textContent = caxis.laeuft ? "Halt" : "Ablauf zeigen";
+    if (caxis.laeuft) caxisAblauf();
+  };
+
   const kopieren = document.getElementById("cax-kopieren");
   if (kopieren) kopieren.onclick = async () => {
     try {
