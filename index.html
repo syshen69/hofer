@@ -2932,6 +2932,8 @@ body.dunkel tr.bz-zeile--spaet td { background: rgba(255,90,80,.12); }
 .dxf-fraeser { fill: rgba(200, 40, 30, .28); stroke: var(--gefahr); stroke-width: 1.4; }
 .dxf-steuer { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
 .dxf-steuer input[type="range"] { flex: 1; }
+.dxf-masse { margin: 10px 0 4px; font-size: .92rem; font-weight: 600;
+             color: var(--marke); }
 </style>
 </head>
 <body>
@@ -2980,7 +2982,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "65.1.0";
+const APP_VERSION = "65.2.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -12049,6 +12051,8 @@ const dxf = {
   glaetten: 0.01,
   schritt: 0,        // Stellung des Fräsers in der Vorschau, 0…1
   laeuft: false,
+  massstab: 100,     // Grösse in Prozent
+  roh: [],           // Konturen so, wie sie in der Datei stehen
 };
 
 // ---------- Einlesen ----------
@@ -12193,6 +12197,31 @@ function dxfVerketten(stuecke) {
     .sort((a, b) => Math.abs(zugFlaeche(b.punkte)) - Math.abs(zugFlaeche(a.punkte)));
 }
 
+// Die Konturen im gewählten Massstab bereitstellen. Die Werte aus
+// der Datei bleiben unangetastet, damit mehrfaches Ändern nicht
+// aufsummiert.
+function dxfSkalieren() {
+  const k = dxf.massstab / 100;
+  dxf.konturen = (dxf.roh || []).map((z) => ({
+    punkte: z.punkte.map(([x, y]) => [x * k, y * k]),
+    geschlossen: z.geschlossen,
+  }));
+}
+
+// Grösse der gewählten Kontur, sonst der ganzen Zeichnung
+function dxfMasse(nurGewaehlte) {
+  const liste = (nurGewaehlte && dxf.konturen[dxf.gewaehlt])
+    ? [dxf.konturen[dxf.gewaehlt]] : dxf.konturen;
+  if (!liste.length) return null;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  liste.forEach((k) => k.punkte.forEach(([x, y]) => {
+    minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+  }));
+  return { breite: maxX - minX, hoehe: maxY - minY,
+           minX: minX, maxX: maxX, minY: minY, maxY: maxY };
+}
+
 // ---------- Bahn und G-Code ----------
 
 function dxfBahn() {
@@ -12312,6 +12341,16 @@ function rechnerDxf(ziel) {
     + '</div>'
     + '<div class="cax-felder">'
     + (dxf.konturen.length
+        ? '<label class="feld"><span>Massstab in Prozent</span>'
+          + '<input type="number" data-dxf="massstab" step="1" min="1" value="'
+          + dxf.massstab.toFixed(1) + '"></label>'
+          + '<label class="feld"><span>oder Breite in mm</span>'
+          + '<input type="number" id="dxf-zielbreite" step="0.1" value="'
+          + ((dxfMasse(dxf.gewaehlt >= 0) || dxfMasse(false)
+              || { breite: 0 }).breite).toFixed(2)
+          + '"><span class="feldhinweis">setzt den Massstab passend</span></label>'
+        : "")
+    + (dxf.konturen.length
         ? '<label class="feld"><span>Kontur</span><select data-dxf="gewaehlt">'
           + '<option value="-1">— wählen —</option>'
           + dxf.konturen.map((k, i) => '<option value="' + i + '"'
@@ -12335,6 +12374,30 @@ function rechnerDxf(ziel) {
     + zahl("glaetten", "Glättung in mm", "0.005")
     + '</div></div>'
 
+    + (() => {
+        const ganz = dxfMasse(false);
+        if (!ganz) return "";
+        const eine = dxfMasse(true);
+        const bahn = dxfBahn();
+        let bm = "";
+        if (bahn) {
+          let a = Infinity, b = -Infinity, c = Infinity, d = -Infinity;
+          bahn.forEach(([x, y]) => {
+            a = Math.min(a, x); b = Math.max(b, x);
+            c = Math.min(c, y); d = Math.max(d, y);
+          });
+          bm = ' · Bahn ' + (b - a).toFixed(2) + ' × ' + (d - c).toFixed(2)
+            + ' mm, grösster Durchmesser '
+            + (2 * Math.max(...bahn.map((q) => Math.hypot(q[0], q[1])))).toFixed(2)
+            + ' mm';
+        }
+        return '<p class="dxf-masse">Zeichnung ' + ganz.breite.toFixed(2) + ' × '
+          + ganz.hoehe.toFixed(2) + ' mm'
+          + (eine && dxf.gewaehlt >= 0
+              ? ' · gewählte Kontur ' + eine.breite.toFixed(2) + ' × '
+                + eine.hoehe.toFixed(2) + ' mm' : "")
+          + bm + '</p>';
+      })()
     + '<p class="klein">Blau sind die Konturen aus der Datei, rot ist die Bahn der '
     + 'Fräsermitte. Eine Kontur lässt sich auch direkt im Bild antippen. '
     + 'X ist im Durchmesser programmiert, C entspricht Y.</p>'
@@ -12348,7 +12411,9 @@ function rechnerDxf(ziel) {
     if (!f2) return;
     try {
       const inhalt = await f2.text();
-      dxf.konturen = dxfLesen(inhalt);
+      dxf.roh = dxfLesen(inhalt);
+      dxf.massstab = 100;
+      dxfSkalieren();
       dxf.name = f2.name;
       dxf.gewaehlt = dxf.konturen.length ? 0 : -1;
       dxf.schritt = 0;
@@ -12367,6 +12432,10 @@ function rechnerDxf(ziel) {
       const name = el.dataset.dxf;
       dxf[name] = el.type === "number" ? Number(el.value)
         : (name === "gewaehlt" ? Number(el.value) : el.value);
+      if (name === "massstab") {
+        dxf.massstab = Math.max(1, dxf.massstab || 100);
+        dxfSkalieren();
+      }
       dxf.schritt = 0;
       rechnerDxf(ziel);
     };
@@ -12375,6 +12444,18 @@ function rechnerDxf(ziel) {
   ziel.querySelectorAll("[data-dxfk]").forEach((el) => {
     el.onclick = () => { dxf.gewaehlt = Number(el.dataset.dxfk); rechnerDxf(ziel); };
   });
+
+  // Statt am Massstab zu drehen, lässt sich die Breite direkt setzen
+  const zielbreite = document.getElementById("dxf-zielbreite");
+  if (zielbreite) zielbreite.onchange = () => {
+    const soll = Number(zielbreite.value);
+    const jetzt = dxfMasse(dxf.gewaehlt >= 0) || dxfMasse(false);
+    if (!jetzt || !jetzt.breite || !soll || soll <= 0) return;
+    dxf.massstab = Math.max(1, (dxf.massstab * soll) / jetzt.breite);
+    dxfSkalieren();
+    dxf.schritt = 0;
+    rechnerDxf(ziel);
+  };
 
   const schieber = document.getElementById("dxf-schieber");
   if (schieber) schieber.oninput = () => {
