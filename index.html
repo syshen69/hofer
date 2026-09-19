@@ -3042,38 +3042,71 @@ body.dunkel .pw-name:not(.pw-name--kopf):not(.pw-name--fein) .pw-name__text {
 .gc-kopf summary { cursor: pointer; font-weight: 700; }
 .gc-kopf textarea { font-family: ui-monospace, Consolas, monospace; font-size: .86rem; }
 /* ---------- Solaranlage ---------- */
-.solar-fluss { width: 100%; max-width: 420px; height: auto; display: block;
-               margin: 4px auto 0; }
-.solar-knoten { fill: var(--flaeche); stroke: var(--linie-stark); stroke-width: 1.6; }
-.solar-knoten--sonne { fill: #ffd94020; stroke: #e6a800; stroke-width: 2; }
-.solar-strahl { stroke: #e6a800; stroke-width: 2; stroke-linecap: round; }
-.solar-dach { fill: none; stroke: var(--linie-stark); stroke-width: 1.6;
-              stroke-linejoin: round; }
-.solar-mast { fill: none; stroke: var(--linie-stark); stroke-width: 2;
-              stroke-linecap: round; }
-.solar-name { font-size: 11.5px; fill: var(--gedaempft); text-anchor: middle; }
-.solar-wert { font-size: 15px; font-weight: 800; fill: var(--tinte);
-              text-anchor: middle; }
-.solar-wert--bezug { fill: var(--gefahr); }
-.solar-pfeil { fill: none; stroke-linecap: round; }
-.solar-pfeil--gruen { stroke: #1e8449; }
-.solar-pfeil--rot { stroke: #c0392b; }
-.solar-pfeil--blau { stroke: #1268e0; }
-.solar-eigen { font-size: 12px; fill: var(--marke); text-anchor: middle;
-               font-weight: 700; }
+.solar { background: linear-gradient(140deg, #0f1b2e 0%, #132844 55%, #0d1826 100%);
+         color: #eef4ff; border: 0; overflow: hidden; position: relative; }
+.solar::after { content: ""; position: absolute; top: -60px; right: -40px;
+                width: 220px; height: 220px; border-radius: 50%;
+                background: radial-gradient(circle, rgba(255,201,64,.22), transparent 70%);
+                pointer-events: none; }
+.solar h2 { color: #fff; }
+.solar .karte__kopf .klein { color: #8fa6c6; }
 
-.solar-verlauf { width: 100%; height: auto; display: block; margin-top: 6px; }
-.solar-kurve--prod { fill: rgba(230, 168, 0, .35); stroke: #e6a800; stroke-width: 1.4; }
-.solar-kurve--verb { fill: rgba(18, 104, 224, .18); stroke: #1268e0; stroke-width: 1.4; }
-.solar-achse { font-size: 10px; fill: var(--gedaempft); }
+.sol { position: relative; }
+.sol__karten { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+               position: relative; z-index: 2; }
 
-.solar-tag { display: grid; gap: 10px; margin-top: 10px;
-             grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
-.solar-tag div { background: var(--grund); border-radius: var(--radius);
-                 padding: 8px 10px; font-weight: 700; }
-.solar-tag span { display: block; font-size: .72rem; font-weight: 500;
-                  color: var(--gedaempft); text-transform: uppercase;
-                  letter-spacing: .06em; }
+.sol-kachel { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1);
+              border-radius: 16px; padding: 14px 12px; display: flex;
+              flex-direction: column; align-items: center; gap: 4px;
+              backdrop-filter: blur(3px); }
+.sol-sym { width: 30px; height: 30px; fill: none; stroke-width: 1.7;
+           margin-bottom: 2px; }
+.sol-kachel--sonne .sol-sym { stroke: #ffc940; }
+.sol-kachel--haus .sol-sym { stroke: #7fb2ff; }
+.sol-kachel--bezug .sol-sym { stroke: #ff6b5e; }
+.sol-kachel--speisung .sol-sym { stroke: #3ddc84; }
+.sol-kachel--sonne { box-shadow: inset 0 0 0 1px rgba(255,201,64,.25); }
+.sol-kachel--bezug { box-shadow: inset 0 0 0 1px rgba(255,107,94,.3); }
+.sol-kachel--speisung { box-shadow: inset 0 0 0 1px rgba(61,220,132,.3); }
+.sol-kachel__name { font-size: .72rem; letter-spacing: .1em; text-transform: uppercase;
+                    color: #8fa6c6; }
+.sol-kachel__wert { font-size: 1.5rem; font-weight: 800; letter-spacing: -.02em;
+                    line-height: 1.1; }
+
+/* Die Linien dazwischen laufen, solange Leistung fliesst */
+.sol-fluss { width: 100%; height: 40px; display: block; margin: -6px 0 2px; }
+.sol-linie { fill: none; stroke-linecap: round; stroke-dasharray: 2 12;
+             animation: solFliessen var(--tempo, 3s) linear infinite; }
+.sol-linie--sonne { stroke: #ffc940; }
+.sol-linie--bezug { stroke: #ff6b5e; }
+.sol-linie--speisung { stroke: #3ddc84; }
+@keyframes solFliessen { to { stroke-dashoffset: -28; } }
+@media (prefers-reduced-motion: reduce) { .sol-linie { animation: none; } }
+
+.sol-ring { width: 88px; height: 88px; margin: 2px auto 0; position: relative; }
+.sol-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.sol-ring__spur { fill: none; stroke: rgba(255,255,255,.1); stroke-width: 7; }
+.sol-ring__voll { fill: none; stroke: #ffc940; stroke-width: 7; stroke-linecap: round;
+                  filter: drop-shadow(0 0 6px rgba(255,201,64,.55)); }
+.sol-ring__mitte { position: absolute; inset: 0; display: flex; align-items: center;
+                   justify-content: center; gap: 1px; }
+.sol-ring__mitte strong { font-size: 1.6rem; font-weight: 800; }
+.sol-ring__mitte span { font-size: .8rem; color: #8fa6c6; align-self: flex-start;
+                        margin-top: 6px; }
+.sol-ring__text { text-align: center; margin: 2px 0 0; font-size: .74rem;
+                  letter-spacing: .1em; text-transform: uppercase; color: #8fa6c6; }
+
+.solar-tag { display: grid; gap: 8px; margin-top: 14px;
+             grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
+.solar-tag div { background: rgba(255,255,255,.06); border-radius: 12px;
+                 padding: 8px 10px; font-weight: 700; font-size: 1rem; }
+.solar-tag span { display: block; font-size: .66rem; font-weight: 500;
+                  color: #8fa6c6; text-transform: uppercase; letter-spacing: .08em; }
+
+@media (max-width: 560px) {
+  .sol__karten { grid-template-columns: 1fr; }
+  .sol-fluss { display: none; }
+}
 </style>
 </head>
 <body>
@@ -3122,7 +3155,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "69.1.0";
+const APP_VERSION = "70.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -3897,8 +3930,9 @@ function solarKw(w) {
   return Math.round(z) + " W";
 }
 
-// Der Fluss: Sonne → Betrieb → Netz. Die Pfeilstärke zeigt, wie
-// viel gerade wohin läuft.
+// Der Fluss: Anlage → Betrieb → Netz. Die Linien sind bewegt, die
+// Geschwindigkeit richtet sich nach der Leistung — man sieht auf
+// einen Blick, wo gerade viel unterwegs ist.
 function solarFluss(j) {
   const prod = Number(j.produktion_w) || 0;
   const verb = Number(j.verbrauch_w) || 0;
@@ -3908,84 +3942,72 @@ function solarFluss(j) {
   const anteil = verb > 0 ? Math.round((eigen / verb) * 100) : 0;
   const gross = Math.max(1, prod, verb, Math.abs(netz));
 
-  // Zwischen zwei und sieben Pixeln, im Verhältnis zum grössten Wert
-  const dick = (w) => (2 + (Math.abs(w) / gross) * 5).toFixed(1);
+  // Je mehr Leistung, desto schneller läuft die Linie
+  const tempo = (w) => (6 - (Math.abs(w) / gross) * 4.4).toFixed(2) + "s";
+  const dick = (w) => (2.5 + (Math.abs(w) / gross) * 4).toFixed(1);
 
-  return '<svg viewBox="0 0 440 190" class="solar-fluss">'
-    + '<defs>'
-    + '<marker id="sp-gruen" viewBox="0 0 8 8" refX="6.5" refY="4" markerWidth="4"'
-    + ' markerHeight="4" orient="auto"><path d="M0 0l8 4-8 4z" fill="#1e8449"/></marker>'
-    + '<marker id="sp-rot" viewBox="0 0 8 8" refX="6.5" refY="4" markerWidth="4"'
-    + ' markerHeight="4" orient="auto"><path d="M0 0l8 4-8 4z" fill="#c0392b"/></marker>'
-    + '<marker id="sp-blau" viewBox="0 0 8 8" refX="6.5" refY="4" markerWidth="4"'
-    + ' markerHeight="4" orient="auto"><path d="M0 0l8 4-8 4z" fill="#1268e0"/></marker>'
-    + '</defs>'
+  const ring = 2 * Math.PI * 34;
+  const gefuellt = (ring * Math.min(100, anteil)) / 100;
 
-    // Pfeile zuerst, damit die Knoten darüberliegen
-    + (eigen > 0
-      ? '<path d="M96 62h56" class="solar-pfeil solar-pfeil--gruen" stroke-width="'
-        + dick(eigen) + '" marker-end="url(#sp-gruen)"/>' : "")
-    + (Math.abs(netz) > 2
-      ? (bezug
-          ? '<path d="M344 62h-56" class="solar-pfeil solar-pfeil--rot" stroke-width="'
-            + dick(netz) + '" marker-end="url(#sp-rot)"/>'
-          : '<path d="M288 62h56" class="solar-pfeil solar-pfeil--blau" stroke-width="'
-            + dick(netz) + '" marker-end="url(#sp-blau)"/>')
-      : "")
+  return '<div class="sol">'
+    + '<div class="sol__karten">'
 
-    // Anlage
-    + '<circle cx="62" cy="62" r="24" class="solar-knoten solar-knoten--sonne"/>'
-    + '<path d="M62 46v-8M62 78v8M46 62h-8M78 62h8M50 50l-6-6M74 74l6 6M74 50l6-6M50 74l-6 6"'
-    + ' class="solar-strahl"/>'
-    + '<text x="62" y="116" class="solar-name">Anlage</text>'
-    + '<text x="62" y="136" class="solar-wert">' + solarKw(prod) + '</text>'
+    // Erzeugung
+    + '<div class="sol-kachel sol-kachel--sonne">'
+    + '<svg viewBox="0 0 24 24" class="sol-sym"><circle cx="12" cy="12" r="5"/>'
+    + '<path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1'
+    + 'M17 7l2.1-2.1M4.9 19.1L7 17" stroke-linecap="round"/></svg>'
+    + '<span class="sol-kachel__name">Erzeugung</span>'
+    + '<span class="sol-kachel__wert">' + solarKw(prod) + '</span>'
+    + '</div>'
 
-    // Betrieb
-    + '<path d="M188 46l32-22 32 22" class="solar-dach"/>'
-    + '<rect x="192" y="46" width="56" height="42" rx="4" class="solar-knoten"/>'
-    + '<text x="220" y="116" class="solar-name">Betrieb</text>'
-    + '<text x="220" y="136" class="solar-wert">' + solarKw(verb) + '</text>'
+    // Verbrauch
+    + '<div class="sol-kachel sol-kachel--haus">'
+    + '<svg viewBox="0 0 24 24" class="sol-sym">'
+    + '<path d="M3 11l9-7 9 7v9a1 1 0 01-1 1H4a1 1 0 01-1-1z"/>'
+    + '<path d="M9 21v-6h6v6"/></svg>'
+    + '<span class="sol-kachel__name">Verbrauch</span>'
+    + '<span class="sol-kachel__wert">' + solarKw(verb) + '</span>'
+    + '</div>'
 
     // Netz
-    + '<path d="M378 34v58M360 46h36M364 60h28M368 74h20" class="solar-mast"/>'
-    + '<text x="378" y="116" class="solar-name">'
-    + (bezug ? "Bezug aus dem Netz" : "Einspeisung") + '</text>'
-    + '<text x="378" y="136" class="solar-wert' + (bezug ? " solar-wert--bezug" : "")
-    + '">' + solarKw(Math.abs(netz)) + '</text>'
+    + '<div class="sol-kachel ' + (bezug ? "sol-kachel--bezug" : "sol-kachel--speisung")
+    + '">'
+    + '<svg viewBox="0 0 24 24" class="sol-sym">'
+    + (bezug
+        ? '<path d="M13 2L4 14h6l-1 8 9-12h-6z" stroke-linejoin="round"/>'
+        : '<path d="M12 21V8M12 3v2M7 8h10M8 12h8M9 16h6" stroke-linecap="round"/>')
+    + '</svg>'
+    + '<span class="sol-kachel__name">' + (bezug ? "Netzbezug" : "Einspeisung") + '</span>'
+    + '<span class="sol-kachel__wert">' + solarKw(Math.abs(netz)) + '</span>'
+    + '</div>'
+    + '</div>'
 
-    + '<text x="220" y="172" class="solar-eigen">' + anteil
-    + ' % des Verbrauchs kommt gerade vom Dach</text>'
-    + '</svg>';
-}
+    // Die Verbindungen dazwischen
+    + '<svg viewBox="0 0 440 60" class="sol-fluss" preserveAspectRatio="none">'
+    + (eigen > 1
+        ? '<path d="M78 30H210" class="sol-linie sol-linie--sonne" stroke-width="'
+          + dick(eigen) + '" style="--tempo:' + tempo(eigen) + '"/>' : "")
+    + (Math.abs(netz) > 1
+        ? (bezug
+            ? '<path d="M362 30H230" class="sol-linie sol-linie--bezug" stroke-width="'
+              + dick(netz) + '" style="--tempo:' + tempo(netz) + '"/>'
+            : '<path d="M230 30H362" class="sol-linie sol-linie--speisung" stroke-width="'
+              + dick(netz) + '" style="--tempo:' + tempo(netz) + '"/>')
+        : "")
+    + '</svg>'
 
-// Tagesverlauf: Erzeugung und Verbrauch als Flächen
-function solarVerlauf(reihe) {
-  if (reihe.length < 2) return "";
-  const b = 320, h = 90;
-  const werte = reihe.map((r) => ({
-    t: new Date(r.gemessen).getTime(),
-    p: Number(r.produktion_w) || 0,
-    v: Number(r.verbrauch_w) || 0,
-  }));
-  const t0 = werte[0].t, t1 = werte[werte.length - 1].t || t0 + 1;
-  const gross = Math.max(1, ...werte.map((w) => Math.max(w.p, w.v)));
-  const x = (t) => (((t - t0) / (t1 - t0 || 1)) * b).toFixed(1);
-  const y = (w) => (h - (w / gross) * (h - 6)).toFixed(1);
-
-  const flaeche = (feld) => 'M0,' + h + " "
-    + werte.map((w) => x(w.t) + "," + y(w[feld])).join(" L")
-    + " L" + b + "," + h + "Z";
-
-  return '<svg viewBox="0 0 ' + b + ' ' + (h + 16) + '" class="solar-verlauf">'
-    + '<path d="' + flaeche("p") + '" class="solar-kurve solar-kurve--prod"/>'
-    + '<path d="' + flaeche("v") + '" class="solar-kurve solar-kurve--verb"/>'
-    + '<text x="0" y="' + (h + 13) + '" class="solar-achse">'
-    + uhrzeit(reihe[0].gemessen) + '</text>'
-    + '<text x="' + b + '" y="' + (h + 13) + '" text-anchor="end" class="solar-achse">'
-    + uhrzeit(reihe[reihe.length - 1].gemessen) + '</text>'
-    + '<text x="' + (b / 2) + '" y="' + (h + 13) + '" text-anchor="middle"'
-    + ' class="solar-achse">Spitze ' + solarKw(gross) + '</text>'
-    + '</svg>';
+    // Eigenverbrauch als Ring
+    + '<div class="sol-ring">'
+    + '<svg viewBox="0 0 80 80">'
+    + '<circle cx="40" cy="40" r="34" class="sol-ring__spur"/>'
+    + '<circle cx="40" cy="40" r="34" class="sol-ring__voll"'
+    + ' stroke-dasharray="' + gefuellt.toFixed(1) + ' ' + ring.toFixed(1) + '"/>'
+    + '</svg>'
+    + '<div class="sol-ring__mitte"><strong>' + anteil + '</strong><span>%</span></div>'
+    + '</div>'
+    + '<p class="sol-ring__text">vom Dach gedeckt</p>'
+    + '</div>';
 }
 
 function uhrzeit(iso) {
@@ -4029,7 +4051,6 @@ async function solarKachel(ziel) {
     + '<span class="klein">' + (alt < 2 ? "gerade eben"
         : "vor " + alt + " Min.") + '</span></div>'
     + solarFluss(j)
-    + solarVerlauf(reihe)
     + '<div class="solar-tag">'
     + (j.ertrag_tag_kwh !== null && j.ertrag_tag_kwh !== undefined
         ? '<div><span>Ertrag heute</span>'
