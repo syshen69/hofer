@@ -2905,6 +2905,18 @@ body.dunkel tr.bz-zeile--spaet td { background: rgba(255,90,80,.12); }
 .cax-felder { display: grid; gap: 10px;
               grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 @media (max-width: 760px) { .cax-raster { grid-template-columns: 1fr; } }
+/* ---------- Planwand bis an den unteren Rand ----------
+   Die Rolle hatte eine feste Höhenbegrenzung und darunter stand die
+   Bedienhilfe. Beides weg: der Bereich misst sich jetzt selbst und
+   endet am Fensterrand. */
+#pw-inhalt { display: flex; flex-direction: column; min-height: 0; }
+#pw-inhalt .pw-rolle {
+  max-height: none !important;
+  height: calc(100vh - var(--pw-oben, 220px) - 8px);
+  min-height: 240px; }
+@media (max-width: 720px) {
+  #pw-inhalt .pw-rolle { height: calc(100dvh - var(--pw-oben, 200px) - 8px); }
+}
 </style>
 </head>
 <body>
@@ -2953,7 +2965,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "63.1.0";
+const APP_VERSION = "63.2.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -6927,10 +6939,26 @@ function zeichnePlanwand(b) {
     + (heuteSpalte >= 0
         ? '<div class="pw-heutelinie' + (heuteAmRand ? " pw-heutelinie--rand" : "")
           + '" style="--heute:' + heuteSpalte + '"></div>' : "")
-    + '</div></div>'
-    + '<p class="pw-legende">Balken antippen öffnet den Auftrag. '
-    + 'Langes Drücken verschiebt ihn, an den Rändern ziehen ändert die Dauer. '
-    + 'Fertige Aufträge werden dunkelgrau.</p>';
+    + '</div></div>';
+
+  // Wie viel Platz über der Tafel weggeht — Kopfzeile, Regler,
+  // Reiter. Daraus ergibt sich die Höhe bis zum Fensterrand.
+  const messen = () => {
+    const rolle = document.querySelector(".pw-rolle");
+    if (!rolle) return;
+    const oben = rolle.getBoundingClientRect().top;
+    rolle.style.setProperty("--pw-oben", Math.round(oben) + "px");
+  };
+  messen();
+  requestAnimationFrame(messen);
+  if (!window._pwMessen) {
+    window._pwMessen = true;
+    window.addEventListener("resize", () => {
+      const r = document.querySelector(".pw-rolle");
+      if (r) r.style.setProperty("--pw-oben",
+        Math.round(r.getBoundingClientRect().top) + "px");
+    });
+  }
 
   // Der Puffer liegt links davor — also dorthin scrollen, wo der
   // eigentlich gewählte Zeitraum beginnt.
