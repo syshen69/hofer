@@ -2965,6 +2965,56 @@ body.dunkel .pw-name__nr { color: #a9b6c6 !important; }
 .pw-name--zieht .pw-name__text, .pw-name--zieht .pw-name__nr,
 .pw-name--zieht .pw-name__griff { color: #fff !important; opacity: 1; }
 .pw-zeile--ziel { box-shadow: inset 0 3px 0 0 var(--marke); }
+/* ---------- Fortschritt ---------- */
+.fo-zahlen { display: grid; gap: 12px; margin: 14px 0;
+             grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+.fo-zahl { background: var(--flaeche); border: 1px solid var(--linie);
+           border-radius: var(--radius); padding: 14px 16px;
+           display: flex; flex-direction: column; gap: 2px;
+           font-size: .85rem; color: var(--gedaempft); }
+.fo-zahl span { font-size: 1.9rem; font-weight: 800; color: var(--tinte);
+                line-height: 1; }
+.fo-zahl--minus span { color: var(--gefahr); }
+.fo-zahl--plus span { color: var(--gut); }
+
+.fo-filter { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.fo-filter select { min-width: 170px; }
+
+.fo-kopf { display: grid; grid-template-columns: minmax(180px, 1.4fr) 3fr 110px;
+           gap: 12px; align-items: baseline; padding: 0 4px 8px;
+           font-size: .74rem; letter-spacing: .07em; text-transform: uppercase;
+           color: var(--gedaempft); border-bottom: 1px solid var(--linie); }
+.fo-kopf__mitte { text-align: center; }
+
+.fo-zeile { display: grid; grid-template-columns: minmax(180px, 1.4fr) 3fr 110px;
+            gap: 12px; align-items: center; padding: 9px 4px;
+            border-bottom: 1px solid var(--linie); cursor: pointer; }
+.fo-zeile:hover { background: var(--grund); }
+.fo-zeile:last-child { border-bottom: 0; }
+.fo-wer { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.fo-wer strong { font-size: 1rem; }
+.fo-wer .klein { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.fo-balken { display: grid; grid-template-columns: 1fr 2px 1fr;
+             align-items: center; height: 18px; }
+.fo-balken__links { display: flex; justify-content: flex-end; }
+.fo-balken__rechts { display: flex; justify-content: flex-start; }
+.fo-balken__mitte { height: 18px; background: var(--linie-stark); }
+.fo-stab { display: block; height: 14px; border-radius: 3px; }
+.fo-stab--minus { background: var(--gefahr); }
+.fo-stab--plus { background: var(--gut); }
+
+.fo-tage { text-align: right; font-weight: 700; font-size: .95rem;
+           display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.fo-tage--minus { color: var(--gefahr); }
+.fo-tage--plus { color: var(--gut); }
+.fo-tage .klein { font-weight: 400; }
+
+@media (max-width: 700px) {
+  .fo-kopf { display: none; }
+  .fo-zeile { grid-template-columns: 1fr 90px; gap: 8px; }
+  .fo-balken { grid-column: 1 / -1; }
+}
 </style>
 </head>
 <body>
@@ -3013,7 +3063,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "66.0.0";
+const APP_VERSION = "67.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -15705,6 +15755,12 @@ SYM.start = svg('<rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/>'
   + '<rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/>'
   + '<rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/>');
 
+// Fortschritt: Zeitstrahl mit Abweichung nach oben und unten
+SYM.fortschritt = svg('<path d="M3 12h18"/>'
+  + '<path d="M7 12V7"/><path d="M12 12v6"/><path d="M17 12V9"/>'
+  + '<circle cx="7" cy="6" r="1.6"/><circle cx="12" cy="19" r="1.6"/>'
+  + '<circle cx="17" cy="8" r="1.6"/>');
+
 // Planwand: Tafel mit Balken
 SYM.planwand = svg('<rect x="2.5" y="4" width="19" height="16" rx="2"/>'
   + '<line x1="2.5" y1="8.5" x2="21.5" y2="8.5"/>'
@@ -17134,10 +17190,161 @@ SYM.spass = svg('<circle cx="12" cy="12" r="3"/>'
   + '<path d="M12 3.2a8.8 8.8 0 0 1 8.8 8.8M12 20.8A8.8 8.8 0 0 1 3.2 12"/>'
   + '<path d="M17.5 6.5l2.6-2.6M6.5 17.5l-2.6 2.6"/>');
 
+
+// =================================================================
+//  FORTSCHRITT
+//  Wie stehen die Aufträge zeitlich? Für jeden laufenden Auftrag
+//  wird verglichen, wie viel bis heute hätte fertig sein sollen und
+//  wie viel es wirklich ist. Die Abweichung in Stück wird über die
+//  Tagesleistung in Tage umgerechnet.
+// =================================================================
+
+const fort = { park: "alle", nur: "alle" };
+
+function fortschrittRechnen(j) {
+  const heute = isoDatum(new Date());
+  const tage = Math.max(1, j.planned_days || 1);
+  const ziel = Number(j.target_quantity) || 0;
+  const stand = Number(j.stand) || 0;
+  const proTag = ziel / tage;
+
+  const fertig = !!j.ended_at || j.plan_status === "fertig";
+  const laeuft = j.plan_status === "laeuft";
+
+  // Noch nicht angefangen, obwohl der Start vorbei ist
+  if (!laeuft && !fertig && j.planned_from && j.planned_from < heute) {
+    const spaet = arbeitstageZwischen(j.planned_from, heute) - 1;
+    return { art: "nichtgestartet", tage: -spaet, stueck: -Math.round(spaet * proTag),
+             soll: 0, proTag: proTag };
+  }
+
+  if (!laeuft || !ziel) return null;
+
+  // Wie viele Arbeitstage laufen schon?
+  const seit = j.planned_from && j.planned_from <= heute
+    ? arbeitstageZwischen(j.planned_from, heute) : 0;
+  const gelaufen = Math.min(tage, Math.max(0, seit));
+  const soll = Math.round(proTag * gelaufen);
+  const abweichung = stand - soll;
+
+  return { art: "laeuft", tage: proTag > 0 ? abweichung / proTag : 0,
+           stueck: abweichung, soll: soll, proTag: proTag, gelaufen: gelaufen };
+}
+
+async function seiteFortschritt(b) {
+  b.innerHTML = '<div class="laedt">Wird geladen …</div>';
+
+  let auftraege = [], parks = [];
+  try {
+    [auftraege, parks] = await Promise.all([ladePlanAuftraege(), ladeParks(false)]);
+  } catch (f) {
+    b.innerHTML = '<div class="karte karte--fehler"><p>' + esc(fehlertext(f)) + '</p></div>';
+    return;
+  }
+
+  const liste = auftraege
+    .filter((j) => fort.park === "alle" || j.park_id === fort.park)
+    .map((j) => ({ j: j, r: fortschrittRechnen(j) }))
+    .filter((x) => x.r)
+    .filter((x) => fort.nur === "alle"
+      || (fort.nur === "verzug" && x.r.tage < -0.5)
+      || (fort.nur === "vorsprung" && x.r.tage > 0.5))
+    .sort((a, c) => a.r.tage - c.r.tage);
+
+  const schlimmste = Math.max(2, ...liste.map((x) => Math.abs(x.r.tage)));
+  const imVerzug = liste.filter((x) => x.r.tage < -0.5).length;
+  const imPlan = liste.filter((x) => Math.abs(x.r.tage) <= 0.5).length;
+  const voraus = liste.filter((x) => x.r.tage > 0.5).length;
+
+  const balken = (x) => {
+    const anteil = Math.min(1, Math.abs(x.r.tage) / schlimmste);
+    const breit = (anteil * 46).toFixed(1);
+    const minus = x.r.tage < 0;
+    return '<div class="fo-balken">'
+      + '<div class="fo-balken__links">'
+      + (minus ? '<span class="fo-stab fo-stab--minus" style="width:'
+          + (breit / 46 * 100).toFixed(1) + '%"></span>' : "")
+      + '</div>'
+      + '<div class="fo-balken__mitte"></div>'
+      + '<div class="fo-balken__rechts">'
+      + (!minus ? '<span class="fo-stab fo-stab--plus" style="width:'
+          + (breit / 46 * 100).toFixed(1) + '%"></span>' : "")
+      + '</div></div>';
+  };
+
+  const tagText = (t) => (t > 0 ? "+" : "") + t.toFixed(1).replace(".", ",") + " Tage";
+
+  b.innerHTML = '<h1 class="seitentitel">Fortschritt</h1>'
+
+    + '<div class="fo-zahlen">'
+    + '<div class="fo-zahl fo-zahl--minus"><span>' + imVerzug + '</span>im Verzug</div>'
+    + '<div class="fo-zahl"><span>' + imPlan + '</span>im Plan</div>'
+    + '<div class="fo-zahl fo-zahl--plus"><span>' + voraus + '</span>voraus</div>'
+    + '</div>'
+
+    + '<div class="fo-filter">'
+    + '<select id="fo-park"><option value="alle">Alle Parks</option>'
+    + parks.map((p) => '<option value="' + esc(p.id) + '"'
+        + (fort.park === p.id ? " selected" : "") + '>' + esc(p.name) + '</option>').join("")
+    + '</select>'
+    + '<select id="fo-nur">'
+    + [["alle", "Alle Aufträge"], ["verzug", "Nur im Verzug"],
+       ["vorsprung", "Nur voraus"]]
+      .map(([w, t]) => '<option value="' + w + '"'
+        + (fort.nur === w ? " selected" : "") + '>' + t + '</option>').join("")
+    + '</select>'
+    + '</div>'
+
+    + (liste.length
+      ? '<section class="karte">'
+        + '<div class="fo-kopf"><span>Auftrag</span>'
+        + '<span class="fo-kopf__mitte">Verzug ← im Plan → Vorsprung</span>'
+        + '<span class="rechts">Tage</span></div>'
+        + liste.map((x) => '<div class="fo-zeile" data-fojob="' + esc(x.j.id) + '">'
+            + '<div class="fo-wer">'
+            + '<strong>' + esc(x.j.job_number || "") + '</strong>'
+            + '<span class="klein">' + esc(x.j.maschine || "")
+            + (x.r.art === "nichtgestartet"
+                ? " · noch nicht gestartet"
+                : " · " + zahlText(x.j.stand || 0) + " von "
+                  + zahlText(x.j.target_quantity || 0) + " Stück")
+            + '</span></div>'
+            + balken(x)
+            + '<div class="fo-tage ' + (x.r.tage < -0.5 ? "fo-tage--minus"
+                : (x.r.tage > 0.5 ? "fo-tage--plus" : "")) + '">'
+            + tagText(x.r.tage)
+            + (x.r.art === "laeuft" && x.r.stueck
+                ? '<span class="klein">' + (x.r.stueck > 0 ? "+" : "")
+                  + zahlText(x.r.stueck) + ' Stk</span>' : "")
+            + '</div></div>').join("")
+        + '</section>'
+      : '<p class="hinweis">Keine laufenden Aufträge mit einer Fertigungsmenge. '
+        + 'Gerechnet wird nur für Aufträge, die laufen und eine Stückzahl haben.</p>')
+
+    + '<p class="klein">Gerechnet wird aus Fertigungsmenge und geplanten Tagen die '
+    + 'Tagesleistung. Daraus ergibt sich, wie viele Stück bis heute fertig sein '
+    + 'sollten. Die Abweichung wird über dieselbe Tagesleistung in Tage '
+    + 'umgerechnet. Aufträge, die überfällig sind und noch nicht laufen, zählen '
+    + 'mit den vergangenen Arbeitstagen als Verzug.</p>';
+
+  const park = document.getElementById("fo-park");
+  if (park) park.onchange = () => { fort.park = park.value; seiteFortschritt(b); };
+  const nur = document.getElementById("fo-nur");
+  if (nur) nur.onchange = () => { fort.nur = nur.value; seiteFortschritt(b); };
+
+  b.querySelectorAll("[data-fojob]").forEach((el) => {
+    el.onclick = () => {
+      const j = auftraege.find((x) => x.id === el.dataset.fojob);
+      if (j) planAuftragDialog(j, b);
+    };
+  });
+}
+
 const SEITEN = [
   { pfad: "dashboard",    titel: "Start",        zeichen: SYM.start, zeige: seiteDashboard },
   { pfad: "planwand",     titel: "Planwand",     zeichen: SYM.planwand, zeige: seitePlanwand },
   { pfad: "produktion",   titel: "Produktion",   zeichen: SYM.produktion, zeige: seiteProduktion },
+  { pfad: "fortschritt",  titel: "Fortschritt",  zeichen: SYM.fortschritt, zeige: seiteFortschritt },
   { pfad: "bestellungen", titel: "Bestellungen", zeichen: SYM.bestellungen, zeige: seiteBestellungen },
   { pfad: "einkauf",      titel: "Einkauf",      zeichen: SYM.einkauf, zeige: seiteEinkauf },
   { pfad: "rechner",      titel: "Rechner",      zeichen: SYM.rechner, zeige: seiteRechner },
