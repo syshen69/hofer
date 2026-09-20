@@ -2867,6 +2867,14 @@ body.dunkel tr.bz-zeile--spaet td { background: rgba(255,90,80,.12); }
 .statuszeile__knopf:hover { background: rgba(0,0,0,.16); }
 body.dunkel .statuszeile__knopf { background: rgba(255,255,255,.12);
                                   border-color: rgba(255,255,255,.2); }
+/* Materialkachel in der Balkenfarbe der Planwand */
+.pad-karte[data-kfarbe] { background: var(--kfarbe) !important;
+                          border-color: rgba(0,0,0,.25) !important;
+                          color: var(--kschrift) !important; }
+.pad-karte[data-kfarbe] .pad-karte__name,
+.pad-karte[data-kfarbe] .pad-karte__unten { color: rgba(0,0,0,.6) !important; }
+.pad-karte[data-kfarbe]::before { background: radial-gradient(circle,
+                                    rgba(255,255,255,.28), transparent 70%); }
 </style>
 </head>
 <body>
@@ -2915,7 +2923,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "71.1.0";
+const APP_VERSION = "71.2.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -9429,7 +9437,10 @@ async function padMaschine(h) {
     + '</div>';
 
   const kachel = (name, wert, stil) => '<div class="pad-karte pad-karte--' + stil + '"'
-    + (wert.tipp ? ' data-padfeld="' + wert.tipp + '"' : "") + '>'
+    + (wert.tipp ? ' data-padfeld="' + wert.tipp + '"' : "")
+    + (wert.farbe ? ' style="--kfarbe:' + wert.farbe.hg + ';--kschrift:'
+        + wert.farbe.vg + '" data-kfarbe="1"' : "")
+    + '>'
     + '<span class="pad-karte__name">' + name + (wert.tipp ? " · antippen" : "") + '</span>'
     + '<span class="pad-karte__wert' + (wert.text ? "" : " pad-karte__wert--leer") + '">'
     + (wert.text ? esc(wert.text) : "keine vorhanden") + '</span>'
@@ -9442,8 +9453,16 @@ async function padMaschine(h) {
     + kachel("Stückzahl", { text: j ? zahlText(j.stand || 0) : "",
         unten: j && j.target_quantity ? "von " + zahlText(j.target_quantity) : "",
         tipp: j ? "stand" : "" }, "zahl")
+    // Die Materialkachel bekommt die Farbe des Balkens von der
+    // Planwand — dieselbe Zuordnung, dasselbe Erkennen auf einen Blick.
     + kachel("Material", { text: (j && j.material_bez) || (teil ? teil.material : ""),
-        unten: "" }, "breit")
+        unten: "",
+        farbe: (() => {
+          if (!j || !j.color) return null;
+          const f = (typeof PLANFARBEN !== "undefined" ? PLANFARBEN : [])
+            .find((x) => x.wert === j.color);
+          return f ? leuchtend(f.hex) : null;
+        })() }, "breit")
     + kachel("Programm", { text: programm }, "klein")
     + '</div>'
 
@@ -9550,6 +9569,9 @@ async function padMaschine(h) {
     try {
       await speichereStand(m.id, isoDatum(new Date()),
         Math.max(0, Math.round(Number(w.stk) || 0)), j.id);
+      // Dieselbe Ablage wie in der Produktion — was hier eingetragen
+      // wird, steht dort und auf der Planwand, und umgekehrt.
+      try { prod.auftraege = await ladeLaufendeAuftraege(); } catch (g) { /* egal */ }
       meldung("Stückzahl eingetragen.");
       padZeichnen();
     } catch (f) { meldung(fehlertext(f), "fehler"); }
