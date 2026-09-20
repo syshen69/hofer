@@ -2875,6 +2875,103 @@ body.dunkel .statuszeile__knopf { background: rgba(255,255,255,.12);
 .pad-karte[data-kfarbe] .pad-karte__unten { color: rgba(0,0,0,.6) !important; }
 .pad-karte[data-kfarbe]::before { background: radial-gradient(circle,
                                     rgba(255,255,255,.28), transparent 70%); }
+/* ---------- Fortschritt ---------- */
+.fo-zahlen { display: grid; gap: 12px; margin: 14px 0;
+             grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+.fo-zahl { background: var(--flaeche); border: 1px solid var(--linie);
+           border-radius: var(--radius); padding: 14px 16px;
+           display: flex; flex-direction: column; gap: 2px;
+           font-size: .85rem; color: var(--gedaempft); }
+.fo-zahl span { font-size: 1.9rem; font-weight: 800; color: var(--tinte);
+                line-height: 1; }
+.fo-zahl--minus span { color: var(--gefahr); }
+.fo-zahl--plus span { color: var(--gut); }
+
+.fo-filter { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.fo-filter select { min-width: 170px; }
+
+.fo-kopf { display: grid; grid-template-columns: minmax(180px, 1.4fr) 3fr 110px;
+           gap: 12px; align-items: baseline; padding: 0 4px 8px;
+           font-size: .74rem; letter-spacing: .07em; text-transform: uppercase;
+           color: var(--gedaempft); border-bottom: 1px solid var(--linie); }
+.fo-kopf__mitte { text-align: center; }
+
+.fo-zeile { display: grid; grid-template-columns: minmax(180px, 1.4fr) 3fr 110px;
+            gap: 12px; align-items: center; padding: 9px 4px;
+            border-bottom: 1px solid var(--linie); cursor: pointer; }
+.fo-zeile:hover { background: var(--grund); }
+.fo-zeile:last-child { border-bottom: 0; }
+.fo-wer { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.fo-wer strong { font-size: 1rem; }
+.fo-wer .klein { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fo-mnr { font-weight: 800; color: var(--tinte); font-size: 1.05em; }
+
+.fo-balken { display: grid; grid-template-columns: 1fr 2px 1fr;
+             align-items: center; height: 18px; }
+.fo-balken__links { display: flex; justify-content: flex-end; }
+.fo-balken__rechts { display: flex; justify-content: flex-start; }
+.fo-balken__mitte { height: 18px; background: var(--linie-stark); }
+.fo-stab { display: block; height: 14px; border-radius: 3px; }
+.fo-stab--minus { background: var(--gefahr); }
+.fo-stab--plus { background: var(--gut); }
+
+.fo-tage { text-align: right; font-weight: 700; font-size: .95rem;
+           display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.fo-tage--minus { color: var(--gefahr); }
+.fo-tage--plus { color: var(--gut); }
+.fo-tage .klein { font-weight: 400; }
+
+@media (max-width: 700px) {
+  .fo-kopf { display: none; }
+  .fo-zeile { grid-template-columns: 1fr 90px; gap: 8px; }
+  .fo-balken { grid-column: 1 / -1; }
+}
+/* ---------- C-Achse, Polarinterpolation ---------- */
+.cax-raster { display: grid; gap: 18px; grid-template-columns: 320px 1fr;
+              align-items: start; margin: 14px 0; }
+.cax-bildfeld { background: var(--grund); border: 1px solid var(--linie);
+                border-radius: var(--radius); padding: 8px; }
+.cax-bild { width: 100%; height: auto; display: block; }
+.cax-teil { fill: var(--marke-hell); stroke: var(--marke); stroke-width: 1.6; }
+.cax-bahn { fill: none; stroke: var(--gefahr); stroke-width: 1.4;
+            stroke-dasharray: 5 3; }
+.cax-mitte { fill: var(--gedaempft); }
+.cax-mass { stroke: var(--tinte); stroke-width: 1; stroke-dasharray: 3 2; }
+.cax-text { font-size: 12px; fill: var(--tinte); font-weight: 600; }
+.cax-legende { font-size: 11px; fill: var(--marke); }
+.cax-legende--bahn { fill: var(--gefahr); }
+.cax-felder { display: grid; gap: 10px;
+              grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.cax-warnung { margin: 10px 0; padding: 10px 14px; font-size: .9rem; }
+@media (max-width: 760px) { .cax-raster { grid-template-columns: 1fr; } }
+
+/* ---------- Gravur ---------- */
+.grav-zug { fill: var(--marke-hell); stroke: var(--gefahr); stroke-width: 1; }
+.grav-gefahren { fill: none; stroke: var(--gefahr); stroke-width: 2.6; opacity: .45; }
+.grav-werkzeug { fill: rgba(200, 40, 30, .3); stroke: var(--gefahr); stroke-width: 1.4; }
+
+/* ---------- DXF ---------- */
+.dxf-kopf { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+            margin-bottom: 12px; }
+.dxf-raster { grid-template-columns: 480px 1fr; }
+@media (max-width: 900px) { .dxf-raster { grid-template-columns: 1fr; } }
+.dxf-kontur { fill: none; stroke: var(--marke); stroke-width: 1.2; cursor: pointer; }
+.dxf-kontur:hover { stroke-width: 2.4; }
+.dxf-kontur--an { stroke-width: 2.4; }
+.dxf-bahn { fill: none; stroke: var(--gefahr); stroke-width: 1.2;
+            stroke-dasharray: 5 3; }
+.dxf-gefahren { fill: none; stroke: var(--gefahr); stroke-width: 2.6; opacity: .5; }
+.dxf-fraeser { fill: rgba(200, 40, 30, .28); stroke: var(--gefahr); stroke-width: 1.4; }
+.dxf-steuer { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.dxf-steuer input[type="range"] { flex: 1; }
+.dxf-masse { margin: 10px 0 4px; font-size: .92rem; font-weight: 600;
+             color: var(--marke); }
+
+/* ---------- Vor- und Nachspann für die Maschine ---------- */
+.gc-kopf { margin: 14px 0; border: 1px solid var(--linie); border-radius: var(--radius);
+           padding: 10px 14px; background: var(--grund); }
+.gc-kopf summary { cursor: pointer; font-weight: 700; }
+.gc-kopf textarea { font-family: ui-monospace, Consolas, monospace; font-size: .86rem; }
 </style>
 </head>
 <body>
@@ -2923,7 +3020,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "71.2.0";
+const APP_VERSION = "71.4.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
