@@ -2687,8 +2687,10 @@ body.dunkel tr.bz-zeile--spaet td { background: rgba(255,90,80,.12); }
   --prand: rgba(255,255,255,.08); --ptext: #eaf1fb;
   --pgedaempft: #8b9db8; --pblau: #1f6fe0; --pblauhell: #123a6e; }
 .pad { background:
-    radial-gradient(1100px 700px at 12% -10%, #1b3b78 0%, transparent 60%),
-    radial-gradient(900px 600px at 105% 110%, #2a1d6b 0%, transparent 55%),
+    radial-gradient(1100px 700px at 12% -10%,
+      color-mix(in srgb, var(--pblau) 55%, #0a1220) 0%, transparent 60%),
+    radial-gradient(900px 600px at 105% 110%,
+      color-mix(in srgb, var(--pblau) 30%, #1a1040) 0%, transparent 55%),
     #0a1220;
   color: var(--ptext); }
 
@@ -2705,7 +2707,8 @@ body.dunkel tr.bz-zeile--spaet td { background: rgba(255,90,80,.12); }
 .pad-kachel:active { transform: translateY(2px);
                      box-shadow: 0 8px 20px rgba(0,0,0,.4); }
 .pad-kachel__nr { color: var(--pgedaempft); }
-.pad-kachel__auftrag, .pad-kachel__zeichen { color: #5aa7ff; }
+.pad-kachel__auftrag, .pad-kachel__zeichen {
+  color: color-mix(in srgb, var(--pblau) 55%, #fff); }
 .pad-sprung { background: rgba(255,255,255,.06); border-color: var(--prand);
               color: var(--ptext); }
 
@@ -2731,9 +2734,11 @@ body.dunkel tr.bz-zeile--spaet td { background: rgba(255,90,80,.12); }
                      pointer-events: none; }
 .pad-karte--haupt { grid-column: span 4; }
 .pad-karte--zahl { grid-column: span 2;
-                   background: linear-gradient(160deg, #15376e, #0e2350);
-                   border-color: rgba(90,167,255,.35);
-                   box-shadow: 0 22px 50px rgba(12,60,140,.45),
+                   background: linear-gradient(160deg,
+                     color-mix(in srgb, var(--pblau) 42%, #0b1526),
+                     color-mix(in srgb, var(--pblau) 22%, #0b1526));
+                   border-color: color-mix(in srgb, var(--pblau) 55%, transparent);
+                   box-shadow: 0 22px 50px rgba(0,0,0,.45),
                                inset 0 1px 0 rgba(255,255,255,.12); }
 .pad-karte--breit { grid-column: span 3; }
 .pad-karte--klein { grid-column: span 1; }
@@ -2747,7 +2752,8 @@ body.dunkel tr.bz-zeile--spaet td { background: rgba(255,90,80,.12); }
 .pad-karte__wert--leer { font-size: 1.05rem !important; font-weight: 500;
                          color: var(--pgedaempft); }
 .pad-karte__unten { font-size: 1.05rem; color: var(--pgedaempft); }
-.pad-karte[data-padfeld] { cursor: pointer; border-color: rgba(90,167,255,.35); }
+.pad-karte[data-padfeld] { cursor: pointer;
+  border-color: color-mix(in srgb, var(--pblau) 50%, transparent); }
 .pad-karte[data-padfeld]:active { transform: translateY(2px); }
 
 /* Fortschritt */
@@ -2756,16 +2762,20 @@ body.dunkel tr.bz-zeile--spaet td { background: rgba(255,90,80,.12); }
                border-radius: 15px; overflow: hidden;
                box-shadow: inset 0 2px 6px rgba(0,0,0,.4); }
 .pad__balken__fuellung { position: absolute; inset: 0 auto 0 0;
-                         background: linear-gradient(90deg, #1f6fe0, #5aa7ff);
-                         box-shadow: 0 0 22px rgba(90,167,255,.55); }
+                         background: linear-gradient(90deg, var(--pblau),
+                           color-mix(in srgb, var(--pblau) 55%, #fff));
+                         box-shadow: 0 0 22px color-mix(in srgb,
+                           var(--pblau) 55%, transparent); }
 .pad__balken span { position: relative; display: block; text-align: center;
                     line-height: 28px; font-size: .88rem; font-weight: 700; }
 
 /* Die grossen Sprungkacheln unten */
 .pad__sprungkacheln { flex: 0 0 auto; display: grid; gap: 14px;
                       padding: 0 18px 18px; grid-template-columns: repeat(5, 1fr); }
-.pad-sprungkachel { background: linear-gradient(160deg, #1f6fe0, #14509f);
-                    border: 1px solid rgba(90,167,255,.5); color: #fff;
+.pad-sprungkachel { background: linear-gradient(160deg, var(--pblau),
+                      color-mix(in srgb, var(--pblau) 65%, #000));
+                    border: 1px solid color-mix(in srgb, var(--pblau) 70%, transparent);
+                    color: #fff;
                     border-radius: 20px; font: inherit; font-size: 1.15rem;
                     font-weight: 700; padding: 26px 12px; cursor: pointer;
                     box-shadow: 0 16px 34px rgba(12,60,140,.45),
@@ -3003,6 +3013,115 @@ body.dunkel .statuszeile__knopf { background: rgba(255,255,255,.12);
                     border-color: rgba(255,120,110,.45) !important; }
 .pad-karte--frueh { background: linear-gradient(160deg, #14452c, #0d2b1c) !important;
                     border-color: rgba(80,220,140,.4) !important; }
+/* ---------- Themenfarbe ----------
+   Die Grundfarbe lässt sich in den Einstellungen wechseln. Alles,
+   was die Marke benutzt — Menü, Knöpfe, Planwand, Pad Mode —,
+   folgt automatisch mit. */
+body[data-thema="rot"]      { --marke: #a4231c; --marke-dunkel: #7d1a15;
+                              --marke-hell: #fae9e8; --aktion: #a4231c;
+                              --aktion-dunkel: #7d1a15; --stahl: #a4231c; }
+body[data-thema="gruen"]    { --marke: #1c6b42; --marke-dunkel: #145131;
+                              --marke-hell: #e6f3ec; --aktion: #1c6b42;
+                              --aktion-dunkel: #145131; --stahl: #1c6b42; }
+body[data-thema="gelb"]     { --marke: #8a6608; --marke-dunkel: #6b4f06;
+                              --marke-hell: #fbf2dc; --aktion: #8a6608;
+                              --aktion-dunkel: #6b4f06; --stahl: #8a6608; }
+body[data-thema="rosa"]     { --marke: #a4256e; --marke-dunkel: #7f1c55;
+                              --marke-hell: #fbe9f3; --aktion: #a4256e;
+                              --aktion-dunkel: #7f1c55; --stahl: #a4256e; }
+body[data-thema="violett"]  { --marke: #5b2a9e; --marke-dunkel: #452078;
+                              --marke-hell: #f0e9fb; --aktion: #5b2a9e;
+                              --aktion-dunkel: #452078; --stahl: #5b2a9e; }
+body[data-thema="orange"]   { --marke: #9c4a0c; --marke-dunkel: #7a3a09;
+                              --marke-hell: #fceee2; --aktion: #9c4a0c;
+                              --aktion-dunkel: #7a3a09; --stahl: #9c4a0c; }
+
+/* Im dunklen Modus heller, damit die Schrift lesbar bleibt */
+body.dunkel[data-thema="rot"]     { --marke: #ff8a80; --marke-dunkel: #ffaba3;
+                                    --marke-hell: #3a1f1d; --aktion: #ff8a80;
+                                    --aktion-dunkel: #ffaba3; }
+body.dunkel[data-thema="gruen"]   { --marke: #5fd699; --marke-dunkel: #86e4b4;
+                                    --marke-hell: #17301f; --aktion: #5fd699;
+                                    --aktion-dunkel: #86e4b4; }
+body.dunkel[data-thema="gelb"]    { --marke: #f2c85a; --marke-dunkel: #f7d888;
+                                    --marke-hell: #332b14; --aktion: #f2c85a;
+                                    --aktion-dunkel: #f7d888; }
+body.dunkel[data-thema="rosa"]    { --marke: #ff86c4; --marke-dunkel: #ffa8d4;
+                                    --marke-hell: #351c2b; --aktion: #ff86c4;
+                                    --aktion-dunkel: #ffa8d4; }
+body.dunkel[data-thema="violett"] { --marke: #b98cf0; --marke-dunkel: #cdabf6;
+                                    --marke-hell: #281a3d; --aktion: #b98cf0;
+                                    --aktion-dunkel: #cdabf6; }
+body.dunkel[data-thema="orange"]  { --marke: #ffa45c; --marke-dunkel: #ffbe8a;
+                                    --marke-hell: #342315; --aktion: #ffa45c;
+                                    --aktion-dunkel: #ffbe8a; }
+
+/* Pad Mode folgt der Themenfarbe */
+body[data-thema="rot"] .pad     { --pblau: #c0392b; }
+body[data-thema="gruen"] .pad   { --pblau: #1e8449; }
+body[data-thema="gelb"] .pad    { --pblau: #b08900; }
+body[data-thema="rosa"] .pad    { --pblau: #c02a86; }
+body[data-thema="violett"] .pad { --pblau: #7239c0; }
+body[data-thema="orange"] .pad  { --pblau: #c25b10; }
+/* Auswahl der Themenfarbe */
+.themawahl { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 16px; }
+.themaknopf { display: inline-flex; align-items: center; gap: 7px; font: inherit;
+              font-size: .86rem; font-weight: 600; padding: 7px 14px 7px 9px;
+              border: 1.5px solid var(--linie); background: var(--flaeche);
+              color: var(--tinte); border-radius: 999px; cursor: pointer; }
+.themaknopf:hover { border-color: var(--linie-stark); }
+.themaknopf.aktiv { border-color: var(--marke); box-shadow: 0 0 0 2px var(--marke-hell); }
+.themaknopf__punkt { width: 16px; height: 16px; border-radius: 50%; flex: none;
+                     box-shadow: inset 0 0 0 1px rgba(0,0,0,.18); }
+.themaknopf--blau .themaknopf__punkt { background: #003884; }
+.themaknopf--rot .themaknopf__punkt { background: #a4231c; }
+.themaknopf--gruen .themaknopf__punkt { background: #1c6b42; }
+.themaknopf--gelb .themaknopf__punkt { background: #d9a300; }
+.themaknopf--rosa .themaknopf__punkt { background: #a4256e; }
+.themaknopf--violett .themaknopf__punkt { background: #5b2a9e; }
+.themaknopf--orange .themaknopf__punkt { background: #d96a12; }
+/* Das Profilbild ganz rechts ist der Weg in die Einstellungen */
+.kopf__ich { order: 99; margin-left: 6px; background: none; border: 0; padding: 2px;
+             cursor: pointer; border-radius: 8px; display: inline-flex;
+             align-items: center; }
+.kopf__ich:hover { background: var(--marke-hell); }
+.kopf__ich:focus-visible { outline: 2px solid var(--marke); outline-offset: 2px; }
+.kopf__benutzer { order: 98; }
+/* HOCO Nummern als grosses Fenster */
+.dialog--voll { width: min(1240px, 96vw) !important;
+                max-width: min(1240px, 96vw) !important;
+                height: min(860px, 92vh); max-height: 92vh;
+                display: flex; flex-direction: column; }
+/* Der Titel steht schon oben im Fenster — innen kein zweites Mal */
+.hoco-fenster > .karte > .karte__kopf > h2:first-child,
+.hoco-fenster > .karte__kopf > h2:first-child { display: none; }
+.hoco-fenster { flex: 1; min-height: 0; overflow: auto; padding-right: 4px; }
+.hoco-fenster .seitentitel { display: none; }
+/* Kopfkarte und Solaranlage in einem Block, aber getrennt lesbar */
+.kopfkarte { flex-wrap: wrap; align-items: stretch; }
+.kopfkarte__solar { flex: 1 1 100%; min-width: 0;
+                    margin: 14px -18px -18px; padding: 0; }
+.kopfkarte__solar .karte { margin: 0; border-radius: 0 0 var(--radius) var(--radius);
+                           box-shadow: none; }
+.kopfkarte__solar .karte__kopf { margin-bottom: 10px; }
+.kopfkarte__solar .solar { border-top: 1px solid rgba(255,255,255,.14); }
+.kopfkarte__solar .solar::after { top: -80px; }
+@media (max-width: 700px) { .kopfkarte__solar { margin: 12px -14px -14px; } }
+/* Am Handy ist die Namensspalte schmal. Dort kleinere Schrift und
+   ein Umbruch, damit Nummer und Name überhaupt Platz haben. */
+@media (max-width: 700px) {
+  .pw-name:not(.pw-name--kopf):not(.pw-name--fein) {
+    flex-wrap: wrap; white-space: normal; line-height: 1.15; }
+  .pw-name:not(.pw-name--kopf):not(.pw-name--fein) .pw-name__nr {
+    font-size: calc(0.92rem * var(--pw-v)) !important; margin-right: 5px; }
+  .pw-name:not(.pw-name--kopf):not(.pw-name--fein) .pw-name__text {
+    font-size: calc(0.74rem * var(--pw-v)) !important; overflow: visible;
+    text-overflow: clip; }
+  .pw-name__griff { display: none; }
+  /* Balkenschrift nicht unter die Lesbarkeitsgrenze fallen lassen */
+  .pw-zeile1 { font-size: max(11px, calc(0.82rem * var(--pw-t))) !important; }
+  .pw-zeile2 { font-size: max(10px, calc(0.74rem * var(--pw-t))) !important; }
+}
 </style>
 </head>
 <body>
@@ -3051,7 +3170,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "72.1.0";
+const APP_VERSION = "73.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -3400,6 +3519,22 @@ function einstellungAblegen(name, wert) {
   db.from("profiles").update({ einstellungen: profil.einstellungen })
     .eq("id", profil.id)
     .then((r) => { if (r && r.error) console.warn("Einstellung:", r.error.message); });
+}
+
+// Gewählte Themenfarbe, gemerkt wie die übrigen Einstellungen
+function themaJetzt() {
+  return einstellungWert("thema", "blau") || "blau";
+}
+
+function themaSetzen(wert) {
+  einstellungSetzenWert("thema", wert);
+  themaAnwenden();
+}
+
+function themaAnwenden() {
+  const w = themaJetzt();
+  if (w === "blau") document.body.removeAttribute("data-thema");
+  else document.body.setAttribute("data-thema", w);
 }
 
 function einstellungSetzenWert(name, wert) {
@@ -3972,11 +4107,11 @@ async function seiteDashboard(b) {
     + '<div class="kopfkarte__zeit"><div class="uhr" id="uhr">--:--</div>'
     + '<div class="kopfkarte__datum" id="datum"></div></div>'
     + '<div class="kopfkarte__wetter" id="wetter"><span class="klein">Wetter wird geladen …</span></div>'
+    + '<div class="kopfkarte__solar" id="db-solar"></div>'
     + '</section>'
 
     + '<p class="gruss">' + esc(begruessung()) + (name ? ", " + esc(name) : "") + '</p>'
 
-    + '<div id="db-solar"></div>'
     + '<div id="db-probleme"></div>'
     + '<div id="db-vorbereitung"></div>'
     + '<div id="db-einkauf"></div>'
@@ -4975,8 +5110,10 @@ async function seiteProduktion(b) {
     + '<div class="reiter">'
     // Alle Reiter auch am Handy. Die Listen sind schmal genug, und
     // wer unterwegs etwas nachschauen will, kommt sonst nicht hin.
+    // HOCO Nr. steht nicht mehr hier, sondern als Fenster auf der
+    // Planwand — dort wird am häufigsten nachgeschaut.
     + [["erfassen", "Erfassen"], ["fortschritt", "Fortschritt"],
-       ["maschinen", "Maschinen"], ["typen", "Typen"], ["hoco", "HOCO Nr."]]
+       ["maschinen", "Maschinen"], ["typen", "Typen"]]
         .map(([w, t]) => '<button class="reiter__knopf' + (prod.ansicht === w ? " aktiv" : "")
           + '" data-ansicht="' + w + '">' + t + '</button>').join("")
     + '</div>'
@@ -5998,7 +6135,13 @@ function planSyncStoppen() {
 }
 
 function masseBerechnen(b) {
-  if (!plan.tageWunsch) plan.tageWunsch = Number(einstellungWert("pwtage", 15)) || 15;
+  // Am Handy von Haus aus weniger Tage. Bei 15 Tagen auf 390 Pixeln
+  // bleiben je Tag knapp 18 Pixel — dort passt keine Nummer mehr in
+  // den Balken, und die Wand zeigt nur noch Farbflächen.
+  if (!plan.tageWunsch) {
+    plan.tageWunsch = Number(einstellungWert("pwtage", isMobil() ? 6 : 15))
+      || (isMobil() ? 6 : 15);
+  }
   plan.tage = Math.max(5, Math.min(200, plan.tageWunsch));
 
   const breite = (b && b.clientWidth) || window.innerWidth;
@@ -6026,15 +6169,18 @@ function masseBerechnen(b) {
     // Polster links und rechts, dazu der Griff zum Verschieben.
     // Die kleine Zugabe fängt ab, dass die Messung auf der Leinwand
     // Laufweite und Schriftglättung nicht genau abbildet.
-    const polster = 16 * v + (darfPlanen() ? 20 : 0) + 12;
+    const polster = 16 * v + (darfPlanen() && !isMobil() ? 20 : 0) + 12;
+    // Am Handy ist der Platz knapp: weniger Zugabe, dafür ein
+    // höherer Mindestwert, damit die Nummer nicht verschwindet.
+    if (isMobil()) return Math.max(118, Math.ceil(breiteste * 0.72 + polster));
     return Math.max(110, Math.ceil(breiteste * 1.06 + polster));
   })();
 
-  let namensbreite = Math.min(nameGross, Math.floor(gesamt / 3));
+  let namensbreite = Math.min(nameGross, Math.floor(gesamt / (isMobil() ? 2.6 : 3)));
   plan.spalte = Math.max(9, (gesamt - namensbreite) / plan.tage);
 
   if (plan.spalte < 22) {
-    namensbreite = Math.min(namensbreite, 120);
+    namensbreite = Math.min(namensbreite, isMobil() ? 118 : 120);
     plan.spalte = Math.max(9, (gesamt - namensbreite) / plan.tage);
   }
 
@@ -6142,10 +6288,7 @@ async function ansichtPlanwand(ziel, b) {
   // Knopf dafür ist deshalb nicht mehr nötig.
 
   const hocoKnopf = document.getElementById("pw-hoco");
-  if (hocoKnopf) hocoKnopf.onclick = () => {
-    prod.ansicht = "hoco";
-    location.hash = "#produktion";
-  };
+  if (hocoKnopf) hocoKnopf.onclick = () => hocoFenster(b);
 
   const sucheKnopf = document.getElementById("pw-suche-los");
   if (sucheKnopf) sucheKnopf.onclick = () => sucheDialog(b);
@@ -7640,6 +7783,28 @@ function wischVerhalten(b) {
 // Zeilen umsortieren: auf dem Namen lange drücken, dann nach oben
 // oder unten ziehen. Die Reihenfolge steht als sort_order an der
 // Maschine und gilt innerhalb des Parks.
+// Die HOCO Nummern als grosses Fenster über der Planwand. Innen
+// läuft dieselbe Ansicht wie früher im Reiter.
+function hocoFenster(b) {
+  const huelle = document.createElement("div");
+  huelle.className = "dialog-huelle";
+  huelle.innerHTML = '<div class="dialog dialog--voll">'
+    + '<div class="blatt__kopf"><h2>HOCO Nr.</h2>'
+    + '<button class="knopf knopf--still" data-zu>Schliessen</button></div>'
+    + '<div class="hoco-fenster" id="hoco-fensterinhalt">'
+    + '<div class="laedt">Wird geladen …</div></div></div>';
+
+  document.body.appendChild(huelle);
+  const zu = () => { huelle.remove(); };
+  huelle.querySelector("[data-zu]").onclick = zu;
+  dialogSchliessen(huelle, zu);
+
+  const inhalt = huelle.querySelector("#hoco-fensterinhalt");
+  ansichtHoco(inhalt, b).catch((f) => {
+    inhalt.innerHTML = '<p class="hinweis">' + esc(fehlertext(f)) + '</p>';
+  });
+}
+
 function zeilenVerschieben(b) {
   if (!darfPlanen()) return;
   const tafel = document.querySelector(".pw-tafel");
@@ -15711,6 +15876,10 @@ async function seiteEinstellungen(b) {
   }
 
   // ---------- Darstellung ----------
+  b.querySelectorAll("[data-thema]").forEach((el) => {
+    el.onclick = () => { themaSetzen(el.dataset.thema); seiteEinstellungen(b); };
+  });
+
   document.getElementById("e-dunkel").onchange = (e) => {
     einstellungSetzen("dunkel", e.target.checked);
     document.body.classList.toggle("dunkel", e.target.checked);
@@ -19062,6 +19231,7 @@ function zeichneGeruest() {
   // Die Einstellungen kommen vom Konto. Erst jetzt, nach dem
   // Anmelden, stehen sie fest — also hier noch einmal anwenden.
   document.body.classList.toggle("dunkel", einstellung("dunkel"));
+  themaAnwenden();
   // Administratoren sehen den Pad-Knopf auf jedem Gerät
   document.body.classList.toggle("ist-admin", istAdmin());
   // Steuert die Touch-Freigabe auf der Planwand
@@ -19081,20 +19251,16 @@ function zeichneGeruest() {
     + '<button class="kopf__rueck" id="rueck-knopf" hidden'
     + ' title="Rückgängig">↶</button>'
     + '<span class="kopf__luecke"></span>'
+    // Das Bild ganz rechts führt in die Einstellungen — der eigene
+    // Knopf dafür ist weg.
+    + '<span class="kopf__benutzer" data-benutzername>' + esc(anzeige) + '</span>'
+    + '<button class="kopf__ich" id="kopf-einstellungen" title="Einstellungen">'
     + (profil && profil.bild_url
         ? '<img class="kopf__bild" src="' + esc(profil.bild_url) + '" alt="">'
         : '<span class="kopf__bild kopf__bild--leer">'
           + esc(((profil && (profil.full_name || profil.email)) || "?").charAt(0).toUpperCase())
           + '</span>')
-    + '<span class="kopf__benutzer" data-benutzername>' + esc(anzeige) + '</span>'
-    + '<button class="kopf__einstellungen" id="kopf-einstellungen" title="Einstellungen">'
-    + '<svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor"'
-    + ' stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-    + '<circle cx="12" cy="12" r="3.2"/>'
-    + '<path d="M12 2.8v2.4M12 18.8v2.4M4.5 4.5l1.7 1.7M17.8 17.8l1.7 1.7'
-    + 'M2.8 12h2.4M18.8 12h2.4M4.5 19.5l1.7-1.7M17.8 6.2l1.7-1.7"/>'
-    + '</svg></button>' 
-    + '</header>'
+    + '</button>'
     + '<div class="rahmen"><nav class="nav" aria-label="Hauptnavigation">'
     + SEITEN.map((s) => '<a class="nav__punkt" data-nav="' + s.pfad + '" href="#/' + s.pfad + '">'
         + '<span class="nav__zeichen" aria-hidden="true">' + s.zeichen + '</span>'
@@ -19220,6 +19386,7 @@ window.addEventListener("hashchange", () => {
 
 // Gespeicherte Darstellung sofort anwenden, noch vor dem Anmelden
 if (einstellung("dunkel")) document.body.classList.add("dunkel");
+themaAnwenden();
 if (einstellungWert("navschmal", "0") === "1") document.body.classList.add("nav--schmal");
 
 try {
