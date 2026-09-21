@@ -3110,6 +3110,256 @@ body[data-thema="orange"] .pad  { --pblau: #c25b10; }
 @media (max-width: 560px) {
   .kopf__benutzer { display: none; }
 }
+/* ---------- Benutzerkacheln bei der Anmeldung ----------
+   Die Reihen werden im Code gleichmässig gefüllt; hier sorgt das
+   Layout nur dafür, dass jede Reihe mittig steht. */
+.login__kacheln--reihen { display: flex !important; flex-direction: column;
+                          align-items: center; gap: 14px !important;
+                          margin: 6px auto 0; max-width: none !important; }
+.login__reihe { display: flex; justify-content: center; gap: 14px; }
+.login__kacheln--reihen .login__kachel { flex: 0 0 112px; width: 112px;
+                                         max-width: 112px; margin: 0; }
+@media (max-width: 480px) {
+  .login__kacheln--reihen, .login__reihe { gap: 10px !important; }
+  .login__kacheln--reihen .login__kachel { flex-basis: 94px; width: 94px;
+                                           max-width: 94px; }
+}
+
+/* ---------- Logo und Bilder in der Themenfarbe ----------
+   Alle Firmenbilder sind in Firmenblau gehalten. Über eine
+   Farbdrehung folgen sie der gewählten Farbe — Anmeldebild, Logo in
+   der Kopfzeile und die Bilder im Pad Mode. */
+body[data-thema="rot"]     :is(.login__bild, .pad__logo, .pad__bildoben, .kopf__logo) {
+  filter: hue-rotate(148deg) saturate(1.25); }
+body[data-thema="gruen"]   :is(.login__bild, .pad__logo, .pad__bildoben, .kopf__logo) {
+  filter: hue-rotate(-68deg) saturate(1.1); }
+body[data-thema="gelb"]    :is(.login__bild, .pad__logo, .pad__bildoben, .kopf__logo) {
+  filter: hue-rotate(-172deg) saturate(1.6) brightness(1.18); }
+body[data-thema="rosa"]    :is(.login__bild, .pad__logo, .pad__bildoben, .kopf__logo) {
+  filter: hue-rotate(110deg) saturate(1.2); }
+body[data-thema="violett"] :is(.login__bild, .pad__logo, .pad__bildoben, .kopf__logo) {
+  filter: hue-rotate(52deg) saturate(1.1); }
+body[data-thema="orange"]  :is(.login__bild, .pad__logo, .pad__bildoben, .kopf__logo) {
+  filter: hue-rotate(-192deg) saturate(1.6) brightness(1.12); }
+
+/* ---------- Pad Mode: Hintergrund immer deckend ----------
+   Der Farbverlauf nutzt color-mix. Ältere Tablets kennen das nicht
+   und verwerfen dann die ganze Angabe — deshalb zuerst ein fester
+   Hintergrund, der Verlauf nur, wo er verstanden wird. */
+.pad { background-color: #0a1220 !important; }
+@supports not (background: color-mix(in srgb, red 50%, blue)) {
+  .pad { background: linear-gradient(160deg, #13284d 0%, #0a1220 55%, #150f33 100%)
+         !important; }
+  .pad-karte--zahl { background: linear-gradient(160deg, #15376e, #0e2350) !important; }
+  .pad-sprungkachel { background: linear-gradient(160deg, #1f6fe0, #14509f) !important; }
+  .pad__balken__fuellung { background: #1f6fe0 !important; }
+}
+
+/* Startbild und Kacheln im Pad Mode */
+.pad__start { flex: 1 1 auto; display: flex; flex-direction: column;
+              align-items: center; min-height: 0; overflow: auto; }
+.pad__logo { display: block; width: min(560px, 82%); height: auto;
+             margin: 26px auto 8px; border-radius: 18px;
+             box-shadow: 0 24px 60px rgba(0,0,0,.55); }
+.pad__start .pad__kacheln { width: 100%; max-width: 1000px; flex: 0 0 auto; }
+@media (max-width: 700px) {
+  .pad__logo { width: 92%; margin-top: 16px; border-radius: 12px; }
+}
+/* ---------- Dunkler Modus: Nachbesserungen ----------
+   1. Die Balken sind hell, die Schrift darauf muss schwarz bleiben —
+      auch im dunklen Modus, sonst ist sie weiss auf Pastell.
+   2. Unter dem Seiteninhalt schaute das helle html durch.
+   3. Grosse Flächen in der Themenfarbe sind im dunklen Modus zu hell
+      für weisse Schrift; dort wird die Farbe abgedunkelt.
+   4. Auf der aufgehellten Markenfarbe steht dunkle Schrift. */
+body.dunkel .pw-balken,
+body.dunkel .pw-balken .pw-zeile1,
+body.dunkel .pw-balken .pw-zeile2,
+body.dunkel .pw-balken .pw-balken__nr,
+body.dunkel .pw-balken .pw-balken__statusgross,
+body.dunkel .pw-balken .pw-balken__planer { color: #10151c !important; }
+body.dunkel .pw-balken--fertig,
+body.dunkel .pw-balken--fertig .pw-zeile1,
+body.dunkel .pw-balken--fertig .pw-zeile2 { color: #3b4350 !important; }
+
+html:has(body.dunkel) { background: #14181d; }
+
+body.dunkel .kopfkarte { background: #1b2733; }
+@supports (background: color-mix(in srgb, red 50%, blue)) {
+  body.dunkel .kopfkarte {
+    background: color-mix(in srgb, var(--marke) 30%, #151b22); }
+}
+body.dunkel .kopfkarte, body.dunkel .kopfkarte .uhr,
+body.dunkel .kopfkarte__datum { color: #eef3f9; }
+
+body.dunkel :is(.pad-start, .knopf--haupt, .kopf__bild--leer, .marke,
+                .reiter__knopf.aktiv .zaehler) { color: #0d1117 !important; }
+body.dunkel .pad-start { box-shadow: none; }
+/* Kacheln im Pad Mode leicht in der Themenfarbe getönt */
+@supports (background: color-mix(in srgb, red 50%, blue)) {
+  .pad-kachel { background: linear-gradient(160deg,
+      color-mix(in srgb, var(--pblau) 22%, #111a2b),
+      color-mix(in srgb, var(--pblau) 8%, #0c1422)) !important; }
+  .pad-kachel__zeichen { color: color-mix(in srgb, var(--pblau) 50%, #fff); }
+}
+/* =================================================================
+   PLANWAND — wiederhergestellt
+   Diese Regeln waren beim Umbau des Pad-Stils (Version 71) verloren
+   gegangen. Hier stehen sie gesammelt, damit sie nicht wieder in
+   einem anderen Abschnitt untergehen.
+   ================================================================= */
+
+/* Balken ohne Rahmen, volle Zeilenhöhe, Farbstreifen links */
+.pw-balken-schicht { inset: 0 !important; }
+.pw-balken { position: relative; border: 0 !important; border-radius: 0 !important;
+             box-shadow: none !important; padding-top: 0 !important;
+             padding-bottom: 0 !important; padding-left: 9px !important;
+             align-items: stretch; }
+.pw-balken::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+                     width: 4px; background: var(--voll, #003884); }
+.pw-balken--laeuft { box-shadow: inset 0 0 0 2px rgba(0, 0, 0, .55) !important; }
+.pw-balken--offen::before { background: repeating-linear-gradient(
+    180deg, var(--voll, #003884) 0 4px, transparent 4px 8px); }
+
+/* Zwei Textzeilen, dicht untereinander, ohne sich zu berühren */
+.pw-tafel { --pw-t: min(var(--pw-s, 1), var(--pw-v, 1)); }
+.pw-balken__inhalt { display: flex; flex-direction: column; justify-content: center;
+                     gap: 0 !important; line-height: 1.05; }
+.pw-zeile1 { line-height: 1.05 !important; margin: 0; padding: 0;
+             font-size: max(9.5px, calc(0.82rem * var(--pw-t))); }
+.pw-zeile2 { line-height: 1.05 !important; margin: 0; padding: 0;
+             font-size: max(9px, calc(0.74rem * var(--pw-t))); }
+.pw-balken__nr { line-height: 1.05; font-size: inherit; }
+.pw-balken__planer { font-size: max(8.5px, calc(0.7rem * var(--pw-t))); }
+.pw-balken__statusgross { font-size: max(12px, calc(1.35rem * var(--pw-v, 1))); }
+.pw-balken__fehlt { font-size: max(8px, calc(0.6rem * var(--pw-t))); }
+
+/* Flache Zeilen: beide Textzeilen bleiben, alles rückt zusammen */
+.pw-tafel--flach .pw-zeile1 { font-size: 9.5px; }
+.pw-tafel--flach .pw-zeile2 { font-size: 8.5px; }
+.pw-tafel--flach .pw-balken__statusgross { font-size: 13px; }
+.pw-tafel--flach .pw-balken__fehlt,
+.pw-tafel--flach .pw-balken__zeichen { display: none; }
+
+/* Maschinenbeschriftung: Nummer vorn, fett und grösser, Name daneben */
+.pw-name:not(.pw-name--kopf):not(.pw-name--fein) {
+  display: flex; align-items: center; justify-content: flex-start;
+  flex-wrap: nowrap; white-space: nowrap; gap: 0; }
+.pw-name:not(.pw-name--kopf):not(.pw-name--fein) .pw-name__nr {
+  order: -1; flex: none; margin: 0 6px 0 0;
+  font-size: calc(1.1rem * var(--pw-v, 1)) !important;
+  font-weight: 800 !important; color: var(--tinte) !important; }
+.pw-name:not(.pw-name--kopf):not(.pw-name--fein) .pw-name__text {
+  min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis;
+  font-size: calc(0.9rem * var(--pw-v, 1)) !important; font-weight: 600;
+  color: #4a5666; }
+body.dunkel .pw-name:not(.pw-name--kopf):not(.pw-name--fein) .pw-name__text {
+  color: #a9b6c6; }
+
+/* Zeilen umsortieren */
+.pw-name--fassbar { cursor: grab; touch-action: none; }
+.pw-name--zieht { background: var(--marke) !important; }
+.pw-name--zieht .pw-name__text, .pw-name--zieht .pw-name__nr { color: #fff !important; }
+.pw-zeile--ziel { box-shadow: inset 0 3px 0 0 var(--marke); }
+
+/* Beim Verschieben liegt die Balkenschicht nicht im Weg — sonst
+   findet das Loslassen keine Zielzelle */
+.pw-tafel--zieht .pw-balken-schicht,
+.pw-tafel--zieht .pw-balken,
+.pw-tafel--zieht .pw-griff { pointer-events: none !important; }
+
+/* Der Schatten schwebt über dem Zeiger und ist durchsichtig */
+.pw-schatten { transform: translate(-50%, -175%) !important; opacity: .6;
+               padding: 5px 10px; font-size: .78rem;
+               box-shadow: 0 4px 12px rgba(0, 0, 0, .25); }
+
+/* Heute-Linie */
+.pw-heutelinie { left: calc(var(--pw-name, 108px)
+                   + (100% - var(--pw-name, 108px))
+                     * (var(--heute) + 0.5) / var(--pw-tage, 15)) !important;
+                 width: 2px; background: var(--gefahr); opacity: .9;
+                 box-shadow: 0 0 0 1px rgba(255, 255, 255, .35); }
+.pw-heutelinie--rand { left: calc(var(--pw-name, 108px)
+                        + (100% - var(--pw-name, 108px))
+                          * var(--heute) / var(--pw-tage, 15)) !important; }
+.pw-heutelinie::before { content: ""; position: absolute; top: 0; left: -3px;
+                         width: 8px; height: 8px; border-radius: 50%;
+                         background: var(--gefahr); }
+
+/* Die Tafel reicht bis an den unteren Fensterrand */
+#pw-inhalt { display: flex; flex-direction: column; min-height: 0; }
+#pw-inhalt .pw-rolle { max-height: none !important;
+                       height: calc(100vh - var(--pw-oben, 220px) - 8px);
+                       min-height: 240px; }
+@media (max-width: 720px) {
+  #pw-inhalt .pw-rolle { height: calc(100dvh - var(--pw-oben, 200px) - 8px); }
+}
+
+/* Regler für die Zeilenhöhe */
+.pw-zoom--hoehe input[type="range"] { max-width: 120px; }
+#pw-hoehewert { min-width: 42px; text-align: right; }
+/* ---------- Pad-Dashboard: Kacheln füllen die ganze Fläche ----------
+   Oben HOCO Nr. und Stückzahl, etwas höher; darunter Material,
+   Programm und Fortschritt gleich breit. */
+.pad__raster { grid-template-columns: repeat(6, 1fr) !important;
+               grid-template-rows: 1.3fr 1fr !important;
+               flex: 1 1 auto !important; min-height: 0; }
+.pad-karte--haupt { grid-column: span 3 !important; }
+.pad-karte--zahl  { grid-column: span 3 !important; }
+.pad-karte--breit { grid-column: span 2 !important; }
+.pad-karte--klein { grid-column: span 2 !important; }
+.pad-karte__wert { font-size: clamp(1.5rem, 3.8vw, 3.2rem) !important; }
+.pad-karte--haupt .pad-karte__wert,
+.pad-karte--zahl .pad-karte__wert { font-size: clamp(2rem, 5.4vw, 4.4rem) !important; }
+.pad-karte--breit .pad-karte__wert,
+.pad-karte--klein .pad-karte__wert { font-size: clamp(1.2rem, 2.6vw, 2.2rem) !important; }
+
+.pad__sprungkacheln { grid-template-columns: repeat(6, 1fr) !important; }
+.pad-sprungkachel--ende { background: linear-gradient(160deg, #b3261e, #7a1a14) !important;
+                          border-color: rgba(255, 140, 130, .5) !important; }
+.pad-sprungkachel--start { background: linear-gradient(160deg, #1f8a4c, #145c33) !important;
+                           border-color: rgba(120, 230, 160, .5) !important; }
+
+@media (max-width: 900px) {
+  .pad__raster { grid-template-columns: repeat(2, 1fr) !important;
+                 grid-template-rows: none !important; }
+  .pad-karte--haupt, .pad-karte--zahl, .pad-karte--breit { grid-column: span 2 !important; }
+  .pad-karte--klein { grid-column: span 1 !important; }
+  .pad__sprungkacheln { grid-template-columns: repeat(2, 1fr) !important; }
+}
+/* ---------- Kopflogo in der Themenfarbe ---------- */
+.kopf__logo--maske { display: block; height: 30px; width: 120px;
+                     background: var(--marke); filter: none !important;
+                     -webkit-mask: url("./logo.png") left center / contain no-repeat;
+                     mask: url("./logo.png") left center / contain no-repeat; }
+
+/* ---------- Startseite: Verlauf von der Kopfkarte ins Dunkle ----------
+   Die Solaranlage beginnt oben in der Farbe der Kopfkarte und läuft
+   nach unten ins Dunkle — die beiden Teile wirken wie ein Block. */
+.kopfkarte__solar .solar {
+  background: linear-gradient(180deg, var(--marke) 0%, #13284a 34%, #0d1826 100%) !important;
+  border-top: 0 !important; }
+body.dunkel .kopfkarte__solar .solar { background: linear-gradient(180deg, #1b2733 0%, #121b26 40%, #0d141d 100%) !important; }
+@supports (background: color-mix(in srgb, red 50%, blue)) {
+  body.dunkel .kopfkarte__solar .solar {
+    background: linear-gradient(180deg,
+      color-mix(in srgb, var(--marke) 30%, #151b22) 0%, #121b26 40%, #0d141d 100%) !important; }
+}
+.kopfkarte { box-shadow: none; }
+
+/* ---------- Prozent im Ring ----------
+   Das Zeichen steht jetzt direkt hinter der Zahl, klein und auf der
+   Grundlinie — vorher sass es schräg oben und lief am Handy in den Ring. */
+.sol-ring__mitte { display: flex !important; align-items: center !important;
+                   justify-content: center !important; }
+.sol-ring__mitte .sol-ring__zahl { font-size: 1.55rem; font-weight: 800; line-height: 1;
+                  display: inline-flex; align-items: baseline; gap: 1px;
+                  align-self: center; margin: 0; color: #fff; }
+.sol-ring__zahl small { font-size: .62em; font-weight: 700; color: #8fa6c6; }
+@media (max-width: 560px) { .sol-ring__mitte .sol-ring__zahl { font-size: 1.35rem; } }
+/* Ring etwas grösser, damit auch "100 %" frei in der Mitte steht */
+.sol-ring { width: 104px !important; height: 104px !important; }
+@media (max-width: 560px) { .sol-ring { width: 96px !important; height: 96px !important; } }
 </style>
 </head>
 <body>
@@ -3158,7 +3408,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "73.1.0";
+const APP_VERSION = "74.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -3790,16 +4040,38 @@ function zeigeLogin() {
       const { data, error } = await db.from("login_kacheln").select("*");
       if (error || !data || !data.length) throw error || new Error("leer");
 
-      auswahl.innerHTML = '<div class="login__kacheln">'
-        + data.map((u, i) => '<button type="button" class="login__kachel" data-nr="' + i + '">'
-            + (u.bild_url
-                ? '<img src="' + esc(u.bild_url) + '" alt="">'
-                : '<span class="login__kachel-buchstabe">'
-                  + esc((u.full_name || u.email).charAt(0).toUpperCase()) + '</span>')
-            + '<span class="login__kachel-name">' + esc(u.full_name || u.email) + '</span>'
-            + (u.ohne_passwort ? '<span class="login__offen" title="Ohne Passwort">•</span>' : "")
-            + '</button>').join("")
-        + '</div>';
+      // Reihen ausgleichen: lieber 3 + 3 als 5 + 1. Die Spaltenzahl
+      // ergibt sich aus der Anzahl, der Rest steht mittig darunter.
+      // Gleichmässige Reihen: höchstens vier nebeneinander (am Handy
+      // drei), und die Reihen unterscheiden sich um höchstens eine
+      // Kachel. Aus zehn Personen werden 4 · 3 · 3, aus sieben 4 · 3,
+      // aus fünf 3 · 2 — nie eine einsame Kachel in der letzten Reihe.
+      const anzahl = data.length;
+      const hoechstens = window.innerWidth < 480 ? 3 : 4;
+      const reihen = Math.max(1, Math.ceil(anzahl / hoechstens));
+      const grund = Math.floor(anzahl / reihen);
+      const mehr = anzahl % reihen;          // so viele Reihen kriegen eine mehr
+
+      const kachel = (u, i) => '<button type="button" class="login__kachel" data-nr="' + i + '">'
+        + (u.bild_url
+            ? '<img src="' + esc(u.bild_url) + '" alt="">'
+            : '<span class="login__kachel-buchstabe">'
+              + esc((u.full_name || u.email).charAt(0).toUpperCase()) + '</span>')
+        + '<span class="login__kachel-name">' + esc(personName(u)) + '</span>'
+        + (u.ohne_passwort ? '<span class="login__offen" title="Ohne Passwort">•</span>' : "")
+        + '</button>';
+
+      let zeiger = 0;
+      let html = '<div class="login__kacheln login__kacheln--reihen">';
+      for (let r = 0; r < reihen; r++) {
+        const inReihe = grund + (r < mehr ? 1 : 0);
+        html += '<div class="login__reihe">';
+        for (let k = 0; k < inReihe && zeiger < anzahl; k++, zeiger++) {
+          html += kachel(data[zeiger], zeiger);
+        }
+        html += '</div>';
+      }
+      auswahl.innerHTML = html + '</div>';
 
       auswahl.querySelectorAll("[data-nr]").forEach((k) => {
         k.onclick = () => anmeldenZeigen(data[Number(k.dataset.nr)],
@@ -4025,7 +4297,8 @@ function solarFluss(j) {
     + '<circle cx="40" cy="40" r="34" class="sol-ring__voll"'
     + ' stroke-dasharray="' + gefuellt.toFixed(1) + ' ' + ring.toFixed(1) + '"/>'
     + '</svg>'
-    + '<div class="sol-ring__mitte"><strong>' + anteil + '</strong><span>%</span></div>'
+    + '<div class="sol-ring__mitte"><span class="sol-ring__zahl">' + anteil
+    + '<small>%</small></span></div>'
     + '</div>'
     + '<p class="sol-ring__text">vom Dach gedeckt</p>'
     + '</div>';
@@ -5524,14 +5797,11 @@ function auftragsKnoepfeBinden(raster, b) {
         })));
       if (!wahl || wahl === j.plan_status) return;
 
-      const daten = { plan_status: wahl };
-      if (wahl === "fertig" && !j.ended_at) {
-        daten.ended_at = new Date().toISOString();
-        daten.ended_by = profil.id;
-      }
-      const { error } = await db.from("jobs").update(daten).eq("id", j.id);
-      if (error) meldung(fehlertext(error), "fehler");
-      else { meldung("Zustand geändert."); await prodAuftraegeAktualisieren(b); }
+      try {
+        const r = await zustandSetzen(j, wahl);
+        meldung("Zustand geändert." + (r.hinweis ? " " + r.hinweis : ""));
+        await prodAuftraegeAktualisieren(b);
+      } catch (f) { meldung(fehlertext(f), "fehler"); }
     };
   });
 
@@ -5574,13 +5844,12 @@ function auftragsKnoepfeBinden(raster, b) {
       if (!wahl) return;
 
       const auftrag = geplant.find((j) => j.id === wahl);
-      const { error } = await db.from("jobs").update({
-        started_at: new Date().toISOString(),
-        plan_status: "laeuft",
-      }).eq("id", auftrag.id);
-
-      if (error) meldung(fehlertext(error), "fehler");
-      else { meldung("Auftrag " + auftrag.job_number + " gestartet."); await prodAuftraegeAktualisieren(b); }
+      try {
+        const r = await zustandSetzen(auftrag, "laeuft");
+        meldung("Auftrag " + auftrag.job_number + " gestartet."
+          + (r.hinweis ? " " + r.hinweis : ""));
+        await prodAuftraegeAktualisieren(b);
+      } catch (f) { meldung(fehlertext(f), "fehler"); }
     };
   });
 
@@ -5623,12 +5892,12 @@ function auftragsKnoepfeBinden(raster, b) {
         .find((x) => x.id === el.dataset.maschine);
       await blattStandSichern(j, maschineHier);
 
-      const { error } = await db.from("jobs")
-        .update({ ended_at: new Date().toISOString(), ended_by: profil.id,
-                  plan_status: "fertig" })
-        .eq("id", el.dataset.auftragEnde);
-      if (error) meldung(fehlertext(error), "fehler");
-      else { meldung("Auftrag beendet."); await prodAuftraegeAktualisieren(b); }
+      try {
+        const r = await zustandSetzen(j || { id: el.dataset.auftragEnde,
+          machine_id: el.dataset.maschine }, "fertig");
+        meldung("Auftrag beendet." + (r.hinweis ? " " + r.hinweis : ""));
+        await prodAuftraegeAktualisieren(b);
+      } catch (f) { meldung(fehlertext(f), "fehler"); }
     };
   });
 }
@@ -7000,14 +7269,11 @@ function statusSchnellVerhalten(b) {
         })));
       if (!wahl || wahl === j.plan_status) return;
 
-      const daten = { plan_status: wahl };
-      if (wahl === "fertig" && !j.ended_at) {
-        daten.ended_at = new Date().toISOString();
-        daten.ended_by = profil.id;
-      }
-      const { error } = await db.from("jobs").update(daten).eq("id", j.id);
-      if (error) meldung(fehlertext(error), "fehler");
-      else { meldung("Zustand geändert."); planAktualisieren(b); }
+      try {
+        const r = await zustandSetzen(j, wahl);
+        meldung("Zustand geändert." + (r.hinweis ? " " + r.hinweis : ""));
+        planAktualisieren(b);
+      } catch (f) { meldung(fehlertext(f), "fehler"); }
     };
   });
 }
@@ -7386,7 +7652,6 @@ function zeichnePlanwand(b) {
             + '" data-msort="' + esc(m.id) + '" data-mpark="' + esc(m.park_id || "")
             + '" title="' + esc(m.name)
             + (m.machine_number ? " " + esc(m.machine_number) : "") + '">'
-            + (darfPlanen() ? '<span class="pw-name__griff">⋮⋮</span>' : "")
             // Die Nummer steht vorn und ist die auffälligere Angabe —
             // danach wird an der Maschine gesucht, nicht nach dem Namen.
             + (m.machine_number
@@ -7791,6 +8056,65 @@ function hocoFenster(b) {
   ansichtHoco(inhalt, b).catch((f) => {
     inhalt.innerHTML = '<p class="hinweis">' + esc(fehlertext(f)) + '</p>';
   });
+}
+
+// Setzt den Zustand eines Auftrags — überall gleich, ob aus der
+// Produktion, der Planwand oder dem Pad Mode. Zwei Regeln:
+//  - Auf einer Maschine läuft höchstens ein Auftrag. Wird einer auf
+//    "läuft" gesetzt, gehen andere laufende dort zurück auf geplant.
+//  - Wird ein Auftrag beendet, rückt der nächste auf derselben
+//    Maschine nach und läuft.
+// Wird ein beendeter Auftrag wieder geöffnet, verschwindet sein
+// Endzeitpunkt. Genau daran hing es bisher: der Zustand stand auf
+// "läuft", aber der Endzeitpunkt blieb, und damit galt er weiter als
+// abgeschlossen und tauchte nirgends mehr auf.
+async function zustandSetzen(j, neu) {
+  if (!j || !neu) return { ok: false };
+  const jetzt = new Date().toISOString();
+  const daten = { plan_status: neu };
+
+  if (neu === "fertig") {
+    if (!j.ended_at) { daten.ended_at = jetzt; daten.ended_by = profil.id; }
+  } else {
+    daten.ended_at = null;
+    daten.ended_by = null;
+  }
+  if (neu === "laeuft" && !j.started_at) daten.started_at = jetzt;
+
+  const r = await db.from("jobs").update(daten).eq("id", j.id);
+  if (r.error) throw r.error;
+
+  let hinweis = "";
+  let naechster = null;
+
+  if (neu === "laeuft" && j.machine_id) {
+    // Andere laufende Aufträge auf dieser Maschine anhalten
+    const andere = await db.from("jobs").select("id, job_number")
+      .eq("machine_id", j.machine_id).eq("plan_status", "laeuft").neq("id", j.id);
+    const liste = (andere && andere.data) || [];
+    for (const x of liste) {
+      await db.from("jobs").update({ plan_status: "geplant" }).eq("id", x.id);
+    }
+    if (liste.length) {
+      hinweis = liste.map((x) => x.job_number).join(", ") + " zurück auf geplant.";
+    }
+  }
+
+  if (neu === "fertig" && j.machine_id) {
+    // Der nächste Auftrag auf derselben Maschine rückt nach
+    const n = await db.from("jobs").select("*")
+      .eq("machine_id", j.machine_id).is("ended_at", null).neq("id", j.id)
+      .not("planned_from", "is", null).order("planned_from").limit(1);
+    naechster = n && n.data && n.data[0];
+    if (naechster && naechster.plan_status !== "laeuft") {
+      await db.from("jobs").update({
+        plan_status: "laeuft",
+        started_at: naechster.started_at || jetzt,
+      }).eq("id", naechster.id);
+      hinweis = naechster.job_number + " läuft jetzt.";
+    }
+  }
+  return { ok: true, hinweis: hinweis, naechster: naechster };
 }
 
 function zeilenVerschieben(b) {
@@ -8643,11 +8967,12 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
   if (speichern) speichern.onclick = async () => {
     // Wer nicht planen darf, kann trotzdem den Zustand setzen
     if (!darf && auftrag) {
-      const { error } = await db.from("jobs")
-        .update({ plan_status: planZustand }).eq("id", auftrag.id);
       zu();
-      if (error) meldung(fehlertext(error), "fehler");
-      else { meldung("Zustand geändert."); planAktualisieren(b); }
+      try {
+        const r = await zustandSetzen(auftrag, planZustand);
+        meldung("Zustand geändert." + (r.hinweis ? " " + r.hinweis : ""));
+        planAktualisieren(b);
+      } catch (f) { meldung(fehlertext(f), "fehler"); }
       return;
     }
     const menge = $("pl-menge").value;
@@ -9808,6 +10133,13 @@ async function padMaschine(h) {
       .map(([wert, text, da]) => '<button class="pad-sprungkachel'
         + (da ? "" : " pad-sprungkachel--leer") + '" data-padreiter="' + wert + '">'
         + text + '</button>').join("")
+    // Zustand direkt an der Maschine: laufenden Auftrag beenden — der
+    // nächste rückt nach — oder, wenn nichts läuft, den nächsten starten
+    + (j
+        ? '<button class="pad-sprungkachel pad-sprungkachel--ende" data-padstatus="ende">'
+          + 'Auftrag beenden</button>'
+        : '<button class="pad-sprungkachel pad-sprungkachel--start" data-padstatus="start">'
+          + 'Auftrag starten</button>')
     + '</div>'
     + (j && j.target_quantity
         ? '<div class="pad__balken"><div class="pad__balken__fuellung" style="width:'
@@ -9823,6 +10155,46 @@ async function padMaschine(h) {
         + '" title="Ansicht"></iframe></div>'
       : (j ? "" : '<p class="pad__hinweis">Auf dieser Maschine läuft gerade kein '
           + 'Auftrag.</p>') + uebersicht);
+
+  h.querySelectorAll("[data-padstatus]").forEach((el) => {
+    el.onclick = async () => {
+      try {
+        if (el.dataset.padstatus === "ende" && j) {
+          const ok = await nachfragen({
+            titel: "Auftrag beenden",
+            text: "Auftrag " + j.job_number + " wird abgeschlossen. "
+              + "Der nächste Auftrag auf dieser Maschine rückt nach und läuft.",
+            bestaetigen: "Auftrag beenden",
+          });
+          if (!ok) return;
+          if (typeof blattStandSichern === "function") {
+            try { await blattStandSichern(j, m); } catch (g) { /* Beiwerk */ }
+          }
+          const r = await zustandSetzen(j, "fertig");
+          meldung("Auftrag beendet." + (r.hinweis ? " " + r.hinweis : ""));
+        } else {
+          const n = await db.from("jobs").select("*").eq("machine_id", m.id)
+            .is("ended_at", null).not("planned_from", "is", null)
+            .order("planned_from").limit(1);
+          const naechster = n && n.data && n.data[0];
+          if (!naechster) {
+            meldung("Für diese Maschine ist nichts eingeplant.", "warn");
+            return;
+          }
+          const ok = await nachfragen({
+            titel: "Auftrag starten",
+            text: naechster.job_number + " auf " + m.name + " starten?",
+            bestaetigen: "Starten",
+          });
+          if (!ok) return;
+          const r = await zustandSetzen(naechster, "laeuft");
+          meldung(naechster.job_number + " läuft." + (r.hinweis ? " " + r.hinweis : ""));
+        }
+        try { prod.auftraege = await ladeLaufendeAuftraege(); } catch (g) { /* egal */ }
+        padZeichnen();
+      } catch (f) { meldung(fehlertext(f), "fehler"); }
+    };
+  });
 
   h.querySelectorAll("[data-padzu]").forEach((el) => { el.onclick = padSchliessen; });
   h.querySelectorAll("[data-padzurueck]").forEach((el) => {
@@ -14136,13 +14508,9 @@ async function bestOffen(ziel, b, bereich) {
           .map((w) => ({ wert: w, text: BESTELLSTATUS[w] })));
       if (!wahl) return;
 
-      // "Geliefert" führt über den Einlagerdialog, der je Position
-      // nach Menge und Lagerplatz fragt. Das lässt sich nicht
-      // sammeln, deshalb hier der klare Hinweis statt halber Arbeit.
-      if (wahl === "geliefert") {
-        meldung("Geliefert wird je Position gesetzt, weil dabei eingelagert wird.", "warn");
-        return;
-      }
+      // Eine Lagerhaltung gibt es nicht mehr — Geliefert lässt sich
+      // deshalb genauso für alle auf einmal setzen wie jeder andere
+      // Status. Vorher blockierte hier ein Überbleibsel davon.
 
       const ok = await nachfragen({ titel: "Status für alle ändern",
         text: "Sollen alle " + posten.length + " Positionen von " + name
@@ -14150,8 +14518,13 @@ async function bestOffen(ziel, b, bereich) {
         bestaetigen: "Ja, alle ändern" });
       if (!ok) return;
 
+      const jetzt = new Date().toISOString();
+      const daten = { status: wahl };
+      if (wahl === "bestellt") daten.ordered_at = jetzt;
+      if (wahl === "geliefert") { daten.delivered_at = jetzt; daten.completed_at = jetzt; }
+
       const { error } = await db.from("order_items")
-        .update({ status: wahl })
+        .update(daten)
         .in("id", posten.map((z) => z.id));
 
       if (error) meldung(fehlertext(error), "fehler");
@@ -14227,14 +14600,13 @@ async function bestOffen(ziel, b, bereich) {
       if (!(best.alleMaschinen || []).length) {
         try { best.alleMaschinen = await ladeAlleMaschinen(); } catch (f) {}
       }
-      const zielListe = [["lager::Lager", "Lager"]].concat(
-        (best.alleMaschinen || []).map((m) => ["maschine::" + maschineZielText(m),
-          "Maschine: " + m.name + (m.machine_number ? " · " + m.machine_number : "")]));
-      const jetzt = (z.ziel_art || "lager") + "::" + (z.ziel_text || "Lager");
+      const zielListe = (best.alleMaschinen || []).map((m) => ["maschine::" + maschineZielText(m),
+          "Maschine: " + m.name + (m.machine_number ? " · " + m.machine_number : "")]);
+      const jetzt = (z.ziel_art || "maschine") + "::" + (z.ziel_text || "");
       // Steht dort etwas anderes — eine Person oder freier Text —,
       // bleibt es als Möglichkeit erhalten, statt still zu verschwinden.
       if (!zielListe.some(([wert]) => wert === jetzt)) {
-        zielListe.unshift([jetzt, (z.ziel_text || "Lager") + "  (bisher)"]);
+        if (z.ziel_text) zielListe.unshift([jetzt, z.ziel_text + "  (bisher)"]);
       }
 
       const w = await dialogFelder({ titel: "Bestellung bearbeiten",
@@ -14307,14 +14679,6 @@ async function bestOffen(ziel, b, bereich) {
         k.onclick = async () => {
           const neuStatus = k.dataset.neu;
 
-          // Geliefert läuft immer über den Einlagerdialog, damit der
-          // Bestand gleich mitgebucht wird.
-          if (neuStatus === "geliefert") {
-            huelle.remove();
-            await lieferungEinlagern(z, b);
-            return;
-          }
-
           const ok = await nachfragen({ titel: "Status ändern",
             text: 'Wirklich auf "' + BESTELLSTATUS[neuStatus] + '" setzen?',
             bestaetigen: "Ja, ändern" });
@@ -14322,6 +14686,10 @@ async function bestOffen(ziel, b, bereich) {
 
           const daten = { status: neuStatus };
           if (neuStatus === "bestellt") daten.ordered_at = new Date().toISOString();
+          if (neuStatus === "geliefert") {
+            daten.delivered_at = new Date().toISOString();
+            daten.completed_at = daten.delivered_at;
+          }
 
           const { error } = await db.from("order_items").update(daten).eq("id", z.id);
           huelle.remove();
@@ -14540,8 +14908,7 @@ async function positionDialog(b) {
     + '</div>'
     + '<div class="feld"><span class="feldlabel">Wohin nach dem Eintreffen</span>'
     + '<div class="moduswahl" id="pd-zielwahl">'
-    + '<button type="button" class="moduswahl__knopf aktiv" data-ziel="lager">Lager</button>'
-    + '<button type="button" class="moduswahl__knopf" data-ziel="maschine">Maschine</button>'
+    + '<button type="button" class="moduswahl__knopf aktiv" data-ziel="maschine">Maschine</button>'
     + '<button type="button" class="moduswahl__knopf" data-ziel="person">Person</button>'
     + '<button type="button" class="moduswahl__knopf" data-ziel="andere">Anderes</button>'
     + '</div>'
@@ -14561,7 +14928,7 @@ async function positionDialog(b) {
   const $ = (kennung) => huelle.querySelector("#" + kennung);
 
   // Ziel der Lieferung
-  let zielArt = "lager";
+  let zielArt = "maschine";
   const zielAuswahl = $("pd-zielauswahl");
   const zielFrei = $("pd-zielfrei");
 
@@ -14619,6 +14986,8 @@ async function positionDialog(b) {
       zielFuellen();
     };
   });
+  // Ohne Lager ist Maschine der Ausgangspunkt — die Auswahl gleich zeigen
+  zielFuellen();
 
   let gewaehlt = null;
   const zu = () => huelle.remove();
@@ -14688,11 +15057,10 @@ async function positionDialog(b) {
 
     // Ziel zusammensetzen
     let zielText = "";
-    if (zielArt === "lager") zielText = "Lager";
-    else if (zielArt === "andere") zielText = (zielFrei.value || "").trim();
+    if (zielArt === "andere") zielText = (zielFrei.value || "").trim();
     else zielText = zielAuswahl.value || "";
 
-    if (zielArt !== "lager" && !zielText) {
+    if (!zielText) {
       meldung("Bitte noch angeben, wohin die Lieferung soll.", "warn");
       return;
     }
@@ -19240,7 +19608,11 @@ function zeichneGeruest() {
     + '<header class="kopf">'
     + '<button class="kopf__klapp" id="nav-klapp" title="Menü ein- oder ausklappen">☰</button>'
     + '<button class="kopf__logolink" id="kopf-neuladen" title="Seite neu laden">'
-    + '<img class="kopf__logo" src="./logo.png" alt="Hofer + Co."></button>' 
+    // Das Logo wird als Maske gezeichnet und mit der Themenfarbe
+    // gefüllt — so trifft es die gewählte Farbe genau, auch im dunklen
+    // Modus, statt sie über eine Farbdrehung nur anzunähern.
+    + '<span class="kopf__logo kopf__logo--maske" role="img" aria-label="Hofer + Co."></span>'
+    + '</button>' 
     + (meineRolle() === "planwand"
         ? '<button class="kopf__admin' + (plan.pinOk ? " aktiv" : "") + '" id="kopf-admin"'
           + ' title="Bearbeiten freischalten">Bearbeiten</button>'
@@ -19306,6 +19678,18 @@ function zeichneGeruest() {
 
   // Das Logo lädt die Seite neu. Im Vollbild gibt es sonst keinen Weg,
   // eine hängende Ansicht aufzufrischen.
+  // Breite des Logos aus dem Seitenverhältnis des Bildes
+  const logoMaske = document.querySelector(".kopf__logo--maske");
+  if (logoMaske) {
+    const bild = new Image();
+    bild.onload = () => {
+      if (bild.naturalHeight) {
+        logoMaske.style.width = Math.round(30 * bild.naturalWidth / bild.naturalHeight) + "px";
+      }
+    };
+    bild.src = "./logo.png";
+  }
+
   const neuladen = document.getElementById("kopf-neuladen");
   if (neuladen) neuladen.onclick = () => location.reload();
 
