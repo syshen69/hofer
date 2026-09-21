@@ -2375,7 +2375,6 @@ body.dunkel .kopf__logo { filter: brightness(0) invert(1); }
                     repeat(var(--pw-tage, 15), var(--pw-spalte, 40px)) !important; }
   .pw-name { position: sticky; left: 0; z-index: 3; background: var(--flaeche); }
 }
-}
 
 .login__kachel { position: relative; }
 .login__offen { position: absolute; top: 2px; right: 6px; color: rgba(255,255,255,.7);
@@ -3097,30 +3096,19 @@ body[data-thema="orange"] .pad  { --pblau: #c25b10; }
 .hoco-fenster > .karte__kopf > h2:first-child { display: none; }
 .hoco-fenster { flex: 1; min-height: 0; overflow: auto; padding-right: 4px; }
 .hoco-fenster .seitentitel { display: none; }
-/* Kopfkarte und Solaranlage in einem Block, aber getrennt lesbar */
-.kopfkarte { flex-wrap: wrap; align-items: stretch; }
-.kopfkarte__solar { flex: 1 1 100%; min-width: 0;
-                    margin: 14px -18px -18px; padding: 0; }
-.kopfkarte__solar .karte { margin: 0; border-radius: 0 0 var(--radius) var(--radius);
-                           box-shadow: none; }
-.kopfkarte__solar .karte__kopf { margin-bottom: 10px; }
-.kopfkarte__solar .solar { border-top: 1px solid rgba(255,255,255,.14); }
-.kopfkarte__solar .solar::after { top: -80px; }
-@media (max-width: 700px) { .kopfkarte__solar { margin: 12px -14px -14px; } }
-/* Am Handy ist die Namensspalte schmal. Dort kleinere Schrift und
-   ein Umbruch, damit Nummer und Name überhaupt Platz haben. */
-@media (max-width: 700px) {
-  .pw-name:not(.pw-name--kopf):not(.pw-name--fein) {
-    flex-wrap: wrap; white-space: normal; line-height: 1.15; }
-  .pw-name:not(.pw-name--kopf):not(.pw-name--fein) .pw-name__nr {
-    font-size: calc(0.92rem * var(--pw-v)) !important; margin-right: 5px; }
-  .pw-name:not(.pw-name--kopf):not(.pw-name--fein) .pw-name__text {
-    font-size: calc(0.74rem * var(--pw-v)) !important; overflow: visible;
-    text-overflow: clip; }
-  .pw-name__griff { display: none; }
-  /* Balkenschrift nicht unter die Lesbarkeitsgrenze fallen lassen */
-  .pw-zeile1 { font-size: max(11px, calc(0.82rem * var(--pw-t))) !important; }
-  .pw-zeile2 { font-size: max(10px, calc(0.74rem * var(--pw-t))) !important; }
+/* Kopfkarte und Solaranlage bilden einen Block: die Kopfkarte oben
+   abgerundet, die Solaranlage unten, ohne Abstand dazwischen. Die
+   Kachel sitzt nicht IN der Kopfkarte — dort würde sie das Raster
+   sprengen, vor allem am Handy. */
+.kopfkarte { border-radius: var(--radius) var(--radius) 0 0; margin-bottom: 0; }
+.kopfkarte__solar { margin: 0 0 18px; }
+.kopfkarte__solar:empty { display: none; }
+.kopfkarte__solar .karte { margin: 0;
+                           border-radius: 0 0 var(--radius) var(--radius);
+                           border-top: 1px solid rgba(255,255,255,.14); }
+/* Am Handy nimmt der Benutzername dem Pad-Knopf den Platz weg */
+@media (max-width: 560px) {
+  .kopf__benutzer { display: none; }
 }
 </style>
 </head>
@@ -3170,7 +3158,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "73.0.0";
+const APP_VERSION = "73.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -4107,8 +4095,8 @@ async function seiteDashboard(b) {
     + '<div class="kopfkarte__zeit"><div class="uhr" id="uhr">--:--</div>'
     + '<div class="kopfkarte__datum" id="datum"></div></div>'
     + '<div class="kopfkarte__wetter" id="wetter"><span class="klein">Wetter wird geladen …</span></div>'
-    + '<div class="kopfkarte__solar" id="db-solar"></div>'
     + '</section>'
+    + '<div id="db-solar" class="kopfkarte__solar"></div>'
 
     + '<p class="gruss">' + esc(begruessung()) + (name ? ", " + esc(name) : "") + '</p>'
 
@@ -15762,6 +15750,15 @@ async function seiteEinstellungen(b) {
     + '<p class="hinweis">Mit Haken genügt ein Klick auf die eigene Kachel. '
     + 'Bequem, aber jeder am Gerät kommt damit in dein Konto.</p></section>'
     + '<section class="karte"><h2>Darstellung</h2>'
+    + '<p class="hinweis">Die Themenfarbe gilt überall — Menü, Knöpfe, '
+    + 'Planwand und Pad Mode.</p>'
+    + '<div class="themawahl">'
+    + [["blau", "Blau"], ["rot", "Rot"], ["gruen", "Grün"], ["gelb", "Gelb"],
+       ["rosa", "Rosa"], ["violett", "Violett"], ["orange", "Orange"]]
+      .map(([w, tt]) => '<button type="button" class="themaknopf themaknopf--' + w
+        + (themaJetzt() === w ? " aktiv" : "") + '" data-thema="' + w + '">'
+        + '<span class="themaknopf__punkt"></span>' + tt + '</button>').join("")
+    + '</div>'
     + '<label class="schalter"><input type="checkbox" id="e-dunkel"'
     + (einstellung("dunkel") ? " checked" : "") + '>'
     + '<span>Dunkler Modus</span></label>'
@@ -19261,6 +19258,7 @@ function zeichneGeruest() {
           + esc(((profil && (profil.full_name || profil.email)) || "?").charAt(0).toUpperCase())
           + '</span>')
     + '</button>'
+    + '</header>'
     + '<div class="rahmen"><nav class="nav" aria-label="Hauptnavigation">'
     + SEITEN.map((s) => '<a class="nav__punkt" data-nav="' + s.pfad + '" href="#/' + s.pfad + '">'
         + '<span class="nav__zeichen" aria-hidden="true">' + s.zeichen + '</span>'
