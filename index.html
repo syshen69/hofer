@@ -3378,6 +3378,44 @@ body.dunkel .kopfkarte__solar .solar { background: linear-gradient(180deg, #1b27
 .kopfkarte__solar .solar::after { display: none !important; }
 .kopfkarte { border-bottom: 0 !important; margin-bottom: 0 !important; }
 .kopfkarte__solar { margin-top: 0 !important; }
+/* ---------- Pad Mode: alles für Finger ----------
+   Während der Pad Mode offen ist, gelten grössere Knöpfe — auch in
+   jedem Fenster, das sich darüber öffnet (Zustand, Stückzahl,
+   Rückfragen). Richtwert: mindestens 56 Pixel hoch. */
+body.pad-offen .dialog { font-size: 1.08rem; padding: 26px 26px 22px;
+                         width: min(560px, 94vw); border-radius: 18px; }
+body.pad-offen .dialog h2 { font-size: 1.45rem; margin-bottom: 14px; }
+body.pad-offen .dialog .knopf { min-height: 58px; padding: 0 26px;
+                                font-size: 1.15rem; border-radius: 14px; }
+body.pad-offen .dialog__knoepfe { gap: 12px; margin-top: 18px; }
+body.pad-offen .dialog__knoepfe .knopf { flex: 1 1 0; }
+body.pad-offen .statuswahl { display: grid; gap: 10px; }
+body.pad-offen .statuswahl .knopf { min-height: 64px; font-size: 1.2rem;
+                                    justify-content: flex-start; text-align: left;
+                                    padding: 0 22px; }
+body.pad-offen .dialog input,
+body.pad-offen .dialog select,
+body.pad-offen .dialog textarea { min-height: 60px; font-size: 1.45rem;
+                                  padding: 10px 16px; border-radius: 12px; }
+body.pad-offen .dialog .feld > span { font-size: 1rem; }
+
+/* Die Knöpfe im Pad selbst */
+.pad-sprungkachel { min-height: 88px; font-size: 1.22rem !important;
+                    padding: 22px 12px !important; border-radius: 22px !important; }
+.pad-zustand__zeichen { font-size: 1.7rem; }
+.pad__zurueck, .pad__zu { min-width: 56px; min-height: 56px; font-size: 1.8rem;
+                          display: inline-flex; align-items: center;
+                          justify-content: center; border-radius: 14px; }
+.pad-kachel { min-height: 120px; }
+@media (max-width: 900px) {
+  .pad-sprungkachel { min-height: 76px; font-size: 1.1rem !important; }
+}
+/* Im Pad Mode: breite Fenster, Auswahl untereinander */
+body.pad-offen .dialog { width: min(600px, 94vw) !important;
+                         max-width: min(600px, 94vw) !important; }
+body.pad-offen .statuswahl { grid-template-columns: 1fr !important;
+                             display: grid !important; }
+body.pad-offen .statuswahl .knopf { width: 100%; white-space: normal; }
 </style>
 </head>
 <body>
@@ -3426,7 +3464,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "75.1.0";
+const APP_VERSION = "76.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -5325,11 +5363,19 @@ async function ladeLaufendeAuftraege() {
   // wie auf der Planwand. Vorher genügte "noch nicht beendet", und so
   // zeigte die Produktion einen nur geplanten Auftrag als laufend an
   // und buchte die Stückzahl auf ihn.
+  // An der Maschine ist, was läuft, gerüstet oder geprüft wird. Nur
+  // "geplant" zählt nicht — sonst wanderte ein Auftrag aus der
+  // Produktion, sobald man ihn auf Rüsten oder QS setzt.
+  // Gibt es mehrere, hat "läuft" Vorrang, dann Rüsten, dann QS.
+  const RANG = { laeuft: 3, ruesten: 2, qs: 1 };
   const karte = {};
   (data || []).forEach((j) => {
-    if (j.plan_status !== "laeuft") return;
+    const rang = RANG[j.plan_status] || 0;
+    if (!rang) return;
     const vorhanden = karte[j.machine_id];
-    if (!vorhanden || String(j.started_at || "") > String(vorhanden.started_at || "")) {
+    const rangDa = vorhanden ? (RANG[vorhanden.plan_status] || 0) : -1;
+    if (!vorhanden || rang > rangDa
+        || (rang === rangDa && String(j.started_at || "") > String(vorhanden.started_at || ""))) {
       karte[j.machine_id] = j;
     }
   });
@@ -6889,18 +6935,29 @@ function griffVerhalten(b) {
       auftrag.planned_days = dauerJetzt;
       if (daten.planned_from) auftrag.planned_from = daten.planned_from;
 
-      const vorherNachrueck = [];
-      // Der Reihe nach: der Abstand zwischen den Aufträgen bleibt
-      // erhalten, aber keiner darf auf einem anderen landen.
-      dahinter.sort((a, c) => a.planned_from < c.planned_from ? -1
-        : (a.planned_from > c.planned_from ? 1 : 0));
-      for (const x of dahinter) {
-        const gewuenscht = arbeitstagePlus(x.planned_from, differenz);
-        const neu = freierStart(auftrag.machine_id, gewuenscht, x.planned_days || 1, x.id);
-        if (neu === x.planned_from) continue;
-        vorherNachrueck.push({ id: x.id, von: x.planned_from });
-        await db.from("jobs").update({ planned_from: neu }).eq("id", x.id);
-        x.planned_from = neu;
+      let vorherNachrueck = [];
+      if (differenz > 0 || daten.planned_from) {
+        // Länger gemacht: Was jetzt überdeckt wird, rückt bündig dahinter,
+        // und was dadurch wiederum überdeckt wird, ebenso — Glied für
+        // Glied, ohne Lücke. Weiter hinten liegende Aufträge, die nichts
+        // berühren, bleiben, wo sie sind.
+        // Vorher wurde jeder Folgeauftrag einzeln an den nächsten freien
+        // Platz gesetzt; dabei sprang einer über einen noch nicht
+        // verschobenen hinweg, und es entstanden Lücken.
+        vorherNachrueck = await planKonflikteLoesen(auftrag.machine_id, auftrag.id);
+      } else {
+        // Kürzer gemacht: die Folgenden rücken um dieselbe Zahl Tage auf.
+        // In aufsteigender Reihenfolge kann dabei keiner auf einem
+        // anderen landen, weil der vordere schon Platz gemacht hat.
+        dahinter.sort((a, c) => a.planned_from < c.planned_from ? -1
+          : (a.planned_from > c.planned_from ? 1 : 0));
+        for (const x of dahinter) {
+          const neu = arbeitstagePlus(x.planned_from, differenz);
+          if (neu === x.planned_from) continue;
+          vorherNachrueck.push({ id: x.id, von: x.planned_from });
+          await db.from("jobs").update({ planned_from: neu }).eq("id", x.id);
+          x.planned_from = neu;
+        }
       }
 
       merkeSchritt("Dauer von " + auftrag.job_number, async () => {
@@ -6912,7 +6969,8 @@ function griffVerhalten(b) {
         planAktualisieren(b);
       });
       meldung(dauerJetzt + (dauerJetzt === 1 ? " Tag" : " Tage") + " eingeplant."
-        + (dahinter.length ? "  " + dahinter.length + " nachfolgende mitverschoben." : ""));
+        + (vorherNachrueck.length ? "  " + vorherNachrueck.length
+            + (vorherNachrueck.length === 1 ? " Auftrag" : " Aufträge") + " bündig dahinter." : ""));
       planAktualisieren(b);
     });
 
@@ -8323,16 +8381,13 @@ function balkenVerhalten(b) {
       return zelle ? zelle.dataset.zelle : null;
     };
 
-    el.addEventListener("pointerdown", (e) => {
-      if (e.button !== undefined && e.button !== 0) return;
-      gestartet = true;
-      // Ohne das "const" hier bleiben die äusseren Werte stehen —
-      // vorher standen sie auf 0 und jede kleinste Bewegung galt
-      // sofort als Wischen.
-      startX = e.clientX;
-      startY = e.clientY;
-
-      halten = setTimeout(() => {
+    // Das eigentliche Anheben des Balkens. Mit der Maus geschieht es,
+    // sobald man losfährt; am Tablet nach kurzem Halten, damit ein
+    // Wischen über die Wand nicht jedes Mal einen Balken greift.
+    let zeigerArt = "mouse";
+    const anheben = (e) => {
+        if (zieht) return;
+        clearTimeout(halten);
         zieht = true;
         el.classList.add("pw-balken--zieht");
         // Während des Ziehens ist die ganze Balkenschicht durchlässig.
@@ -8351,7 +8406,16 @@ function balkenVerhalten(b) {
         // Erst mit dem Ziehen einfangen — sonst bricht der Browser
         // beim Berühren eines Balkens das Wischen ab.
         try { el.setPointerCapture(e.pointerId); } catch (f) { /* egal */ }
-      }, 400);
+    };
+
+    el.addEventListener("pointerdown", (e) => {
+      if (e.button !== undefined && e.button !== 0) return;
+      gestartet = true;
+      zeigerArt = e.pointerType || "mouse";
+      startX = e.clientX;
+      startY = e.clientY;
+      // Nur mit dem Finger braucht es das Halten
+      if (zeigerArt === "touch") halten = setTimeout(() => anheben(e), 400);
     });
 
     // Sobald das lange Drücken gegriffen hat, gehört die Geste dem
@@ -8367,11 +8431,17 @@ function balkenVerhalten(b) {
       // Fährt der Finger los, bevor das Halten greift, ist es ein
       // Wischen — dann lassen wir die Tafel scrollen.
       if (!zieht) {
-        if (Math.abs(e.clientX - startX) > 8 || Math.abs(e.clientY - startY) > 8) {
+        const weit = Math.abs(e.clientX - startX) > 6 || Math.abs(e.clientY - startY) > 6;
+        if (!weit) return;
+        if (zeigerArt === "touch") {
+          // Fährt der Finger los, bevor das Halten greift, ist es ein
+          // Wischen — dann lassen wir die Tafel scrollen.
           clearTimeout(halten);
           gestartet = false;
+          return;
         }
-        return;
+        // Maus und Stift: gedrückt und losgefahren heisst ziehen
+        anheben(e);
       }
       e.preventDefault();
 
@@ -10274,7 +10344,7 @@ async function padMaschine(h) {
             Object.keys(PLANSTATUS).filter((k) => k !== j.plan_status)
               .map((k) => ({ wert: k,
                 text: PLANSTATUS[k].zeichen + "  " + PLANSTATUS[k].name
-                  + (k === "fertig" ? "  (der nächste rückt nach)" : "") })));
+                  + (k === "fertig" ? "  · nächster rückt nach" : "") })));
           if (!wahl) return;
           if (wahl === "fertig") {
             const ok = await nachfragen({
