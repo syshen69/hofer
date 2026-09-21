@@ -3360,6 +3360,24 @@ body.dunkel .kopfkarte__solar .solar { background: linear-gradient(180deg, #1b27
 /* Ring etwas grösser, damit auch "100 %" frei in der Mitte steht */
 .sol-ring { width: 104px !important; height: 104px !important; }
 @media (max-width: 560px) { .sol-ring { width: 96px !important; height: 96px !important; } }
+/* Zustandsknopf im Pad Mode in der Farbe des Zustands */
+.pad-sprungkachel--zustand { display: flex; flex-direction: column; align-items: center;
+                             justify-content: center; gap: 4px; }
+.pad-zustand__zeichen { font-size: 1.5rem; line-height: 1; }
+.pad-zustand--laeuft  { background: linear-gradient(160deg, #1f8a4c, #145c33) !important;
+                        border-color: rgba(120, 230, 160, .5) !important; }
+.pad-zustand--ruesten { background: linear-gradient(160deg, #c27a12, #8a560b) !important;
+                        border-color: rgba(255, 200, 120, .5) !important; }
+.pad-zustand--qs      { background: linear-gradient(160deg, #7239c0, #4e2585) !important;
+                        border-color: rgba(200, 160, 255, .5) !important; }
+.pad-zustand--geplant { background: linear-gradient(160deg, #3b4a60, #262f3d) !important;
+                        border-color: rgba(200, 215, 235, .35) !important; }
+/* Der Lichtschein oben rechts wurde an der Nahtstelle zur Kopfkarte
+   hart abgeschnitten und zeichnete dort eine Kante. Im gemeinsamen
+   Block entfällt er; die Kopfkarte bekommt unten keine Rundung. */
+.kopfkarte__solar .solar::after { display: none !important; }
+.kopfkarte { border-bottom: 0 !important; margin-bottom: 0 !important; }
+.kopfkarte__solar { margin-top: 0 !important; }
 </style>
 </head>
 <body>
@@ -3408,7 +3426,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "74.0.0";
+const APP_VERSION = "75.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -5303,11 +5321,19 @@ async function ladeLaufendeAuftraege() {
   // läuft, ein anderer ist erst geplant), gewinnt immer der, der
   // wirklich läuft — sonst hing die Stückzahl-Erfassung zufällig
   // davon ab, welcher zuletzt aus der Datenbank kam.
+  // Laufend ist nur, was auch auf "läuft" steht — dieselbe Wahrheit
+  // wie auf der Planwand. Vorher genügte "noch nicht beendet", und so
+  // zeigte die Produktion einen nur geplanten Auftrag als laufend an
+  // und buchte die Stückzahl auf ihn.
   const karte = {};
   (data || []).forEach((j) => {
+    if (j.plan_status !== "laeuft") return;
     const vorhanden = karte[j.machine_id];
-    if (!vorhanden || j.plan_status === "laeuft") karte[j.machine_id] = j;
+    if (!vorhanden || String(j.started_at || "") > String(vorhanden.started_at || "")) {
+      karte[j.machine_id] = j;
+    }
   });
+  await standsNachtragen(Object.values(karte));
   return karte;
 }
 
@@ -5330,29 +5356,59 @@ async function ladeZaehlerstaende(von, bis, maschinenIds) {
     (proMaschine[z.machine_id] = proMaschine[z.machine_id] || []).push(z);
   });
 
-  // Tagesleistung = Differenz zum vorherigen Eintrag desselben Auftrags
+  // Tagesleistung = Differenz zum vorherigen Eintrag DESSELBEN Auftrags.
+  // Seit ein Tag mehrere Zeilen je Maschine haben kann — eine je
+  // Auftrag —, wird je Auftrag gezählt, nicht einfach der Vorgänger
+  // in der Liste genommen.
   const proSchluessel = {};
   Object.keys(proMaschine).forEach((mid) => {
     const liste = proMaschine[mid];
-    liste.forEach((z, i) => {
-      const vorher = i > 0 ? liste[i - 1] : null;
-      z.leistung = (vorher && vorher.job_id === z.job_id)
-        ? z.quantity - vorher.quantity
-        : z.quantity;
-      proSchluessel[mid + "|" + z.record_date] = z;
+    const letzter = {};
+    const laeuft = (prod.auftraege && prod.auftraege[mid]) ? prod.auftraege[mid].id : null;
+    liste.forEach((z) => {
+      const vorher = letzter[z.job_id];
+      z.leistung = vorher ? z.quantity - vorher.quantity : z.quantity;
+      letzter[z.job_id] = z;
+
+      // Genaue Ablage je Auftrag
+      proSchluessel[mid + "|" + z.record_date + "|" + z.job_id] = z;
+
+      // Für die Tagesansicht: gibt es an einem Tag mehrere Zeilen, zählt
+      // die des laufenden Auftrags, sonst die zuletzt geänderte
+      const k = mid + "|" + z.record_date;
+      const da = proSchluessel[k];
+      if (!da
+          || (z.job_id === laeuft && da.job_id !== laeuft)
+          || (da.job_id !== laeuft
+              && String(z.updated_at || "") >= String(da.updated_at || ""))) {
+        proSchluessel[k] = z;
+      }
     });
   });
 
   return { proSchluessel: proSchluessel, proMaschine: proMaschine };
 }
 
+// Ein Zählerstand gehört zu Maschine, Tag UND Auftrag. Vorher war der
+// Schlüssel nur Maschine und Tag: Wurde am selben Tag ein Auftrag
+// beendet und der nächste gestartet, überschrieb die neue Eingabe die
+// Zeile des alten — und hängte sie dabei auch noch an den neuen.
+// Ist die Datenbank noch nicht umgestellt (stueckzahl.sql), greift
+// der alte Schlüssel als Rückfall, damit das Speichern nicht bricht.
 async function speichereStand(maschineId, datum, stand, auftragId) {
-  const { error } = await zeitlimit(
-    db.from("production_records").upsert(
-      { machine_id: maschineId, record_date: datum, quantity: stand, job_id: auftragId },
-      { onConflict: "machine_id,record_date" }),
+  const zeile = { machine_id: maschineId, record_date: datum,
+                  quantity: stand, job_id: auftragId };
+  let r = await zeitlimit(
+    db.from("production_records").upsert(zeile,
+      { onConflict: "machine_id,record_date,job_id" }),
     12000, "Speichern");
-  if (error) throw error;
+  if (r.error && /ON CONFLICT|unique or exclusion|no unique/i.test(r.error.message || "")) {
+    r = await zeitlimit(
+      db.from("production_records").upsert(zeile,
+        { onConflict: "machine_id,record_date" }),
+      12000, "Speichern");
+  }
+  if (r.error) throw r.error;
 }
 
 // ---------- Einstieg ----------
@@ -6328,7 +6384,33 @@ async function ladePlanAuftraege() {
       .order("planned_from", { nullsFirst: false }).order("id"),
     12000, "Planwand");
   if (error) throw error;
-  return data || [];
+  const liste = data || [];
+  await standsNachtragen(liste.filter((j) => !j.ended_at));
+  return liste;
+}
+
+// Der Stand eines Auftrags ist der jüngste Zählerstand, der für genau
+// diesen Auftrag erfasst wurde — egal ob in der Produktion oder im
+// Pad Mode. So zeigen Planwand, Produktion und Pad dieselbe Zahl.
+async function standsNachtragen(auftraege) {
+  const ids = [...new Set((auftraege || []).map((j) => j.id).filter(Boolean))];
+  if (!ids.length) return;
+  const juengster = {};
+  for (let i = 0; i < ids.length; i += 150) {
+    const teil = ids.slice(i, i + 150);
+    try {
+      const r = await db.from("production_records")
+        .select("job_id, quantity, record_date, updated_at").in("job_id", teil);
+      (r.data || []).forEach((z) => {
+        const da = juengster[z.job_id];
+        const schl = String(z.record_date || "") + String(z.updated_at || "");
+        if (!da || schl >= da.schl) juengster[z.job_id] = { menge: Number(z.quantity) || 0, schl: schl };
+      });
+    } catch (f) { /* dann bleibt der Wert aus der Ansicht */ }
+  }
+  auftraege.forEach((j) => {
+    if (juengster[j.id]) j.stand = juengster[j.id].menge;
+  });
 }
 
 // Rechnet Spaltenbreite, Namensbreite und Schriftgrösse aus.
@@ -8071,34 +8153,44 @@ function hocoFenster(b) {
 async function zustandSetzen(j, neu) {
   if (!j || !neu) return { ok: false };
   const jetzt = new Date().toISOString();
-  const daten = { plan_status: neu };
-
-  if (neu === "fertig") {
-    if (!j.ended_at) { daten.ended_at = jetzt; daten.ended_by = profil.id; }
-  } else {
-    daten.ended_at = null;
-    daten.ended_by = null;
-  }
-  if (neu === "laeuft" && !j.started_at) daten.started_at = jetzt;
-
-  const r = await db.from("jobs").update(daten).eq("id", j.id);
-  if (r.error) throw r.error;
-
   let hinweis = "";
   let naechster = null;
 
+  // Die Datenbank erlaubt pro Maschine nur einen laufenden Auftrag.
+  // Deshalb zuerst die anderen freigeben, dann diesen setzen — in der
+  // umgekehrten Reihenfolge lehnt sie den ersten Schritt ab.
   if (neu === "laeuft" && j.machine_id) {
-    // Andere laufende Aufträge auf dieser Maschine anhalten
-    const andere = await db.from("jobs").select("id, job_number")
-      .eq("machine_id", j.machine_id).eq("plan_status", "laeuft").neq("id", j.id);
-    const liste = (andere && andere.data) || [];
-    for (const x of liste) {
-      await db.from("jobs").update({ plan_status: "geplant" }).eq("id", x.id);
+    // Nur was wirklich auf "läuft" steht, geht zurück. started_at ist
+    // in der Datenbank Pflicht und bei jedem Auftrag gesetzt — daran
+    // lässt sich "läuft" nicht erkennen, und leeren darf man es nicht.
+    const andere = await db.from("jobs").select("id, job_number, plan_status")
+      .eq("machine_id", j.machine_id).is("ended_at", null).neq("id", j.id)
+      .eq("plan_status", "laeuft");
+    const laufend = (andere && andere.data) || [];
+    for (const x of laufend) {
+      const r0 = await db.from("jobs")
+        .update({ plan_status: "geplant" }).eq("id", x.id);
+      if (r0.error) throw r0.error;
     }
-    if (liste.length) {
-      hinweis = liste.map((x) => x.job_number).join(", ") + " zurück auf geplant.";
+    if (laufend.length) {
+      hinweis = laufend.map((x) => x.job_number).join(", ") + " zurück auf geplant.";
     }
   }
+
+  const daten = { plan_status: neu };
+  if (neu === "fertig") {
+    if (!j.ended_at) { daten.ended_at = jetzt; daten.ended_by = profil.id; }
+  } else {
+    // Wieder offen: Endzeitpunkt weg, sonst gilt er weiter als erledigt
+    daten.ended_at = null;
+    daten.ended_by = null;
+  }
+  // Beim Start die echte Startzeit festhalten. Geleert wird sie nie —
+  // das Feld ist in der Datenbank Pflicht.
+  if (neu === "laeuft" && j.plan_status !== "laeuft") daten.started_at = jetzt;
+
+  const r = await db.from("jobs").update(daten).eq("id", j.id);
+  if (r.error) throw r.error;
 
   if (neu === "fertig" && j.machine_id) {
     // Der nächste Auftrag auf derselben Maschine rückt nach
@@ -8107,10 +8199,10 @@ async function zustandSetzen(j, neu) {
       .not("planned_from", "is", null).order("planned_from").limit(1);
     naechster = n && n.data && n.data[0];
     if (naechster && naechster.plan_status !== "laeuft") {
-      await db.from("jobs").update({
-        plan_status: "laeuft",
-        started_at: naechster.started_at || jetzt,
+      const r2 = await db.from("jobs").update({
+        plan_status: "laeuft", started_at: jetzt,
       }).eq("id", naechster.id);
+      if (r2.error) throw r2.error;
       hinweis = naechster.job_number + " läuft jetzt.";
     }
   }
@@ -9018,7 +9110,20 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     let festId = null;
 
     if (auftrag) {
+      // Den Zustand nicht mit den übrigen Feldern schreiben, sondern
+      // über dieselbe Stelle wie Produktion und Pad Mode — nur so
+      // rückt beim Beenden der nächste nach und bleibt je Maschine
+      // höchstens einer auf "läuft".
+      const neuerZustand = daten.plan_status;
+      delete daten.plan_status;
       ({ error: fehler } = await db.from("jobs").update(daten).eq("id", auftrag.id));
+      if (!fehler && neuerZustand && neuerZustand !== auftrag.plan_status) {
+        try {
+          const rz = await zustandSetzen(Object.assign({}, auftrag,
+            { machine_id: daten.machine_id || auftrag.machine_id }), neuerZustand);
+          if (rz.hinweis) meldung(rz.hinweis);
+        } catch (fz) { fehler = fz; }
+      }
       if (!fehler) {
         // Örtlich nachziehen, damit das Aufräumen mit den neuen
         // Werten rechnet
@@ -10135,9 +10240,14 @@ async function padMaschine(h) {
         + text + '</button>').join("")
     // Zustand direkt an der Maschine: laufenden Auftrag beenden — der
     // nächste rückt nach — oder, wenn nichts läuft, den nächsten starten
+    // Der Zustand als Knopf: zeigt, was gerade gilt, und öffnet beim
+    // Antippen dieselbe Auswahl wie in der Produktion
     + (j
-        ? '<button class="pad-sprungkachel pad-sprungkachel--ende" data-padstatus="ende">'
-          + 'Auftrag beenden</button>'
+        ? '<button class="pad-sprungkachel pad-sprungkachel--zustand pad-zustand--'
+          + esc(j.plan_status || "geplant") + '" data-padstatus="wechseln">'
+          + '<span class="pad-zustand__zeichen">'
+          + esc((PLANSTATUS[j.plan_status] || PLANSTATUS.geplant).zeichen) + '</span>'
+          + esc((PLANSTATUS[j.plan_status] || PLANSTATUS.geplant).name) + '</button>'
         : '<button class="pad-sprungkachel pad-sprungkachel--start" data-padstatus="start">'
           + 'Auftrag starten</button>')
     + '</div>'
@@ -10159,19 +10269,28 @@ async function padMaschine(h) {
   h.querySelectorAll("[data-padstatus]").forEach((el) => {
     el.onclick = async () => {
       try {
-        if (el.dataset.padstatus === "ende" && j) {
-          const ok = await nachfragen({
-            titel: "Auftrag beenden",
-            text: "Auftrag " + j.job_number + " wird abgeschlossen. "
-              + "Der nächste Auftrag auf dieser Maschine rückt nach und läuft.",
-            bestaetigen: "Auftrag beenden",
-          });
-          if (!ok) return;
-          if (typeof blattStandSichern === "function") {
-            try { await blattStandSichern(j, m); } catch (g) { /* Beiwerk */ }
+        if (el.dataset.padstatus === "wechseln" && j) {
+          const wahl = await auswahlDialog("Zustand — " + j.job_number,
+            Object.keys(PLANSTATUS).filter((k) => k !== j.plan_status)
+              .map((k) => ({ wert: k,
+                text: PLANSTATUS[k].zeichen + "  " + PLANSTATUS[k].name
+                  + (k === "fertig" ? "  (der nächste rückt nach)" : "") })));
+          if (!wahl) return;
+          if (wahl === "fertig") {
+            const ok = await nachfragen({
+              titel: "Auftrag beenden",
+              text: "Auftrag " + j.job_number + " wird abgeschlossen. "
+                + "Der nächste Auftrag auf dieser Maschine rückt nach und läuft.",
+              bestaetigen: "Auftrag beenden",
+            });
+            if (!ok) return;
+            if (typeof blattStandSichern === "function") {
+              try { await blattStandSichern(j, m); } catch (g) { /* Beiwerk */ }
+            }
           }
-          const r = await zustandSetzen(j, "fertig");
-          meldung("Auftrag beendet." + (r.hinweis ? " " + r.hinweis : ""));
+          const r = await zustandSetzen(j, wahl);
+          meldung((wahl === "fertig" ? "Auftrag beendet." : "Zustand geändert.")
+            + (r.hinweis ? " " + r.hinweis : ""));
         } else {
           const n = await db.from("jobs").select("*").eq("machine_id", m.id)
             .is("ended_at", null).not("planned_from", "is", null)
