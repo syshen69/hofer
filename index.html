@@ -2997,9 +2997,11 @@ body.dunkel .statuszeile__knopf { background: rgba(255,255,255,.12);
 .pw-eck { display: inline-flex; align-items: center; gap: 6px;
           padding: 0 12px; white-space: nowrap; }
 .pw-ecksym { width: 15px; height: 15px; flex: none; }
+/* Auch am Handy mit Text — dort steht die Zeile allein, der Platz
+   ist da, und ein Ordnersymbol allein sagt niemandem etwas. */
 @media (max-width: 900px) {
-  .pw-eck span { display: none; }
-  .pw-eck { padding: 0 10px; }
+  .pw-eckknoepfe { flex: 1 1 100%; }
+  .pw-eck { flex: 1 1 0; justify-content: center; padding: 0 10px; }
 }
 /* Maschinenhistorie an der HOCO Nr. */
 .hl-jetzt { background: var(--marke-hell); }
@@ -3471,6 +3473,67 @@ body.pad-offen .suchliste__eintrag { min-height: 60px; font-size: 1.1rem; }
                     display: flex; flex-direction: column; align-items: center; gap: 2px;
                     font-size: 1rem; text-align: center; }
 .leerlauf-hinweis strong { font-size: 1.15rem; }
+/* ---------- Einrichtblatt als Blatt ---------- */
+.dialog--druck { width: min(1180px, 96vw) !important; max-width: min(1180px, 96vw) !important;
+                 height: min(880px, 92vh); display: flex; flex-direction: column; }
+.eb-rolle { flex: 1; min-height: 0; overflow: auto; background: #e9ecf0; padding: 14px;
+            border-radius: var(--radius); }
+.eb-blatt { background: #fff; color: #111; width: 100%; max-width: 1000px; margin: 0 auto;
+            padding: 18px 22px 24px; box-shadow: 0 4px 18px rgba(0,0,0,.18);
+            font-size: 13px; line-height: 1.35; }
+.eb-kopf { display: flex; justify-content: space-between; align-items: flex-start;
+           border-bottom: 2px solid #003884; padding-bottom: 8px; }
+.eb-titel { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: #55606e; }
+.eb-nr { font-size: 26px; font-weight: 800; line-height: 1.1; color: #003884; }
+.eb-bez { font-size: 14px; }
+.eb-kopf__rechts { text-align: right; }
+.eb-firma { font-weight: 700; }
+.eb-klein { font-size: 11px; color: #55606e; }
+
+.eb-felder { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px 14px;
+             margin: 12px 0 14px; }
+.eb-feld { border: 1px solid #c9d1da; border-radius: 4px; padding: 5px 8px; }
+.eb-feld span { display: block; font-size: 10px; letter-spacing: .06em;
+                text-transform: uppercase; color: #55606e; }
+.eb-feld strong { font-size: 14px; }
+.eb-infos { border: 1px solid #c9d1da; border-left: 4px solid #003884; border-radius: 4px;
+            padding: 6px 10px; margin-bottom: 12px; }
+.eb-infos span { display: block; font-size: 10px; letter-spacing: .06em;
+                 text-transform: uppercase; color: #55606e; }
+
+.eb-tabelle { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+.eb-tabelle th, .eb-tabelle td { border: 1px solid #c9d1da; padding: 4px 7px;
+                                 text-align: left; vertical-align: top; }
+.eb-tabelle thead tr:first-child th { background: #003884; color: #fff; font-size: 12px;
+                                      letter-spacing: .08em; text-transform: uppercase; }
+.eb-tabelle thead tr:last-child th { background: #eef2f7; font-size: 11px;
+                                     text-transform: uppercase; letter-spacing: .04em; }
+.eb-tabelle tbody tr:nth-child(even) td { background: #f7f9fb; }
+.eb-tool { font-weight: 800; white-space: nowrap; }
+.eb-unter .eb-tool { padding-left: 18px; font-weight: 600; }
+.eb-w-tool { width: 9%; } .eb-w-wz { width: 31%; } .eb-w-her { width: 18%; }
+.eb-w-tat { width: 24%; } .eb-w-mas { width: 18%; }
+.eb-leer { padding: 20px; text-align: center; color: #55606e; }
+
+@media (max-width: 700px) {
+  .eb-felder { grid-template-columns: repeat(2, 1fr); }
+  .eb-blatt { font-size: 12px; padding: 12px; }
+}
+
+/* Beim Drucken nur das Blatt, quer auf A4 */
+@media print {
+  @page { size: A4 landscape; margin: 8mm; }
+  body.nur-blatt-drucken > *:not(.dialog-huelle) { display: none !important; }
+  body.nur-blatt-drucken .dialog-huelle { position: static; background: none; }
+  body.nur-blatt-drucken .dialog { box-shadow: none; width: auto !important;
+                                   max-width: none !important; height: auto !important;
+                                   padding: 0; }
+  body.nur-blatt-drucken .blatt__kopf, body.nur-blatt-drucken .klein { display: none !important; }
+  body.nur-blatt-drucken .eb-rolle { background: none; padding: 0; overflow: visible; }
+  body.nur-blatt-drucken .eb-blatt { box-shadow: none; max-width: none; padding: 0; }
+  .eb-tabelle { page-break-inside: auto; }
+  .eb-tabelle tr { page-break-inside: avoid; }
+}
 </style>
 </head>
 <body>
@@ -3519,7 +3582,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "78.2.0";
+const APP_VERSION = "79.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -5346,6 +5409,12 @@ function zielZeichen(art) {
 }
 
 function zahlText(n) { return Number(n || 0).toLocaleString("de-CH"); }
+
+// Minuten als Stunden, ohne unnötige Nullen: 450 wird zu 7.5, 480 zu 8
+function stundenText(minuten) {
+  const h = (Number(minuten) || 0) / 60;
+  return String(Math.round(h * 100) / 100);
+}
 
 // Anzeigename einer Person. Fehlt der hinterlegte Name, wird er aus
 // der Mailadresse gebaut: tristan.ecker@… wird zu Tristan Ecker.
@@ -10440,6 +10509,13 @@ async function padMaschine(h) {
           return f ? leuchtend(f.hex) : null;
         })() }, "breit")
     + kachel("Programm", { text: programm, unten: blattZusatz, leer: programmGrund }, "klein")
+    // Wie viele Stück am Abend einzutragen sind. Leer, bis es jemand
+    // einmal setzt — danach steht es hier und auf dem Einrichtblatt.
+    + kachel("Stück am Abend", {
+        text: blattDaten && blattDaten.abend_stk ? zahlText(blattDaten.abend_stk) : "",
+        unten: blattDaten && blattDaten.abend_stk ? "Stk" : "",
+        leer: blattDaten ? "antippen und eintragen" : (programmGrund || "kein Einrichtblatt"),
+        tipp: blattDaten ? "abend" : "" }, "klein")
     // Wie steht der Auftrag zeitlich? Dieselbe Rechnung wie im
     // Reiter Fortschritt — aus Tagesleistung und Stückzahl.
     + (() => {
@@ -10609,6 +10685,26 @@ async function padMaschine(h) {
     a.href = datei; a.download = (pad.reiter === "wbg" ? "WBG" : "Zeichnung") + ".pdf";
     a.target = "_blank"; a.rel = "noopener";
     document.body.appendChild(a); a.click(); a.remove();
+  };
+
+  const abendFeld = h.querySelector('[data-padfeld="abend"]');
+  if (abendFeld && blattDaten) abendFeld.onclick = async () => {
+    const w = await dialogFelder({ titel: "Stück am Abend",
+      felder: [{ name: "stk", label: "Wie viele Stück sind am Abend einzutragen?",
+                 typ: "number", wert: blattDaten.abend_stk || "" }],
+      bestaetigen: "Speichern" });
+    if (!w) return;
+    const wert = w.stk === "" || w.stk === undefined ? null : Math.round(Number(w.stk));
+    const { error } = await db.from("setup_sheets").update({ abend_stk: wert })
+      .eq("id", blattDaten.id);
+    if (error) {
+      meldung(/abend_stk/.test(error.message || "")
+        ? "Dafür fehlt noch abendstueck.sql in der Datenbank."
+        : fehlertext(error), "fehler");
+      return;
+    }
+    meldung(wert ? "Gespeichert." : "Eintrag entfernt.");
+    padZeichnen();
   };
 
   const standFeld = h.querySelector('[data-padfeld="stand"]');
@@ -11094,7 +11190,135 @@ async function einrichtblattOeffnen(hocoNr, typId, jobId, maschineId, nurLesen) 
   try { blatt = await blattHolenOderAnlegen(hocoNr, typId, jobId, maschineId); }
   catch (f) { meldung(fehlertext(f), "fehler"); return; }
 
-  blattFenster(blatt, nurLesen);
+  // Im Pad Mode das fertige Blatt zeigen, so wie es gedruckt aussieht.
+  // Bearbeitet wird in der Produktion.
+  if (nurLesen) blattDruckFenster(blatt);
+  else blattFenster(blatt, nurLesen);
+}
+
+// Das Einrichtblatt so, wie es auf Papier aussieht: A4 quer, Kopf mit
+// den Angaben, darunter je Path eine Tabelle mit allen Werkzeugplätzen.
+// Leere Plätze bleiben stehen — an der Maschine soll man sehen, welcher
+// Platz noch nicht bestückt ist. Der Knopf "Drucken" öffnet den
+// Druckdialog, dort lässt es sich auch als PDF speichern.
+function blattDruckAnsicht(blatt, zeilen, stamm, typName, maschine) {
+  const gruppen = [];
+  (zeilen || []).forEach((z) => {
+    const name = z.path_name || "ohne Path";
+    let g = gruppen.find((x) => x.name === name);
+    if (!g) { g = { name: name, nr: z.path_nr, zeilen: [] }; gruppen.push(g); }
+    g.zeilen.push(z);
+  });
+  gruppen.sort((a, c) => (a.nr || 0) - (c.nr || 0));
+  gruppen.forEach((g) => g.zeilen.sort((a, c) =>
+    toolVergleich(a.tool_nr, c.tool_nr) || ((a.unter_nr || 0) - (c.unter_nr || 0))));
+
+  const wert = (v) => v ? esc(v) : "";
+  const werkzeug = (z) => {
+    if (z.articles) {
+      return esc(z.articles.article_number)
+        + (z.articles.name ? ' <span class="eb-klein">' + esc(z.articles.name) + '</span>' : "");
+    }
+    return z.werkzeug ? esc(z.werkzeug) : "";
+  };
+
+  const kopfFeld = (k, v) => '<div class="eb-feld"><span>' + k + '</span><strong>'
+    + (v ? esc(v) : "—") + '</strong></div>';
+
+  const inhalt = '<div class="eb-blatt" id="eb-druck">'
+    + '<div class="eb-kopf">'
+    + '<div class="eb-kopf__links">'
+    + '<div class="eb-titel">Einrichtblatt</div>'
+    + '<div class="eb-nr">' + esc(blatt.hoco_nr || "") + '</div>'
+    + '<div class="eb-bez">' + esc(stamm.bezeichnung || blatt.bezeichnung || "") + '</div>'
+    + '</div>'
+    + '<div class="eb-kopf__rechts">'
+    + '<div class="eb-firma">Hofer + Co. Präzisionsdrehteile</div>'
+    + '<div class="eb-klein">' + esc(typName || "")
+    + (maschine ? " · " + esc(maschine) : "") + '</div>'
+    + '<div class="eb-klein">Stand ' + esc(kurzDatum(isoDatum(new Date()))) + '</div>'
+    + '</div></div>'
+
+    + '<div class="eb-felder">'
+    + kopfFeld("Zeichnungs Nr.", stamm.zeichnungs_nr || blatt.zeichnungs_nr)
+    + kopfFeld("Material", stamm.material || blatt.material)
+    + kopfFeld("Programm Nr.", blatt.programm_nr)
+    + kopfFeld("Stückzeit", blatt.stueckzeit_s ? blatt.stueckzeit_s + " Sek./Stk." : "")
+    + kopfFeld("Laufzeit", blatt.laufzeit_min ? stundenText(blatt.laufzeit_min) + " Std." : "")
+    + kopfFeld("Abgreifzange", blatt.abgreifzange)
+    + kopfFeld("Stück am Abend", blatt.abend_stk ? zahlText(blatt.abend_stk) + " Stk" : "")
+    + '</div>'
+
+    + (blatt.infos ? '<div class="eb-infos"><span>Infos</span>'
+        + esc(blatt.infos) + '</div>' : "")
+
+    + (gruppen.length
+      ? gruppen.map((g) => '<table class="eb-tabelle"><thead>'
+          + '<tr><th colspan="5">' + esc(g.name) + '</th></tr>'
+          + '<tr><th class="eb-w-tool">Tool</th><th class="eb-w-wz">Werkzeug</th>'
+          + '<th class="eb-w-her">Hersteller</th><th class="eb-w-tat">Tätigkeit</th>'
+          + '<th class="eb-w-mas">Masse</th></tr></thead><tbody>'
+          + g.zeilen.map((z) => '<tr' + (z.unter_nr ? ' class="eb-unter"' : "") + '>'
+              + '<td class="eb-tool">' + wert(z.tool_nr) + '</td>'
+              + '<td>' + werkzeug(z) + '</td>'
+              + '<td>' + wert(z.hersteller) + '</td>'
+              + '<td>' + wert(z.taetigkeit) + '</td>'
+              + '<td>' + wert(z.masse) + '</td></tr>').join("")
+          + '</tbody></table>').join("")
+      : '<p class="eb-leer">Für diesen Maschinentyp sind noch keine Werkzeugplätze '
+        + 'angelegt. Das geht unter Produktion → Typen.</p>')
+    + '</div>';
+
+  return inhalt;
+}
+
+// Zeigt das Blatt als Druckansicht in einem Fenster. Wird im Pad Mode
+// benutzt und lässt sich von dort direkt ausdrucken.
+async function blattDruckFenster(blatt) {
+  const huelle = document.createElement("div");
+  huelle.className = "dialog-huelle";
+  huelle.innerHTML = '<div class="dialog dialog--voll dialog--druck">'
+    + '<div class="laedt">Wird geladen …</div></div>';
+  document.body.appendChild(huelle);
+  const kasten = huelle.querySelector(".dialog");
+  const zu = () => huelle.remove();
+  huelle.onclick = (e) => { if (e.target === huelle) zu(); };
+
+  let zeilen = [], typName = "", stamm = {}, maschine = "";
+  try {
+    zeilen = await ladeBlattZeilen(blatt.id);
+    const t = await db.from("machine_types").select("name").eq("id", blatt.type_id).limit(1);
+    typName = ((t.data || [])[0] || {}).name || "";
+    const h = await db.from("hoco_parts").select("*").eq("hoco_nr", blatt.hoco_nr).limit(1);
+    stamm = ((h && h.data) || [])[0] || {};
+    if (blatt.machine_id) {
+      const m = (prod.maschinen || []).find((x) => x.id === blatt.machine_id);
+      if (m) maschine = (m.machine_number ? m.machine_number + " " : "") + m.name;
+    }
+  } catch (f) {
+    kasten.innerHTML = '<p class="hinweis">' + esc(fehlertext(f)) + '</p>';
+    return;
+  }
+
+  kasten.innerHTML = '<div class="blatt__kopf">'
+    + '<h2>Einrichtblatt ' + esc(blatt.hoco_nr || "") + '</h2>'
+    + '<button class="knopf knopf--klein" data-drucken>Drucken</button>'
+    + '<button class="knopf knopf--still" data-zu>Schliessen</button>'
+    + '</div>'
+    + '<div class="eb-rolle">'
+    + blattDruckAnsicht(blatt, zeilen, stamm, typName, maschine)
+    + '</div>'
+    + '<p class="klein">Nur zum Ansehen. Bearbeitet wird das Einrichtblatt '
+    + 'in der Produktion.</p>';
+
+  kasten.querySelector("[data-zu]").onclick = zu;
+  kasten.querySelector("[data-drucken]").onclick = () => {
+    document.body.classList.add("nur-blatt-drucken");
+    const fertig = () => document.body.classList.remove("nur-blatt-drucken");
+    window.addEventListener("afterprint", fertig, { once: true });
+    setTimeout(fertig, 4000);
+    window.print();
+  };
 }
 
 // Ein festgehaltener Stand: dieselbe Darstellung, aber nichts
@@ -11220,7 +11444,9 @@ async function blattFenster(blatt, nurLesen) {
       + feld("Material", stamm.material || blatt.material, true)
       + feld("Programm Nr.", blatt.programm_nr)
       + feld("Stückzeit", blatt.stueckzeit_s ? blatt.stueckzeit_s + " Sek./Stk." : "")
-      + feld("Maschinenlaufzeit", blatt.laufzeit_min ? blatt.laufzeit_min + " Min." : "")
+      + feld("Maschinenlaufzeit", blatt.laufzeit_min
+          ? stundenText(blatt.laufzeit_min) + " Std." : "")
+      + feld("Stück am Abend", blatt.abend_stk ? zahlText(blatt.abend_stk) + " Stk" : "")
       + feld("Abgreifzange", blatt.abgreifzange)
       + feld("Allgemeine Infos", blatt.infos)
       + '</tbody></table>'
@@ -11271,18 +11497,33 @@ async function blattFenster(blatt, nurLesen) {
           { name: "prog", label: "Programm Nr.", wert: blatt.programm_nr || "" },
           { name: "zeit", label: "Stückzeit in Sekunden", typ: "number",
             wert: blatt.stueckzeit_s || "" },
-          { name: "lauf", label: "Maschinenlaufzeit in Minuten", typ: "number",
-            wert: blatt.laufzeit_min || "" },
+          { name: "lauf", label: "Maschinenlaufzeit in Stunden", typ: "number",
+            wert: blatt.laufzeit_min ? stundenText(blatt.laufzeit_min) : "",
+            hinweis: "Zum Beispiel 7.5 für siebeneinhalb Stunden." },
+          { name: "abend", label: "Stück am Abend", typ: "number",
+            wert: blatt.abend_stk || "",
+            hinweis: "Wie viele Stück am Abend einzutragen sind. "
+              + "Leer lassen, solange es nicht feststeht." },
           { name: "zange", label: "Abgreifzange", wert: blatt.abgreifzange || "" },
           { name: "infos", label: "Allgemeine Infos", wert: blatt.infos || "" }] });
       if (!w) return;
       const daten = {
         programm_nr: w.prog || null,
         stueckzeit_s: w.zeit === "" || w.zeit === undefined ? null : Number(w.zeit),
-        laufzeit_min: w.lauf === "" || w.lauf === undefined ? null : Number(w.lauf),
+        // Eingetippt wird in Stunden, gespeichert bleibt es in Minuten
+        laufzeit_min: w.lauf === "" || w.lauf === undefined
+          ? null : Math.round(Number(w.lauf) * 60),
+        abend_stk: w.abend === "" || w.abend === undefined ? null : Math.round(Number(w.abend)),
         abgreifzange: w.zange || null,
         infos: w.infos || null };
-      const { error } = await db.from("setup_sheets").update(daten).eq("id", blatt.id);
+      let { error } = await db.from("setup_sheets").update(daten).eq("id", blatt.id);
+      // Fehlt die Spalte noch, weil abendstueck.sql nicht gelaufen ist,
+      // wird der Rest trotzdem gespeichert
+      if (error && /abend_stk/.test(error.message || "")) {
+        delete daten.abend_stk;
+        ({ error } = await db.from("setup_sheets").update(daten).eq("id", blatt.id));
+        if (!error) meldung("Stück am Abend braucht noch abendstueck.sql.", "warn");
+      }
       if (error) { meldung(fehlertext(error), "fehler"); return; }
       Object.assign(blatt, daten);
       meldung("Gespeichert.");
