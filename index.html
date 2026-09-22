@@ -3449,6 +3449,28 @@ body.pad-offen .statuswahl .knopf { width: 100%; white-space: normal; }
 .suchliste__eintrag:hover { border-color: var(--marke); background: var(--marke-hell); }
 .suchliste__eintrag span { font-size: .82rem; color: var(--gedaempft); }
 body.pad-offen .suchliste__eintrag { min-height: 60px; font-size: 1.1rem; }
+/* Anmeldung am Handy: Bei vielen Personen stehen bis zu fünf Kacheln
+   in einer Zeile. Dort dürfen sie schmaler werden, statt am Rand
+   abgeschnitten zu werden. */
+@media (max-width: 480px) {
+  .login__kacheln--reihen { width: 100%; }
+  .login__reihe { width: 100%; gap: 8px !important; }
+  .login__kacheln--reihen .login__kachel {
+    flex: 0 0 min(94px, calc((100% - (var(--spalten, 3) - 1) * 8px) / var(--spalten, 3))) !important;
+    width: auto !important; max-width: 94px !important; min-width: 0; }
+  .login__kacheln--reihen .login__kachel img,
+  .login__kacheln--reihen .login__kachel-buchstabe { width: 100%; max-width: 100%; }
+  .login__kacheln--reihen .login__kachel-name { max-width: 100%; overflow: hidden;
+                                                text-overflow: ellipsis; white-space: nowrap;
+                                                font-size: .72rem; }
+}
+/* Warnung vor der automatischen Abmeldung — über allem, auch dem Pad */
+.leerlauf-hinweis { position: fixed; left: 50%; top: 18px; transform: translateX(-50%);
+                    z-index: 200; background: #b3261e; color: #fff; border-radius: 14px;
+                    padding: 14px 22px; box-shadow: 0 12px 30px rgba(0,0,0,.35);
+                    display: flex; flex-direction: column; align-items: center; gap: 2px;
+                    font-size: 1rem; text-align: center; }
+.leerlauf-hinweis strong { font-size: 1.15rem; }
 </style>
 </head>
 <body>
@@ -3497,7 +3519,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "77.0.0";
+const APP_VERSION = "78.2.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -4131,8 +4153,8 @@ function zeigeLogin() {
 
       // Reihen ausgleichen: lieber 3 + 3 als 5 + 1. Die Spaltenzahl
       // ergibt sich aus der Anzahl, der Rest steht mittig darunter.
-      // Immer drei nebeneinander, auf jedem Gerät. Geht die Zahl nicht
-      // auf, ist die letzte Reihe kürzer und steht mittig.
+      // Immer drei nebeneinander. Geht die Zahl nicht auf, ist die
+      // letzte Zeile kürzer und steht mittig.
       const anzahl = data.length;
       const proReihe = 3;
       const reihen = Math.max(1, Math.ceil(anzahl / proReihe));
@@ -4147,7 +4169,11 @@ function zeigeLogin() {
         + '</button>';
 
       let zeiger = 0;
-      let html = '<div class="login__kacheln login__kacheln--reihen">';
+      // Die vollste Zeile bestimmt die Kachelbreite — so sind am Handy
+      // alle Kacheln gleich gross, auch in der kürzeren letzten Zeile
+      const breiteste = Math.min(proReihe, anzahl);
+      let html = '<div class="login__kacheln login__kacheln--reihen" style="--spalten:'
+        + Math.max(1, breiteste) + '">';
       for (let r = 0; r < reihen; r++) {
         const inReihe = Math.min(proReihe, anzahl - zeiger);
         html += '<div class="login__reihe">';
@@ -10032,6 +10058,72 @@ async function ladeBlaetter(hocoNr) {
 
 const pad = { wo: "start", parkId: null, maschineId: null, daten: {} };
 
+const LEERLAUF_MS = 3 * 60 * 1000;     // drei Minuten
+const WARNUNG_MS = 20 * 1000;          // so lange vorher warnen
+let leerlauf = { letzte: Date.now(), takt: null, abmelden: null, hinweis: null };
+
+function leerlaufAktiv() {
+  leerlauf.letzte = Date.now();
+  if (leerlauf.hinweis) { leerlauf.hinweis.remove(); leerlauf.hinweis = null; }
+}
+
+function leerlaufStarten(abmelden) {
+  leerlaufStoppen();
+  leerlauf.abmelden = abmelden;
+  leerlauf.letzte = Date.now();
+  ["pointerdown", "keydown", "wheel", "touchstart", "input"].forEach((art) =>
+    document.addEventListener(art, leerlaufAktiv, { capture: true, passive: true }));
+  // Mausbewegung zählt auch, aber nur alle paar Sekunden — sonst wird
+  // bei jedem Pixel gerechnet
+  let zuletzt = 0;
+  leerlauf.bewegt = () => {
+    const jetzt = Date.now();
+    if (jetzt - zuletzt > 3000) { zuletzt = jetzt; leerlaufAktiv(); }
+  };
+  document.addEventListener("mousemove", leerlauf.bewegt, { passive: true });
+  leerlauf.sichtbar = () => { if (!document.hidden) leerlaufPruefen(); };
+  document.addEventListener("visibilitychange", leerlauf.sichtbar);
+  leerlauf.takt = setInterval(leerlaufPruefen, 2000);
+}
+
+function leerlaufStoppen() {
+  if (leerlauf.takt) clearInterval(leerlauf.takt);
+  leerlauf.takt = null;
+  ["pointerdown", "keydown", "wheel", "touchstart", "input"].forEach((art) =>
+    document.removeEventListener(art, leerlaufAktiv, { capture: true }));
+  if (leerlauf.bewegt) document.removeEventListener("mousemove", leerlauf.bewegt);
+  if (leerlauf.sichtbar) document.removeEventListener("visibilitychange", leerlauf.sichtbar);
+  if (leerlauf.hinweis) { leerlauf.hinweis.remove(); leerlauf.hinweis = null; }
+}
+
+function leerlaufPruefen() {
+  if (!leerlauf.takt || !profil) return;
+  const ruhe = Date.now() - leerlauf.letzte;
+
+  if (ruhe >= LEERLAUF_MS) {
+    const abmelden = leerlauf.abmelden;
+    leerlaufStoppen();
+    if (abmelden) {
+      // Die Meldung erst nach dem Aufbau der Anmeldeseite zeigen,
+      // sonst verschwindet sie mit dem alten Inhalt
+      abmelden().then(() => setTimeout(() =>
+        meldung("Nach drei Minuten ohne Eingabe abgemeldet."), 400));
+    }
+    return;
+  }
+
+  if (ruhe >= LEERLAUF_MS - WARNUNG_MS) {
+    const rest = Math.ceil((LEERLAUF_MS - ruhe) / 1000);
+    if (!leerlauf.hinweis) {
+      leerlauf.hinweis = document.createElement("div");
+      leerlauf.hinweis.className = "leerlauf-hinweis";
+      document.body.appendChild(leerlauf.hinweis);
+    }
+    leerlauf.hinweis.innerHTML = '<strong>Abmeldung in ' + rest + ' Sekunden</strong>'
+      + '<span>Tippe irgendwo, um angemeldet zu bleiben.</span>';
+  }
+}
+
 function padOeffnen() {
   if (document.getElementById("pad")) return;
   const h = document.createElement("div");
@@ -10239,15 +10331,40 @@ async function padMaschine(h) {
     try { teil = await ladeHocoEins(j.job_number); } catch (f) { /* Beiwerk */ }
   }
 
-  // Programmnummer je Typ, falls hinterlegt
-  let programm = "";
-  if (j && teil && m.type_id) {
+  // Was im Einrichtblatt steht — Programm, Stückzeit, Zange —, zeigt
+  // das Dashboard. Das Blatt gehört zu HOCO Nr. und Maschinentyp, ist
+  // also dasselbe, das in der Produktion bearbeitet wird. Fehlt dort
+  // die Programmnummer, gilt die aus den Typdaten.
+  // Warum steht dort nichts? Das Pad soll den Grund nennen, statt
+  // stumm "keine vorhanden" zu zeigen.
+  let programm = "", blattDaten = null, programmGrund = "";
+  if (!j) programmGrund = "kein Auftrag";
+  else if (!m.type_id) programmGrund = "Maschine ohne Typ";
+  if (j && j.job_number && m.type_id) {
     try {
-      const r = await db.from("hoco_type_data").select("programm_nr")
-        .eq("hoco_nr", j.job_number).eq("type_id", m.type_id).limit(1);
-      programm = ((r.data || [])[0] || {}).programm_nr || "";
+      const r = await db.from("setup_sheets").select("*")
+        .eq("hoco_nr", j.job_number).eq("type_id", m.type_id)
+        .order("created_at").limit(1);
+      blattDaten = ((r && r.data) || [])[0] || null;
+      programm = (blattDaten && blattDaten.programm_nr) || "";
     } catch (f) { /* Beiwerk */ }
+    if (!programm) {
+      try {
+        const r = await db.from("hoco_type_data").select("programm_nr")
+          .eq("hoco_nr", j.job_number).eq("type_id", m.type_id).limit(1);
+        programm = ((r.data || [])[0] || {}).programm_nr || "";
+      } catch (f) { /* Beiwerk */ }
+    }
+    if (!programm) {
+      programmGrund = blattDaten ? "im Einrichtblatt nicht eingetragen"
+        : "noch kein Einrichtblatt";
+    }
   }
+  const blattZusatz = blattDaten
+    ? [blattDaten.stueckzeit_s ? blattDaten.stueckzeit_s + " s/Stk" : "",
+       blattDaten.abgreifzange ? "Zange " + blattDaten.abgreifzange : ""]
+        .filter(Boolean).join(" · ")
+    : "";
 
   // Alle Felder und Knöpfe stehen immer da. Fehlt etwas, steht
   // "keine vorhanden" statt eines leeren Platzes — so sieht die
@@ -10302,7 +10419,7 @@ async function padMaschine(h) {
     + '>'
     + '<span class="pad-karte__name">' + name + (wert.tipp ? " · antippen" : "") + '</span>'
     + '<span class="pad-karte__wert' + (wert.text ? "" : " pad-karte__wert--leer") + '">'
-    + (wert.text ? esc(wert.text) : "keine vorhanden") + '</span>'
+    + (wert.text ? esc(wert.text) : esc(wert.leer || "keine vorhanden")) + '</span>'
     + (wert.unten ? '<span class="pad-karte__unten">' + esc(wert.unten) + '</span>' : "")
     + '</div>';
 
@@ -10322,7 +10439,7 @@ async function padMaschine(h) {
             .find((x) => x.wert === j.color);
           return f ? leuchtend(f.hex) : null;
         })() }, "breit")
-    + kachel("Programm", { text: programm }, "klein")
+    + kachel("Programm", { text: programm, unten: blattZusatz, leer: programmGrund }, "klein")
     // Wie steht der Auftrag zeitlich? Dieselbe Rechnung wie im
     // Reiter Fortschritt — aus Tagesleistung und Stückzahl.
     + (() => {
@@ -10446,7 +10563,7 @@ async function padMaschine(h) {
           + "gibt es kein Einrichtblatt.", "warn"); return; }
         if (!m.type_id) { meldung("Dieser Maschine ist kein Typ zugewiesen. Das wird "
           + "unter Produktion → Maschinen eingestellt.", "warn"); return; }
-        einrichtblattOeffnen(j.job_number, m.type_id, j.id, m.id);
+        einrichtblattOeffnen(j.job_number, m.type_id, j.id, m.id, true);
         return;
       }
       if (wert === "wechsel") {
@@ -10833,7 +10950,13 @@ async function blattHolenOderAnlegen(hocoNr, typId, jobId, maschineId) {
   const vorhanden = await db.from("setup_sheets").select("*")
     .eq("hoco_nr", hocoNr).eq("type_id", typId).order("created_at").limit(1);
   if (vorhanden.error) throw vorhanden.error;
-  if ((vorhanden.data || []).length) return vorhanden.data[0];
+  if ((vorhanden.data || []).length) {
+    const blatt = vorhanden.data[0];
+    // Plätze, die seit dem Anlegen am Typ dazugekommen sind, fehlen
+    // sonst für immer in diesem Blatt. Also bei jedem Öffnen nachtragen.
+    try { await blattPlaetzeNachtragen(blatt); } catch (f) { /* Blatt trotzdem zeigen */ }
+    return blatt;
+  }
 
   const teil = await ladeHocoEins(hocoNr);
   const kopf = {
@@ -10875,6 +10998,35 @@ async function blattHolenOderAnlegen(hocoNr, typId, jobId, maschineId) {
   return blatt;
 }
 
+// Trägt Plätze nach, die am Typ angelegt wurden, nachdem dieses Blatt
+// entstanden ist. Bestehende Zeilen bleiben, wie sie sind.
+async function blattPlaetzeNachtragen(blatt) {
+  const [paths, da] = await Promise.all([
+    ladeTypAufbau(blatt.type_id),
+    db.from("setup_sheet_slots").select("slot_id, sortierung").eq("sheet_id", blatt.id)]);
+  const vorhanden = new Set(((da && da.data) || []).map((z) => z.slot_id).filter(Boolean));
+  let rang = Math.max(0, ...((da && da.data) || []).map((z) => z.sortierung || 0));
+  const neu = [];
+  paths.forEach((p) => {
+    (p.type_slots || []).forEach((sl) => {
+      if (vorhanden.has(sl.id)) return;
+      rang++;
+      neu.push({
+        sheet_id: blatt.id, slot_id: sl.id,
+        path_name: p.name, path_nr: p.nummer,
+        platz: sl.bezeichnung, platz_nr: sl.platz_nr,
+        bezeichnung: sl.tool_nr || sl.bezeichnung,
+        tool_nr: sl.tool_nr, unter_nr: 0, sortierung: rang,
+      });
+    });
+  });
+  if (neu.length) {
+    const r = await db.from("setup_sheet_slots").insert(neu);
+    if (r.error) throw r.error;
+  }
+  return neu.length;
+}
+
 // Beim Abschliessen eines Auftrags wird der Stand des Einrichtblatts
 // als Daten festgehalten. Kein PDF — daraus wird das Blatt später
 // genauso erzeugt wie sonst, nur eben aus dem eingefrorenen Stand.
@@ -10913,7 +11065,7 @@ async function blattStandSichern(auftrag, maschine) {
   } catch (f) { /* der Abschluss darf daran nicht scheitern */ }
 }
 
-async function einrichtblattOeffnen(hocoNr, typId, jobId, maschineId) {
+async function einrichtblattOeffnen(hocoNr, typId, jobId, maschineId, nurLesen) {
   if (!hocoNr) { meldung("Ohne HOCO Nr. geht das nicht.", "warn"); return; }
   if (!typId) {
     meldung("Der Maschine ist kein Typ zugewiesen. Das geht unter Produktion → Maschinen.", "warn");
@@ -10922,11 +11074,19 @@ async function einrichtblattOeffnen(hocoNr, typId, jobId, maschineId) {
 
   // Ist der Auftrag abgeschlossen und ein Stand festgehalten, wird
   // das Blatt daraus erzeugt — nicht aus den heutigen Daten.
+  // Aber nur, wenn der Auftrag wirklich noch abgeschlossen ist: Wurde
+  // er wieder geöffnet, gilt wieder das lebende Blatt. Vorher zeigte
+  // das Pad sonst den alten Stand, ohne die neu erfassten Werkzeuge.
   if (jobId) {
     try {
-      const r = await db.from("setup_snapshots").select("*").eq("job_id", jobId).limit(1);
-      const stand = (r.data || [])[0];
-      if (stand) { blattFensterStand(stand); return; }
+      const a = await db.from("jobs").select("ended_at, plan_status").eq("id", jobId).limit(1);
+      const auftrag = ((a && a.data) || [])[0] || {};
+      const beendet = !!auftrag.ended_at || auftrag.plan_status === "fertig";
+      if (beendet) {
+        const r = await db.from("setup_snapshots").select("*").eq("job_id", jobId).limit(1);
+        const stand = (r.data || [])[0];
+        if (stand) { blattFensterStand(stand); return; }
+      }
     } catch (f) { /* dann eben die aktuelle Fassung */ }
   }
 
@@ -10934,7 +11094,7 @@ async function einrichtblattOeffnen(hocoNr, typId, jobId, maschineId) {
   try { blatt = await blattHolenOderAnlegen(hocoNr, typId, jobId, maschineId); }
   catch (f) { meldung(fehlertext(f), "fehler"); return; }
 
-  blattFenster(blatt);
+  blattFenster(blatt, nurLesen);
 }
 
 // Ein festgehaltener Stand: dieselbe Darstellung, aber nichts
@@ -10997,8 +11157,10 @@ function blattFensterStand(stand) {
   dialogSchliessen(huelle, zu);
 }
 
-async function blattFenster(blatt) {
-  const darf = darfSchreiben();
+async function blattFenster(blatt, nurLesen) {
+  // Im Pad Mode wird das Blatt nur angesehen, bearbeitet wird es in
+  // der Produktion
+  const darf = !nurLesen && darfSchreiben();
   const huelle = document.createElement("div");
   huelle.className = "dialog-huelle";
   huelle.innerHTML = '<div class="dialog dialog--breit dialog--blatt">'
@@ -11062,12 +11224,17 @@ async function blattFenster(blatt) {
       + feld("Abgreifzange", blatt.abgreifzange)
       + feld("Allgemeine Infos", blatt.infos)
       + '</tbody></table>'
-      + (darf ? '<button class="knopf knopf--klein" data-kopf>Programm, Zeit, Zange bearbeiten</button>' : "")
+      + (darf ? '<button class="knopf knopf--klein" data-kopf>Programm, Zeit, Zange bearbeiten</button>'
+          : (nurLesen ? '<p class="hinweis">Nur zum Ansehen. Bearbeitet wird das Einrichtblatt '
+              + 'in der Produktion.</p>' : ""))
       + '<p class="klein">Bezeichnung, Zeichnungs Nr. und Material kommen aus den '
       + 'Stammdaten der HOCO Nr. und werden dort geändert.</p>'
 
       + gruppen.map((g) => '<section class="karte">'
-          + '<div class="karte__kopf"><h2>' + esc(g.name) + '</h2></div>'
+          + '<div class="karte__kopf"><h2>' + esc(g.name) + '</h2>'
+          + (darf ? '<button class="knopf knopf--klein" data-z-neu="' + esc(g.name) + '">'
+              + '+ Platz</button>' : "")
+          + '</div>'
           + '<table class="tabelle blatt-tabelle"><thead><tr>'
           + '<th>Tool</th><th>Werkzeug</th><th>Hersteller</th><th>Tätigkeit</th>'
           + '<th>Masse</th><th></th></tr></thead><tbody>'
@@ -11222,6 +11389,34 @@ async function blattFenster(blatt) {
       };
     });
 
+    // Einen Platz direkt im Blatt hinzufügen. Er gilt nur für dieses
+    // Blatt — das Raster des Maschinentyps bleibt unverändert.
+    kasten.querySelectorAll("[data-z-neu]").forEach((el) => {
+      el.onclick = async () => {
+        const g = gruppen.find((x) => x.name === el.dataset.zNeu);
+        if (!g) return;
+        const w = await dialogFelder({ titel: "Neuer Platz in " + g.name,
+          felder: [{ name: "tool", label: "Toolnummer", pflicht: true,
+                     platzhalter: "z. B. T200" }],
+          bestaetigen: "Anlegen" });
+        if (!w) return;
+        const nr = String(w.tool || "").trim();
+        if (!nr) return;
+        if (g.zeilen.some((z) => String(z.tool_nr || "").trim().toUpperCase() === nr.toUpperCase())) {
+          meldung(nr + " gibt es in " + g.name + " schon.", "warn");
+          return;
+        }
+        const { error } = await db.from("setup_sheet_slots").insert({
+          sheet_id: blatt.id, slot_id: null,
+          path_name: g.name, path_nr: g.nr,
+          platz: nr, bezeichnung: nr, tool_nr: nr, unter_nr: 0,
+          sortierung: Math.max(0, ...zeilen.map((z) => z.sortierung || 0)) + 1 });
+        if (error) { meldung(fehlertext(error), "fehler"); return; }
+        meldung("Platz " + nr + " angelegt. Jetzt ein Werkzeug hinzufügen.");
+        zeichnen();
+      };
+    });
+
     kasten.querySelectorAll("[data-z-weg]").forEach((el) => {
       el.onclick = async () => {
         const ok = await nachfragen({ titel: "Zeile löschen",
@@ -11295,11 +11490,19 @@ async function werkzeugWaehlen(z) {
 
   let lieferant;
   if (lw === "__neu") {
+    // Dieselben Angaben wie beim Anlegen eines Lieferanten in den
+    // Bestellungen — es ist ja auch derselbe Lieferant
     const w = await dialogFelder({ titel: "Neuer Hersteller",
-      felder: [{ name: "name", label: "Name", pflicht: true, platzhalter: "z. B. Sphinx, Iscar" }],
+      felder: [
+        { name: "name", label: "Name", pflicht: true, platzhalter: "z. B. Sphinx, Iscar" },
+        { name: "website", label: "Website", platzhalter: "www.beispiel.ch",
+          hinweis: "Der Name wird dann überall in der App anklickbar." }],
       bestaetigen: "Anlegen" });
     if (!w) return null;
-    const r = await db.from("suppliers").insert({ name: w.name.trim() }).select();
+    let seite = (w.website || "").trim();
+    if (seite && !/^https?:\/\//i.test(seite)) seite = "https://" + seite;
+    const r = await db.from("suppliers")
+      .insert({ name: w.name.trim(), website: seite || null }).select();
     if (r.error) throw r.error;
     lieferant = (r.data || [])[0];
   } else {
@@ -11323,17 +11526,10 @@ async function werkzeugWaehlen(z) {
 
   let gewaehlt;
   if (aw === "__neu") {
-    const w = await dialogFelder({ titel: "Neues Werkzeug von " + lieferant.name,
-      felder: [
-        { name: "nr", label: "Artikel Nr.", pflicht: true },
-        { name: "name", label: "Bezeichnung", platzhalter: "z. B. Bohrer Ø4.2 HM" }],
-      bestaetigen: "Anlegen" });
-    if (!w) return null;
-    const r = await db.from("articles").insert({
-      article_number: w.nr.trim(), name: (w.name || "").trim() || w.nr.trim(),
-      supplier_id: lieferant.id }).select();
-    if (r.error) throw r.error;
-    gewaehlt = (r.data || [])[0];
+    // Genau wie beim Bestellen: Artikelnummer, Beschreibung, Bezeichnung
+    // aus der gepflegten Liste. Der Hersteller steht schon fest.
+    gewaehlt = await artikelSchnellAnlegen("", lieferant.id);
+    if (!gewaehlt) return null;
   } else {
     gewaehlt = artikel.find((x) => x.id === aw);
   }
@@ -11372,7 +11568,12 @@ async function ansichtHoco(ziel, b) {
     return;
   }
 
-  const neuLaden = () => seiteProduktion(b);
+  // Im Fenster auf der Planwand wird nur das Fenster neu gezeichnet.
+  // Vorher lief jeder Klick — Ordner, Kunde, Suche — über die
+  // Produktionsseite: Im Fenster tat sich nichts, dahinter wurde aus
+  // der Planwand die Produktion.
+  const imFenster = !!(ziel && ziel.closest && ziel.closest(".hoco-fenster"));
+  const neuLaden = () => (imFenster ? ansichtHoco(ziel, b) : seiteProduktion(b));
 
   // ----- Ein einzelnes Teil -----
   if (prod.hocoOffen) {
@@ -15135,7 +15336,10 @@ async function lieferungEinlagern(z, b) {
 // ---------- Neue Position ----------
 
 // Legt einen Artikel mit den nötigsten Angaben an und gibt ihn zurück.
-async function artikelSchnellAnlegen(vorgabe) {
+// lieferantVorgabe: ist der Lieferant schon gewählt — etwa im
+// Einrichtblatt, wo man zuerst den Hersteller aussucht —, wird er
+// nicht noch einmal abgefragt.
+async function artikelSchnellAnlegen(vorgabe, lieferantVorgabe) {
   let lieferanten = [], bezeichnungen = [];
   try { lieferanten = await ladeLieferanten(); } catch (f) { /* geht auch ohne */ }
   try { bezeichnungen = await ladeBezeichnungen(); } catch (f) { /* geht auch ohne */ }
@@ -15159,7 +15363,7 @@ async function artikelSchnellAnlegen(vorgabe) {
   let lieferantId = null;
   // Ein Lieferant ist Pflicht. Die Abfrage wiederholt sich,
   // bis wirklich einer gewählt oder neu angelegt wurde.
-  let wahl = null;
+  let wahl = lieferantVorgabe || null;
   while (!wahl) {
     const auswahlListe = lieferanten.map((l) => ({ wert: l.id, text: l.name, such: l.name }))
       .concat([{ wert: "__neu", text: "+ Neuen Lieferanten anlegen", such: "neu" }]);
@@ -20119,8 +20323,16 @@ function zeichneGeruest() {
   };
   if (einstellungWert("navschmal", "0") === "1") document.body.classList.add("nav--schmal");
 
+  // Nach drei Minuten ohne Eingabe wird abgemeldet. 20 Sekunden vorher
+  // erscheint eine Warnung; jede Berührung, jeder Klick, jede Taste
+  // setzt die Uhr zurück. Gerechnet wird mit Zeitstempeln, nicht mit
+  // einem einzelnen Zähler — so greift es auch, wenn der Browser das
+  // Fenster im Hintergrund schlafen legt.
+  leerlaufStarten(jetztAbmelden);
 
   async function jetztAbmelden() {
+    leerlaufStoppen();
+    if (typeof padSchliessen === "function") padSchliessen();
     await db.auth.signOut();
     profil = null;
     document.querySelectorAll(".dialog-huelle").forEach((el) => el.remove());
