@@ -3545,6 +3545,9 @@ body.pad-offen .suchliste__eintrag { min-height: 60px; font-size: 1.1rem; }
   body.nur-blatt-drucken .blatt__kopf, body.nur-blatt-drucken .klein { display: none !important; }
   body.nur-blatt-drucken .eb-rolle { background: none; padding: 0; overflow: visible; }
   body.nur-blatt-drucken .eb-blatt { box-shadow: none; max-width: none; padding: 0; }
+  body.nur-blatt-drucken .eb-rolle { background: none !important; }
+  .eb-blatt, .eb-blatt * { -webkit-print-color-adjust: exact !important;
+                           print-color-adjust: exact !important; }
   @page { size: A4 landscape; margin: 8mm; }
   .eb-karten { grid-template-columns: repeat(10, 1fr); }
   .eb-karte__bild { min-height: 20mm; }
@@ -3583,6 +3586,53 @@ body.pad-offen .suchliste__eintrag { min-height: 60px; font-size: 1.1rem; }
 @media (max-width: 480px) {
   .login__bild { width: calc(100% - 28px) !important; margin: 4px auto 0 !important; }
 }
+/* ---------- Werkzeugblatt im Pad: gross wie eine PDF ----------
+   Das Blatt füllt das Fenster, statt in einer schmalen Spalte zu
+   stehen. Die Kacheln wachsen mit. */
+body.pad-offen .dialog--druck { width: 98vw !important; max-width: 98vw !important;
+                                height: 95vh; max-height: 95vh; }
+.dialog--druck { width: min(1500px, 97vw) !important; max-width: min(1500px, 97vw) !important; }
+.dialog--druck .eb-rolle { background: #2a2f36; padding: 18px; }
+.dialog--druck .eb-blatt--quer { max-width: none; width: 100%;
+                                 box-shadow: 0 10px 40px rgba(0,0,0,.45); }
+.dialog--druck .eb-karte__bild { min-height: 74px; }
+.dialog--druck .eb-karte__kopf { font-size: 13px; }
+
+/* ---------- Farben beim Drucken ----------
+   Browser lassen Hintergrundfarben beim Drucken standardmässig weg.
+   Ohne diese Angabe wären die Kachelköpfe und die Pathfarben auf dem
+   Papier weiss. */
+.eb-blatt, .eb-blatt * { -webkit-print-color-adjust: exact !important;
+                         print-color-adjust: exact !important; }
+/* ---------- Werkzeugblatt: Farben und grosse Ansicht ----------
+   Browser drucken Hintergrundfarben nur, wenn man es ausdrücklich
+   verlangt. Ohne das bleiben die farbigen Kachelköpfe in der
+   Druckvorschau weiss. */
+.eb-blatt, .eb-blatt * { -webkit-print-color-adjust: exact !important;
+                         print-color-adjust: exact !important; }
+
+/* Im Pad wird das Blatt gross gezeigt wie eine Zeichnung: heller
+   Hintergrund, die Seite füllt die Breite. */
+.dialog--druck { width: 96vw !important; max-width: 96vw !important;
+                 height: 94vh; display: flex; flex-direction: column; }
+.dialog--druck .eb-rolle { flex: 1; min-height: 0; }
+.dialog--druck .eb-blatt { max-width: 1600px; }
+
+@media print {
+  .eb-karte__kopf { color: #fff !important; }
+  .eb-karte--frei .eb-karte__kopf { color: #7a8694 !important; }
+}
+/* Werkzeugplätze am Typ verschieben */
+.platz--fassbar { cursor: grab; touch-action: none; user-select: none; }
+.platz--zieht { opacity: .45; }
+.platz--ziel { box-shadow: inset 3px 0 0 0 var(--marke); }
+.platzliste--offen { outline: 2px dashed var(--marke); outline-offset: 3px;
+                     border-radius: var(--radius); }
+.platzliste--leer { min-height: 60px; display: block; }
+.platz-schatten { position: fixed; z-index: 200; transform: translate(-50%, -160%);
+                  background: var(--marke); color: #fff; font-weight: 800;
+                  padding: 6px 12px; border-radius: 8px; pointer-events: none;
+                  box-shadow: 0 6px 16px rgba(0,0,0,.3); opacity: .9; }
 </style>
 </head>
 <body>
@@ -3631,7 +3681,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "82.2.0";
+const APP_VERSION = "83.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -8453,6 +8503,129 @@ async function zustandSetzen(j, neu) {
   return { ok: true, hinweis: hinweis, naechster: naechster };
 }
 
+// Zieht Werkzeugplätze eines Maschinentyps an eine andere Stelle,
+// auch in einen anderen Path. Die neue Reihenfolge wird als
+// sortierung gespeichert, damit sie bleibt.
+function platzVerschieben(ziel, fertigMachen) {
+  ziel.querySelectorAll(".platz--fassbar").forEach((el) => {
+    let halten = null, zieht = false, art = "mouse", startX = 0, startY = 0;
+    let schatten = null, markiert = null;
+
+    // Während des Ziehens hört das ganze Fenster mit. Nur auf der
+    // Kachel selbst zu lauschen reicht nicht: Sobald der Zeiger sie
+    // verlässt, käme das Loslassen dort nie an.
+    const loesen = () => {
+      document.removeEventListener("pointermove", bewegen, true);
+      document.removeEventListener("pointerup", loslassen, true);
+      document.removeEventListener("pointercancel", abbrechen, true);
+    };
+
+    const aufraeumen = () => {
+      clearTimeout(halten);
+      if (schatten) { schatten.remove(); schatten = null; }
+      if (markiert) { markiert.classList.remove("platz--ziel"); markiert = null; }
+      ziel.querySelectorAll(".platzliste--offen")
+        .forEach((x) => x.classList.remove("platzliste--offen"));
+      el.classList.remove("platz--zieht");
+      zieht = false;
+      loesen();
+    };
+
+    const unterZeiger = (e) => {
+      el.style.pointerEvents = "none";
+      const treffer = document.elementFromPoint(e.clientX, e.clientY);
+      el.style.pointerEvents = "";
+      return {
+        karte: treffer && treffer.closest(".platz--kurz"),
+        liste: treffer && treffer.closest(".platzliste"),
+      };
+    };
+
+    const anheben = (e) => {
+      if (zieht) return;
+      zieht = true;
+      el.classList.add("platz--zieht");
+      schatten = document.createElement("div");
+      schatten.className = "platz-schatten";
+      schatten.textContent = el.querySelector(".platz__tool").textContent;
+      document.body.appendChild(schatten);
+      schatten.style.left = e.clientX + "px";
+      schatten.style.top = e.clientY + "px";
+    };
+
+    function bewegen(e) {
+      if (!zieht) {
+        const weit = Math.abs(e.clientX - startX) > 6 || Math.abs(e.clientY - startY) > 6;
+        if (!weit) return;
+        if (art === "touch") { clearTimeout(halten); aufraeumen(); return; }
+        anheben(e);
+      }
+      e.preventDefault();
+      schatten.style.left = e.clientX + "px";
+      schatten.style.top = e.clientY + "px";
+
+      const { karte, liste } = unterZeiger(e);
+      if (markiert && markiert !== karte) { markiert.classList.remove("platz--ziel"); markiert = null; }
+      ziel.querySelectorAll(".platzliste--offen")
+        .forEach((x) => x.classList.remove("platzliste--offen"));
+      if (karte && karte !== el) { karte.classList.add("platz--ziel"); markiert = karte; }
+      else if (liste) liste.classList.add("platzliste--offen");
+    }
+
+    async function loslassen(e) {
+      if (!zieht) { aufraeumen(); return; }
+      const { karte, liste } = unterZeiger(e);
+      aufraeumen();
+      if (karte === el) return;
+      if (!karte && !liste) return;
+
+      const pathNeu = karte ? karte.dataset.path : liste.dataset.pathliste;
+      try {
+        await platzEinordnen(el.dataset.platz, pathNeu, karte ? karte.dataset.platz : null);
+        meldung("Verschoben.");
+        fertigMachen();
+      } catch (f) { meldung(fehlertext(f), "fehler"); }
+    }
+
+    function abbrechen() { aufraeumen(); }
+
+    el.addEventListener("pointerdown", (e) => {
+      if (e.target.closest("button")) return;      // Ändern und Löschen bleiben Knöpfe
+      if (e.button !== undefined && e.button !== 0) return;
+      art = e.pointerType || "mouse";
+      startX = e.clientX; startY = e.clientY;
+      document.addEventListener("pointermove", bewegen, true);
+      document.addEventListener("pointerup", loslassen, true);
+      document.addEventListener("pointercancel", abbrechen, true);
+      if (art === "touch") halten = setTimeout(() => anheben(e), 380);
+    });
+  });
+}
+
+// Setzt einen Platz in einen Path, vor einen bestimmten anderen Platz
+// oder ans Ende, und schreibt die Reihenfolge neu.
+async function platzEinordnen(platzId, pathId, vorPlatzId) {
+  const r = await db.from("type_slots").select("id, tool_nr, sortierung, path_id")
+    .eq("path_id", pathId);
+  if (r.error) throw r.error;
+
+  const liste = (r.data || [])
+    .filter((x) => x.id !== platzId)
+    .sort((a, c) => ((a.sortierung || 0) - (c.sortierung || 0))
+      || toolVergleich(a.tool_nr, c.tool_nr));
+
+  const stelle = vorPlatzId ? liste.findIndex((x) => x.id === vorPlatzId) : -1;
+  if (stelle === -1) liste.push({ id: platzId });
+  else liste.splice(stelle, 0, { id: platzId });
+
+  for (let i = 0; i < liste.length; i++) {
+    const daten = { sortierung: i + 1, platz_nr: i + 1 };
+    if (liste[i].id === platzId) daten.path_id = pathId;
+    const e = await db.from("type_slots").update(daten).eq("id", liste[i].id);
+    if (e.error) throw e.error;
+  }
+}
+
 function zeilenVerschieben(b) {
   if (!darfPlanen()) return;
   const tafel = document.querySelector(".pw-tafel");
@@ -9721,8 +9894,30 @@ function toolVergleich(a, b) {
   return 0;
 }
 
-// Ordnet die Plätze eines Paths nach Toolnummer und schreibt die
-// Reihenfolge zurück. Läuft nach jedem Anlegen und Ändern.
+// Fügt einen neuen Platz an der Stelle ein, an die seine Toolnummer
+// gehört. Die übrige Reihenfolge bleibt, wie sie ist — sonst würde
+// jedes Anlegen ein von Hand verschobenes Werkzeug zurückwerfen.
+async function platzEinreihen(pathId, neuId, neuNr) {
+  const r = await db.from("type_slots").select("id, tool_nr, sortierung").eq("path_id", pathId);
+  if (r.error) throw r.error;
+  const liste = (r.data || [])
+    .filter((x) => x.id !== neuId)
+    .sort((a, c) => ((a.sortierung || 0) - (c.sortierung || 0))
+      || toolVergleich(a.tool_nr, c.tool_nr));
+
+  let stelle = liste.findIndex((x) => toolVergleich(x.tool_nr, neuNr) > 0);
+  if (stelle === -1) stelle = liste.length;
+  liste.splice(stelle, 0, { id: neuId });
+
+  for (let i = 0; i < liste.length; i++) {
+    const e = await db.from("type_slots")
+      .update({ sortierung: i + 1, platz_nr: i + 1 }).eq("id", liste[i].id);
+    if (e.error) throw e.error;
+  }
+}
+
+// Ordnet alle Plätze eines Paths nach Toolnummer. Wird nur noch
+// gebraucht, wenn jemand die ganze Reihenfolge zurücksetzen will.
 async function pathSortieren(pathId) {
   const r = await db.from("type_slots").select("id, tool_nr").eq("path_id", pathId);
   const liste = ((r && r.data) || []).slice().sort((a, b) => toolVergleich(a.tool_nr, b.tool_nr));
@@ -9970,10 +10165,16 @@ async function ansichtTypen(ziel, b) {
         + '</div>'
 
         + ((p.type_slots || []).length
-          ? '<div class="platzliste">'
+          ? '<div class="platzliste" data-pathliste="' + esc(p.id) + '">'
             + (p.type_slots || []).slice()
-              .sort((a, c) => toolVergleich(a.tool_nr, c.tool_nr))
-              .map((s) => '<div class="platz platz--kurz">'
+              // Reihenfolge wie gespeichert. Neue Plätze werden beim
+              // Anlegen nach ihrer Toolnummer einsortiert, danach zählt,
+              // wohin man sie zieht.
+              .sort((a, c) => ((a.sortierung || 0) - (c.sortierung || 0))
+                || toolVergleich(a.tool_nr, c.tool_nr))
+              .map((s) => '<div class="platz platz--kurz'
+                + (darf ? " platz--fassbar" : "") + '" data-platz="' + esc(s.id) + '"'
+                + ' data-path="' + esc(p.id) + '">'
                 + '<strong class="platz__tool">' + esc(s.tool_nr || "—") + '</strong>'
                 + (darf ? '<span class="platz__aktionen">'
                     + '<button class="linkknopf" data-platz-um="' + esc(s.id) + '">Ändern</button>'
@@ -9981,7 +10182,9 @@ async function ansichtTypen(ziel, b) {
                     + '">Löschen</button></span>' : "")
                 + '</div>').join("")
             + '</div>'
-          : '<p class="hinweis">Noch kein Werkzeugplatz auf diesem Path.</p>')
+          : '<div class="platzliste platzliste--leer" data-pathliste="' + esc(p.id) + '">'
+            + '<p class="hinweis">Noch kein Werkzeugplatz. Einen von einem anderen Path '
+            + 'hierher ziehen oder unten anlegen.</p></div>')
 
         + (darf ? '<button class="knopf knopf--klein" data-platz-neu="' + esc(p.id)
             + '">+ Werkzeugplatz</button>' : "")
@@ -10051,11 +10254,14 @@ async function ansichtTypen(ziel, b) {
       if (!w) return;
       const nr = String(w.tool || "").trim();
       if (!nr) return;
-      const { error } = await db.from("type_slots").insert({
+      const r = await db.from("type_slots").insert({
         path_id: p.id, tool_nr: nr, bezeichnung: nr,
-        werkzeuge: 1, platz_nr: 999, sortierung: 999 });
-      if (error) { meldung(fehlertext(error), "fehler"); return; }
-      try { await pathSortieren(p.id); } catch (f) { /* Reihenfolge beim nächsten Mal */ }
+        werkzeuge: 1, platz_nr: 999, sortierung: 999 }).select();
+      if (r.error) { meldung(fehlertext(r.error), "fehler"); return; }
+      const angelegt = (r.data || [])[0];
+      try {
+        if (angelegt) await platzEinreihen(p.id, angelegt.id, nr);
+      } catch (f) { /* steht dann am Ende */ }
       meldung("Platz " + nr + " angelegt.");
       neuLaden();
     };
@@ -10081,11 +10287,17 @@ async function ansichtTypen(ziel, b) {
       const { error } = await db.from("type_slots")
         .update({ tool_nr: nr, bezeichnung: nr }).eq("id", g.slot.id);
       if (error) { meldung(fehlertext(error), "fehler"); return; }
-      try { await pathSortieren(g.path.id); } catch (f) { /* Reihenfolge beim nächsten Mal */ }
+      // Die Reihenfolge bleibt: Sie kann von Hand gesetzt worden sein.
       meldung("Gespeichert.");
       neuLaden();
     };
   });
+
+  // ----- Werkzeugplätze verschieben -----
+  // Mit der Maus sofort, mit dem Finger nach kurzem Halten. Ziehen
+  // auf einen anderen Platz setzt davor oder dahinter, auf einen
+  // leeren Path hängt hinten an.
+  if (darf) platzVerschieben(ziel, neuLaden);
 
   ziel.querySelectorAll("[data-platz-weg]").forEach((el) => {
     el.onclick = async () => {
