@@ -3516,7 +3516,7 @@ body.pad-offen .suchliste__eintrag { min-height: 60px; font-size: 1.1rem; }
             page-break-inside: avoid; break-inside: avoid; }
 .eb-karte__kopf { color: #fff; font-weight: 800; font-size: 12px; text-align: center;
                   padding: 3px 4px; min-height: 19px; }
-.eb-karte__bild { flex: 1; min-height: 64px; display: grid; place-items: center;
+.eb-karte__bild { flex: 1; min-height: 52px; display: grid; place-items: center;
                   background: #fbfcfd; }
 .eb-karte__bild img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .eb-karte__zeile { border-top: 1px solid #c9d1da; font-size: 10px; padding: 3px 4px;
@@ -3545,7 +3545,7 @@ body.pad-offen .suchliste__eintrag { min-height: 60px; font-size: 1.1rem; }
   body.nur-blatt-drucken .eb-blatt { box-shadow: none; max-width: none; padding: 0; }
   @page { size: A4 landscape; margin: 8mm; }
   .eb-karten { grid-template-columns: repeat(8, 1fr); }
-  .eb-karte__bild { min-height: 22mm; }
+  .eb-karte__bild { min-height: 17mm; }
   .eb-tabelle tr { page-break-inside: avoid; }
 }
 /* Bei vielen Personen stehen bis zu sechs oder mehr nebeneinander.
@@ -3563,9 +3563,12 @@ body.pad-offen .suchliste__eintrag { min-height: 60px; font-size: 1.1rem; }
 /* Freie Kacheln stehen bereit, drängen sich aber nicht auf */
 .eb-karte--frei .eb-karte__kopf { background: #eef1f5; color: #7a8694;
                                   border-bottom: 1px solid #c9d1da; }
-.eb-karte__was { color: #aab3bf; font-size: 8.5px; font-weight: 400;
-                 letter-spacing: .02em; }
-.eb-karte__zeile { white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+/* Der Lieferant darf auf zwei Zeilen umbrechen, die Artikelnummer
+   bleibt einzeilig — sonst wird aus einer Nummer ein Umbruchsalat. */
+.eb-karte__zeile { overflow: hidden; line-height: 1.15; display: -webkit-box;
+                   -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.eb-karte__zeile--letzte { white-space: nowrap; text-overflow: ellipsis;
+                           display: block; }
 </style>
 </head>
 <body>
@@ -3614,7 +3617,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "81.0.0";
+const APP_VERSION = "81.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -11273,36 +11276,40 @@ function blattDruckAnsicht(blatt, zeilen, stamm, typName, maschine) {
   const kopfFeld = (k, v) => '<div class="eb-feld"><span>' + k + '</span><strong>'
     + (v ? esc(v) : "—") + '</strong></div>';
 
-  const artVon = (z) => {
-    if (z.articles) {
-      return (z.articles.name || z.articles.article_number || "");
-    }
-    return z.werkzeug || "";
+  // Untere Zeilen einer Kachel: oben der Lieferant, unten die
+  // Artikelnummer des Werkzeugs. Steht kein Werkzeug am Platz,
+  // bleiben beide Zeilen leer.
+  const lieferantVon = (z) => (z && z.hersteller) || "";
+  const artNrVon = (z) => {
+    if (!z) return "";
+    if (z.articles && z.articles.article_number) return z.articles.article_number;
+    // Aus dem gespeicherten Text "SP-4.2 · Bohrer" nur die Nummer nehmen
+    const t = String(z.werkzeug || "");
+    return t.split("·")[0].trim();
   };
 
   // Eine Kachel. Ohne Werkzeug bleiben die Zeilen leer, die Kachel
   // selbst steht aber da — zum Ausfüllen von Hand.
   const kachel = (z, farbe) => {
-    const leer = !z;
-    const lief = (z && z.hersteller) || "";
-    const art = z ? artVon(z) : "";
-    return '<div class="eb-karte' + (leer ? " eb-karte--frei" : "") + '">'
-      + '<div class="eb-karte__kopf"' + (leer ? "" : ' style="background:' + farbe + '"') + '>'
+    const ohnePlatz = !z;                       // Reserve zum Ausfüllen von Hand
+    return '<div class="eb-karte' + (ohnePlatz ? " eb-karte--frei" : "") + '">'
+      + '<div class="eb-karte__kopf"' + (ohnePlatz ? "" : ' style="background:' + farbe + '"') + '>'
       + esc((z && z.tool_nr) || "") + '</div>'
       + '<div class="eb-karte__bild">'
       + (z && z.bild_url ? '<img src="' + esc(z.bild_url) + '" alt="">' : "")
       + '</div>'
-      + '<div class="eb-karte__zeile">'
-      + (lief ? esc(lief) : '<span class="eb-karte__was">Lieferant</span>') + '</div>'
+      + '<div class="eb-karte__zeile">' + esc(lieferantVon(z)) + '</div>'
       + '<div class="eb-karte__zeile eb-karte__zeile--letzte">'
-      + (art ? esc(art) : '<span class="eb-karte__was">Art</span>') + '</div>'
+      + esc(artNrVon(z)) + '</div>'
       + '</div>';
   };
 
   // So viele Kacheln, dass jeder Maschinentyp Platz hat: aufgefüllt
   // auf volle Reihen, mindestens 24.
+  // Mindestens 30 Plätze, aufgefüllt auf volle Reihen: 8 nebeneinander
+  // mal 4 Reihen ergeben 32 Kacheln auf einem A4 quer.
   const JE_REIHE = 8;
-  const MINDESTENS = 24;
+  const MINDESTENS = 32;
   const belegt = gruppen.reduce((n, g) => n + g.zeilen.length, 0);
   const gesamt = Math.max(MINDESTENS, Math.ceil((belegt + JE_REIHE) / JE_REIHE) * JE_REIHE);
 
