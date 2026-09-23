@@ -3534,6 +3534,15 @@ body.pad-offen .suchliste__eintrag { min-height: 60px; font-size: 1.1rem; }
   .eb-tabelle { page-break-inside: auto; }
   .eb-tabelle tr { page-break-inside: avoid; }
 }
+/* Bei vielen Personen stehen bis zu sechs oder mehr nebeneinander.
+   Am Handy dürfen die Kacheln dafür deutlich schmaler werden. */
+@media (max-width: 480px) {
+  .login__reihe { gap: 6px !important; }
+  .login__kacheln--reihen .login__kachel {
+    flex: 0 0 min(94px, calc((100% - (var(--spalten, 3) - 1) * 6px) / var(--spalten, 3))) !important;
+    min-width: 40px; }
+  .login__kacheln--reihen .login__kachel-name { font-size: .62rem; }
+}
 </style>
 </head>
 <body>
@@ -3582,7 +3591,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "79.0.0";
+const APP_VERSION = "79.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -4216,11 +4225,14 @@ function zeigeLogin() {
 
       // Reihen ausgleichen: lieber 3 + 3 als 5 + 1. Die Spaltenzahl
       // ergibt sich aus der Anzahl, der Rest steht mittig darunter.
-      // Immer drei nebeneinander. Geht die Zahl nicht auf, ist die
-      // letzte Zeile kürzer und steht mittig.
+      // Höchstens drei Zeilen, waagrecht gefüllt: aus 18 Personen
+      // werden 6 · 6 · 6. Bei wenigen Personen wird nicht künstlich
+      // auf drei Zeilen aufgeteilt — mindestens drei nebeneinander,
+      // sonst stünde bei drei Personen eine senkrechte Spalte da.
       const anzahl = data.length;
-      const proReihe = 3;
-      const reihen = Math.max(1, Math.ceil(anzahl / proReihe));
+      const reihen = Math.min(3, Math.max(1, Math.ceil(anzahl / 3)));
+      const grund = Math.floor(anzahl / reihen);
+      const mehr = anzahl % reihen;          // so viele Zeilen kriegen eine mehr
 
       const kachel = (u, i) => '<button type="button" class="login__kachel" data-nr="' + i + '">'
         + (u.bild_url
@@ -4234,11 +4246,11 @@ function zeigeLogin() {
       let zeiger = 0;
       // Die vollste Zeile bestimmt die Kachelbreite — so sind am Handy
       // alle Kacheln gleich gross, auch in der kürzeren letzten Zeile
-      const breiteste = Math.min(proReihe, anzahl);
+      const breiteste = grund + (mehr ? 1 : 0);
       let html = '<div class="login__kacheln login__kacheln--reihen" style="--spalten:'
         + Math.max(1, breiteste) + '">';
       for (let r = 0; r < reihen; r++) {
-        const inReihe = Math.min(proReihe, anzahl - zeiger);
+        const inReihe = grund + (r < mehr ? 1 : 0);
         html += '<div class="login__reihe">';
         for (let k = 0; k < inReihe && zeiger < anzahl; k++, zeiger++) {
           html += kachel(data[zeiger], zeiger);
