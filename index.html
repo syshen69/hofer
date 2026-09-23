@@ -3543,6 +3543,9 @@ body.pad-offen .suchliste__eintrag { min-height: 60px; font-size: 1.1rem; }
     min-width: 40px; }
   .login__kacheln--reihen .login__kachel-name { font-size: .62rem; }
 }
+/* Freie Zeilen auf dem Einrichtblatt: gleiche Höhe wie belegte, damit
+   das Blatt vollständig aussieht und sich von Hand ergänzen lässt. */
+.eb-frei td { height: 1.05em; }
 </style>
 </head>
 <body>
@@ -3591,7 +3594,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "79.1.0";
+const APP_VERSION = "80.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -10139,7 +10142,7 @@ async function ladeBlaetter(hocoNr) {
 
 const pad = { wo: "start", parkId: null, maschineId: null, daten: {} };
 
-const LEERLAUF_MS = 3 * 60 * 1000;     // drei Minuten
+const LEERLAUF_MS = 5 * 60 * 1000;     // fünf Minuten
 const WARNUNG_MS = 20 * 1000;          // so lange vorher warnen
 let leerlauf = { letzte: Date.now(), takt: null, abmelden: null, hinweis: null };
 
@@ -10179,6 +10182,12 @@ function leerlaufStoppen() {
 
 function leerlaufPruefen() {
   if (!leerlauf.takt || !profil) return;
+  // Wer den Haken "Angemeldet bleiben" gesetzt hat, wird nicht
+  // abgemeldet — wie bisher.
+  if (einstellung("angemeldetbleiben")) {
+    if (leerlauf.hinweis) { leerlauf.hinweis.remove(); leerlauf.hinweis = null; }
+    return;
+  }
   const ruhe = Date.now() - leerlauf.letzte;
 
   if (ruhe >= LEERLAUF_MS) {
@@ -10188,7 +10197,7 @@ function leerlaufPruefen() {
       // Die Meldung erst nach dem Aufbau der Anmeldeseite zeigen,
       // sonst verschwindet sie mit dem alten Inhalt
       abmelden().then(() => setTimeout(() =>
-        meldung("Nach drei Minuten ohne Eingabe abgemeldet."), 400));
+        meldung("Automatische Abmeldung."), 400));
     }
     return;
   }
@@ -10520,9 +10529,9 @@ async function padMaschine(h) {
             .find((x) => x.wert === j.color);
           return f ? leuchtend(f.hex) : null;
         })() }, "breit")
-    + kachel("Programm", { text: programm, unten: blattZusatz, leer: programmGrund }, "klein")
-    // Wie viele Stück am Abend einzutragen sind. Leer, bis es jemand
-    // einmal setzt — danach steht es hier und auf dem Einrichtblatt.
+    // Die Programmnummer stand hier nur zum Ablesen und nahm den Platz
+    // weg. Sie steht weiterhin auf dem Einrichtblatt. Hier zählt, was
+    // der Bediener am Abend eintragen muss.
     + kachel("Stück am Abend", {
         text: blattDaten && blattDaten.abend_stk ? zahlText(blattDaten.abend_stk) : "",
         unten: blattDaten && blattDaten.abend_stk ? "Stk" : "",
@@ -11264,21 +11273,48 @@ function blattDruckAnsicht(blatt, zeilen, stamm, typName, maschine) {
     + (blatt.infos ? '<div class="eb-infos"><span>Infos</span>'
         + esc(blatt.infos) + '</div>' : "")
 
-    + (gruppen.length
-      ? gruppen.map((g) => '<table class="eb-tabelle"><thead>'
-          + '<tr><th colspan="5">' + esc(g.name) + '</th></tr>'
+    // Leere Zeilen füllen das Blatt auf, damit es immer gleich
+    // aussieht und von Hand ergänzt werden kann. Ein Platz ohne
+    // Werkzeug behält so seine Zeile, sie bleibt einfach leer.
+    + (() => {
+        const ZEILEN_GESAMT = 22;          // so viele passen auf die Seite
+        const leer = () => '<tr class="eb-frei"><td class="eb-tool">&nbsp;</td>'
+          + '<td></td><td></td><td></td><td></td></tr>';
+
+        const tabelle = (titel, inhaltZeilen, fuellen) =>
+          '<table class="eb-tabelle"><thead>'
+          + '<tr><th colspan="5">' + esc(titel) + '</th></tr>'
           + '<tr><th class="eb-w-tool">Tool</th><th class="eb-w-wz">Werkzeug</th>'
           + '<th class="eb-w-her">Hersteller</th><th class="eb-w-tat">Tätigkeit</th>'
           + '<th class="eb-w-mas">Masse</th></tr></thead><tbody>'
-          + g.zeilen.map((z) => '<tr' + (z.unter_nr ? ' class="eb-unter"' : "") + '>'
+          + inhaltZeilen
+          + Array.from({ length: Math.max(0, fuellen) }, leer).join("")
+          + '</tbody></table>';
+
+        if (!gruppen.length) {
+          // Kein Werkzeugplatz am Typ: trotzdem ein vollständiges Blatt,
+          // das von Hand ausgefüllt werden kann.
+          return tabelle("Werkzeuge", "", ZEILEN_GESAMT);
+        }
+
+        const belegt = gruppen.reduce((n, g) => n + g.zeilen.length, 0);
+        let uebrig = Math.max(0, ZEILEN_GESAMT - belegt);
+
+        return gruppen.map((g, i) => {
+          const zeilen = g.zeilen.map((z) => '<tr' + (z.unter_nr ? ' class="eb-unter"' : "") + '>'
               + '<td class="eb-tool">' + wert(z.tool_nr) + '</td>'
               + '<td>' + werkzeug(z) + '</td>'
               + '<td>' + wert(z.hersteller) + '</td>'
               + '<td>' + wert(z.taetigkeit) + '</td>'
-              + '<td>' + wert(z.masse) + '</td></tr>').join("")
-          + '</tbody></table>').join("")
-      : '<p class="eb-leer">Für diesen Maschinentyp sind noch keine Werkzeugplätze '
-        + 'angelegt. Das geht unter Produktion → Typen.</p>')
+              + '<td>' + wert(z.masse) + '</td></tr>').join("");
+          // Jede Tabelle bekommt mindestens zwei freie Zeilen, der Rest
+          // geht an die letzte, damit die Seite ausgefüllt ist.
+          const mindestens = Math.min(uebrig, 2);
+          const dazu = (i === gruppen.length - 1) ? uebrig : mindestens;
+          uebrig -= dazu;
+          return tabelle(g.name, zeilen, dazu);
+        }).join("");
+      })()
     + '</div>';
 
   return inhalt;
@@ -20611,26 +20647,10 @@ function zeichneGeruest() {
     };
   };
 
-  // Nach fünf Minuten ohne jede Bewegung wird automatisch abgemeldet —
-  // ausser der Haken "Angemeldet bleiben" ist in den Einstellungen
-  // gesetzt. Dann meldet man sich nur noch selbst ab.
-  let untaetigTakt = null;
-  const untaetigZuruecksetzen = () => {
-    clearTimeout(untaetigTakt);
-    if (einstellung("angemeldetbleiben")) return;
-    untaetigTakt = setTimeout(async () => {
-      if (!profil) return;
-      if (einstellung("angemeldetbleiben")) return;
-      await jetztAbmelden();
-      meldung("Wegen Inaktivität automatisch abgemeldet.", "warn");
-    }, 5 * 60 * 1000);
-  };
-  ["mousemove", "mousedown", "keydown", "touchstart", "scroll", "wheel"].forEach((art) => {
-    document.addEventListener(art, untaetigZuruecksetzen, { passive: true });
-  });
-  // Damit der Haken in den Einstellungen sofort greift
-  window.untaetigNeuStarten = untaetigZuruecksetzen;
-  untaetigZuruecksetzen();
+  // Das automatische Abmelden erledigt der Leerlaufwächter weiter
+  // oben. Er zählt dieselben fünf Minuten, warnt aber vorher mit
+  // einem Countdown. Zwei Uhren nebeneinander wären nur verwirrend.
+  window.untaetigNeuStarten = () => leerlaufAktiv();
 
   if (!location.hash) location.hash = "#/dashboard";
   Promise.all([farbzuteilungLaden(), planerLaden()]).then(() => zeichneSeite());
