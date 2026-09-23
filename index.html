@@ -3115,17 +3115,19 @@ body[data-thema="orange"] .pad  { --pblau: #c25b10; }
 /* ---------- Benutzerkacheln bei der Anmeldung ----------
    Die Reihen werden im Code gleichmässig gefüllt; hier sorgt das
    Layout nur dafür, dass jede Reihe mittig steht. */
+/* Alle Zeilen gleich breit, damit jede Kachel dieselbe Grösse bekommt.
+   Vorher war jede Zeile nur so breit wie ihr Inhalt — Zeilen mit mehr
+   Kacheln rechneten deshalb mit weniger Platz und wurden schmaler. */
 .login__kacheln--reihen { display: flex !important; flex-direction: column;
-                          align-items: center; gap: 14px !important;
-                          margin: 6px auto 0; max-width: none !important; }
-.login__reihe { display: flex; justify-content: center; gap: 14px; }
+                          align-items: stretch; gap: 14px !important;
+                          width: 100%; margin: 6px auto 0; max-width: none !important; }
+.login__reihe { display: flex; justify-content: center; gap: 14px; width: 100%; }
 .login__kacheln--reihen .login__kachel {
-  flex: 0 1 min(112px, calc((100% - (var(--spalten, 3) - 1) * 14px) / var(--spalten, 3)));
+  flex: 0 0 min(112px, calc((100% - (var(--spalten, 3) - 1) * 14px) / var(--spalten, 3)));
   width: auto; max-width: 112px; min-width: 44px; margin: 0; }
 @media (max-width: 480px) {
   .login__kacheln--reihen, .login__reihe { gap: 10px !important; }
-  .login__kacheln--reihen .login__kachel { flex-basis: 94px; width: 94px;
-                                           max-width: 94px; }
+  .login__kacheln--reihen .login__kachel { max-width: 94px; }
 }
 
 /* ---------- Logo und Bilder in der Themenfarbe ----------
@@ -3510,7 +3512,7 @@ body.pad-offen .suchliste__eintrag { min-height: 60px; font-size: 1.1rem; }
               font-size: 11px; color: #55606e; margin: 6px 0 10px; }
 .eb-legende__punkt { display: inline-block; width: 10px; height: 10px; border-radius: 2px;
                      margin-right: 5px; vertical-align: -1px; }
-.eb-karten { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
+.eb-karten { display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; }
 .eb-karte { border: 1px solid #98a3b0; border-radius: 3px; overflow: hidden;
             display: flex; flex-direction: column; background: #fff;
             page-break-inside: avoid; break-inside: avoid; }
@@ -3544,8 +3546,8 @@ body.pad-offen .suchliste__eintrag { min-height: 60px; font-size: 1.1rem; }
   body.nur-blatt-drucken .eb-rolle { background: none; padding: 0; overflow: visible; }
   body.nur-blatt-drucken .eb-blatt { box-shadow: none; max-width: none; padding: 0; }
   @page { size: A4 landscape; margin: 8mm; }
-  .eb-karten { grid-template-columns: repeat(8, 1fr); }
-  .eb-karte__bild { min-height: 17mm; }
+  .eb-karten { grid-template-columns: repeat(10, 1fr); }
+  .eb-karte__bild { min-height: 20mm; }
   .eb-tabelle tr { page-break-inside: avoid; }
 }
 /* Bei vielen Personen stehen bis zu sechs oder mehr nebeneinander.
@@ -3617,7 +3619,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "81.2.0";
+const APP_VERSION = "82.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -11149,13 +11151,42 @@ async function blattHolenOderAnlegen(hocoNr, typId, jobId, maschineId) {
       }
     });
   });
-  if (zeilen.length) await db.from("setup_sheet_slots").insert(zeilen);
+  // Auch hier über den Einfüger, der unbekannte Spalten weglässt
+  if (zeilen.length) await einfuegenOhneUnbekannte("setup_sheet_slots", zeilen);
 
   return blatt;
 }
 
 // Trägt Plätze nach, die am Typ angelegt wurden, nachdem dieses Blatt
 // entstanden ist. Bestehende Zeilen bleiben, wie sie sind.
+// Fügt Zeilen ein und lässt Spalten weg, die es in der Tabelle nicht
+// gibt. Die Datenbank meldet sie namentlich ("Could not find the 'x'
+// column"), also nehmen wir sie heraus und versuchen es erneut. So
+// läuft die App auch dort, wo eine Spalte fehlt oder anders heisst.
+async function einfuegenOhneUnbekannte(tabelle, zeilen) {
+  let daten = Array.isArray(zeilen) ? zeilen : [zeilen];
+  const weggelassen = [];
+
+  for (let versuch = 0; versuch < 6; versuch++) {
+    const r = await db.from(tabelle).insert(daten);
+    if (!r.error) return { ok: true, weggelassen: weggelassen };
+
+    const text = String((r.error && r.error.message) || "");
+    const treffer = text.match(/find the '([^']+)' column/i)
+      || text.match(/column "([^"]+)" of relation/i);
+    if (!treffer) throw r.error;
+
+    const spalte = treffer[1];
+    weggelassen.push(spalte);
+    daten = daten.map((z) => {
+      const neu = Object.assign({}, z);
+      delete neu[spalte];
+      return neu;
+    });
+  }
+  throw new Error("Zu viele unbekannte Spalten in " + tabelle);
+}
+
 async function blattPlaetzeNachtragen(blatt) {
   const [paths, da] = await Promise.all([
     ladeTypAufbau(blatt.type_id),
@@ -11180,23 +11211,7 @@ async function blattPlaetzeNachtragen(blatt) {
       });
     });
   });
-  if (neu.length) {
-    const r = await db.from("setup_sheet_slots").insert(neu);
-    if (r.error) {
-      // Einzeln nachfassen: so kommen wenigstens die Plätze durch, die
-      // gehen, und die Meldung nennt den wirklichen Grund.
-      let geschafft = 0, ersterFehler = r.error;
-      for (const zeile of neu) {
-        const e = await db.from("setup_sheet_slots").insert(zeile);
-        if (e.error) { if (!ersterFehler) ersterFehler = e.error; }
-        else geschafft++;
-      }
-      if (!geschafft) throw ersterFehler;
-      meldung(geschafft + " von " + neu.length + " Plätzen übernommen. "
-        + "Beim Rest: " + fehlertext(ersterFehler), "warn");
-      return geschafft;
-    }
-  }
+  if (neu.length) await einfuegenOhneUnbekannte("setup_sheet_slots", neu);
   return neu.length;
 }
 
@@ -11331,8 +11346,8 @@ function blattDruckAnsicht(blatt, zeilen, stamm, typName, maschine) {
   // auf volle Reihen, mindestens 24.
   // Mindestens 30 Plätze, aufgefüllt auf volle Reihen: 8 nebeneinander
   // mal 4 Reihen ergeben 32 Kacheln auf einem A4 quer.
-  const JE_REIHE = 8;
-  const MINDESTENS = 32;
+  const JE_REIHE = 10;
+  const MINDESTENS = 30;
   const belegt = gruppen.reduce((n, g) => n + g.zeilen.length, 0);
   const gesamt = Math.max(MINDESTENS, Math.ceil((belegt + JE_REIHE) / JE_REIHE) * JE_REIHE);
 
@@ -11740,12 +11755,13 @@ async function blattFenster(blatt, nurLesen) {
               r = await db.from("setup_sheet_slots")
                 .update({ tool_nr: namen["p" + i], unter_nr: i }).eq("id", alt.id);
             } else {
-              r = await db.from("setup_sheet_slots").insert({
+              await einfuegenOhneUnbekannte("setup_sheet_slots", {
                 sheet_id: blatt.id, slot_id: z.slot_id,
                 path_name: z.path_name, path_nr: z.path_nr,
                 platz: z.platz, platz_nr: z.platz_nr,
                 bezeichnung: namen["p" + i],
                 tool_nr: namen["p" + i], unter_nr: i, sortierung: z.sortierung || 0 });
+              r = { error: null };
             }
             if (r.error) throw r.error;
           }
@@ -11775,12 +11791,13 @@ async function blattFenster(blatt, nurLesen) {
           meldung(nr + " gibt es in " + g.name + " schon.", "warn");
           return;
         }
-        const { error } = await db.from("setup_sheet_slots").insert({
-          sheet_id: blatt.id, slot_id: null,
-          path_name: g.name, path_nr: g.nr,
-          platz: nr, bezeichnung: nr, tool_nr: nr, unter_nr: 0,
-          sortierung: Math.max(0, ...zeilen.map((z) => z.sortierung || 0)) + 1 });
-        if (error) { meldung(fehlertext(error), "fehler"); return; }
+        try {
+          await einfuegenOhneUnbekannte("setup_sheet_slots", {
+            sheet_id: blatt.id, slot_id: null,
+            path_name: g.name, path_nr: g.nr,
+            platz: nr, bezeichnung: nr, tool_nr: nr, unter_nr: 0,
+            sortierung: Math.max(0, ...zeilen.map((z) => z.sortierung || 0)) + 1 });
+        } catch (f) { meldung(fehlertext(f), "fehler"); return; }
         meldung("Platz " + nr + " angelegt. Jetzt ein Werkzeug hinzufügen.");
         zeichnen();
       };
@@ -15579,9 +15596,10 @@ async function bestOffen(ziel, b, bereich) {
       if (!(best.alleMaschinen || []).length) {
         try { best.alleMaschinen = await ladeAlleMaschinen(); } catch (f) {}
       }
-      const zielListe = (best.alleMaschinen || []).map((m) => ["maschine::" + maschineZielText(m),
-          "Maschine: " + m.name + (m.machine_number ? " · " + m.machine_number : "")]);
-      const jetzt = (z.ziel_art || "maschine") + "::" + (z.ziel_text || "");
+      const zielListe = [["lager::Lager", "Lager"]].concat(
+        (best.alleMaschinen || []).map((m) => ["maschine::" + maschineZielText(m),
+          "Maschine: " + m.name + (m.machine_number ? " · " + m.machine_number : "")]));
+      const jetzt = (z.ziel_art || "lager") + "::" + (z.ziel_text || "Lager");
       // Steht dort etwas anderes — eine Person oder freier Text —,
       // bleibt es als Möglichkeit erhalten, statt still zu verschwinden.
       if (!zielListe.some(([wert]) => wert === jetzt)) {
@@ -15890,7 +15908,10 @@ async function positionDialog(b) {
     + '</div>'
     + '<div class="feld"><span class="feldlabel">Wohin nach dem Eintreffen</span>'
     + '<div class="moduswahl" id="pd-zielwahl">'
-    + '<button type="button" class="moduswahl__knopf aktiv" data-ziel="maschine">Maschine</button>'
+    // Lager ist der Normalfall und deshalb vorgewählt. Es wird nicht
+    // verbucht, sondern steht wie jedes andere Ziel in der Historie.
+    + '<button type="button" class="moduswahl__knopf aktiv" data-ziel="lager">Lager</button>'
+    + '<button type="button" class="moduswahl__knopf" data-ziel="maschine">Maschine</button>'
     + '<button type="button" class="moduswahl__knopf" data-ziel="person">Person</button>'
     + '<button type="button" class="moduswahl__knopf" data-ziel="andere">Anderes</button>'
     + '</div>'
@@ -15910,13 +15931,14 @@ async function positionDialog(b) {
   const $ = (kennung) => huelle.querySelector("#" + kennung);
 
   // Ziel der Lieferung
-  let zielArt = "maschine";
+  let zielArt = "lager";
   const zielAuswahl = $("pd-zielauswahl");
   const zielFrei = $("pd-zielfrei");
 
   const zielFuellen = async () => {
     zielAuswahl.hidden = true;
     zielFrei.hidden = true;
+    if (zielArt === "lager") return;      // Lager braucht keine weitere Angabe
 
     if (zielArt === "maschine") {
       zielAuswahl.hidden = false;
@@ -16039,7 +16061,8 @@ async function positionDialog(b) {
 
     // Ziel zusammensetzen
     let zielText = "";
-    if (zielArt === "andere") zielText = (zielFrei.value || "").trim();
+    if (zielArt === "lager") zielText = "Lager";
+    else if (zielArt === "andere") zielText = (zielFrei.value || "").trim();
     else zielText = zielAuswahl.value || "";
 
     if (!zielText) {
