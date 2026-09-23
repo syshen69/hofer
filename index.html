@@ -3119,8 +3119,9 @@ body[data-thema="orange"] .pad  { --pblau: #c25b10; }
                           align-items: center; gap: 14px !important;
                           margin: 6px auto 0; max-width: none !important; }
 .login__reihe { display: flex; justify-content: center; gap: 14px; }
-.login__kacheln--reihen .login__kachel { flex: 0 0 112px; width: 112px;
-                                         max-width: 112px; margin: 0; }
+.login__kacheln--reihen .login__kachel {
+  flex: 0 1 min(112px, calc((100% - (var(--spalten, 3) - 1) * 14px) / var(--spalten, 3)));
+  width: auto; max-width: 112px; min-width: 44px; margin: 0; }
 @media (max-width: 480px) {
   .login__kacheln--reihen, .login__reihe { gap: 10px !important; }
   .login__kacheln--reihen .login__kachel { flex-basis: 94px; width: 94px;
@@ -4261,6 +4262,16 @@ function zeigeLogin() {
         html += '</div>';
       }
       auswahl.innerHTML = html + '</div>';
+
+      // Die Karte ist von Haus aus schmal. Bei sechs Kacheln in einer
+      // Zeile lief die Reihe über den Rand hinaus und wurde
+      // abgeschnitten. Also wächst die Karte mit, höchstens aber auf
+      // die Fensterbreite.
+      const karte = auswahl.closest(".login__karte");
+      if (karte) {
+        const breit = breiteste * 112 + (breiteste - 1) * 14 + 56;
+        karte.style.maxWidth = "min(96vw, " + Math.max(380, breit) + "px)";
+      }
 
       auswahl.querySelectorAll("[data-nr]").forEach((k) => {
         k.onclick = () => anmeldenZeigen(data[Number(k.dataset.nr)],
@@ -20612,7 +20623,7 @@ function zeichneGeruest() {
   };
   if (einstellungWert("navschmal", "0") === "1") document.body.classList.add("nav--schmal");
 
-  // Nach drei Minuten ohne Eingabe wird abgemeldet. 20 Sekunden vorher
+  // Nach fünf Minuten ohne Eingabe wird abgemeldet. 20 Sekunden vorher
   // erscheint eine Warnung; jede Berührung, jeder Klick, jede Taste
   // setzt die Uhr zurück. Gerechnet wird mit Zeitstempeln, nicht mit
   // einem einzelnen Zähler — so greift es auch, wenn der Browser das
