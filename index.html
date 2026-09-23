@@ -3743,6 +3743,36 @@ body.dunkel .platzliste .eb-karte { background: #fff; color: #111; }
   body.nur-blatt-drucken #druckbereich { page-break-after: avoid; break-after: avoid; }
   body.nur-blatt-drucken #druckbereich > * { page-break-after: avoid; break-after: avoid; }
 }
+/* Kopf des Werkzeugblatts: grosses Logo links, Datum klein oben rechts */
+.eb-logo { height: 15mm !important; max-width: 62mm; object-fit: contain;
+           object-position: left center; }
+.eb-kopf__firma { min-width: 50mm !important; gap: 2mm !important; }
+.eb-stand { position: absolute; top: 0; right: 0; font-size: 9px; color: #7a8694;
+            letter-spacing: .04em; }
+.eb-blatt--quer .eb-kopf { position: relative; padding-top: 3mm; }
+
+/* Im Druck kein grauer Rand um das Blatt */
+@media print {
+  /* Der Druckbereich selbst bleibt weiss — sonst legt sich der graue
+     Hintergrund der Vorschau über die halbe Seite. */
+  #druckbereich { background: #fff !important; }
+  /* Unterhalb des Blatts schaute sonst der graue Seitenhintergrund
+     der App durch. */
+  html, body.nur-blatt-drucken { background: #fff !important; }
+  #druckbereich * { background-color: transparent; }
+  #druckbereich .eb-blatt, #druckbereich .eb-karte { background: #fff !important; }
+  #druckbereich .eb-karte__bild { background: #fbfcfd !important; }
+  #druckbereich .eb-karte--frei .eb-karte__kopf { background: #eef1f5 !important;
+                                                  color: #7a8694 !important; }
+}
+/* Kacheln im Einrichtblatt-Editor */
+.dialog--blatt .platzliste.eb-karten { grid-template-columns: repeat(6, 1fr); }
+.eb-karte--unter .eb-karte__kopf::before { content: "└ "; opacity: .7; }
+.eb-karte__tat { font-size: 9px; color: #55606e; text-align: center;
+                 padding: 2px 3px; line-height: 1.2; }
+@media (max-width: 900px) {
+  .dialog--blatt .platzliste.eb-karten { grid-template-columns: repeat(3, 1fr); }
+}
 </style>
 </head>
 <body>
@@ -3791,7 +3821,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "84.0.0";
+const APP_VERSION = "85.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -8616,7 +8646,12 @@ async function zustandSetzen(j, neu) {
 // Zieht Werkzeugplätze eines Maschinentyps an eine andere Stelle,
 // auch in einen anderen Path. Die neue Reihenfolge wird als
 // sortierung gespeichert, damit sie bleibt.
-function platzVerschieben(ziel, fertigMachen) {
+// Wann zuletzt gezogen wurde. Der Klick, der auf ein Ziehen folgt,
+// landet sonst auf dem Fensterhintergrund und schliesst das Fenster.
+let zuletztGezogen = 0;
+
+function platzVerschieben(ziel, fertigMachen, einordnen) {
+  einordnen = einordnen || platzEinordnen;
   ziel.querySelectorAll(".platz--fassbar").forEach((el) => {
     let halten = null, zieht = false, art = "mouse", startX = 0, startY = 0;
     let schatten = null, markiert = null;
@@ -8657,7 +8692,10 @@ function platzVerschieben(ziel, fertigMachen) {
       el.classList.add("platz--zieht");
       schatten = document.createElement("div");
       schatten.className = "platz-schatten";
-      schatten.textContent = el.querySelector(".platz__tool").textContent;
+      // Am Typ heisst die Beschriftung .platz__tool, im Blatt ist es
+      // der Kachelkopf — beides zulassen.
+      const beschriftung = el.querySelector(".platz__tool, .eb-karte__kopf");
+      schatten.textContent = beschriftung ? beschriftung.textContent : "";
       document.body.appendChild(schatten);
       schatten.style.left = e.clientX + "px";
       schatten.style.top = e.clientY + "px";
@@ -8684,6 +8722,7 @@ function platzVerschieben(ziel, fertigMachen) {
 
     async function loslassen(e) {
       if (!zieht) { aufraeumen(); return; }
+      zuletztGezogen = Date.now();
       const { karte, liste } = unterZeiger(e);
       aufraeumen();
       if (karte === el) return;
@@ -8691,7 +8730,7 @@ function platzVerschieben(ziel, fertigMachen) {
 
       const pathNeu = karte ? karte.dataset.path : liste.dataset.pathliste;
       try {
-        await platzEinordnen(el.dataset.platz, pathNeu, karte ? karte.dataset.platz : null);
+        await einordnen(el.dataset.platz, pathNeu, karte ? karte.dataset.platz : null);
         meldung("Verschoben.");
         fertigMachen();
       } catch (f) { meldung(fehlertext(f), "fehler"); }
@@ -8710,6 +8749,34 @@ function platzVerschieben(ziel, fertigMachen) {
       if (art === "touch") halten = setTimeout(() => anheben(e), 380);
     });
   });
+}
+
+// Dasselbe für die Zeilen eines Einrichtblatts. Dort heissen die
+// Paths noch beim Namen, es gibt keine eigene Tabelle dafür.
+function blattEinordnenFuer(blatt) {
+  return async function (zeileId, pathName, vorZeileId) {
+    const r = await db.from("setup_sheet_slots")
+      .select("id, tool_nr, sortierung, path_name, path_nr").eq("sheet_id", blatt.id);
+    if (r.error) throw r.error;
+    const alle = r.data || [];
+    const pathNr = (alle.find((x) => x.path_name === pathName) || {}).path_nr || 0;
+
+    const liste = alle
+      .filter((x) => x.path_name === pathName && x.id !== zeileId)
+      .sort((a, c) => ((a.sortierung || 0) - (c.sortierung || 0))
+        || toolVergleich(a.tool_nr, c.tool_nr));
+
+    const stelle = vorZeileId ? liste.findIndex((x) => x.id === vorZeileId) : -1;
+    if (stelle === -1) liste.push({ id: zeileId });
+    else liste.splice(stelle, 0, { id: zeileId });
+
+    for (let i = 0; i < liste.length; i++) {
+      const daten = { sortierung: i + 1 };
+      if (liste[i].id === zeileId) { daten.path_name = pathName; daten.path_nr = pathNr; }
+      const e = await db.from("setup_sheet_slots").update(daten).eq("id", liste[i].id);
+      if (e.error) throw e.error;
+    }
+  };
 }
 
 // Setzt einen Platz in einen Path, vor einen bestimmten anderen Platz
@@ -11704,12 +11771,13 @@ function blattDruckAnsicht(blatt, zeilen, stamm, typName, maschine) {
   return '<div class="eb-blatt eb-blatt--quer" id="eb-druck">'
     + '<div class="eb-kopf">'
     // Firma mit Logo steht links, danach die Nummer, rechts die Felder
+    // Links gross das Logo. Die Maschine steht schon in den Feldern,
+    // das Datum klein oben rechts.
     + '<div class="eb-kopf__firma">'
     + '<img class="eb-logo" src="./logo.png" alt="Hofer + Co.">'
-    + '<div class="eb-klein">' + esc(typName || "")
-    + (maschine ? " · " + esc(maschine) : "") + '</div>'
-    + '<div class="eb-klein">Stand ' + esc(kurzDatum(isoDatum(new Date()))) + '</div>'
+    + '<div class="eb-klein">' + esc(typName || "") + '</div>'
     + '</div>'
+    + '<div class="eb-stand">' + esc(kurzDatum(isoDatum(new Date()))) + '</div>'
     + '<div class="eb-kopf__links">'
     + '<div class="eb-titel">Werkzeugblatt</div>'
     + '<div class="eb-nr">' + esc(blatt.hoco_nr || "") + '</div>'
@@ -11918,7 +11986,11 @@ async function blattFenster(blatt, nurLesen) {
   const kasten = huelle.querySelector(".dialog");
 
   const zu = () => huelle.remove();
-  huelle.onclick = (e) => { if (e.target === huelle) zu(); };
+  huelle.onclick = (e) => {
+    if (e.target !== huelle) return;
+    if (Date.now() - zuletztGezogen < 500) return;   // Klick nach dem Ziehen
+    zu();
+  };
 
   const zeichnen = async () => {
     let zeilen = [], typName = "", stamm = {};
@@ -11981,33 +12053,41 @@ async function blattFenster(blatt, nurLesen) {
       + '<p class="klein">Bezeichnung, Zeichnungs Nr. und Material kommen aus den '
       + 'Stammdaten der HOCO Nr. und werden dort geändert.</p>'
 
-      + gruppen.map((g) => '<section class="karte">'
+      + gruppen.map((g, gi) => '<section class="karte">'
           + '<div class="karte__kopf"><h2>' + esc(g.name) + '</h2>'
           + (darf ? '<button class="knopf knopf--klein" data-z-neu="' + esc(g.name) + '">'
               + '+ Platz</button>' : "")
           + '</div>'
-          + '<table class="tabelle blatt-tabelle"><thead><tr>'
-          + '<th>Tool</th><th>Werkzeug</th><th>Hersteller</th><th>Tätigkeit</th>'
-          + '<th>Masse</th><th></th></tr></thead><tbody>'
-          + g.zeilen.map((z) => '<tr' + (z.unter_nr ? ' class="blatt-unter"' : "") + '>'
-              + '<td class="nowrap"><strong>' + esc(z.tool_nr || "—") + '</strong></td>'
-              + '<td>' + werkzeugZelle(z) + '</td>'
-              + '<td>' + esc(z.hersteller || "") + '</td>'
-              + '<td>' + esc(z.taetigkeit || "") + '</td>'
-              + '<td>' + esc(z.masse || "") + '</td>'
-              + '<td class="rechts nowrap">'
-              + (darf
-                  ? '<button class="knopf knopf--klein" data-z-wz="' + esc(z.id) + '">'
-                    + (z.articles || z.werkzeug ? "Werkzeug ändern" : "Werkzeug hinzufügen")
-                    + '</button> '
-                    + '<button class="linkknopf" data-z-um="' + esc(z.id) + '">Angaben</button> '
-                    + (z.unter_nr ? "" : '<button class="linkknopf" data-z-mehr="' + esc(z.id)
-                        + '" title="Mehrere Werkzeuge auf diesem Platz">Mehrere</button> ')
-                    + '<button class="linkknopf linkknopf--gefahr" data-z-weg="' + esc(z.id)
-                    + '">Löschen</button>'
+          // Dieselben Kacheln wie auf dem fertigen Blatt. Ziehen ordnet
+          // sie um, auch in einen anderen Path — das gilt nur für dieses
+          // Blatt, die Vorlage des Maschinentyps bleibt unberührt.
+          + '<div class="platzliste eb-karten" data-pathliste="' + esc(g.name) + '">'
+          + g.zeilen.map((z) => '<div class="eb-karte'
+              + (darf ? " platz--fassbar" : "") + (z.unter_nr ? " eb-karte--unter" : "")
+              + '" data-platz="' + esc(z.id) + '" data-path="' + esc(g.name) + '">'
+              + '<div class="eb-karte__kopf" style="background:' + pathFarbe(gi) + '">'
+              + esc(z.tool_nr || "—") + '</div>'
+              + '<div class="eb-karte__bild">'
+              + (z.taetigkeit || z.masse
+                  ? '<span class="eb-karte__tat">' + esc(z.taetigkeit || "")
+                    + (z.masse ? '<br>' + esc(z.masse) : "") + '</span>'
                   : "")
-              + '</td></tr>').join("")
-          + '</tbody></table></section>').join("")
+              + '</div>'
+              + '<div class="eb-karte__zeile">' + esc(z.hersteller || "") + '</div>'
+              + '<div class="eb-karte__zeile eb-karte__zeile--letzte">'
+              + esc(z.articles ? z.articles.article_number : (z.werkzeug || "")) + '</div>'
+              + (darf ? '<span class="eb-karte__werkzeuge">'
+                  + '<button class="eb-karte__knopf" data-z-wz="' + esc(z.id)
+                  + '" title="Werkzeug wählen">🔧</button>'
+                  + '<button class="eb-karte__knopf" data-z-um="' + esc(z.id)
+                  + '" title="Angaben">✎</button>'
+                  + (z.unter_nr ? "" : '<button class="eb-karte__knopf" data-z-mehr="'
+                      + esc(z.id) + '" title="Mehrere Werkzeuge auf diesem Platz">⧉</button>')
+                  + '<button class="eb-karte__knopf eb-karte__knopf--weg" data-z-weg="'
+                  + esc(z.id) + '" title="Platz löschen">✕</button></span>' : "")
+              + '</div>').join("")
+          + '</div>'
+          + '</section>').join("")
 
       + (gruppen.length ? ""
           : '<p class="hinweis">In diesem Blatt steht noch kein Werkzeugplatz. '
@@ -12017,6 +12097,10 @@ async function blattFenster(blatt, nurLesen) {
                 + 'Werkzeugplätze vom Typ holen</button>' : ""));
 
     kasten.querySelector("[data-zu]").onclick = zu;
+
+    // Plätze im Blatt umordnen — genau wie beim Maschinentyp, nur
+    // dass es hier bloss dieses eine Blatt betrifft.
+    if (darf) platzVerschieben(kasten, zeichnen, blattEinordnenFuer(blatt));
 
     const holen = kasten.querySelector("[data-holen]");
     if (holen) holen.onclick = async () => {
