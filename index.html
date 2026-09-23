@@ -3536,7 +3536,7 @@ body.pad-offen .suchliste__eintrag { min-height: 60px; font-size: 1.1rem; }
 
 /* Beim Drucken nur das Blatt, quer auf A4 */
 @media print {
-  @page { size: A4 landscape; margin: 8mm; }
+  /* Seitenrand steht weiter unten: margin 0, der Rand sitzt im Blatt */
   body.nur-blatt-drucken > *:not(.dialog-huelle) { display: none !important; }
   body.nur-blatt-drucken .dialog-huelle { position: static; background: none; }
   body.nur-blatt-drucken .dialog { box-shadow: none; width: auto !important;
@@ -3548,7 +3548,7 @@ body.pad-offen .suchliste__eintrag { min-height: 60px; font-size: 1.1rem; }
   body.nur-blatt-drucken .eb-rolle { background: none !important; }
   .eb-blatt, .eb-blatt * { -webkit-print-color-adjust: exact !important;
                            print-color-adjust: exact !important; }
-  @page { size: A4 landscape; margin: 8mm; }
+  /* Seitenrand steht weiter unten: margin 0, der Rand sitzt im Blatt */
   .eb-karten { grid-template-columns: repeat(10, 1fr); }
   .eb-karte__bild { min-height: 20mm; }
   .eb-tabelle tr { page-break-inside: avoid; }
@@ -3656,6 +3656,93 @@ body.dunkel .platzliste .eb-karte { background: #fff; color: #111; }
   .platzliste.eb-karten { grid-template-columns: repeat(5, 1fr); }
   .eb-karte__werkzeuge { opacity: 1; }
 }
+/* ---------- Werkzeugblatt als A4 quer ----------
+   Feste Seitengrösse in Millimetern: Die Vorschau zeigt genau das,
+   was aus dem Drucker kommt. Beim Drucken wird nichts skaliert,
+   deshalb werden auch keine Linien oder halben Felder abgeschnitten. */
+.eb-blatt--quer { width: 297mm; min-height: 210mm; max-width: none;
+                  padding: 7mm 7mm 5mm; box-sizing: border-box;
+                  transform-origin: top center; }
+.dialog--druck .eb-rolle { display: block; text-align: center; }
+.dialog--druck .eb-blatt--quer { width: 297mm !important; margin: 0 auto; }
+.eb-blatt--quer .eb-kopf { gap: 6mm; align-items: flex-start; }
+.eb-kopf__firma { display: flex; flex-direction: column; align-items: flex-start;
+                  gap: 1mm; min-width: 34mm; }
+.eb-logo { height: 9mm; width: auto; display: block; }
+.eb-kopf__links { min-width: 40mm; }
+.eb-blatt--quer .eb-kopf__mitte { margin: 0 0 0 auto; flex: 0 1 auto; }
+
+/* Kachelhöhe in Millimetern: drei Reihen passen sicher auf die Seite */
+.eb-blatt--quer .eb-karten { gap: 2.2mm; }
+.eb-blatt--quer .eb-karte { height: 46mm; }
+.eb-blatt--quer .eb-karte__bild { min-height: 0; }
+.eb-blatt--quer .eb-karte__zeile { min-height: 5mm; }
+
+@media print {
+  @page { size: A4 landscape; margin: 0; }
+  /* Beim Drucken zählt nur das Blatt: kein Fensterrahmen, kein
+     grauer Hintergrund, keine abgerundeten Ecken. */
+  body.nur-blatt-drucken { background: #fff !important; }
+  body.nur-blatt-drucken .dialog--druck { height: auto !important; padding: 0 !important;
+                                          border-radius: 0 !important; background: #fff !important; }
+  body.nur-blatt-drucken .eb-rolle { background: #fff !important; padding: 0 !important; }
+  body.nur-blatt-drucken .eb-blatt--quer { width: 297mm; min-height: 210mm;
+                                           transform: none !important;
+                                           padding: 7mm 7mm 5mm !important;
+                                           box-shadow: none; }
+  .eb-karten { break-inside: avoid; page-break-inside: avoid; }
+}
+/* ---------- Werkzeugblatt: echtes A4 quer ----------
+   Die Vorschau hat exakt das Seitenverhältnis von A4 quer, damit man
+   sieht, was auf die Seite passt. Der Kachelbereich füllt den Rest
+   der Seite, die drei Reihen teilen ihn gleichmässig. */
+.eb-blatt--quer { aspect-ratio: 297 / 210; width: 100%; max-width: none;
+                  display: flex; flex-direction: column; padding: 10mm;
+                  box-sizing: border-box; overflow: hidden; }
+.eb-blatt--quer .eb-karten { flex: 1; min-height: 0;
+                             grid-auto-rows: 1fr; align-content: stretch; }
+.eb-blatt--quer .eb-karte__bild { min-height: 0; }
+.dialog--druck .eb-rolle { display: flex; align-items: flex-start;
+                           justify-content: center; }
+.dialog--druck .eb-blatt { width: 100%; }
+
+@media print {
+  /* Die Seite bestimmt den Rand, das Blatt selbst hat keinen mehr.
+     Sonst schnitt der Drucker Linien und halbe Kacheln ab. */
+  @page { size: A4 landscape; margin: 7mm; }
+
+  /* Fenster und Rollbereich geben ihre Bildschirmhöhe ab. Ohne das
+     entstand hinter dem Blatt eine zweite, leere Seite. */
+  body.nur-blatt-drucken .dialog--druck { display: block !important;
+                                          height: auto !important; }
+  body.nur-blatt-drucken .eb-rolle { display: block !important; flex: none !important;
+                                     height: auto !important; min-height: 0 !important;
+                                     overflow: visible !important; background: none !important;
+                                     padding: 0 !important; }
+  .eb-blatt--quer { aspect-ratio: auto !important; padding: 0 !important;
+                    height: auto !important; overflow: visible !important;
+                    border: 0 !important; }
+  .eb-blatt--quer .eb-karten { grid-auto-rows: 26mm; }
+  .eb-karte { break-inside: avoid; page-break-inside: avoid; }
+  .eb-kopf, .eb-legende { break-inside: avoid; page-break-inside: avoid; }
+  .eb-karten { break-inside: auto; }
+}
+/* Der Bereich, der beim Drucken tatsächlich auf die Seite kommt */
+#druckbereich { display: none; }
+@media print {
+  body.nur-blatt-drucken > *:not(#druckbereich) { display: none !important; }
+  body.nur-blatt-drucken #druckbereich { display: block !important; }
+  #druckbereich .eb-blatt { aspect-ratio: auto !important; width: 100% !important;
+                            max-width: none !important; padding: 0 !important;
+                            height: auto !important; overflow: visible !important;
+                            box-shadow: none !important; transform: none !important; }
+  #druckbereich .eb-karten { grid-auto-rows: 25mm !important; }
+  /* Sonst hängt hinter dem Blatt eine leere Seite */
+  html, body.nur-blatt-drucken { height: auto !important; margin: 0 !important;
+                                 padding: 0 !important; overflow: visible !important; }
+  body.nur-blatt-drucken #druckbereich { page-break-after: avoid; break-after: avoid; }
+  body.nur-blatt-drucken #druckbereich > * { page-break-after: avoid; break-after: avoid; }
+}
 </style>
 </head>
 <body>
@@ -3704,7 +3791,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "83.1.0";
+const APP_VERSION = "84.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -11616,6 +11703,13 @@ function blattDruckAnsicht(blatt, zeilen, stamm, typName, maschine) {
 
   return '<div class="eb-blatt eb-blatt--quer" id="eb-druck">'
     + '<div class="eb-kopf">'
+    // Firma mit Logo steht links, danach die Nummer, rechts die Felder
+    + '<div class="eb-kopf__firma">'
+    + '<img class="eb-logo" src="./logo.png" alt="Hofer + Co.">'
+    + '<div class="eb-klein">' + esc(typName || "")
+    + (maschine ? " · " + esc(maschine) : "") + '</div>'
+    + '<div class="eb-klein">Stand ' + esc(kurzDatum(isoDatum(new Date()))) + '</div>'
+    + '</div>'
     + '<div class="eb-kopf__links">'
     + '<div class="eb-titel">Werkzeugblatt</div>'
     + '<div class="eb-nr">' + esc(blatt.hoco_nr || "") + '</div>'
@@ -11631,11 +11725,7 @@ function blattDruckAnsicht(blatt, zeilen, stamm, typName, maschine) {
     + kopfFeld("Stück am Abend", blatt.abend_stk ? zahlText(blatt.abend_stk) + " Stk" : "")
     + kopfFeld("Maschine", maschine || "")
     + '</div>'
-    + '<div class="eb-kopf__rechts">'
-    + '<div class="eb-firma">Hofer + Co.</div>'
-    + '<div class="eb-klein">' + esc(typName || "") + '</div>'
-    + '<div class="eb-klein">Stand ' + esc(kurzDatum(isoDatum(new Date()))) + '</div>'
-    + '</div></div>'
+    + '</div>'
 
     + (gruppen.length
         ? '<div class="eb-legende">'
@@ -11659,7 +11749,8 @@ async function blattDruckFenster(blatt) {
     + '<div class="laedt">Wird geladen …</div></div>';
   document.body.appendChild(huelle);
   const kasten = huelle.querySelector(".dialog");
-  const zu = () => huelle.remove();
+  let anpassen = () => {};
+  const zu = () => { window.removeEventListener("resize", anpassen); huelle.remove(); };
   huelle.onclick = (e) => { if (e.target === huelle) zu(); };
 
   let zeilen = [], typName = "", stamm = {}, maschine = "";
@@ -11690,9 +11781,65 @@ async function blattDruckFenster(blatt) {
     + 'in der Produktion.</p>';
 
   kasten.querySelector("[data-zu]").onclick = zu;
+
+  // Das Blatt ist eine echte A4-Seite und damit breiter als das
+  // Fenster. Für die Vorschau wird es als Ganzes verkleinert — beim
+  // Drucken bleibt es unangetastet in Originalgrösse.
+  const rolle = kasten.querySelector(".eb-rolle");
+  const seite = kasten.querySelector(".eb-blatt");
+  anpassen = () => {
+    if (!rolle || !seite) return;
+    seite.style.transform = "none";
+    seite.style.marginBottom = "0px";
+    const platz = rolle.clientWidth - 24;
+    const breite = seite.offsetWidth;
+    if (!breite) return;
+    const faktor = Math.min(1, platz / breite);
+    seite.style.transform = "scale(" + faktor + ")";
+    // Der verkleinerte Rest der Höhe darf keinen leeren Raum lassen
+    seite.style.marginBottom = -(seite.offsetHeight * (1 - faktor)) + "px";
+  };
+  anpassen();
+  setTimeout(anpassen, 120);
+  window.addEventListener("resize", anpassen);
   kasten.querySelector("[data-drucken]").onclick = () => {
+    // Zum Drucken kommt das Blatt in einen eigenen, schlichten Bereich
+    // direkt im Seitenkörper. Im Fenster selbst hängt es an einer
+    // festen Bildschirmhöhe — daraus wurden Schnittkanten und eine
+    // zweite, leere Seite.
+    const alt = document.getElementById("druckbereich");
+    if (alt) alt.remove();
+    const bereich = document.createElement("div");
+    bereich.id = "druckbereich";
+    bereich.innerHTML = (seite && seite.outerHTML) || "";
+    const kopie = bereich.querySelector("#eb-druck");
+    if (kopie) {
+      kopie.id = "eb-druck-kopie";
+      // Die Kopie bekommt feste Werte mit: Höhe nach Inhalt, Kacheln
+      // in fester Zeilenhöhe. Sonst erbt sie die Bildschirmhöhe des
+      // Fensters, und der Drucker schneidet ab oder hängt eine leere
+      // Seite an.
+      ["transform:none", "aspect-ratio:auto", "height:auto", "min-height:0",
+       "max-height:none", "padding:0", "width:100%", "display:block",
+       "overflow:visible", "box-shadow:none"].forEach((regel) => {
+        const [k, v] = regel.split(":");
+        kopie.style.setProperty(k, v, "important");
+      });
+      const karten = kopie.querySelector(".eb-karten");
+      if (karten) {
+        karten.style.setProperty("grid-auto-rows", "25mm", "important");
+        karten.style.setProperty("flex", "none", "important");
+        karten.style.setProperty("height", "auto", "important");
+      }
+    }
+    document.body.appendChild(bereich);
     document.body.classList.add("nur-blatt-drucken");
-    const fertig = () => document.body.classList.remove("nur-blatt-drucken");
+
+    const fertig = () => {
+      document.body.classList.remove("nur-blatt-drucken");
+      bereich.remove();
+      anpassen();
+    };
     window.addEventListener("afterprint", fertig, { once: true });
     setTimeout(fertig, 4000);
     window.print();
