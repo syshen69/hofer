@@ -3625,7 +3625,7 @@ body.pad-offen .dialog--druck { width: 98vw !important; max-width: 98vw !importa
 /* Werkzeugplätze am Typ verschieben */
 .platz--fassbar { cursor: grab; touch-action: none; user-select: none; }
 .platz--zieht { opacity: .45; }
-.platz--ziel { box-shadow: inset 3px 0 0 0 var(--marke); }
+.platz--ziel { box-shadow: inset 3px 0 0 0 var(--marke), 0 0 0 2px var(--marke); }
 .platzliste--offen { outline: 2px dashed var(--marke); outline-offset: 3px;
                      border-radius: var(--radius); }
 .platzliste--leer { min-height: 60px; display: block; }
@@ -3633,6 +3633,29 @@ body.pad-offen .dialog--druck { width: 98vw !important; max-width: 98vw !importa
                   background: var(--marke); color: #fff; font-weight: 800;
                   padding: 6px 12px; border-radius: 8px; pointer-events: none;
                   box-shadow: 0 6px 16px rgba(0,0,0,.3); opacity: .9; }
+/* ---------- Typ: Vorschau des Werkzeugblatts ----------
+   Die Plätze sehen hier aus wie später auf dem Blatt. Bearbeiten und
+   Löschen erscheinen erst beim Überfahren, damit die Vorschau ruhig
+   bleibt. */
+.platzliste.eb-karten { margin: 8px 0 14px; }
+.platzliste .eb-karte { position: relative; min-height: 118px; }
+.eb-karte__beispiel { color: #b3bcc7; font-style: italic; font-weight: 400; }
+.platzliste .eb-karte__kopf { display: block; width: 100%; font-size: 12px; }
+/* Immer sichtbar, aber zurückhaltend — auf dem Tablet gibt es kein
+   Überfahren mit der Maus. */
+.eb-karte__werkzeuge { position: absolute; top: 2px; right: 2px; display: flex; gap: 2px;
+                       opacity: .5; transition: opacity .15s ease; }
+.platzliste .eb-karte:hover .eb-karte__werkzeuge { opacity: 1; }
+.eb-karte__knopf { border: 0; background: rgba(255,255,255,.9); color: #33445c;
+                   width: 20px; height: 20px; border-radius: 4px; cursor: pointer;
+                   font-size: 12px; line-height: 1; padding: 0;
+                   box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+.eb-karte__knopf--weg { color: var(--gefahr); }
+body.dunkel .platzliste .eb-karte { background: #fff; color: #111; }
+@media (max-width: 900px) {
+  .platzliste.eb-karten { grid-template-columns: repeat(5, 1fr); }
+  .eb-karte__werkzeuge { opacity: 1; }
+}
 </style>
 </head>
 <body>
@@ -3681,7 +3704,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "83.0.0";
+const APP_VERSION = "83.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -8536,7 +8559,7 @@ function platzVerschieben(ziel, fertigMachen) {
       const treffer = document.elementFromPoint(e.clientX, e.clientY);
       el.style.pointerEvents = "";
       return {
-        karte: treffer && treffer.closest(".platz--kurz"),
+        karte: treffer && treffer.closest("[data-platz]"),
         liste: treffer && treffer.closest(".platzliste"),
       };
     };
@@ -9876,6 +9899,11 @@ async function ladeTypen() {
 // Vergleicht Toolnummern so, wie man sie liest: T2 vor T10, T100 vor
 // T1100, 11.1 vor 11.2. Zahlen werden als Zahlen verglichen, der Rest
 // als Text — so passt es für jede Schreibweise, ohne sie vorzugeben.
+// Farbe eines Paths — dieselbe in der Vorschau am Typ und auf dem
+// fertigen Werkzeugblatt.
+const PATHFARBEN = ["#003884", "#1c6b42", "#a4231c", "#5b2a9e", "#9c4a0c", "#0d7b8a"];
+function pathFarbe(i) { return PATHFARBEN[i % PATHFARBEN.length]; }
+
 function toolVergleich(a, b) {
   const teile = (x) => String(x || "").trim().toUpperCase().match(/\d+|\D+/g) || [];
   const ta = teile(a), tb = teile(b);
@@ -10155,7 +10183,7 @@ async function ansichtTypen(ziel, b) {
         + 'Die meisten Maschinen haben zwei oder drei.</p>')
     + '</section>'
 
-    + paths.map((p) => '<section class="karte">'
+    + paths.map((p, pi) => '<section class="karte">'
         + '<div class="karte__kopf"><h2>' + esc(p.name)
         + ' <span class="klein">Nr. ' + (p.nummer || 1) + '</span></h2>'
         + (darf ? '<div class="karte__aktionen">'
@@ -10165,23 +10193,29 @@ async function ansichtTypen(ziel, b) {
         + '</div>'
 
         + ((p.type_slots || []).length
-          ? '<div class="platzliste" data-pathliste="' + esc(p.id) + '">'
+          ? '<div class="platzliste eb-karten" data-pathliste="' + esc(p.id) + '">'
+            // Die Plätze sehen hier genauso aus wie später auf dem
+            // Werkzeugblatt — samt Farbe des Paths und Beispieltext.
+            // Geändert und verschoben wird direkt in dieser Vorschau.
             + (p.type_slots || []).slice()
-              // Reihenfolge wie gespeichert. Neue Plätze werden beim
-              // Anlegen nach ihrer Toolnummer einsortiert, danach zählt,
-              // wohin man sie zieht.
               .sort((a, c) => ((a.sortierung || 0) - (c.sortierung || 0))
                 || toolVergleich(a.tool_nr, c.tool_nr))
-              .map((s) => '<div class="platz platz--kurz'
-                + (darf ? " platz--fassbar" : "") + '" data-platz="' + esc(s.id) + '"'
+              .map((sl) => '<div class="eb-karte'
+                + (darf ? " platz--fassbar" : "") + '" data-platz="' + esc(sl.id) + '"'
                 + ' data-path="' + esc(p.id) + '">'
-                + '<strong class="platz__tool">' + esc(s.tool_nr || "—") + '</strong>'
-                + (darf ? '<span class="platz__aktionen">'
-                    + '<button class="linkknopf" data-platz-um="' + esc(s.id) + '">Ändern</button>'
-                    + '<button class="linkknopf linkknopf--gefahr" data-platz-weg="' + esc(s.id)
-                    + '">Löschen</button></span>' : "")
+                + '<div class="eb-karte__kopf platz__tool" style="background:'
+                + pathFarbe(pi) + '">' + esc(sl.tool_nr || "—") + '</div>'
+                + '<div class="eb-karte__bild"></div>'
+                + '<div class="eb-karte__zeile eb-karte__beispiel">Lieferant</div>'
+                + '<div class="eb-karte__zeile eb-karte__zeile--letzte eb-karte__beispiel">'
+                + 'Art.-Nr.</div>'
+                + (darf ? '<span class="eb-karte__werkzeuge">'
+                    + '<button class="eb-karte__knopf" data-platz-um="' + esc(sl.id)
+                    + '" title="Toolnummer ändern">✎</button>'
+                    + '<button class="eb-karte__knopf eb-karte__knopf--weg" data-platz-weg="'
+                    + esc(sl.id) + '" title="Platz löschen">✕</button></span>' : "")
                 + '</div>').join("")
-            + '</div>'
+            + '</div>' 
           : '<div class="platzliste platzliste--leer" data-pathliste="' + esc(p.id) + '">'
             + '<p class="hinweis">Noch kein Werkzeugplatz. Einen von einem anderen Path '
             + 'hierher ziehen oder unten anlegen.</p></div>')
@@ -11532,8 +11566,7 @@ function blattDruckAnsicht(blatt, zeilen, stamm, typName, maschine) {
   gruppen.forEach((g) => g.zeilen.sort((a, c) =>
     toolVergleich(a.tool_nr, c.tool_nr) || ((a.unter_nr || 0) - (c.unter_nr || 0))));
 
-  const PATHFARBEN = ["#003884", "#1c6b42", "#a4231c", "#5b2a9e", "#9c4a0c", "#0d7b8a"];
-  const farbeVon = (i) => PATHFARBEN[i % PATHFARBEN.length];
+  const farbeVon = pathFarbe;
 
   const kopfFeld = (k, v) => '<div class="eb-feld"><span>' + k + '</span><strong>'
     + (v ? esc(v) : "—") + '</strong></div>';
