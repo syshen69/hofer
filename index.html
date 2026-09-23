@@ -3617,7 +3617,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "81.1.0";
+const APP_VERSION = "81.2.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -11104,7 +11104,13 @@ async function blattHolenOderAnlegen(hocoNr, typId, jobId, maschineId) {
     const blatt = vorhanden.data[0];
     // Plätze, die seit dem Anlegen am Typ dazugekommen sind, fehlen
     // sonst für immer in diesem Blatt. Also bei jedem Öffnen nachtragen.
-    try { await blattPlaetzeNachtragen(blatt); } catch (f) { /* Blatt trotzdem zeigen */ }
+    // Fehler hier nicht verschlucken: Wenn das Nachtragen scheitert,
+    // fehlen im Blatt sämtliche Werkzeugplätze, und niemand weiss warum.
+    try {
+      await blattPlaetzeNachtragen(blatt);
+    } catch (f) {
+      meldung("Werkzeugplätze konnten nicht nachgetragen werden: " + fehlertext(f), "warn");
+    }
     return blatt;
   }
 
@@ -11156,23 +11162,40 @@ async function blattPlaetzeNachtragen(blatt) {
     db.from("setup_sheet_slots").select("slot_id, sortierung").eq("sheet_id", blatt.id)]);
   const vorhanden = new Set(((da && da.data) || []).map((z) => z.slot_id).filter(Boolean));
   let rang = Math.max(0, ...((da && da.data) || []).map((z) => z.sortierung || 0));
+  // Alle Werte auffüllen. Fehlt an einem Platz die laufende Nummer
+  // oder die Bezeichnung, scheitert sonst das ganze Einfügen, sobald
+  // die Spalte in der Datenbank ein Pflichtfeld ist.
   const neu = [];
-  paths.forEach((p) => {
-    (p.type_slots || []).forEach((sl) => {
+  paths.forEach((p, pi) => {
+    (p.type_slots || []).forEach((sl, si) => {
       if (vorhanden.has(sl.id)) return;
       rang++;
+      const name = sl.tool_nr || sl.bezeichnung || ("Platz " + (si + 1));
       neu.push({
         sheet_id: blatt.id, slot_id: sl.id,
-        path_name: p.name, path_nr: p.nummer,
-        platz: sl.bezeichnung, platz_nr: sl.platz_nr,
-        bezeichnung: sl.tool_nr || sl.bezeichnung,
-        tool_nr: sl.tool_nr, unter_nr: 0, sortierung: rang,
+        path_name: p.name || ("Path " + (pi + 1)), path_nr: p.nummer || (pi + 1),
+        platz: sl.bezeichnung || name, platz_nr: sl.platz_nr || (si + 1),
+        bezeichnung: name,
+        tool_nr: sl.tool_nr || name, unter_nr: 0, sortierung: rang,
       });
     });
   });
   if (neu.length) {
     const r = await db.from("setup_sheet_slots").insert(neu);
-    if (r.error) throw r.error;
+    if (r.error) {
+      // Einzeln nachfassen: so kommen wenigstens die Plätze durch, die
+      // gehen, und die Meldung nennt den wirklichen Grund.
+      let geschafft = 0, ersterFehler = r.error;
+      for (const zeile of neu) {
+        const e = await db.from("setup_sheet_slots").insert(zeile);
+        if (e.error) { if (!ersterFehler) ersterFehler = e.error; }
+        else geschafft++;
+      }
+      if (!geschafft) throw ersterFehler;
+      meldung(geschafft + " von " + neu.length + " Plätzen übernommen. "
+        + "Beim Rest: " + fehlertext(ersterFehler), "warn");
+      return geschafft;
+    }
   }
   return neu.length;
 }
@@ -11567,10 +11590,32 @@ async function blattFenster(blatt, nurLesen) {
               + '</td></tr>').join("")
           + '</tbody></table></section>').join("")
 
-      + (gruppen.length ? "" : '<p class="hinweis">Der Typ hat noch keine Werkzeugplätze. '
-          + 'Die legst du unter Produktion → Typen an.</p>');
+      + (gruppen.length ? ""
+          : '<p class="hinweis">In diesem Blatt steht noch kein Werkzeugplatz. '
+            + 'Sind beim Maschinentyp welche angelegt, hol sie mit dem Knopf hierher. '
+            + 'Sonst legst du sie unter Produktion → Typen an.</p>'
+            + (darf ? '<button class="knopf knopf--haupt" data-holen>'
+                + 'Werkzeugplätze vom Typ holen</button>' : ""));
 
     kasten.querySelector("[data-zu]").onclick = zu;
+
+    const holen = kasten.querySelector("[data-holen]");
+    if (holen) holen.onclick = async () => {
+      try {
+        const paths = await ladeTypAufbau(blatt.type_id);
+        const amTyp = paths.reduce((n, p) => n + ((p.type_slots || []).length), 0);
+        if (!amTyp) {
+          meldung("Dieser Maschinentyp hat keine Werkzeugplätze. "
+            + "Leg sie unter Produktion → Typen an.", "warn");
+          return;
+        }
+        const wieviele = await blattPlaetzeNachtragen(blatt);
+        meldung(wieviele
+          ? wieviele + " Werkzeugplätze übernommen."
+          : "Am Typ sind " + amTyp + " Plätze, im Blatt stehen sie schon.");
+        zeichnen();
+      } catch (f) { meldung(fehlertext(f), "fehler"); }
+    };
 
     // ----- Kopf: nur was nicht aus den Stammdaten kommt -----
     const kopfKnopf = kasten.querySelector("[data-kopf]");
