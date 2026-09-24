@@ -3094,7 +3094,9 @@ body[data-thema="orange"] .pad  { --pblau: #c25b10; }
                 height: min(860px, 92vh); max-height: 92vh;
                 display: flex; flex-direction: column; }
 /* Der Titel steht schon oben im Fenster — innen kein zweites Mal */
-.hoco-fenster > .karte > .karte__kopf > h2:first-child,
+/* Nur die oberste Überschrift doppelt sich mit dem Fenstertitel —
+   die Überschriften der übrigen Karten müssen bleiben. */
+.hoco-fenster > section.karte:first-of-type > .karte__kopf > h2:first-child,
 .hoco-fenster > .karte__kopf > h2:first-child { display: none; }
 .hoco-fenster { flex: 1; min-height: 0; overflow: auto; padding-right: 4px; }
 .hoco-fenster .seitentitel { display: none; }
@@ -3858,6 +3860,10 @@ body.dunkel .platzliste .eb-karte { background: #fff; color: #111; }
 .pw-tafel--sehrflach .pw-spuren { min-height: calc(20px * var(--pw-v)) !important; }
 .pw-tafel--sehrflach .pw-balken { padding-left: 6px !important; }
 .pw-tafel--sehrflach .pw-name:not(.pw-name--kopf) .pw-name__text { display: none; }
+/* Bei "geplant" zeigt das Zeichen, ob das Material bereit ist:
+   ○ leer heisst bereit, ● rot heisst, es fehlt noch. */
+.pw-balken__statusgross--ohnematerial { color: var(--gefahr) !important; }
+body.dunkel .pw-balken .pw-balken__statusgross--ohnematerial { color: #c2261c !important; }
 </style>
 </head>
 <body>
@@ -3906,7 +3912,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "87.0.0";
+const APP_VERSION = "88.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -8448,9 +8454,17 @@ function planBalken(j, spalte, dauer, angeschnitten, vorlaufTage, dauerWahr) {
         ? '<div class="pw-rest" style="left:' + restLinks + '%"></div>' : "")
 
     + '<div class="pw-balken__aussen">'
-    + '<span class="pw-balken__statusgross" title="'
-    + esc((PLANSTATUS[st] || PLANSTATUS.geplant).name) + '">'
-    + (PLANSTATUS[st] || PLANSTATUS.geplant).zeichen + '</span>'
+    // Bei "geplant" sagt das Zeichen zusätzlich, ob das Material da
+    // ist: leerer Kreis heisst bereit, rot gefüllter heisst fehlt noch.
+    + '<span class="pw-balken__statusgross'
+    + (st === "geplant" && !j.material_ok ? " pw-balken__statusgross--ohnematerial" : "")
+    + '" title="'
+    + esc((PLANSTATUS[st] || PLANSTATUS.geplant).name
+        + (st === "geplant" ? (j.material_ok ? " · Material bereit" : " · Material fehlt") : ""))
+    + '">'
+    + (st === "geplant" && !j.material_ok
+        ? "●"
+        : (PLANSTATUS[st] || PLANSTATUS.geplant).zeichen) + '</span>'
     + '<div class="pw-balken__inhalt">'
     + '<div class="pw-zeile1">'
     + '<span class="pw-balken__nr">' + esc(j.job_number) + '</span>'
@@ -12588,6 +12602,7 @@ async function ansichtHoco(ziel, b) {
     let blaetter = [];
     try { blaetter = await ladeBlaetter(t.hoco_nr); } catch (f) { /* zeigt dann keine */ }
 
+
     // Die FA Nummern stehen an den Aufträgen. Hier werden sie zum
     // Teil zusammengetragen, damit man sieht, wann es gelaufen ist.
     let faListe = [], vomAuftrag = null;
@@ -12619,6 +12634,7 @@ async function ansichtHoco(ziel, b) {
       if (mitZeichnung) vomAuftrag = mitZeichnung.drawing_url;
     } catch (f) { /* Beiwerk */ }
 
+
     // Auf welchen Maschinen lief das Teil — je Maschine nur der
     // jüngste Auftrag, neueste oben. So sieht man auf einen Blick,
     // wann von einer Maschine auf eine andere gewechselt wurde.
@@ -12640,6 +12656,41 @@ async function ansichtHoco(ziel, b) {
         });
       }
     } catch (f) { /* Beiwerk */ }
+
+    // Auf welchen Maschinentypen die Nummer gelaufen ist — dazu je
+    // Typ das Einrichtblatt, das man von hier aus öffnen kann.
+    let typenGenutzt = [];
+    try {
+      const [maschinen, typen2, sheets] = await Promise.all([
+        ladeMaschinen(true),
+        ladeTypen(),
+        db.from("setup_sheets").select("id, type_id, created_at").eq("hoco_nr", t.hoco_nr),
+      ]);
+      const namen = {};
+      (typen2 || []).forEach((x) => { namen[x.id] = x.name; });
+      const sammlung = {};
+      const dazu = (typId) => {
+        if (!typId) return null;
+        if (!sammlung[typId]) {
+          sammlung[typId] = { typId: typId, name: namen[typId] || "ohne Typ",
+                              maschinen: [], blatt: null };
+        }
+        return sammlung[typId];
+      };
+      (maschinenlauf || []).forEach((j) => {
+        const m = (maschinen || []).find((x) => x.id === j.machine_id);
+        const e = m && dazu(m.type_id);
+        if (!e) return;
+        const bez = (m.machine_number ? m.machine_number + " " : "") + (m.name || "");
+        if (e.maschinen.indexOf(bez) === -1) e.maschinen.push(bez);
+      });
+      ((sheets && sheets.data) || []).forEach((b) => {
+        const e = dazu(b.type_id);
+        if (e) e.blatt = b;
+      });
+      typenGenutzt = Object.keys(sammlung).map((k) => sammlung[k])
+        .sort((a, c) => String(a.name).localeCompare(String(c.name)));
+    } catch (f) { /* dann eben ohne */ }
 
     ziel.innerHTML = '<button class="linkknopf" id="hoco-zurueck">‹ alle HOCO Nr.</button>'
       + '<section class="karte"><div class="karte__kopf">'
@@ -12674,19 +12725,25 @@ async function ansichtHoco(ziel, b) {
       + '</section>'
 
       + '<section class="karte"><div class="karte__kopf">'
-      + '<h2>Einrichtblätter</h2></div>'
-      + (blaetter.length
-        ? '<table class="tabelle"><tbody>' + blaetter.map((e) =>
-            '<tr><td><strong>' + esc(e.typ || "ohne Typ") + '</strong>'
-            + (e.name ? ' <span class="klein">' + esc(e.name) + '</span>' : "")
-            + '<div class="klein">' + (e.werkzeuge || 0) + ' Werkzeuge'
-            + (e.maschine ? " · zuletzt auf " + esc(e.maschine) : "")
-            + '</div></td>'
-            + '<td class="rechts klein">' + esc(kurzDatum(e.created_at || "")) + '</td>'
-            + '</tr>').join("") + '</tbody></table>'
-        : '<p class="hinweis">Noch kein Einrichtblatt hinterlegt. '
-          + 'Ein Blatt gilt je Maschinentyp — dasselbe Teil auf einem anderen Typ '
-          + 'braucht ein eigenes.</p>')
+      + '<h2>Einrichtblätter</h2>'
+      + '<span class="klein">je Maschinentyp eines</span></div>'
+      + (typenGenutzt.length
+        ? '<table class="tabelle"><thead><tr><th>Maschinentyp</th><th>Maschinen</th>'
+          + '<th>Blatt</th><th></th></tr></thead><tbody>'
+          + typenGenutzt.map((e) => '<tr>'
+              + '<td><strong>' + esc(e.name) + '</strong></td>'
+              + '<td class="klein">' + esc(e.maschinen.join(", ") || "—") + '</td>'
+              + '<td class="klein">' + (e.blatt
+                  ? "angelegt " + esc(kurzDatum(e.blatt.created_at || ""))
+                  : '<span class="gedaempft">noch keines</span>') + '</td>'
+              + '<td class="rechts nowrap">'
+              + '<button class="knopf knopf--klein" data-blatt-typ="' + esc(e.typId) + '">'
+              + (e.blatt ? "Einrichtblatt öffnen" : "Einrichtblatt anlegen") + '</button>'
+              + '</td></tr>').join("")
+          + '</tbody></table>'
+        : '<p class="hinweis">Diese Nummer ist noch auf keiner Maschine gelaufen. '
+          + 'Ein Einrichtblatt gilt je Maschinentyp — dasselbe Teil auf einem anderen '
+          + 'Typ braucht ein eigenes.</p>')
       + '</section>'
 
       + '<section class="karte"><div class="karte__kopf">'
@@ -12832,6 +12889,15 @@ async function ansichtHoco(ziel, b) {
     const zeichnungKnopf = ziel.querySelector("[data-zeichnung]");
     if (zeichnungKnopf) zeichnungKnopf.onclick = () =>
       betrachter(zeichnungKnopf.dataset.zeichnung, "Zeichnung " + t.hoco_nr, true);
+
+    // Einrichtblatt je Maschinentyp öffnen, direkt von der HOCO Nr. aus
+    ziel.querySelectorAll("[data-blatt-typ]").forEach((el) => {
+      el.onclick = async () => {
+        try {
+          await einrichtblattOeffnen(t.hoco_nr, el.dataset.blattTyp);
+        } catch (f) { meldung(fehlertext(f), "fehler"); }
+      };
+    });
 
     const bearb = document.getElementById("hoco-bearb");
     if (bearb) bearb.onclick = async () => {
