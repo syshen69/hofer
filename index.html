@@ -3229,13 +3229,16 @@ body.dunkel .pad-start { box-shadow: none; }
     180deg, var(--voll, #003884) 0 4px, transparent 4px 8px); }
 
 /* Zwei Textzeilen, dicht untereinander, ohne sich zu berühren */
-.pw-tafel { --pw-t: min(var(--pw-s, 1), var(--pw-v, 1)); }
+/* Die Schrift auf den Balken folgt der Zeilenhöhe: dicker Balken,
+   grössere Schrift. Die Spaltenbreite bremst nur nach unten, damit in
+   schmalen Tagesspalten nichts überläuft. */
+.pw-tafel { --pw-t: max(var(--pw-v, 1), min(var(--pw-s, 1), var(--pw-v, 1))); }
 .pw-balken__inhalt { display: flex; flex-direction: column; justify-content: center;
                      gap: 0 !important; line-height: 1.05; }
 .pw-zeile1 { line-height: 1.05 !important; margin: 0; padding: 0;
-             font-size: max(9.5px, calc(0.82rem * var(--pw-t))); }
+             font-size: clamp(9.5px, calc(0.82rem * var(--pw-t)), 30px); }
 .pw-zeile2 { line-height: 1.05 !important; margin: 0; padding: 0;
-             font-size: max(9px, calc(0.74rem * var(--pw-t))); }
+             font-size: clamp(9px, calc(0.74rem * var(--pw-t)), 24px); }
 .pw-balken__nr { line-height: 1.05; font-size: inherit; }
 .pw-balken__planer { font-size: max(8.5px, calc(0.7rem * var(--pw-t))); }
 .pw-balken__statusgross { font-size: max(12px, calc(1.35rem * var(--pw-v, 1))); }
@@ -3864,6 +3867,38 @@ body.dunkel .platzliste .eb-karte { background: #fff; color: #111; }
    ○ leer heisst bereit, ● rot heisst, es fehlt noch. */
 .pw-balken__statusgross--ohnematerial { color: var(--gefahr) !important; }
 body.dunkel .pw-balken .pw-balken__statusgross--ohnematerial { color: #c2261c !important; }
+/* Trennlinie zwischen Maschinen und Typen im gemeinsamen Reiter */
+.prod-trenner { display: flex; align-items: center; gap: 12px; margin: 22px 0 10px;
+                color: var(--gedaempft); font-size: .78rem; letter-spacing: .08em;
+                text-transform: uppercase; font-weight: 700; }
+.prod-trenner::before, .prod-trenner::after { content: ""; flex: 1;
+                                              border-top: 1px solid var(--linie); }
+/* ---------- Anmeldung im dunklen Modus ----------
+   Die Karte nahm die aufgehellte Markenfarbe an und leuchtete hellblau.
+   Im Dunkeln ist sie jetzt selbst dunkel, die Kacheln dafür hell —
+   umgekehrt wie vorher. Das Firmenbild bleibt, wie es ist: Es ist
+   ohnehin dunkelblau und passt. */
+body.dunkel .login { background: #0e141c; }
+body.dunkel .login__karte { background: #161d27; border: 1px solid #2b333c;
+                            box-shadow: 0 18px 50px rgba(0, 0, 0, .55); }
+body.dunkel .login__untertitel { color: #93a3b8; }
+body.dunkel .login__marke { border-color: #2b333c; }
+body.dunkel .login__kachel-name { color: #dbe4f0; }
+body.dunkel .login__kachel img,
+body.dunkel .login__kachel-buchstabe { background: #eef2f8 !important;
+                                       box-shadow: 0 2px 8px rgba(0, 0, 0, .4); }
+/* Der Buchstabe steht auf heller Kachel und muss dunkel sein */
+body.dunkel .login__kachel-buchstabe { color: #0f1620 !important; }
+body.dunkel .login__kachel:hover img,
+body.dunkel .login__kachel:hover .login__kachel-buchstabe { background: #fff; }
+body.dunkel .login__bild { box-shadow: 0 6px 18px rgba(0, 0, 0, .45); }
+body.dunkel .login input, body.dunkel .login select {
+  background: #10161e; border-color: #303945; color: #e8eef7; }
+/* Rückgängig gibt es nur am Handy. Am Rechner erledigt das Strg+Z,
+   und der Knopf nimmt in der Kopfzeile nur Platz weg. */
+@media (min-width: 900px) {
+  .kopf__rueck { display: none !important; }
+}
 </style>
 </head>
 <body>
@@ -3912,7 +3947,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "88.0.0";
+const APP_VERSION = "90.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -3950,6 +3985,80 @@ function escapeZurueck() {
     }
   });
 }
+
+// =================================================================
+//  Fenster zentral schliessen
+//  Zurück im Browser und Escape schliessen immer das oberste Fenster,
+//  egal von welcher Stelle es geöffnet wurde. Beobachtet wird, was
+//  am Seitenkörper auftaucht — so gilt es auch für Fenster, die ihre
+//  eigene Schliesslogik mitbringen.
+// =================================================================
+
+const fensterStapel = [];
+// Räumt die App selbst einen Verlaufseintrag ab, darf der folgende
+// Rücksprung kein weiteres Fenster schliessen.
+let zurueckIntern = false;
+
+function fensterZumachen(el) {
+  if (el.id === "pad") {
+    if (typeof padSchliessen === "function") padSchliessen();
+    else el.remove();
+    return;
+  }
+  // Der eigene Schliessknopf weiss am besten, was aufzuräumen ist
+  const knopf = el.querySelector("[data-nein], [data-zu], [data-padzu], #pl-nein,"
+    + " .dialog__knoepfe .knopf--still");
+  if (knopf) knopf.click();
+  else el.remove();
+}
+
+function oberstesFensterSchliessen() {
+  for (let i = fensterStapel.length - 1; i >= 0; i--) {
+    const el = fensterStapel[i];
+    if (!document.body.contains(el)) { fensterStapel.splice(i, 1); continue; }
+    fensterZumachen(el);
+    return true;
+  }
+  return false;
+}
+
+(function fensterUeberwachen() {
+  const beobachter = new MutationObserver((meldungen) => {
+    meldungen.forEach((m) => {
+      m.addedNodes.forEach((n) => {
+        if (n.nodeType !== 1 || !n.classList) return;
+        if (!n.classList.contains("dialog-huelle") && n.id !== "pad") return;
+        fensterStapel.push(n);
+        // Ein Eintrag im Verlauf, damit "Zurück" dieses Fenster trifft
+        try { history.pushState({ fenster: true }, ""); } catch (f) { /* egal */ }
+      });
+      m.removedNodes.forEach((n) => {
+        const i = fensterStapel.indexOf(n);
+        if (i === -1) return;
+        fensterStapel.splice(i, 1);
+        // Den Verlaufseintrag wieder abräumen, sonst braucht es zweimal
+        // Zurück, um die Seite zu wechseln
+        if (history.state && history.state.fenster) {
+          zurueckIntern = true;
+          try { history.back(); } catch (f) { zurueckIntern = false; }
+        }
+      });
+    });
+  });
+  beobachter.observe(document.body, { childList: true });
+
+  window.addEventListener("popstate", () => {
+    if (zurueckIntern) { zurueckIntern = false; return; }
+    oberstesFensterSchliessen();
+  });
+
+  // Escape zuerst hier: Fenster mit eigener Behandlung merken danach,
+  // dass sie schon zu sind, und tun nichts mehr.
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    if (oberstesFensterSchliessen()) e.preventDefault();
+  }, true);
+})();
 
 function dialogSchliessen(huelle, zu) {
   let startAussen = false;
@@ -5942,8 +6051,10 @@ async function seiteProduktion(b) {
     // wer unterwegs etwas nachschauen will, kommt sonst nicht hin.
     // HOCO Nr. steht nicht mehr hier, sondern als Fenster auf der
     // Planwand — dort wird am häufigsten nachgeschaut.
+    // Maschinen und Typen stehen zusammen in einem Reiter: Was für
+    // eine Maschine gilt, hängt am Typ — das gehört auf eine Seite.
     + [["erfassen", "Erfassen"], ["fortschritt", "Fortschritt"],
-       ["maschinen", "Maschinen"], ["typen", "Typen"]]
+       ["maschinen", "Maschinen und Typen"]]
         .map(([w, t]) => '<button class="reiter__knopf' + (prod.ansicht === w ? " aktiv" : "")
           + '" data-ansicht="' + w + '">' + t + '</button>').join("")
     + '</div>'
@@ -5971,8 +6082,24 @@ async function seiteProduktion(b) {
     return;
   }
   if (prod.ansicht === "hoco") { await ansichtHoco(ziel, b); reiterUebergang(ziel); return; }
-  if (prod.ansicht === "typen") { await ansichtTypen(ziel, b); reiterUebergang(ziel); return; }
-  if (prod.ansicht === "maschinen") { await ansichtMaschinen(ziel, b); reiterUebergang(ziel); return; }
+  // Alter Verweis auf den eigenen Typen-Reiter
+  if (prod.ansicht === "typen") prod.ansicht = "maschinen";
+
+  if (prod.ansicht === "maschinen") {
+    // Ist ein Typ geöffnet, zählt nur er. Sonst stehen erst die
+    // Maschinen, darunter die Typen mit ihren Werkzeugplätzen.
+    if (prod.typOffen) {
+      await ansichtTypen(ziel, b);
+    } else {
+      ziel.innerHTML = '<div id="prod-maschinen"></div>'
+        + '<div class="prod-trenner"><span>Maschinentypen</span></div>'
+        + '<div id="prod-typen"><div class="laedt">Wird geladen …</div></div>';
+      await ansichtMaschinen(document.getElementById("prod-maschinen"), b);
+      await ansichtTypen(document.getElementById("prod-typen"), b);
+    }
+    reiterUebergang(ziel);
+    return;
+  }
   // Übersicht gibt es nicht mehr; alter Verweis fällt auf Erfassen zurück
   if (prod.ansicht === "uebersicht") prod.ansicht = "erfassen";
 
@@ -17933,6 +18060,10 @@ async function seiteEinstellungen(b) {
   if (einst.reiter === "nutzer") {
     benutzerlisteLaden(b, bin);
     personenlisteLaden(b);
+    // Ohne diese Zeile hing der Knopf "+ Person" ins Leere: Die
+    // Verbindung stand weiter unten, hinter diesem Abbruch.
+    const pneu = document.getElementById("pe-neu");
+    if (pneu) pneu.onclick = () => personDialog(null, b);
     return;
   }
 
