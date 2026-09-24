@@ -3800,6 +3800,14 @@ body.dunkel .platzliste .eb-karte { background: #fff; color: #111; }
 .auf-vorschau img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .auf-vorschau__leer { color: var(--gedaempft); font-size: .85rem; }
 @media (max-width: 900px) { .auf-vorschau { height: 190px; } }
+/* Die Notiz wächst, aber nicht endlos — sonst zieht sie die dritte
+   Spalte doppelt so hoch wie die anderen. */
+.dialog--auftrag #pl-notiz { max-height: 300px; }
+.dialog--auftrag .auf-vorschau { height: 300px; }
+@media (max-width: 900px) {
+  .dialog--auftrag .auf-vorschau { height: 190px; }
+  .dialog--auftrag #pl-notiz { max-height: 200px; }
+}
 </style>
 </head>
 <body>
@@ -3848,7 +3856,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "86.1.0";
+const APP_VERSION = "86.2.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -9365,10 +9373,6 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
         : "")
     + '</div>'
 
-    // Vorschau der Zeichnung — dort, wo vorher die grossen Knöpfe
-    // standen. Ohne Zeichnung bleibt der Platz mit einem Hinweis leer.
-    + '<div class="feld auf-zeichnung"><span class="feldlabel">Zeichnung</span>'
-    + '<div class="auf-vorschau" id="pl-vorschau"></div></div>'
     + '</div>'
 
     // Spalte 2: Material
@@ -9390,6 +9394,7 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     + esc(auftrag ? (auftrag.material_liefertermin || "")
         : (v ? (v.material_liefertermin || "") : "")) + '"></label>'
 
+    + '</div>'
     + '<div class="feld"><span class="feldlabel">Farbe und Material</span>'
     + '<div class="farbwahl">'
     + farbenZurWahl().map((f) => {
@@ -9403,6 +9408,10 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     + '</div>'
     + '<span class="feldhinweis" id="pl-farbmaterial"></span>'
     + '</div>'
+
+    // Vorschau der Zeichnung füllt den freien Platz unter dem Material
+    + '<div class="feld auf-zeichnung"><span class="feldlabel">Zeichnung</span>'
+    + '<div class="auf-vorschau" id="pl-vorschau"></div></div>'
     + '</div>'
 
     // Spalte 3: Zustand, Notiz, Zeichnung
