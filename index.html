@@ -3808,6 +3808,23 @@ body.dunkel .platzliste .eb-karte { background: #fff; color: #111; }
   .dialog--auftrag .auf-vorschau { height: 190px; }
   .dialog--auftrag #pl-notiz { max-height: 200px; }
 }
+/* Vorschau bleibt bedienbar, der Knopf in der Ecke öffnet sie gross */
+.auf-vorschau--da { cursor: default; }
+.auf-vorschau iframe { pointer-events: auto !important; }
+.auf-vorschau__gross { position: absolute; top: 6px; right: 6px; z-index: 2;
+                       width: 30px; height: 30px; border-radius: 8px; cursor: pointer;
+                       border: 1px solid var(--linie); background: rgba(255,255,255,.92);
+                       color: var(--tinte); font-size: 1rem; line-height: 1; padding: 0;
+                       box-shadow: 0 2px 6px rgba(0,0,0,.2); }
+.auf-vorschau__gross:hover { background: #fff; border-color: var(--marke); }
+/* ---------- Griff zum Verlängern ----------
+   Der weisse Strich an beiden Balkenenden war immer zu sehen und
+   wirkte wie ein Rollbalken. Er erscheint jetzt erst, wenn man mit
+   der Maus über den Balken fährt oder ihn gerade zieht. Greifen
+   lässt er sich unverändert, auch am Tablet. */
+.pw-griff::after { opacity: 0; transition: opacity .12s ease; }
+.pw-balken:hover .pw-griff::after,
+.pw-balken--groesse .pw-griff::after { opacity: 1; }
 </style>
 </head>
 <body>
@@ -3856,7 +3873,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "86.2.0";
+const APP_VERSION = "86.4.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -9493,12 +9510,18 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
       return;
     }
     const istBild = /\.(png|jpe?g|webp|gif)(\?|$)/i.test(adresse);
-    kasten.innerHTML = istBild
+    // Die Vorschau bleibt bedienbar: im PDF lässt sich blättern und
+    // scrollen. Zum Vergrössern gibt es den Knopf in der Ecke — ein
+    // Klick auf die Fläche selbst würde das Rollen verschlucken.
+    kasten.innerHTML = (istBild
       ? '<img src="' + esc(adresse) + '" alt="Zeichnung">'
-      : '<iframe src="' + esc(adresse) + '#toolbar=0&navpanes=0&view=FitH" '
-        + 'title="Zeichnung" loading="lazy"></iframe>';
+      : '<iframe src="' + esc(adresse) + '#navpanes=0&view=FitH" '
+        + 'title="Zeichnung" loading="lazy"></iframe>')
+      + '<button type="button" class="auf-vorschau__gross" title="Gross ansehen">⤢</button>';
     kasten.classList.add("auf-vorschau--da");
-    kasten.onclick = () => betrachter(adresse,
+    kasten.onclick = null;
+    const grossKnopf = kasten.querySelector(".auf-vorschau__gross");
+    if (grossKnopf) grossKnopf.onclick = () => betrachter(adresse,
       "Zeichnung " + ((auftrag && auftrag.job_number) || ""), !istBild);
   };
   dialogSchliessen(huelle, zu);
