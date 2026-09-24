@@ -3825,6 +3825,39 @@ body.dunkel .platzliste .eb-karte { background: #fff; color: #111; }
 .pw-griff::after { opacity: 0; transition: opacity .12s ease; }
 .pw-balken:hover .pw-griff::after,
 .pw-balken--groesse .pw-griff::after { opacity: 1; }
+/* ---------- Bedienleiste der Planwand: alles auf einer Zeile ----------
+   Zeitraum, Tage, Höhe und die beiden Knöpfe teilen sich eine Reihe.
+   Die Regler werden dafür schmaler, die Beschriftungen kürzer, und
+   die Datumsangaben rutschen unter den Zeitregler. */
+@media (min-width: 900px) {
+  .pw-kopfleiste { flex-wrap: nowrap !important; gap: 12px !important;
+                   align-items: center; padding: 4px 0 6px !important; }
+  .pw-regler-reihe { flex: 1 1 auto !important; flex-wrap: nowrap !important;
+                     gap: 12px !important; min-width: 0; }
+  .pw-regler-reihe .pw-zeitregler { flex: 2 1 220px !important; min-width: 160px !important;
+                                    padding-top: 0 !important; position: relative; }
+  .pw-regler-reihe .pw-zoom { flex: 1 1 120px !important; min-width: 110px; gap: 6px !important; }
+  .pw-zoom .klein { white-space: nowrap; }
+  .pw-eckknoepfe { flex: none; }
+  /* Die Datumsangaben am Zeitregler hängen unter der Leiste, damit sie
+     keine eigene Zeile brauchen */
+  /* Die Datumsangaben hängen unter dem Regler, statt eine eigene
+     Zeile zu brauchen */
+  .pw-zeitregler .pw-zeitinfo { position: absolute; left: 0; right: 0; top: 100%;
+                                margin-top: -3px; font-size: .66rem; }
+  .pw-zeitregler .pw-zeitinfo .klein { font-size: .66rem; }
+}
+/* ---------- Sehr flache Zeilen ----------
+   Unter 55 % Höhe zählt nur noch, wo etwas läuft. Die zweite Zeile,
+   das Zustandszeichen und die Kürzel verschwinden, damit die Zeile
+   so flach wird, wie der Regler es zulässt. */
+.pw-tafel--sehrflach .pw-zeile2,
+.pw-tafel--sehrflach .pw-balken__statusgross,
+.pw-tafel--sehrflach .pw-balken__planer { display: none !important; }
+.pw-tafel--sehrflach .pw-zeile1 { font-size: 8.5px !important; line-height: 1 !important; }
+.pw-tafel--sehrflach .pw-spuren { min-height: calc(20px * var(--pw-v)) !important; }
+.pw-tafel--sehrflach .pw-balken { padding-left: 6px !important; }
+.pw-tafel--sehrflach .pw-name:not(.pw-name--kopf) .pw-name__text { display: none; }
 </style>
 </head>
 <body>
@@ -3873,7 +3906,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "86.4.0";
+const APP_VERSION = "87.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -6964,7 +6997,7 @@ function masseBerechnen(b) {
   // Nummer und Name zusammen, in den Grössen, in denen sie wirklich
   // gezeichnet werden. Gemessen wird mit derselben Schrift.
   const nameGross = (() => {
-    const v = Math.max(0.6, plan.vskala || 1);
+    const v = Math.max(0.35, plan.vskala || 1);
     const grund = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
     const schrift = getComputedStyle(document.body).fontFamily || "sans-serif";
     const mess = (planMessung.getContext
@@ -7009,7 +7042,9 @@ function masseBerechnen(b) {
   if (!plan.vskala) {
     plan.vskala = (Number(einstellungWert("pwhoehe", 100)) || 100) / 100;
   }
-  plan.vskala = Math.max(0.6, Math.min(1.8, plan.vskala));
+  // Untergrenze 0.35: so flach, dass über und unter dem Balken kaum
+  // noch Platz bleibt. Darunter wäre die Nummer nicht mehr lesbar.
+  plan.vskala = Math.max(0.35, Math.min(1.8, plan.vskala));
 
   plan.knapp = plan.spalte < 30;
   plan.sehrKnapp = plan.spalte < 18;
@@ -7070,7 +7105,7 @@ async function ansichtPlanwand(ziel, b) {
     // Bildschirm passen, entscheidet dieser Regler.
     + '<div class="pw-zoom pw-zoom--hoehe">'
     + '<span class="klein">Höhe</span>'
-    + '<input type="range" id="pw-hoehe" min="60" max="180" step="5" value="'
+    + '<input type="range" id="pw-hoehe" min="35" max="180" step="5" value="'
     + Math.round((plan.vskala || 1) * 100) + '">'
     + '<span class="klein" id="pw-hoehewert">'
     + Math.round((plan.vskala || 1) * 100) + ' %</span>'
@@ -7191,6 +7226,9 @@ async function ansichtPlanwand(ziel, b) {
         tafel.style.setProperty("--pw-v", w.toFixed(2));
         // Unter 80 Prozent bleibt nur Platz für eine Textzeile
         tafel.classList.toggle("pw-tafel--flach", w < 0.8);
+        // Unter 55 % bleibt nur die Auftragsnummer stehen — so wird die
+        // Zeile wirklich schmal, statt an zwei Textzeilen hängenzubleiben.
+        tafel.classList.toggle("pw-tafel--sehrflach", w < 0.55);
       }
       const anzeige = document.getElementById("pw-hoehewert");
       if (anzeige) anzeige.textContent = hoehe.value + " %";
@@ -8281,6 +8319,7 @@ function zeichnePlanwand(b) {
     '<div class="pw-rolle"><div class="pw-tafel'
     // Unter 80 Prozent Zeilenhöhe passt nur noch eine Textzeile
     + ((plan.vskala || 1) < 0.8 ? " pw-tafel--flach" : "")
+    + ((plan.vskala || 1) < 0.55 ? " pw-tafel--sehrflach" : "")
     + '" style="--pw-tage:' + tage.length
     + ';--pw-s:' + (plan.skala || 1)
     + ';--pw-v:' + (plan.vskala || 1).toFixed(2)
