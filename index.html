@@ -3773,6 +3773,33 @@ body.dunkel .platzliste .eb-karte { background: #fff; color: #111; }
 @media (max-width: 900px) {
   .dialog--blatt .platzliste.eb-karten { grid-template-columns: repeat(3, 1fr); }
 }
+/* ---------- Auftragsfenster der Planwand ----------
+   Die drei Knöpfe standen gross und breit unter dem Fenster. Sie
+   sitzen jetzt klein unten links, Löschen zuerst. Das Notizfeld
+   bekommt dafür mehr Platz. */
+.dialog--auftrag .dialog__knoepfe { justify-content: flex-start !important;
+                                    grid-column: 1 / -1; width: 100%;
+                                    gap: 8px; margin-top: 8px !important; }
+.dialog--auftrag .dialog__knoepfe .knopf { flex: none !important; width: auto !important;
+                                           min-width: 0 !important; height: 32px !important;
+                                           min-height: 0 !important; padding: 0 14px !important;
+                                           font-size: .85rem !important; border-radius: 8px; }
+.dialog--auftrag #pl-notiz { min-height: 150px !important; }
+.dialog--breit #pl-notiz { min-height: 150px; }
+@media (max-width: 700px) {
+  .dialog--auftrag .dialog__knoepfe { flex-wrap: wrap; }
+  .dialog--auftrag #pl-notiz { min-height: 110px !important; }
+}
+/* Vorschau der Zeichnung im Auftragsfenster */
+.auf-zeichnung { margin-top: 10px; }
+.auf-vorschau { position: relative; height: 260px; border: 1px solid var(--linie);
+                border-radius: var(--radius); background: var(--grund);
+                display: grid; place-items: center; overflow: hidden; }
+.auf-vorschau--da { cursor: zoom-in; }
+.auf-vorschau iframe { width: 100%; height: 100%; border: 0; pointer-events: none; }
+.auf-vorschau img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.auf-vorschau__leer { color: var(--gedaempft); font-size: .85rem; }
+@media (max-width: 900px) { .auf-vorschau { height: 190px; } }
 </style>
 </head>
 <body>
@@ -3821,7 +3848,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "85.0.0";
+const APP_VERSION = "86.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -9337,6 +9364,11 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
           + '</div>'
         : "")
     + '</div>'
+
+    // Vorschau der Zeichnung — dort, wo vorher die grossen Knöpfe
+    // standen. Ohne Zeichnung bleibt der Platz mit einem Hinweis leer.
+    + '<div class="feld auf-zeichnung"><span class="feldlabel">Zeichnung</span>'
+    + '<div class="auf-vorschau" id="pl-vorschau"></div></div>'
     + '</div>'
 
     // Spalte 2: Material
@@ -9437,11 +9469,36 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
   const $ = (k) => huelle.querySelector("#" + k);
   const zu = () => { plan.imDialog = false; huelle.remove(); };
   $("pl-nein").onclick = zu;
+
+  // Zeichnung als Vorschau zeigen. PDFs stellt der Browser selbst dar,
+  // Bilder werden direkt eingebettet. Ein Klick öffnet sie gross.
+  const vorschauZeigen = () => {
+    const kasten = $("pl-vorschau");
+    if (!kasten) return;
+    // Immer die gerade gewählte Zeichnung, nicht nur die gespeicherte
+    const adresse = pdfAdresse || "";
+    kasten.classList.remove("auf-vorschau--da");
+    kasten.onclick = null;
+    if (!adresse) {
+      kasten.innerHTML = '<span class="auf-vorschau__leer">Keine Zeichnung hinterlegt</span>';
+      return;
+    }
+    const istBild = /\.(png|jpe?g|webp|gif)(\?|$)/i.test(adresse);
+    kasten.innerHTML = istBild
+      ? '<img src="' + esc(adresse) + '" alt="Zeichnung">'
+      : '<iframe src="' + esc(adresse) + '#toolbar=0&navpanes=0&view=FitH" '
+        + 'title="Zeichnung" loading="lazy"></iframe>';
+    kasten.classList.add("auf-vorschau--da");
+    kasten.onclick = () => betrachter(adresse,
+      "Zeichnung " + ((auftrag && auftrag.job_number) || ""), !istBild);
+  };
   dialogSchliessen(huelle, zu);
 
   // Die Kopie übernimmt auch die Zeichnung. Neu gesetzt werden
   // nur Beginn und Ende.
   let pdfAdresse = auftrag ? auftrag.drawing_url : (v ? (v.drawing_url || null) : null);
+  // Erst hier, nicht früher: vorher gibt es die Adresse noch nicht.
+  vorschauZeigen();
   let wbgAdresse = auftrag ? auftrag.wbg_url : (v ? (v.wbg_url || null) : null);
 
   // Von, Bis und Dauer im Gleichklang halten
@@ -9512,6 +9569,7 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
         }
         const stand = huelle.querySelector("#pl-pdfstand");
         if (stand) stand.textContent = "Zeichnung aus den Stammdaten übernommen";
+        vorschauZeigen();
       }
 
       // Nur füllen, was noch leer ist — Eingetipptes bleibt stehen.
@@ -9617,6 +9675,7 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
         { contentType: "application/pdf" });
       if (r.error) throw r.error;
       pdfAdresse = db.storage.from("zeichnungen").getPublicUrl(name).data.publicUrl;
+      vorschauZeigen();
       $("pl-pdfstand").textContent = "PDF hochgeladen: " + datei.name;
     } catch (f) {
       $("pl-pdfstand").textContent = "Hochladen fehlgeschlagen: " + (f.message || f);
@@ -9656,6 +9715,7 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
       el.remove();
       const feld = $(stand);
       if (feld) feld.textContent = "Entfernt. Wird beim Speichern übernommen.";
+      vorschauZeigen();
     };
   };
   wegBinden("pl-pdfweg", (v) => { pdfAdresse = v; }, "pl-pdfstand");
