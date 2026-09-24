@@ -4024,7 +4024,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "93.0.0";
+const APP_VERSION = "94.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -6659,7 +6659,7 @@ function auftragsKnoepfeBinden(raster, b) {
       const j = Object.values(prod.auftraege || {}).find((x) => x.id === el.dataset.blatt);
       if (!j) return;
       const m = (prod.maschinen || []).find((x) => x.id === el.dataset.maschine);
-      await einrichtblattOeffnen(j.job_number, m && m.type_id, j.id, m && m.id);
+      await einrichtblattPdfOeffnen(j.job_number, m && m.type_id, j.job_number);
     };
   });
 
@@ -6769,7 +6769,7 @@ function auftragsKnoepfeBinden(raster, b) {
       // gearbeitet wurde — auch wenn der Typ später umgerüstet wird.
       const maschineHier = (prod.maschinen || [])
         .find((x) => x.id === el.dataset.maschine);
-      await blattStandSichern(j, maschineHier);
+      /* Einrichtblätter sind jetzt PDFs — nichts mehr zu sichern */
 
       try {
         const r = await zustandSetzen(j || { id: el.dataset.auftragEnde,
@@ -9166,33 +9166,6 @@ function platzVerschieben(ziel, fertigMachen, einordnen) {
   });
 }
 
-// Dasselbe für die Zeilen eines Einrichtblatts. Dort heissen die
-// Paths noch beim Namen, es gibt keine eigene Tabelle dafür.
-function blattEinordnenFuer(blatt) {
-  return async function (zeileId, pathName, vorZeileId) {
-    const r = await db.from("setup_sheet_slots")
-      .select("id, tool_nr, sortierung, path_name, path_nr").eq("sheet_id", blatt.id);
-    if (r.error) throw r.error;
-    const alle = r.data || [];
-    const pathNr = (alle.find((x) => x.path_name === pathName) || {}).path_nr || 0;
-
-    const liste = alle
-      .filter((x) => x.path_name === pathName && x.id !== zeileId)
-      .sort((a, c) => ((a.sortierung || 0) - (c.sortierung || 0))
-        || toolVergleich(a.tool_nr, c.tool_nr));
-
-    const stelle = vorZeileId ? liste.findIndex((x) => x.id === vorZeileId) : -1;
-    if (stelle === -1) liste.push({ id: zeileId });
-    else liste.splice(stelle, 0, { id: zeileId });
-
-    for (let i = 0; i < liste.length; i++) {
-      const daten = { sortierung: i + 1 };
-      if (liste[i].id === zeileId) { daten.path_name = pathName; daten.path_nr = pathNr; }
-      const e = await db.from("setup_sheet_slots").update(daten).eq("id", liste[i].id);
-      if (e.error) throw e.error;
-    }
-  };
-}
 
 // Setzt einen Platz in einen Path, vor einen bestimmten anderen Platz
 // oder ans Ende, und schreibt die Reihenfolge neu.
@@ -10785,7 +10758,7 @@ async function ansichtTypen(ziel, b) {
   ziel.innerHTML = '<button class="linkknopf" id="typ-zurueck">‹ alle Typen</button>'
     + '<section class="karte"><div class="karte__kopf"><h2>' + esc(typ.name) + '</h2>'
     + (darf ? '<div class="karte__aktionen">'
-        + '<button class="knopf knopf--klein" id="typ-layout">Werkzeugblatt anordnen</button>'
+        + '<button class="knopf knopf--klein" id="typ-blatt">Einrichtblatt (PDF)</button>'
         + '<button class="knopf knopf--klein" id="path-neu">+ Path</button></div>' : "")
     + '</div>'
     + (typ.beschreibung ? '<p class="klein">' + esc(typ.beschreibung) + '</p>' : "")
@@ -10888,8 +10861,33 @@ async function ansichtTypen(ziel, b) {
 
   // Ein neuer Platz braucht nur seine Toolnummer. Wie sie geschrieben
   // wird, ist frei — die Reihenfolge ergibt sich danach von selbst.
-  const layoutKnopf = document.getElementById("typ-layout");
-  if (layoutKnopf) layoutKnopf.onclick = () => layoutFuerTyp(typ.id, typ.name).then(neuLaden);
+  // Einrichtblatt als PDF am Maschinentyp — die Vorlage für alle
+  // Teile, die auf diesem Typ laufen.
+  const blattKnopf = document.getElementById("typ-blatt");
+  if (blattKnopf) blattKnopf.onclick = async () => {
+    let jetzt = null;
+    try {
+      const r = await db.from("machine_types").select("blatt_url").eq("id", typ.id).limit(1);
+      jetzt = ((r.data || [])[0] || {}).blatt_url || null;
+    } catch (f) { /* dann eben ohne */ }
+
+    const wahl = await auswahlDialog("Einrichtblatt " + (typ.name || ""),
+      [{ wert: "neu", text: jetzt ? "📄  Anderes PDF hinterlegen" : "📄  PDF hinterlegen" }]
+        .concat(jetzt ? [{ wert: "auf", text: "👁  Ansehen" },
+                         { wert: "weg", text: "✕  Entfernen" }] : []));
+    if (!wahl) return;
+
+    if (wahl === "auf") { betrachter(jetzt, "Einrichtblatt " + (typ.name || ""), true); return; }
+    if (wahl === "weg") {
+      try { await blattPdfAmTyp(typ.id, null); meldung("Entfernt."); }
+      catch (f) { meldung(fehlertext(f), "fehler"); }
+      return;
+    }
+    const adresse = await blattPdfWaehlen();
+    if (!adresse) return;
+    try { await blattPdfAmTyp(typ.id, adresse); meldung("Einrichtblatt hinterlegt."); }
+    catch (f) { meldung(fehlertext(f), "fehler"); }
+  };
 
   ziel.querySelectorAll("[data-platz-neu]").forEach((el) => {
     el.onclick = async () => {
@@ -11337,30 +11335,16 @@ async function padMaschine(h) {
   if (!j) programmGrund = "kein Auftrag";
   else if (!m.type_id) programmGrund = "Maschine ohne Typ";
   if (j && j.job_number && m.type_id) {
+    // Programm und Abendstück hängen an der HOCO Nr. und dem Typ.
     try {
-      const r = await db.from("setup_sheets").select("*")
-        .eq("hoco_nr", j.job_number).eq("type_id", m.type_id)
-        .order("created_at").limit(1);
+      const r = await db.from("hoco_type_data").select("*")
+        .eq("hoco_nr", j.job_number).eq("type_id", m.type_id).limit(1);
       blattDaten = ((r && r.data) || [])[0] || null;
       programm = (blattDaten && blattDaten.programm_nr) || "";
     } catch (f) { /* Beiwerk */ }
-    if (!programm) {
-      try {
-        const r = await db.from("hoco_type_data").select("programm_nr")
-          .eq("hoco_nr", j.job_number).eq("type_id", m.type_id).limit(1);
-        programm = ((r.data || [])[0] || {}).programm_nr || "";
-      } catch (f) { /* Beiwerk */ }
-    }
-    if (!programm) {
-      programmGrund = blattDaten ? "im Einrichtblatt nicht eingetragen"
-        : "noch kein Einrichtblatt";
-    }
+    if (!programm) programmGrund = "nicht eingetragen";
   }
-  const blattZusatz = blattDaten
-    ? [blattDaten.stueckzeit_s ? blattDaten.stueckzeit_s + " s/Stk" : "",
-       blattDaten.abgreifzange ? "Zange " + blattDaten.abgreifzange : ""]
-        .filter(Boolean).join(" · ")
-    : "";
+  const blattZusatz = "";
 
   // Alle Felder und Knöpfe stehen immer da. Fehlt etwas, steht
   // "keine vorhanden" statt eines leeren Platzes — so sieht die
@@ -11519,9 +11503,7 @@ async function padMaschine(h) {
               bestaetigen: "Auftrag beenden",
             });
             if (!ok) return;
-            if (typeof blattStandSichern === "function") {
-              try { await blattStandSichern(j, m); } catch (g) { /* Beiwerk */ }
-            }
+            /* Einrichtblätter sind PDFs — kein Stand zu sichern */
           }
           const r = await zustandSetzen(j, wahl);
           meldung((wahl === "fertig" ? "Auftrag beendet." : "Zustand geändert.")
@@ -11566,7 +11548,7 @@ async function padMaschine(h) {
           + "gibt es kein Einrichtblatt.", "warn"); return; }
         if (!m.type_id) { meldung("Dieser Maschine ist kein Typ zugewiesen. Das wird "
           + "unter Produktion → Maschinen eingestellt.", "warn"); return; }
-        einrichtblattOeffnen(j.job_number, m.type_id, j.id, m.id, true);
+        einrichtblattPdfOeffnen(j.job_number, m.type_id, j.job_number);
         return;
       }
       if (wert === "wechsel") {
@@ -11615,18 +11597,19 @@ async function padMaschine(h) {
   };
 
   const abendFeld = h.querySelector('[data-padfeld="abend"]');
-  if (abendFeld && blattDaten) abendFeld.onclick = async () => {
+  if (abendFeld && j && j.job_number && m.type_id) abendFeld.onclick = async () => {
     const w = await dialogFelder({ titel: "Stück am Abend",
       felder: [{ name: "stk", label: "Wie viele Stück sind am Abend einzutragen?",
-                 typ: "number", wert: blattDaten.abend_stk || "" }],
+                 typ: "number", wert: (blattDaten && blattDaten.abend_stk) || "" }],
       bestaetigen: "Speichern" });
     if (!w) return;
     const wert = w.stk === "" || w.stk === undefined ? null : Math.round(Number(w.stk));
-    const { error } = await db.from("setup_sheets").update({ abend_stk: wert })
-      .eq("id", blattDaten.id);
+    const { error } = await db.from("hoco_type_data").upsert(
+      { hoco_nr: j.job_number, type_id: m.type_id, abend_stk: wert },
+      { onConflict: "hoco_nr,type_id" });
     if (error) {
       meldung(/abend_stk/.test(error.message || "")
-        ? "Dafür fehlt noch abendstueck.sql in der Datenbank."
+        ? "Dafür fehlt noch blattpdf.sql in der Datenbank."
         : fehlertext(error), "fehler");
       return;
     }
@@ -11756,8 +11739,11 @@ async function werkzeugWechselDialog(maschine, auftrag) {
       gewechselt_am: zeitpunkt,
     }));
 
-    const { error } = await db.from("tool_changes").insert(zeilen);
-    if (error) { meldung(fehlertext(error), "fehler"); return; }
+    // Über den Einfüger, der Spalten weglässt, die es in der Tabelle
+    // nicht gibt — sonst scheitert der ganze Eintrag an einem Feld.
+    try {
+      await einfuegenOhneUnbekannte("tool_changes", zeilen);
+    } catch (f) { meldung(fehlertext(f), "fehler"); return; }
     meldung(liste.length + (liste.length === 1 ? " Werkzeug" : " Werkzeuge")
       + " bei " + zahlText(stand) + " Stück eingetragen.");
   };
@@ -11957,6 +11943,97 @@ async function ladeHocoEins(hocoNr) {
   return (data || [])[0] || null;
 }
 
+// =================================================================
+//  EINRICHTBLATT ALS PDF
+//  Statt ein Blatt in der App zu bauen, wird eine fertige PDF
+//  hinterlegt — wie bei der Zeichnung. Zwei Ebenen:
+//    · am Maschinentyp   → gilt für alle Teile auf diesem Typ
+//    · an der HOCO Nr.   → gilt nur für dieses Teil auf diesem Typ
+//  Gibt es beides, gewinnt das Blatt der HOCO Nr.
+// =================================================================
+
+async function blattPdfSuchen(hocoNr, typId) {
+  let eigenes = null, vorlage = null;
+
+  if (hocoNr && typId) {
+    try {
+      const r = await db.from("hoco_type_data").select("blatt_url")
+        .eq("hoco_nr", hocoNr).eq("type_id", typId).limit(1);
+      eigenes = ((r.data || [])[0] || {}).blatt_url || null;
+    } catch (f) { /* dann eben nur die Vorlage */ }
+  }
+  if (typId) {
+    try {
+      // Über die gewohnte Ladefunktion — die kennt die Typen samt
+      // hinterlegtem Blatt und ist gemerkt.
+      const typen = await ladeTypen();
+      const t = (typen || []).find((x) => x.id === typId);
+      vorlage = (t && t.blatt_url) || null;
+    } catch (f) { /* dann eben keine */ }
+  }
+  return { eigenes: eigenes, vorlage: vorlage, adresse: eigenes || vorlage };
+}
+
+async function einrichtblattPdfOeffnen(hocoNr, typId, titel) {
+  if (!typId) {
+    meldung("Dieser Maschine ist kein Typ zugewiesen. "
+      + "Den trägst du unter Produktion → Maschinen ein.", "warn");
+    return;
+  }
+  let gefunden;
+  try { gefunden = await blattPdfSuchen(hocoNr, typId); }
+  catch (f) { meldung(fehlertext(f), "fehler"); return; }
+
+  if (!gefunden.adresse) {
+    meldung("Für diesen Typ ist noch kein Einrichtblatt hinterlegt. "
+      + "Hinterlegen kannst du es beim Maschinentyp oder bei der HOCO Nr.", "warn");
+    return;
+  }
+  betrachter(gefunden.adresse,
+    "Einrichtblatt " + (titel || hocoNr || ""), true);
+}
+
+// Eine PDF auswählen, hochladen und die Adresse zurückgeben
+function blattPdfWaehlen() {
+  return new Promise((fertig) => {
+    const feld = document.createElement("input");
+    feld.type = "file";
+    feld.accept = "application/pdf,image/*";
+    feld.onchange = async () => {
+      const datei = feld.files && feld.files[0];
+      if (!datei) { fertig(null); return; }
+      try {
+        meldung("Wird hochgeladen …");
+        const endung = (datei.name.split(".").pop() || "pdf").toLowerCase();
+        const name = "blatt/" + Date.now() + "-"
+          + Math.random().toString(36).slice(2, 8) + "." + endung;
+        const hoch = await db.storage.from("zeichnungen")
+          .upload(name, datei, { upsert: true, contentType: datei.type || undefined });
+        if (hoch.error) throw hoch.error;
+        fertig(db.storage.from("zeichnungen").getPublicUrl(name).data.publicUrl);
+      } catch (f) {
+        meldung(fehlertext(f), "fehler");
+        fertig(null);
+      }
+    };
+    feld.click();
+  });
+}
+
+// Blatt am Maschinentyp hinterlegen — die Vorlage
+async function blattPdfAmTyp(typId, adresse) {
+  const r = await db.from("machine_types").update({ blatt_url: adresse }).eq("id", typId);
+  if (r.error) throw r.error;
+}
+
+// Blatt an einer HOCO Nr. für genau einen Typ hinterlegen
+async function blattPdfAnHoco(hocoNr, typId, adresse) {
+  const r = await db.from("hoco_type_data")
+    .upsert({ hoco_nr: hocoNr, type_id: typId, blatt_url: adresse },
+            { onConflict: "hoco_nr,type_id" });
+  if (r.error) throw r.error;
+}
+
 async function ladeBlattZeilen(sheetId) {
   const { data, error } = await zeitlimit(
     db.from("setup_sheet_slots").select("*, articles(article_number, name)")
@@ -11966,67 +12043,6 @@ async function ladeBlattZeilen(sheetId) {
   return data || [];
 }
 
-// Sucht das Blatt zu HOCO Nr. und Typ. Gibt es keines, wird eines
-// angelegt: Kopfdaten aus den Stammdaten, je Werkzeugplatz des Typs
-// eine leere Zeile.
-async function blattHolenOderAnlegen(hocoNr, typId, jobId, maschineId) {
-  const vorhanden = await db.from("setup_sheets").select("*")
-    .eq("hoco_nr", hocoNr).eq("type_id", typId).order("created_at").limit(1);
-  if (vorhanden.error) throw vorhanden.error;
-  if ((vorhanden.data || []).length) {
-    const blatt = vorhanden.data[0];
-    // Plätze, die seit dem Anlegen am Typ dazugekommen sind, fehlen
-    // sonst für immer in diesem Blatt. Also bei jedem Öffnen nachtragen.
-    // Fehler hier nicht verschlucken: Wenn das Nachtragen scheitert,
-    // fehlen im Blatt sämtliche Werkzeugplätze, und niemand weiss warum.
-    try {
-      await blattPlaetzeNachtragen(blatt);
-    } catch (f) {
-      meldung("Werkzeugplätze konnten nicht nachgetragen werden: " + fehlertext(f), "warn");
-    }
-    return blatt;
-  }
-
-  const teil = await ladeHocoEins(hocoNr);
-  const kopf = {
-    hoco_nr: hocoNr, type_id: typId,
-    job_id: jobId || null, machine_id: maschineId || null,
-    bezeichnung: teil ? teil.bezeichnung : null,
-    material: teil ? teil.material : null,
-    zeichnungs_nr: teil ? teil.zeichnungs_nr : null,
-    infos: teil ? teil.infos : null,
-  };
-
-  const neu = await db.from("setup_sheets").insert(kopf).select();
-  if (neu.error) throw neu.error;
-  const blatt = (neu.data || [])[0];
-  if (!blatt) throw new Error("Das Blatt konnte nicht angelegt werden.");
-
-  // Raster des Typs übernehmen
-  const paths = await ladeTypAufbau(typId);
-  const zeilen = [];
-  let i = 0;
-  paths.forEach((p) => {
-    (p.type_slots || []).forEach((s) => {
-      // So viele Zeilen, wie der Platz Werkzeuge trägt
-      const wieViele = Math.max(1, s.werkzeuge || 1);
-      const rang = ++i;
-      for (let u = 0; u < wieViele; u++) {
-        zeilen.push({
-          sheet_id: blatt.id, slot_id: s.id,
-          path_name: p.name, path_nr: p.nummer,
-          platz: s.bezeichnung, platz_nr: s.platz_nr,
-          tool_nr: toolNummerErweitert(s.tool_nr, u),
-          unter_nr: u, sortierung: rang,
-        });
-      }
-    });
-  });
-  // Auch hier über den Einfüger, der unbekannte Spalten weglässt
-  if (zeilen.length) await einfuegenOhneUnbekannte("setup_sheet_slots", zeilen);
-
-  return blatt;
-}
 
 // Trägt Plätze nach, die am Typ angelegt wurden, nachdem dieses Blatt
 // entstanden ist. Bestehende Zeilen bleiben, wie sie sind.
@@ -12058,966 +12074,15 @@ async function einfuegenOhneUnbekannte(tabelle, zeilen) {
   throw new Error("Zu viele unbekannte Spalten in " + tabelle);
 }
 
-async function blattPlaetzeNachtragen(blatt) {
-  const [paths, da] = await Promise.all([
-    ladeTypAufbau(blatt.type_id),
-    db.from("setup_sheet_slots").select("slot_id, sortierung").eq("sheet_id", blatt.id)]);
-  const vorhanden = new Set(((da && da.data) || []).map((z) => z.slot_id).filter(Boolean));
-  let rang = Math.max(0, ...((da && da.data) || []).map((z) => z.sortierung || 0));
-  // Alle Werte auffüllen. Fehlt an einem Platz die laufende Nummer
-  // oder die Bezeichnung, scheitert sonst das ganze Einfügen, sobald
-  // die Spalte in der Datenbank ein Pflichtfeld ist.
-  const neu = [];
-  paths.forEach((p, pi) => {
-    (p.type_slots || []).forEach((sl, si) => {
-      if (vorhanden.has(sl.id)) return;
-      rang++;
-      const name = sl.tool_nr || sl.bezeichnung || ("Platz " + (si + 1));
-      neu.push({
-        sheet_id: blatt.id, slot_id: sl.id,
-        path_name: p.name || ("Path " + (pi + 1)), path_nr: p.nummer || (pi + 1),
-        platz: sl.bezeichnung || name, platz_nr: sl.platz_nr || (si + 1),
-        bezeichnung: name,
-        tool_nr: sl.tool_nr || name, unter_nr: 0, sortierung: rang,
-      });
-    });
-  });
-  if (neu.length) await einfuegenOhneUnbekannte("setup_sheet_slots", neu);
-  return neu.length;
-}
 
-// Beim Abschliessen eines Auftrags wird der Stand des Einrichtblatts
-// als Daten festgehalten. Kein PDF — daraus wird das Blatt später
-// genauso erzeugt wie sonst, nur eben aus dem eingefrorenen Stand.
-async function blattStandSichern(auftrag, maschine) {
-  if (!auftrag || !auftrag.job_number) return;
-  const typId = (maschine && maschine.type_id) || null;
-  if (!typId) return;
 
-  try {
-    const da = await db.from("setup_snapshots").select("id")
-      .eq("job_id", auftrag.id).limit(1);
-    if ((da.data || []).length) return;              // schon festgehalten
 
-    const blatt = await db.from("setup_sheets").select("*")
-      .eq("hoco_nr", auftrag.job_number).eq("type_id", typId)
-      .order("created_at").limit(1);
-    const b = (blatt.data || [])[0];
-    if (!b) return;                                   // nie eines erstellt
 
-    const zeilen = await db.from("setup_sheet_slots")
-      .select("*, articles(article_number, name)")
-      .eq("sheet_id", b.id).order("sortierung").order("unter_nr");
 
-    const typ = await db.from("machine_types").select("name").eq("id", typId).limit(1);
 
-    await db.from("setup_snapshots").insert({
-      job_id: auftrag.id,
-      fa_nr: auftrag.fa_nr || null,
-      hoco_nr: auftrag.job_number,
-      type_id: typId,
-      typ_name: ((typ.data || [])[0] || {}).name || null,
-      maschine: maschine ? maschine.name : null,
-      kopf: b,
-      plaetze: zeilen.data || [],
-    });
-  } catch (f) { /* der Abschluss darf daran nicht scheitern */ }
-}
 
-async function einrichtblattOeffnen(hocoNr, typId, jobId, maschineId, nurLesen) {
-  if (!hocoNr) { meldung("Ohne HOCO Nr. geht das nicht.", "warn"); return; }
-  if (!typId) {
-    meldung("Der Maschine ist kein Typ zugewiesen. Das geht unter Produktion → Maschinen.", "warn");
-    return;
-  }
 
-  // Ist der Auftrag abgeschlossen und ein Stand festgehalten, wird
-  // das Blatt daraus erzeugt — nicht aus den heutigen Daten.
-  // Aber nur, wenn der Auftrag wirklich noch abgeschlossen ist: Wurde
-  // er wieder geöffnet, gilt wieder das lebende Blatt. Vorher zeigte
-  // das Pad sonst den alten Stand, ohne die neu erfassten Werkzeuge.
-  if (jobId) {
-    try {
-      const a = await db.from("jobs").select("ended_at, plan_status").eq("id", jobId).limit(1);
-      const auftrag = ((a && a.data) || [])[0] || {};
-      const beendet = !!auftrag.ended_at || auftrag.plan_status === "fertig";
-      if (beendet) {
-        const r = await db.from("setup_snapshots").select("*").eq("job_id", jobId).limit(1);
-        const stand = (r.data || [])[0];
-        if (stand) { blattFensterStand(stand); return; }
-      }
-    } catch (f) { /* dann eben die aktuelle Fassung */ }
-  }
 
-  let blatt;
-  try { blatt = await blattHolenOderAnlegen(hocoNr, typId, jobId, maschineId); }
-  catch (f) { meldung(fehlertext(f), "fehler"); return; }
-
-  // Im Pad Mode das fertige Blatt zeigen, so wie es gedruckt aussieht.
-  // Bearbeitet wird in der Produktion.
-  if (nurLesen) blattDruckFenster(blatt);
-  else blattFenster(blatt, nurLesen);
-}
-
-// Das Einrichtblatt so, wie es auf Papier aussieht: A4 quer, Kopf mit
-// den Angaben, darunter je Path eine Tabelle mit allen Werkzeugplätzen.
-// Leere Plätze bleiben stehen — an der Maschine soll man sehen, welcher
-// Platz noch nicht bestückt ist. Der Knopf "Drucken" öffnet den
-// Druckdialog, dort lässt es sich auch als PDF speichern.
-function blattDruckAnsicht(blatt, zeilen, stamm, typName, maschine) {
-  // Querformat mit Kacheln: jede Kachel ist ein Werkzeugplatz mit
-  // Toolnummer oben, Platz für eine Skizze in der Mitte und Lieferant
-  // und Werkzeugart unten. Jeder Path bekommt eine eigene Farbe.
-  const gruppen = [];
-  (zeilen || []).forEach((z) => {
-    const name = z.path_name || "ohne Path";
-    let g = gruppen.find((x) => x.name === name);
-    if (!g) { g = { name: name, nr: z.path_nr, zeilen: [] }; gruppen.push(g); }
-    g.zeilen.push(z);
-  });
-  gruppen.sort((a, c) => (a.nr || 0) - (c.nr || 0));
-  gruppen.forEach((g) => g.zeilen.sort((a, c) =>
-    toolVergleich(a.tool_nr, c.tool_nr) || ((a.unter_nr || 0) - (c.unter_nr || 0))));
-
-  const farbeVon = pathFarbe;
-
-  const kopfFeld = (k, v) => '<div class="eb-feld"><span>' + k + '</span><strong>'
-    + (v ? esc(v) : "—") + '</strong></div>';
-
-  // Untere Zeilen einer Kachel: oben der Lieferant, unten die
-  // Artikelnummer des Werkzeugs. Steht kein Werkzeug am Platz,
-  // bleiben beide Zeilen leer.
-  const lieferantVon = (z) => (z && z.hersteller) || "";
-  const artNrVon = (z) => {
-    if (!z) return "";
-    if (z.articles && z.articles.article_number) return z.articles.article_number;
-    // Aus dem gespeicherten Text "SP-4.2 · Bohrer" nur die Nummer nehmen
-    const t = String(z.werkzeug || "");
-    return t.split("·")[0].trim();
-  };
-
-  // Eine Kachel. Ohne Werkzeug bleiben die Zeilen leer, die Kachel
-  // selbst steht aber da — zum Ausfüllen von Hand.
-  const kachel = (z, farbe) => {
-    const ohnePlatz = !z;                       // Reserve zum Ausfüllen von Hand
-    return '<div class="eb-karte' + (ohnePlatz ? " eb-karte--frei" : "") + '">'
-      + '<div class="eb-karte__kopf"' + (ohnePlatz ? "" : ' style="background:' + farbe + '"') + '>'
-      + esc((z && z.tool_nr) || "") + '</div>'
-      + '<div class="eb-karte__bild">'
-      + (z && z.bild_url ? '<img src="' + esc(z.bild_url) + '" alt="">' : "")
-      + '</div>'
-      + '<div class="eb-karte__zeile">' + esc(lieferantVon(z)) + '</div>'
-      + '<div class="eb-karte__zeile eb-karte__zeile--letzte">'
-      + esc(artNrVon(z)) + '</div>'
-      + '</div>';
-  };
-
-  // So viele Kacheln, dass jeder Maschinentyp Platz hat: aufgefüllt
-  // auf volle Reihen, mindestens 24.
-  // Mindestens 30 Plätze, aufgefüllt auf volle Reihen: 8 nebeneinander
-  // mal 4 Reihen ergeben 32 Kacheln auf einem A4 quer.
-  // 30 Plätze, drei Reihen zu zehn. Jede Kachel sitzt dort, wo sie im
-  // Konfigurator hingeschoben wurde — die Position steht an platz_nr.
-  const JE_REIHE = 10;
-  const MINDESTENS = 30;
-  const belegt = gruppen.reduce((n, g) => n + g.zeilen.length, 0);
-  const gesamt = Math.max(MINDESTENS, Math.ceil(belegt / JE_REIHE) * JE_REIHE);
-
-  const felder = new Array(gesamt).fill(null);
-  const rest = [];
-  gruppen.forEach((g, i) => {
-    g.zeilen.forEach((z) => {
-      const eintrag = { z: z, farbe: farbeVon(i) };
-      const pos = Number(z.platz_nr) || 0;
-      if (pos >= 1 && pos <= gesamt && !felder[pos - 1]) felder[pos - 1] = eintrag;
-      else rest.push(eintrag);
-    });
-  });
-  // Was keine eigene Position hat, füllt die Lücken der Reihe nach
-  rest.forEach((e) => {
-    const frei = felder.indexOf(null);
-    if (frei !== -1) felder[frei] = e;
-  });
-
-  const kacheln = felder
-    .map((e) => (e ? kachel(e.z, e.farbe) : kachel(null, "#5c6673"))).join("");
-
-  return '<div class="eb-blatt eb-blatt--quer" id="eb-druck">'
-    + '<div class="eb-kopf">'
-    // Firma mit Logo steht links, danach die Nummer, rechts die Felder
-    // Links gross das Logo. Die Maschine steht schon in den Feldern,
-    // das Datum klein oben rechts.
-    + '<div class="eb-kopf__firma">'
-    + '<img class="eb-logo" src="./logo.png" alt="Hofer + Co.">'
-    + '<div class="eb-klein">' + esc(typName || "") + '</div>'
-    + '</div>'
-    + '<div class="eb-stand">' + esc(kurzDatum(isoDatum(new Date()))) + '</div>'
-    + '<div class="eb-kopf__links">'
-    + '<div class="eb-titel">Werkzeugblatt</div>'
-    + '<div class="eb-nr">' + esc(blatt.hoco_nr || "") + '</div>'
-    + '<div class="eb-bez">' + esc(stamm.bezeichnung || blatt.bezeichnung || "") + '</div>'
-    + '</div>'
-    + '<div class="eb-kopf__mitte">'
-    + kopfFeld("Zeichnungs Nr.", stamm.zeichnungs_nr || blatt.zeichnungs_nr)
-    + kopfFeld("Material", stamm.material || blatt.material)
-    + kopfFeld("Programm Nr.", blatt.programm_nr)
-    + kopfFeld("Stückzeit", blatt.stueckzeit_s ? blatt.stueckzeit_s + " Sek./Stk." : "")
-    + kopfFeld("Laufzeit", blatt.laufzeit_min ? stundenText(blatt.laufzeit_min) + " Std." : "")
-    + kopfFeld("Abgreifzange", blatt.abgreifzange)
-    + kopfFeld("Stück am Abend", blatt.abend_stk ? zahlText(blatt.abend_stk) + " Stk" : "")
-    + kopfFeld("Maschine", maschine || "")
-    + '</div>'
-    + '</div>'
-
-    + (gruppen.length
-        ? '<div class="eb-legende">'
-          + gruppen.map((g, i) => '<span class="eb-legende__punkt" style="background:'
-              + farbeVon(i) + '"></span>' + esc(g.name)).join("")
-          + '</div>'
-        : "")
-
-    + (blatt.infos ? '<div class="eb-infos"><span>Infos</span>' + esc(blatt.infos) + '</div>' : "")
-
-    + '<div class="eb-karten">' + kacheln + '</div>'
-    + '</div>';
-}
-
-// Zeigt das Blatt als Druckansicht in einem Fenster. Wird im Pad Mode
-// benutzt und lässt sich von dort direkt ausdrucken.
-// =================================================================
-//  BLATT-KONFIGURATOR
-//  Zeigt das Werkzeugblatt als A4 quer mit 30 Plätzen. Jede Kachel
-//  lässt sich auf einen anderen Platz ziehen — mit der Maus sofort,
-//  am Tablet nach kurzem Halten. Gespeichert wird die Position an
-//  platz_nr, entweder am Maschinentyp (Vorlage) oder an einem
-//  einzelnen Einrichtblatt (Ausnahme für dieses Teil).
-// =================================================================
-
-async function blattLayoutFenster({ titel, unter, laden, speichern }) {
-  const huelle = document.createElement("div");
-  huelle.className = "dialog-huelle";
-  huelle.innerHTML = '<div class="dialog dialog--layout">'
-    + '<div class="blatt__kopf"><div><h2>' + esc(titel) + '</h2>'
-    + (unter ? '<span class="klein">' + esc(unter) + '</span>' : "")
-    + '</div><div class="layout-knoepfe">'
-    + '<button class="knopf knopf--klein" data-auto>Nach Toolnummer ordnen</button>'
-    + '<button class="knopf knopf--klein knopf--haupt" data-speichern>Speichern</button>'
-    + '<button class="knopf knopf--klein knopf--still" data-zu>Schliessen</button>'
-    + '</div></div>'
-    + '<p class="klein">Kachel greifen und auf einen anderen Platz ziehen. '
-    + 'Mit der Maus sofort, am Tablet nach kurzem Halten.</p>'
-    + '<div class="layout-flaeche" id="layout-flaeche">'
-    + '<div class="laedt">Wird geladen …</div></div></div>';
-  document.body.appendChild(huelle);
-
-  const kasten = huelle.querySelector(".dialog");
-  const zu = () => huelle.remove();
-  kasten.querySelector("[data-zu]").onclick = zu;
-  dialogSchliessen(huelle, zu);
-
-  const JE_REIHE = 10;
-  let felder = [];          // Array von 30+ Plätzen, je null oder eine Kachel
-
-  try {
-    const plaetze = await laden();
-    const gesamt = Math.max(30, Math.ceil(plaetze.length / JE_REIHE) * JE_REIHE);
-    felder = new Array(gesamt).fill(null);
-    const rest = [];
-    plaetze.forEach((k) => {
-      const pos = Number(k.position) || 0;
-      if (pos >= 1 && pos <= gesamt && !felder[pos - 1]) felder[pos - 1] = k;
-      else rest.push(k);
-    });
-    rest.forEach((k) => {
-      const frei = felder.indexOf(null);
-      if (frei !== -1) felder[frei] = k;
-    });
-  } catch (f) {
-    kasten.querySelector("#layout-flaeche").innerHTML =
-      '<p class="hinweis">' + esc(fehlertext(f)) + '</p>';
-    return;
-  }
-
-  const zeichnen = () => {
-    const flaeche = kasten.querySelector("#layout-flaeche");
-    flaeche.innerHTML = '<div class="eb-blatt eb-blatt--quer layout-blatt">'
-      + '<div class="eb-karten">'
-      + felder.map((k, i) => '<div class="eb-karte layout-zelle'
-          + (k ? " layout-zelle--voll" : " eb-karte--frei") + '" data-platz="' + i + '">'
-          + '<div class="eb-karte__kopf"'
-          + (k ? ' style="background:' + k.farbe + '"' : "") + '>'
-          + esc(k ? (k.tool || "") : "") + '</div>'
-          + '<div class="eb-karte__bild"><span class="layout-nr">' + (i + 1) + '</span></div>'
-          + '<div class="eb-karte__zeile">' + esc(k ? (k.lieferant || "") : "") + '</div>'
-          + '<div class="eb-karte__zeile eb-karte__zeile--letzte">'
-          + esc(k ? (k.artNr || "") : "") + '</div>'
-          + '</div>').join("")
-      + '</div></div>';
-    ziehenBinden();
-  };
-
-  // ----- Ziehen -----
-  function ziehenBinden() {
-    kasten.querySelectorAll(".layout-zelle--voll").forEach((el) => {
-      let halten = null, zieht = false, art = "mouse", startX = 0, startY = 0;
-      let schatten = null, markiert = null;
-
-      const loesen = () => {
-        document.removeEventListener("pointermove", bewegen, true);
-        document.removeEventListener("pointerup", loslassen, true);
-        document.removeEventListener("pointercancel", abbrechen, true);
-      };
-      const aufraeumen = () => {
-        clearTimeout(halten);
-        if (schatten) { schatten.remove(); schatten = null; }
-        if (markiert) { markiert.classList.remove("layout-zelle--ziel"); markiert = null; }
-        el.classList.remove("layout-zelle--zieht");
-        zieht = false;
-        loesen();
-      };
-      const zelleUnter = (e) => {
-        el.style.pointerEvents = "none";
-        const t = document.elementFromPoint(e.clientX, e.clientY);
-        el.style.pointerEvents = "";
-        return t && t.closest(".layout-zelle");
-      };
-      const anheben = (e) => {
-        if (zieht) return;
-        zieht = true;
-        el.classList.add("layout-zelle--zieht");
-        schatten = document.createElement("div");
-        schatten.className = "platz-schatten";
-        schatten.textContent = el.querySelector(".eb-karte__kopf").textContent;
-        document.body.appendChild(schatten);
-        schatten.style.left = e.clientX + "px";
-        schatten.style.top = e.clientY + "px";
-      };
-      function bewegen(e) {
-        if (!zieht) {
-          const weit = Math.abs(e.clientX - startX) > 6 || Math.abs(e.clientY - startY) > 6;
-          if (!weit) return;
-          if (art === "touch") { aufraeumen(); return; }
-          anheben(e);
-        }
-        e.preventDefault();
-        schatten.style.left = e.clientX + "px";
-        schatten.style.top = e.clientY + "px";
-        const ziel = zelleUnter(e);
-        if (markiert && markiert !== ziel) { markiert.classList.remove("layout-zelle--ziel"); markiert = null; }
-        if (ziel && ziel !== el) { ziel.classList.add("layout-zelle--ziel"); markiert = ziel; }
-      }
-      function loslassen(e) {
-        if (!zieht) { aufraeumen(); return; }
-        const ziel = zelleUnter(e);
-        aufraeumen();
-        zuletztGezogen = Date.now();
-        if (!ziel || ziel === el) return;
-        const von = Number(el.dataset.platz);
-        const nach = Number(ziel.dataset.platz);
-        // Tausch: die Zielkachel geht dorthin, wo die gezogene herkam
-        const merk = felder[nach];
-        felder[nach] = felder[von];
-        felder[von] = merk;
-        zeichnen();
-      }
-      function abbrechen() { aufraeumen(); }
-
-      el.addEventListener("pointerdown", (e) => {
-        if (e.button !== undefined && e.button !== 0) return;
-        art = e.pointerType || "mouse";
-        startX = e.clientX; startY = e.clientY;
-        document.addEventListener("pointermove", bewegen, true);
-        document.addEventListener("pointerup", loslassen, true);
-        document.addEventListener("pointercancel", abbrechen, true);
-        if (art === "touch") halten = setTimeout(() => anheben(e), 380);
-      });
-    });
-  }
-
-  zeichnen();
-
-  // Nach Toolnummer ordnen — der schnelle Weg zu einem sauberen Blatt
-  kasten.querySelector("[data-auto]").onclick = () => {
-    const voll = felder.filter((k) => k).slice()
-      .sort((a, b) => toolVergleich(a.tool, b.tool));
-    felder = felder.map(() => null);
-    voll.forEach((k, i) => { felder[i] = k; });
-    zeichnen();
-  };
-
-  kasten.querySelector("[data-speichern]").onclick = async () => {
-    const stand = [];
-    felder.forEach((k, i) => { if (k) stand.push({ id: k.id, position: i + 1 }); });
-    try {
-      await speichern(stand);
-      meldung("Anordnung gespeichert.");
-      zu();
-    } catch (f) { meldung(fehlertext(f), "fehler"); }
-  };
-}
-
-// Vorlage eines Maschinentyps: alle Werkzeugplätze aller Paths
-async function layoutFuerTyp(typId, typName) {
-  await blattLayoutFenster({
-    titel: "Werkzeugblatt-Vorlage",
-    unter: typName || "",
-    laden: async () => {
-      const paths = await ladeTypAufbau(typId);
-      const raus = [];
-      paths.forEach((p, pi) => {
-        (p.type_slots || []).forEach((sl) => {
-          raus.push({ id: sl.id, tool: sl.tool_nr || "", farbe: pathFarbe(pi),
-                      lieferant: "", artNr: "", position: Number(sl.platz_nr) || 0 });
-        });
-      });
-      return raus;
-    },
-    speichern: async (stand) => {
-      for (const e of stand) {
-        const r = await db.from("type_slots")
-          .update({ platz_nr: e.position }).eq("id", e.id);
-        if (r.error) throw r.error;
-      }
-    },
-  });
-}
-
-// Einzelnes Einrichtblatt: gilt nur für dieses Teil auf diesem Typ
-async function layoutFuerBlatt(blatt, titelZusatz) {
-  await blattLayoutFenster({
-    titel: "Werkzeugblatt anordnen",
-    unter: titelZusatz || "",
-    laden: async () => {
-      const zeilen = await ladeBlattZeilen(blatt.id);
-      const pfade = [];
-      zeilen.forEach((z) => {
-        const n = z.path_name || "ohne Path";
-        if (pfade.indexOf(n) === -1) pfade.push(n);
-      });
-      return zeilen.map((z) => ({
-        id: z.id,
-        tool: z.tool_nr || "",
-        farbe: pathFarbe(pfade.indexOf(z.path_name || "ohne Path")),
-        lieferant: z.hersteller || "",
-        artNr: z.articles ? z.articles.article_number : (z.werkzeug || ""),
-        position: Number(z.platz_nr) || 0,
-      }));
-    },
-    speichern: async (stand) => {
-      for (const e of stand) {
-        const r = await db.from("setup_sheet_slots")
-          .update({ platz_nr: e.position }).eq("id", e.id);
-        if (r.error) throw r.error;
-      }
-    },
-  });
-}
-
-async function blattDruckFenster(blatt) {
-  const huelle = document.createElement("div");
-  huelle.className = "dialog-huelle";
-  huelle.innerHTML = '<div class="dialog dialog--voll dialog--druck">'
-    + '<div class="laedt">Wird geladen …</div></div>';
-  document.body.appendChild(huelle);
-  const kasten = huelle.querySelector(".dialog");
-  let anpassen = () => {};
-  const zu = () => { window.removeEventListener("resize", anpassen); huelle.remove(); };
-  huelle.onclick = (e) => { if (e.target === huelle) zu(); };
-
-  let zeilen = [], typName = "", stamm = {}, maschine = "";
-  try {
-    zeilen = await ladeBlattZeilen(blatt.id);
-    const t = await db.from("machine_types").select("name").eq("id", blatt.type_id).limit(1);
-    typName = ((t.data || [])[0] || {}).name || "";
-    const h = await db.from("hoco_parts").select("*").eq("hoco_nr", blatt.hoco_nr).limit(1);
-    stamm = ((h && h.data) || [])[0] || {};
-    if (blatt.machine_id) {
-      const m = (prod.maschinen || []).find((x) => x.id === blatt.machine_id);
-      if (m) maschine = (m.machine_number ? m.machine_number + " " : "") + m.name;
-    }
-  } catch (f) {
-    kasten.innerHTML = '<p class="hinweis">' + esc(fehlertext(f)) + '</p>';
-    return;
-  }
-
-  kasten.innerHTML = '<div class="blatt__kopf">'
-    + '<h2>Einrichtblatt ' + esc(blatt.hoco_nr || "") + '</h2>'
-    + '<button class="knopf knopf--klein" data-drucken>Drucken</button>'
-    + '<button class="knopf knopf--still" data-zu>Schliessen</button>'
-    + '</div>'
-    + '<div class="eb-rolle">'
-    + blattDruckAnsicht(blatt, zeilen, stamm, typName, maschine)
-    + '</div>'
-    + '<p class="klein">Nur zum Ansehen. Bearbeitet wird das Einrichtblatt '
-    + 'in der Produktion.</p>';
-
-  kasten.querySelector("[data-zu]").onclick = zu;
-
-  // Das Blatt ist eine echte A4-Seite und damit breiter als das
-  // Fenster. Für die Vorschau wird es als Ganzes verkleinert — beim
-  // Drucken bleibt es unangetastet in Originalgrösse.
-  const rolle = kasten.querySelector(".eb-rolle");
-  const seite = kasten.querySelector(".eb-blatt");
-  anpassen = () => {
-    if (!rolle || !seite) return;
-    seite.style.transform = "none";
-    seite.style.marginBottom = "0px";
-    const platz = rolle.clientWidth - 24;
-    const breite = seite.offsetWidth;
-    if (!breite) return;
-    const faktor = Math.min(1, platz / breite);
-    seite.style.transform = "scale(" + faktor + ")";
-    // Der verkleinerte Rest der Höhe darf keinen leeren Raum lassen
-    seite.style.marginBottom = -(seite.offsetHeight * (1 - faktor)) + "px";
-  };
-  anpassen();
-  setTimeout(anpassen, 120);
-  window.addEventListener("resize", anpassen);
-  kasten.querySelector("[data-drucken]").onclick = () => {
-    // Zum Drucken kommt das Blatt in einen eigenen, schlichten Bereich
-    // direkt im Seitenkörper. Im Fenster selbst hängt es an einer
-    // festen Bildschirmhöhe — daraus wurden Schnittkanten und eine
-    // zweite, leere Seite.
-    const alt = document.getElementById("druckbereich");
-    if (alt) alt.remove();
-    const bereich = document.createElement("div");
-    bereich.id = "druckbereich";
-    bereich.innerHTML = (seite && seite.outerHTML) || "";
-    const kopie = bereich.querySelector("#eb-druck");
-    if (kopie) {
-      kopie.id = "eb-druck-kopie";
-      // Die Kopie bekommt feste Werte mit: Höhe nach Inhalt, Kacheln
-      // in fester Zeilenhöhe. Sonst erbt sie die Bildschirmhöhe des
-      // Fensters, und der Drucker schneidet ab oder hängt eine leere
-      // Seite an.
-      ["transform:none", "aspect-ratio:auto", "height:auto", "min-height:0",
-       "max-height:none", "padding:0", "width:100%", "display:block",
-       "overflow:visible", "box-shadow:none"].forEach((regel) => {
-        const [k, v] = regel.split(":");
-        kopie.style.setProperty(k, v, "important");
-      });
-      const karten = kopie.querySelector(".eb-karten");
-      if (karten) {
-        karten.style.setProperty("grid-auto-rows", "25mm", "important");
-        karten.style.setProperty("flex", "none", "important");
-        karten.style.setProperty("height", "auto", "important");
-      }
-    }
-    document.body.appendChild(bereich);
-    document.body.classList.add("nur-blatt-drucken");
-
-    const fertig = () => {
-      document.body.classList.remove("nur-blatt-drucken");
-      bereich.remove();
-      anpassen();
-    };
-    window.addEventListener("afterprint", fertig, { once: true });
-    setTimeout(fertig, 4000);
-    window.print();
-  };
-}
-
-// Ein festgehaltener Stand: dieselbe Darstellung, aber nichts
-// änderbar — so wurde damals gearbeitet.
-function blattFensterStand(stand) {
-  const kopf = stand.kopf || {};
-  const zeilen = (stand.plaetze || []).slice()
-    .sort((a, c) => (a.sortierung - c.sortierung) || (a.unter_nr - c.unter_nr));
-
-  const gruppen = [];
-  zeilen.forEach((z) => {
-    const name = z.path_name || "ohne Path";
-    let g = gruppen.find((x) => x.name === name);
-    if (!g) { g = { name: name, zeilen: [] }; gruppen.push(g); }
-    g.zeilen.push(z);
-  });
-
-  const feld = (k, v) => '<tr><td class="klein">' + k + '</td><td>'
-    + (v ? esc(v) : '<span class="gedaempft">—</span>') + '</td></tr>';
-
-  const huelle = document.createElement("div");
-  huelle.className = "dialog-huelle";
-  huelle.innerHTML = '<div class="dialog dialog--breit">'
-    + '<div class="blatt__kopf"><h2>Einrichtblatt ' + esc(stand.hoco_nr || "") + '</h2>'
-    + '<span class="marke">' + esc(stand.typ_name || "") + '</span>'
-    + '<button class="knopf knopf--still" data-zu>Schliessen</button></div>'
-    + '<p class="hinweis">Stand bei Abschluss'
-    + (stand.fa_nr ? " von FA " + esc(stand.fa_nr) : "")
-    + (stand.maschine ? " auf " + esc(stand.maschine) : "")
-    + " vom " + esc(kurzDatum(stand.erstellt))
-    + ". So wurde damals gearbeitet — nicht änderbar.</p>"
-    + '<table class="tabelle tabelle--kopf"><tbody>'
-    + feld("Artikelbezeichnung", kopf.bezeichnung)
-    + feld("Material", kopf.material)
-    + feld("Programm Nr.", kopf.programm_nr)
-    + feld("Stückzeit", kopf.stueckzeit_s ? kopf.stueckzeit_s + " Sek./Stk." : "")
-    + feld("Abgreifzange", kopf.abgreifzange)
-    + feld("Allgemeine Infos", kopf.infos)
-    + '</tbody></table>'
-    + gruppen.map((g) => '<section class="karte">'
-        + '<div class="karte__kopf"><h2>' + esc(g.name) + '</h2></div>'
-        + '<table class="tabelle"><thead><tr>'
-        + '<th>Tool</th><th>Tätigkeit</th><th>Masse</th><th>Werkzeug</th>'
-        + '<th>Hersteller</th></tr></thead><tbody>'
-        + g.zeilen.map((z) => '<tr>'
-            + '<td class="nowrap"><strong>' + esc(z.tool_nr || "—") + '</strong></td>'
-            + '<td>' + esc(z.taetigkeit || "") + '</td>'
-            + '<td>' + esc(z.masse || "") + '</td>'
-            + '<td>' + esc(z.articles
-                ? z.articles.article_number
-                  + (z.articles.name ? " · " + z.articles.name : "")
-                : (z.werkzeug || z.frei_text || "")) + '</td>'
-            + '<td>' + esc(z.hersteller || "") + '</td>'
-            + '</tr>').join("")
-        + '</tbody></table></section>').join("")
-    + '</div>';
-  document.body.appendChild(huelle);
-  const zu = () => huelle.remove();
-  huelle.querySelector("[data-zu]").onclick = zu;
-  dialogSchliessen(huelle, zu);
-}
-
-async function blattFenster(blatt, nurLesen) {
-  // Im Pad Mode wird das Blatt nur angesehen, bearbeitet wird es in
-  // der Produktion
-  const darf = !nurLesen && darfSchreiben();
-  const huelle = document.createElement("div");
-  huelle.className = "dialog-huelle";
-  huelle.innerHTML = '<div class="dialog dialog--breit dialog--blatt">'
-    + '<div class="laedt">Wird geladen …</div></div>';
-  document.body.appendChild(huelle);
-  const kasten = huelle.querySelector(".dialog");
-
-  const zu = () => huelle.remove();
-  huelle.onclick = (e) => {
-    if (e.target !== huelle) return;
-    if (Date.now() - zuletztGezogen < 500) return;   // Klick nach dem Ziehen
-    zu();
-  };
-
-  const zeichnen = async () => {
-    let zeilen = [], typName = "", stamm = {};
-    try {
-      zeilen = await ladeBlattZeilen(blatt.id);
-      const t = await db.from("machine_types").select("name").eq("id", blatt.type_id).limit(1);
-      typName = ((t.data || [])[0] || {}).name || "";
-      // Bezeichnung, Zeichnungs Nr. und Material kommen aus den
-      // Stammdaten der HOCO Nr. — immer der heutige Stand dort.
-      const h = await db.from("hoco_parts").select("*").eq("hoco_nr", blatt.hoco_nr).limit(1);
-      stamm = ((h && h.data) || [])[0] || {};
-    } catch (f) {
-      kasten.innerHTML = '<p class="hinweis">' + esc(fehlertext(f)) + '</p>';
-      return;
-    }
-
-    // Nach Path gruppieren, darin nach Toolnummer
-    const gruppen = [];
-    zeilen.forEach((z) => {
-      const name = z.path_name || "ohne Path";
-      let g = gruppen.find((x) => x.name === name);
-      if (!g) { g = { name: name, nr: z.path_nr, zeilen: [] }; gruppen.push(g); }
-      g.zeilen.push(z);
-    });
-    gruppen.forEach((g) => g.zeilen.sort((a, c) =>
-      toolVergleich(a.tool_nr, c.tool_nr) || ((a.unter_nr || 0) - (c.unter_nr || 0))));
-
-    const feld = (k, v, ausStamm) => '<tr><td class="klein">' + k
-      + (ausStamm ? ' <span class="stamm-marke">Stammdaten</span>' : "") + '</td><td>'
-      + (v ? esc(v) : '<span class="gedaempft">—</span>') + '</td></tr>';
-
-    const werkzeugZelle = (z) => {
-      const text = z.articles
-        ? z.articles.article_number + (z.articles.name ? " · " + z.articles.name : "")
-        : (z.werkzeug || z.frei_text || "");
-      return text ? esc(text) : '<span class="gedaempft">—</span>';
-    };
-
-    kasten.innerHTML = '<div class="blatt__kopf">'
-      + '<h2>Einrichtblatt ' + esc(blatt.hoco_nr || "") + '</h2>'
-      + '<span class="marke">' + esc(typName) + '</span>'
-      + (darf ? '<button class="knopf knopf--klein" data-layout>Blatt anordnen</button>' : "")
-      + '<button class="knopf knopf--klein" data-drucken2>Drucken</button>'
-      + '<button class="knopf knopf--still" data-zu>Schliessen</button>'
-      + '</div>'
-
-      + '<table class="tabelle tabelle--kopf"><tbody>'
-      + feld("Artikelbezeichnung", stamm.bezeichnung || blatt.bezeichnung, true)
-      + feld("Zeichnungs Nr.", stamm.zeichnungs_nr || blatt.zeichnungs_nr, true)
-      + feld("Material", stamm.material || blatt.material, true)
-      + feld("Programm Nr.", blatt.programm_nr)
-      + feld("Stückzeit", blatt.stueckzeit_s ? blatt.stueckzeit_s + " Sek./Stk." : "")
-      + feld("Maschinenlaufzeit", blatt.laufzeit_min
-          ? stundenText(blatt.laufzeit_min) + " Std." : "")
-      + feld("Stück am Abend", blatt.abend_stk ? zahlText(blatt.abend_stk) + " Stk" : "")
-      + feld("Abgreifzange", blatt.abgreifzange)
-      + feld("Allgemeine Infos", blatt.infos)
-      + '</tbody></table>'
-      + (darf ? '<button class="knopf knopf--klein" data-kopf>Programm, Zeit, Zange bearbeiten</button>'
-          : (nurLesen ? '<p class="hinweis">Nur zum Ansehen. Bearbeitet wird das Einrichtblatt '
-              + 'in der Produktion.</p>' : ""))
-      + '<p class="klein">Bezeichnung, Zeichnungs Nr. und Material kommen aus den '
-      + 'Stammdaten der HOCO Nr. und werden dort geändert.</p>'
-
-      + gruppen.map((g, gi) => '<section class="karte">'
-          + '<div class="karte__kopf"><h2>' + esc(g.name) + '</h2>'
-          + (darf ? '<button class="knopf knopf--klein" data-z-neu="' + esc(g.name) + '">'
-              + '+ Platz</button>' : "")
-          + '</div>'
-          // Dieselben Kacheln wie auf dem fertigen Blatt. Ziehen ordnet
-          // sie um, auch in einen anderen Path — das gilt nur für dieses
-          // Blatt, die Vorlage des Maschinentyps bleibt unberührt.
-          + '<div class="platzliste eb-karten" data-pathliste="' + esc(g.name) + '">'
-          + g.zeilen.map((z) => '<div class="eb-karte'
-              + (darf ? " platz--fassbar" : "") + (z.unter_nr ? " eb-karte--unter" : "")
-              + '" data-platz="' + esc(z.id) + '" data-path="' + esc(g.name) + '">'
-              + '<div class="eb-karte__kopf" style="background:' + pathFarbe(gi) + '">'
-              + esc(z.tool_nr || "—") + '</div>'
-              + '<div class="eb-karte__bild">'
-              + (z.taetigkeit || z.masse
-                  ? '<span class="eb-karte__tat">' + esc(z.taetigkeit || "")
-                    + (z.masse ? '<br>' + esc(z.masse) : "") + '</span>'
-                  : "")
-              + '</div>'
-              + '<div class="eb-karte__zeile">' + esc(z.hersteller || "") + '</div>'
-              + '<div class="eb-karte__zeile eb-karte__zeile--letzte">'
-              + esc(z.articles ? z.articles.article_number : (z.werkzeug || "")) + '</div>'
-              + (darf ? '<span class="eb-karte__werkzeuge">'
-                  + '<button class="eb-karte__knopf" data-z-wz="' + esc(z.id)
-                  + '" title="Werkzeug wählen">🔧</button>'
-                  + '<button class="eb-karte__knopf" data-z-um="' + esc(z.id)
-                  + '" title="Angaben">✎</button>'
-                  + (z.unter_nr ? "" : '<button class="eb-karte__knopf" data-z-mehr="'
-                      + esc(z.id) + '" title="Mehrere Werkzeuge auf diesem Platz">⧉</button>')
-                  + '<button class="eb-karte__knopf eb-karte__knopf--weg" data-z-weg="'
-                  + esc(z.id) + '" title="Platz löschen">✕</button></span>' : "")
-              + '</div>').join("")
-          + '</div>'
-          + '</section>').join("")
-
-      + (gruppen.length ? ""
-          : '<p class="hinweis">In diesem Blatt steht noch kein Werkzeugplatz. '
-            + 'Sind beim Maschinentyp welche angelegt, hol sie mit dem Knopf hierher. '
-            + 'Sonst legst du sie unter Produktion → Typen an.</p>'
-            + (darf ? '<button class="knopf knopf--haupt" data-holen>'
-                + 'Werkzeugplätze vom Typ holen</button>' : ""));
-
-    kasten.querySelector("[data-zu]").onclick = zu;
-
-    const layoutK = kasten.querySelector("[data-layout]");
-    if (layoutK) layoutK.onclick = () =>
-      layoutFuerBlatt(blatt, (blatt.hoco_nr || "") + " · " + (typName || "")).then(zeichnen);
-
-    const druckK = kasten.querySelector("[data-drucken2]");
-    if (druckK) druckK.onclick = () => blattDruckFenster(blatt);
-
-    // Plätze im Blatt umordnen — genau wie beim Maschinentyp, nur
-    // dass es hier bloss dieses eine Blatt betrifft.
-    if (darf) platzVerschieben(kasten, zeichnen, blattEinordnenFuer(blatt));
-
-    const holen = kasten.querySelector("[data-holen]");
-    if (holen) holen.onclick = async () => {
-      try {
-        const paths = await ladeTypAufbau(blatt.type_id);
-        const amTyp = paths.reduce((n, p) => n + ((p.type_slots || []).length), 0);
-        if (!amTyp) {
-          meldung("Dieser Maschinentyp hat keine Werkzeugplätze. "
-            + "Leg sie unter Produktion → Typen an.", "warn");
-          return;
-        }
-        const wieviele = await blattPlaetzeNachtragen(blatt);
-        meldung(wieviele
-          ? wieviele + " Werkzeugplätze übernommen."
-          : "Am Typ sind " + amTyp + " Plätze, im Blatt stehen sie schon.");
-        zeichnen();
-      } catch (f) { meldung(fehlertext(f), "fehler"); }
-    };
-
-    // ----- Kopf: nur was nicht aus den Stammdaten kommt -----
-    const kopfKnopf = kasten.querySelector("[data-kopf]");
-    if (kopfKnopf) kopfKnopf.onclick = async () => {
-      const w = await dialogFelder({ titel: "Einrichtblatt " + (blatt.hoco_nr || ""),
-        felder: [
-          { name: "prog", label: "Programm Nr.", wert: blatt.programm_nr || "" },
-          { name: "zeit", label: "Stückzeit in Sekunden", typ: "number",
-            wert: blatt.stueckzeit_s || "" },
-          { name: "lauf", label: "Maschinenlaufzeit in Stunden", typ: "number",
-            wert: blatt.laufzeit_min ? stundenText(blatt.laufzeit_min) : "",
-            hinweis: "Zum Beispiel 7.5 für siebeneinhalb Stunden." },
-          { name: "abend", label: "Stück am Abend", typ: "number",
-            wert: blatt.abend_stk || "",
-            hinweis: "Wie viele Stück am Abend einzutragen sind. "
-              + "Leer lassen, solange es nicht feststeht." },
-          { name: "zange", label: "Abgreifzange", wert: blatt.abgreifzange || "" },
-          { name: "infos", label: "Allgemeine Infos", wert: blatt.infos || "" }] });
-      if (!w) return;
-      const daten = {
-        programm_nr: w.prog || null,
-        stueckzeit_s: w.zeit === "" || w.zeit === undefined ? null : Number(w.zeit),
-        // Eingetippt wird in Stunden, gespeichert bleibt es in Minuten
-        laufzeit_min: w.lauf === "" || w.lauf === undefined
-          ? null : Math.round(Number(w.lauf) * 60),
-        abend_stk: w.abend === "" || w.abend === undefined ? null : Math.round(Number(w.abend)),
-        abgreifzange: w.zange || null,
-        infos: w.infos || null };
-      let { error } = await db.from("setup_sheets").update(daten).eq("id", blatt.id);
-      // Fehlt die Spalte noch, weil abendstueck.sql nicht gelaufen ist,
-      // wird der Rest trotzdem gespeichert
-      if (error && /abend_stk/.test(error.message || "")) {
-        delete daten.abend_stk;
-        ({ error } = await db.from("setup_sheets").update(daten).eq("id", blatt.id));
-        if (!error) meldung("Stück am Abend braucht noch abendstueck.sql.", "warn");
-      }
-      if (error) { meldung(fehlertext(error), "fehler"); return; }
-      Object.assign(blatt, daten);
-      meldung("Gespeichert.");
-      zeichnen();
-    };
-
-    // ----- Werkzeug wählen: erst der Hersteller, dann sein Werkzeug -----
-    kasten.querySelectorAll("[data-z-wz]").forEach((el) => {
-      el.onclick = async () => {
-        const z = zeilen.find((x) => x.id === el.dataset.zWz);
-        if (!z) return;
-        try {
-          const ergebnis = await werkzeugWaehlen(z);
-          if (!ergebnis) return;
-          const { error } = await db.from("setup_sheet_slots").update({
-            article_id: ergebnis.artikel.id,
-            werkzeug: ergebnis.artikel.article_number
-              + (ergebnis.artikel.name ? " · " + ergebnis.artikel.name : ""),
-            hersteller: ergebnis.lieferant.name,
-          }).eq("id", z.id);
-          if (error) throw error;
-          meldung("Werkzeug auf " + (z.tool_nr || "Platz") + " gesetzt.");
-          zeichnen();
-        } catch (f) { meldung(fehlertext(f), "fehler"); }
-      };
-    });
-
-    // ----- Angaben: Tätigkeit, Masse, Hinweis -----
-    kasten.querySelectorAll("[data-z-um]").forEach((el) => {
-      el.onclick = async () => {
-        const z = zeilen.find((x) => x.id === el.dataset.zUm);
-        if (!z) return;
-        const w = await dialogFelder({ titel: "Platz " + (z.tool_nr || ""),
-          felder: [
-            { name: "tool", label: "Bezeichnung des Platzes", wert: z.tool_nr || "" },
-            { name: "tat", label: "Tätigkeit", wert: z.taetigkeit || "",
-              platzhalter: "z. B. Ansenken, Bohrung, Gewinde" },
-            { name: "masse", label: "Masse", wert: z.masse || "",
-              platzhalter: "z. B. Ø9.40 x 0.33" },
-            { name: "hinweis", label: "Hinweis", wert: z.hinweis || "" }] });
-        if (!w) return;
-        const { error } = await db.from("setup_sheet_slots").update({
-          tool_nr: w.tool || null, taetigkeit: w.tat || null, masse: w.masse || null,
-          hinweis: w.hinweis || null }).eq("id", z.id);
-        if (error) meldung(fehlertext(error), "fehler");
-        else { meldung("Gespeichert."); zeichnen(); }
-      };
-    });
-
-    // ----- Mehrere Werkzeuge auf einem Platz -----
-    // Wie viele, wie heissen sie — dann bekommt jeder Unterplatz eine
-    // eigene Zeile, der ein Werkzeug zugewiesen werden kann.
-    kasten.querySelectorAll("[data-z-mehr]").forEach((el) => {
-      el.onclick = async () => {
-        const z = zeilen.find((x) => x.id === el.dataset.zMehr);
-        if (!z) return;
-        const vorhanden = zeilen
-          .filter((x) => x.slot_id && x.slot_id === z.slot_id && x.id !== z.id)
-          .sort((a, c) => (a.unter_nr || 0) - (c.unter_nr || 0));
-
-        const a = await dialogFelder({ titel: "Mehrere Werkzeuge auf " + (z.tool_nr || "diesem Platz"),
-          felder: [{ name: "n", label: "Wie viele Werkzeuge?", typ: "number", pflicht: true,
-                     wert: Math.max(2, vorhanden.length + 1) }],
-          bestaetigen: "Weiter" });
-        if (!a) return;
-        const n = Math.min(10, Math.max(2, Math.round(Number(a.n) || 2)));
-
-        const namen = await dialogFelder({ titel: "Wie heissen die Plätze?",
-          felder: Array.from({ length: n }, (_, i) => ({
-            name: "p" + i, label: "Platz " + (i + 1), pflicht: true,
-            wert: i === 0 ? (z.tool_nr || "")
-              : ((vorhanden[i - 1] && vorhanden[i - 1].tool_nr)
-                  || toolNummerErweitert(z.tool_nr, i)) })),
-          bestaetigen: "Anlegen" });
-        if (!namen) return;
-
-        try {
-          // Der bestehende Platz wird der erste
-          let r = await db.from("setup_sheet_slots")
-            .update({ tool_nr: namen.p0 || z.tool_nr }).eq("id", z.id);
-          if (r.error) throw r.error;
-          // Vorhandene Unterplätze umbenennen, fehlende anlegen, zu viele entfernen
-          for (let i = 1; i < n; i++) {
-            const alt = vorhanden[i - 1];
-            if (alt) {
-              r = await db.from("setup_sheet_slots")
-                .update({ tool_nr: namen["p" + i], unter_nr: i }).eq("id", alt.id);
-            } else {
-              await einfuegenOhneUnbekannte("setup_sheet_slots", {
-                sheet_id: blatt.id, slot_id: z.slot_id,
-                path_name: z.path_name, path_nr: z.path_nr,
-                platz: z.platz, platz_nr: z.platz_nr,
-                bezeichnung: namen["p" + i],
-                tool_nr: namen["p" + i], unter_nr: i, sortierung: z.sortierung || 0 });
-              r = { error: null };
-            }
-            if (r.error) throw r.error;
-          }
-          for (const ueber of vorhanden.slice(n - 1)) {
-            await db.from("setup_sheet_slots").delete().eq("id", ueber.id);
-          }
-          meldung(n + " Plätze angelegt. Jetzt je ein Werkzeug hinzufügen.");
-          zeichnen();
-        } catch (f) { meldung(fehlertext(f), "fehler"); }
-      };
-    });
-
-    // Einen Platz direkt im Blatt hinzufügen. Er gilt nur für dieses
-    // Blatt — das Raster des Maschinentyps bleibt unverändert.
-    kasten.querySelectorAll("[data-z-neu]").forEach((el) => {
-      el.onclick = async () => {
-        const g = gruppen.find((x) => x.name === el.dataset.zNeu);
-        if (!g) return;
-        const w = await dialogFelder({ titel: "Neuer Platz in " + g.name,
-          felder: [{ name: "tool", label: "Toolnummer", pflicht: true,
-                     platzhalter: "z. B. T200" }],
-          bestaetigen: "Anlegen" });
-        if (!w) return;
-        const nr = String(w.tool || "").trim();
-        if (!nr) return;
-        if (g.zeilen.some((z) => String(z.tool_nr || "").trim().toUpperCase() === nr.toUpperCase())) {
-          meldung(nr + " gibt es in " + g.name + " schon.", "warn");
-          return;
-        }
-        try {
-          await einfuegenOhneUnbekannte("setup_sheet_slots", {
-            sheet_id: blatt.id, slot_id: null,
-            path_name: g.name, path_nr: g.nr,
-            platz: nr, bezeichnung: nr, tool_nr: nr, unter_nr: 0,
-            sortierung: Math.max(0, ...zeilen.map((z) => z.sortierung || 0)) + 1 });
-        } catch (f) { meldung(fehlertext(f), "fehler"); return; }
-        meldung("Platz " + nr + " angelegt. Jetzt ein Werkzeug hinzufügen.");
-        zeichnen();
-      };
-    });
-
-    kasten.querySelectorAll("[data-z-weg]").forEach((el) => {
-      el.onclick = async () => {
-        const ok = await nachfragen({ titel: "Zeile löschen",
-          text: "Soll diese Werkzeugzeile aus dem Blatt entfernt werden?",
-          bestaetigen: "Löschen", gefahr: true });
-        if (!ok) return;
-        const { error } = await db.from("setup_sheet_slots").delete().eq("id", el.dataset.zWeg);
-        if (error) meldung(fehlertext(error), "fehler");
-        else { meldung("Gelöscht."); zeichnen(); }
-      };
-    });
-  };
-
-  await zeichnen();
-}
 
 // Auswahlliste mit Suchfeld. Gibt den gewählten Wert zurück,
 // "__neu" für den Eintrag zum Anlegen, oder null beim Abbrechen.
@@ -13231,7 +12296,7 @@ async function ansichtHoco(ziel, b) {
       const [maschinen, typen2, sheets] = await Promise.all([
         ladeMaschinen(true),
         ladeTypen(),
-        db.from("setup_sheets").select("id, type_id, created_at").eq("hoco_nr", t.hoco_nr),
+        db.from("hoco_type_data").select("type_id, blatt_url").eq("hoco_nr", t.hoco_nr),
       ]);
       const namen = {};
       (typen2 || []).forEach((x) => { namen[x.id] = x.name; });
@@ -13240,7 +12305,7 @@ async function ansichtHoco(ziel, b) {
         if (!typId) return null;
         if (!sammlung[typId]) {
           sammlung[typId] = { typId: typId, name: namen[typId] || "ohne Typ",
-                              maschinen: [], blatt: null };
+                              maschinen: [], eigenes: null, vorlage: null };
         }
         return sammlung[typId];
       };
@@ -13251,9 +12316,15 @@ async function ansichtHoco(ziel, b) {
         const bez = (m.machine_number ? m.machine_number + " " : "") + (m.name || "");
         if (e.maschinen.indexOf(bez) === -1) e.maschinen.push(bez);
       });
+      // Welches Einrichtblatt gilt: eines für genau diese HOCO Nr.
+      // oder die Vorlage am Maschinentyp.
+      (typen2 || []).forEach((t2) => {
+        const e = sammlung[t2.id];
+        if (e) e.vorlage = t2.blatt_url || null;
+      });
       ((sheets && sheets.data) || []).forEach((b) => {
         const e = dazu(b.type_id);
-        if (e) e.blatt = b;
+        if (e) e.eigenes = b.blatt_url || null;
       });
       typenGenutzt = Object.keys(sammlung).map((k) => sammlung[k])
         .sort((a, c) => String(a.name).localeCompare(String(c.name)));
@@ -13300,17 +12371,23 @@ async function ansichtHoco(ziel, b) {
           + typenGenutzt.map((e) => '<tr>'
               + '<td><strong>' + esc(e.name) + '</strong></td>'
               + '<td class="klein">' + esc(e.maschinen.join(", ") || "—") + '</td>'
-              + '<td class="klein">' + (e.blatt
-                  ? "angelegt " + esc(kurzDatum(e.blatt.created_at || ""))
-                  : '<span class="gedaempft">noch keines</span>') + '</td>'
+              + '<td class="klein">' + (e.eigenes
+                  ? "eigenes hinterlegt"
+                  : (e.vorlage ? "Vorlage vom Typ"
+                      : '<span class="gedaempft">noch keines</span>')) + '</td>'
               + '<td class="rechts nowrap">'
-              + '<button class="knopf knopf--klein" data-blatt-typ="' + esc(e.typId) + '">'
-              + (e.blatt ? "Einrichtblatt öffnen" : "Einrichtblatt anlegen") + '</button>'
+              + ((e.eigenes || e.vorlage)
+                  ? '<button class="knopf knopf--klein" data-blatt-typ="' + esc(e.typId)
+                    + '">Ansehen</button> ' : "")
+              + (darf ? '<button class="linkknopf" data-blatt-pdf="' + esc(e.typId) + '">'
+                  + (e.eigenes ? "Ersetzen" : "PDF hinterlegen") + '</button>'
+                  + (e.eigenes ? ' <button class="linkknopf linkknopf--gefahr"'
+                      + ' data-blatt-weg="' + esc(e.typId) + '">Entfernen</button>' : "") : "")
               + '</td></tr>').join("")
           + '</tbody></table>'
         : '<p class="hinweis">Diese Nummer ist noch auf keiner Maschine gelaufen. '
-          + 'Ein Einrichtblatt gilt je Maschinentyp — dasselbe Teil auf einem anderen '
-          + 'Typ braucht ein eigenes.</p>')
+          + 'Ein Einrichtblatt hinterlegst du je Maschinentyp — entweder als Vorlage '
+          + 'beim Typ oder hier für genau dieses Teil.</p>')
       + '</section>'
 
       + '<section class="karte"><div class="karte__kopf">'
@@ -13457,11 +12534,33 @@ async function ansichtHoco(ziel, b) {
     if (zeichnungKnopf) zeichnungKnopf.onclick = () =>
       betrachter(zeichnungKnopf.dataset.zeichnung, "Zeichnung " + t.hoco_nr, true);
 
-    // Einrichtblatt je Maschinentyp öffnen, direkt von der HOCO Nr. aus
+    // Einrichtblatt je Maschinentyp: ansehen, hinterlegen, entfernen
     ziel.querySelectorAll("[data-blatt-typ]").forEach((el) => {
       el.onclick = async () => {
         try {
-          await einrichtblattOeffnen(t.hoco_nr, el.dataset.blattTyp);
+          await einrichtblattPdfOeffnen(t.hoco_nr, el.dataset.blattTyp, t.hoco_nr);
+        } catch (f) { meldung(fehlertext(f), "fehler"); }
+      };
+    });
+
+    ziel.querySelectorAll("[data-blatt-pdf]").forEach((el) => {
+      el.onclick = async () => {
+        const adresse = await blattPdfWaehlen();
+        if (!adresse) return;
+        try {
+          await blattPdfAnHoco(t.hoco_nr, el.dataset.blattPdf, adresse);
+          meldung("Einrichtblatt für " + t.hoco_nr + " hinterlegt.");
+          neuLaden();
+        } catch (f) { meldung(fehlertext(f), "fehler"); }
+      };
+    });
+
+    ziel.querySelectorAll("[data-blatt-weg]").forEach((el) => {
+      el.onclick = async () => {
+        try {
+          await blattPdfAnHoco(t.hoco_nr, el.dataset.blattWeg, null);
+          meldung("Entfernt. Es gilt wieder die Vorlage vom Typ.");
+          neuLaden();
         } catch (f) { meldung(fehlertext(f), "fehler"); }
       };
     });
