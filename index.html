@@ -3976,6 +3976,22 @@ body.dunkel .login input, body.dunkel .login select {
 @media (max-width: 900px) {
   .layout-blatt .eb-karten { grid-template-columns: repeat(5, 1fr); }
 }
+/* Pad Mode: Zurück und Schliessen als richtige Knöpfe */
+.pad__kopf { padding: 12px 14px !important; border-bottom: 0 !important; gap: 10px !important; }
+.pad__zurueck, .pad__zu { width: auto !important; height: 58px !important;
+                          min-width: 130px; padding: 0 22px !important;
+                          font-size: 1.1rem !important; font-weight: 700;
+                          border-radius: 16px !important;
+                          background: rgba(255,255,255,.08) !important;
+                          border: 1px solid rgba(255,255,255,.16) !important; }
+.pad__zurueck:active, .pad__zu:active { background: rgba(255,255,255,.18) !important; }
+.pad__zurueck--leer { min-width: 130px; background: none !important; border: 0 !important; }
+.pad__titel { font-size: 1.45rem !important; }
+@media (max-width: 560px) {
+  .pad__zurueck, .pad__zu { min-width: 0; padding: 0 14px !important; font-size: .95rem !important; }
+  .pad__zurueck--leer { min-width: 0; }
+  .pad__titel { font-size: 1.1rem !important; }
+}
 </style>
 </head>
 <body>
@@ -4024,7 +4040,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "94.0.0";
+const APP_VERSION = "95.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -6053,7 +6069,45 @@ function leistungText(n) {
 
 // ---------- Daten ----------
 
+// =================================================================
+//  Kurzzeitgedächtnis für Stammdaten
+//  Parks, Maschinen und Typen ändern sich selten, werden aber bei
+//  jeder Kleinigkeit neu geholt. Das kostet auf dem Handy spürbar
+//  Zeit. Sie werden deshalb kurz gemerkt und beim Ändern verworfen.
+// =================================================================
+
+const stammGedaechtnis = { werte: {}, zeit: {} };
+const STAMM_MS = 30000;
+
+async function stammGemerkt(schluessel, holen) {
+  const jetzt = Date.now();
+  if (stammGedaechtnis.werte[schluessel] !== undefined
+      && jetzt - (stammGedaechtnis.zeit[schluessel] || 0) < STAMM_MS) {
+    return stammGedaechtnis.werte[schluessel];
+  }
+  const wert = await holen();
+  stammGedaechtnis.werte[schluessel] = wert;
+  stammGedaechtnis.zeit[schluessel] = jetzt;
+  return wert;
+}
+
+// Nach jeder Änderung an Parks, Maschinen oder Typen
+function stammVergessen() {
+  stammGedaechtnis.werte = {};
+  stammGedaechtnis.zeit = {};
+}
+
 async function ladeParks(auchInaktive) {
+  return stammGemerkt("parks" + (auchInaktive ? "-alle" : ""),
+    () => ladeParksFrisch(auchInaktive));
+}
+
+async function ladeMaschinen(auchInaktive) {
+  return stammGemerkt("maschinen" + (auchInaktive ? "-alle" : ""),
+    () => ladeMaschinenFrisch(auchInaktive));
+}
+
+async function ladeParksFrisch(auchInaktive) {
   let a = db.from("machine_parks").select("*").order("name");
   if (!auchInaktive) a = a.eq("is_active", true);
   const { data, error } = await zeitlimit(a, 10000, "Maschinenparks");
@@ -6063,7 +6117,7 @@ async function ladeParks(auchInaktive) {
   return (data || []).filter((p) => parkErlaubt(p.id));
 }
 
-async function ladeMaschinen(auchInaktive) {
+async function ladeMaschinenFrisch(auchInaktive) {
   let a = db.from("machines").select("*").order("sort_order").order("name");
   if (!auchInaktive) a = a.eq("is_active", true);
   const { data, error } = await zeitlimit(a, 10000, "Maschinen");
@@ -6198,6 +6252,9 @@ async function speichereStand(maschineId, datum, stand, auftragId) {
 // ---------- Einstieg ----------
 
 async function seiteProduktion(b) {
+  // Ganz zuerst merken: gleich wird die Seite geleert, danach steht
+  // die Rollposition ohnehin auf null.
+  const zurueckRollen = rollenMerken();
   if (!prod.tag) prod.tag = isoDatum(new Date());
   if (!prod.modus) prod.modus = einstellung("wochestart") ? "woche"
     : (window.innerWidth < 780 ? "tag" : "woche");
@@ -6241,9 +6298,12 @@ async function seiteProduktion(b) {
   if (prod.ansicht === "fortschritt") {
     await ansichtFortschritt(ziel);
     reiterUebergang(ziel);
+    zurueckRollen();
     return;
   }
-  if (prod.ansicht === "hoco") { await ansichtHoco(ziel, b); reiterUebergang(ziel); return; }
+  if (prod.ansicht === "hoco") {
+    await ansichtHoco(ziel, b); reiterUebergang(ziel); zurueckRollen(); return;
+  }
   // Alter Verweis auf den eigenen Typen-Reiter
   if (prod.ansicht === "typen") prod.ansicht = "maschinen";
 
@@ -6281,6 +6341,7 @@ async function seiteProduktion(b) {
     else await ansichtMaschinen(unten, b, prod.parkReiter);
 
     reiterUebergang(ziel);
+    zurueckRollen();
     return;
   }
   // Übersicht gibt es nicht mehr; alter Verweis fällt auf Erfassen zurück
@@ -10472,6 +10533,10 @@ async function ansichtUebersicht(ziel, b) {
 // =================================================================
 
 async function ladeTypen() {
+  return stammGemerkt("typen", ladeTypenFrisch);
+}
+
+async function ladeTypenFrisch() {
   const { data, error } = await zeitlimit(
     db.from("machine_types").select("*").order("name"), 10000, "Maschinentypen");
   if (error) throw error;
@@ -10666,7 +10731,7 @@ async function ansichtTypen(ziel, b) {
     return;
   }
 
-  const neuLaden = () => { prod.typen = null; seiteProduktion(b); };
+  const neuLaden = () => { prod.typen = null; stammVergessen(); seiteProduktion(b); };
 
   // ----- Übersicht aller Typen -----
   if (!prod.typOffen) {
@@ -11136,12 +11201,14 @@ function padSchliessen() {
 }
 
 function padKopf(titel, zurueck) {
+  // Grosse Knöpfe statt eines schmalen Balkens mit Pfeilchen: an der
+  // Maschine wird mit Handschuhen getippt.
   return '<div class="pad__kopf">'
     + (zurueck
-        ? '<button class="pad__zurueck" data-padzurueck>‹</button>'
+        ? '<button class="pad__zurueck" data-padzurueck>‹ Zurück</button>'
         : '<span class="pad__zurueck pad__zurueck--leer"></span>')
     + '<span class="pad__titel">' + esc(titel) + '</span>'
-    + '<button class="pad__zu" data-padzu>✕</button>'
+    + '<button class="pad__zu" data-padzu>✕ Schliessen</button>'
     + '</div>';
 }
 
@@ -12935,7 +13002,7 @@ async function ansichtMaschinen(ziel, b, nurPark) {
   + (darf ? '<button class="knopf knopf--haupt knopf--breit" id="park-neu">+ Maschinenpark</button>' : "");
 
   if (!darf) return;
-  const neuLaden = () => seiteProduktion(b);
+  const neuLaden = () => { stammVergessen(); seiteProduktion(b); };
 
   document.getElementById("park-neu").onclick = async () => {
     const w = await dialogFelder({ titel: "Neuer Maschinenpark",
@@ -20926,6 +20993,30 @@ function auswahlMehrfach(titel, optionen) {
       zu(werte);
     };
   });
+}
+
+// Merkt sich, wie weit gerollt war, und stellt es nach dem Neuzeichnen
+// wieder her. Ohne das springt die Seite bei jeder Kleinigkeit nach
+// oben — auf dem Handy besonders lästig.
+function rollenMerken() {
+  const y = window.scrollY || 0;
+  // Der Inhalt kommt nachgeladen. Deshalb nicht einmal springen,
+  // sondern eine knappe halbe Sekunde lang nachhelfen, solange die
+  // Seite noch wächst.
+  const zurueck = (versuch) => {
+    if (document.body.scrollHeight >= y + window.innerHeight) window.scrollTo(0, y);
+    if (versuch < 12) setTimeout(() => zurueck(versuch + 1), 40);
+  };
+  const innen = [];
+  document.querySelectorAll(".pw-tafel, .dialog, .eb-rolle, #prod-inhalt, #park-inhalt")
+    .forEach((el) => { if (el.scrollTop || el.scrollLeft) innen.push([el, el.scrollTop, el.scrollLeft]); });
+  return () => {
+    if (!y) return;
+    zurueck(0);
+    innen.forEach(([el, t, l]) => {
+      if (document.body.contains(el)) { el.scrollTop = t; el.scrollLeft = l; }
+    });
+  };
 }
 
 function zeichneSeite() {
