@@ -3960,6 +3960,22 @@ body.dunkel .login input, body.dunkel .login select {
 /* Unterreiter für die Maschinenparks */
 .reiter--fein { margin: 4px 0 12px; gap: 4px; flex-wrap: wrap; }
 .reiter--fein .reiter__knopf { font-size: .88rem; padding: 6px 14px; }
+/* ---------- Konfigurator für das Werkzeugblatt ---------- */
+.dialog--layout { width: min(1500px, 97vw) !important; max-width: 97vw !important;
+                  max-height: 94vh; display: flex; flex-direction: column; }
+.layout-knoepfe { display: flex; gap: 8px; flex-wrap: wrap; }
+.layout-flaeche { flex: 1; min-height: 0; overflow: auto; margin-top: 8px; }
+.layout-blatt { background: #fff; padding: 10px !important; aspect-ratio: auto !important;
+                box-shadow: 0 2px 10px rgba(0,0,0,.12); }
+.layout-blatt .eb-karten { grid-auto-rows: 104px; }
+.layout-zelle { position: relative; }
+.layout-zelle--voll { cursor: grab; touch-action: none; user-select: none; }
+.layout-zelle--zieht { opacity: .4; }
+.layout-zelle--ziel { outline: 2px solid var(--marke); outline-offset: 1px; }
+.layout-nr { font-size: 9px; color: #c2cbd6; }
+@media (max-width: 900px) {
+  .layout-blatt .eb-karten { grid-template-columns: repeat(5, 1fr); }
+}
 </style>
 </head>
 <body>
@@ -4008,7 +4024,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "92.0.0";
+const APP_VERSION = "93.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -10769,6 +10785,7 @@ async function ansichtTypen(ziel, b) {
   ziel.innerHTML = '<button class="linkknopf" id="typ-zurueck">‹ alle Typen</button>'
     + '<section class="karte"><div class="karte__kopf"><h2>' + esc(typ.name) + '</h2>'
     + (darf ? '<div class="karte__aktionen">'
+        + '<button class="knopf knopf--klein" id="typ-layout">Werkzeugblatt anordnen</button>'
         + '<button class="knopf knopf--klein" id="path-neu">+ Path</button></div>' : "")
     + '</div>'
     + (typ.beschreibung ? '<p class="klein">' + esc(typ.beschreibung) + '</p>' : "")
@@ -10871,6 +10888,9 @@ async function ansichtTypen(ziel, b) {
 
   // Ein neuer Platz braucht nur seine Toolnummer. Wie sie geschrieben
   // wird, ist frei — die Reihenfolge ergibt sich danach von selbst.
+  const layoutKnopf = document.getElementById("typ-layout");
+  if (layoutKnopf) layoutKnopf.onclick = () => layoutFuerTyp(typ.id, typ.name).then(neuLaden);
+
   ziel.querySelectorAll("[data-platz-neu]").forEach((el) => {
     el.onclick = async () => {
       const p = paths.find((x) => x.id === el.dataset.platzNeu) || {};
@@ -12196,16 +12216,31 @@ function blattDruckAnsicht(blatt, zeilen, stamm, typName, maschine) {
   // auf volle Reihen, mindestens 24.
   // Mindestens 30 Plätze, aufgefüllt auf volle Reihen: 8 nebeneinander
   // mal 4 Reihen ergeben 32 Kacheln auf einem A4 quer.
+  // 30 Plätze, drei Reihen zu zehn. Jede Kachel sitzt dort, wo sie im
+  // Konfigurator hingeschoben wurde — die Position steht an platz_nr.
   const JE_REIHE = 10;
   const MINDESTENS = 30;
   const belegt = gruppen.reduce((n, g) => n + g.zeilen.length, 0);
-  const gesamt = Math.max(MINDESTENS, Math.ceil((belegt + JE_REIHE) / JE_REIHE) * JE_REIHE);
+  const gesamt = Math.max(MINDESTENS, Math.ceil(belegt / JE_REIHE) * JE_REIHE);
 
-  let kacheln = "";
+  const felder = new Array(gesamt).fill(null);
+  const rest = [];
   gruppen.forEach((g, i) => {
-    g.zeilen.forEach((z) => { kacheln += kachel(z, farbeVon(i)); });
+    g.zeilen.forEach((z) => {
+      const eintrag = { z: z, farbe: farbeVon(i) };
+      const pos = Number(z.platz_nr) || 0;
+      if (pos >= 1 && pos <= gesamt && !felder[pos - 1]) felder[pos - 1] = eintrag;
+      else rest.push(eintrag);
+    });
   });
-  for (let k = belegt; k < gesamt; k++) kacheln += kachel(null, "#5c6673");
+  // Was keine eigene Position hat, füllt die Lücken der Reihe nach
+  rest.forEach((e) => {
+    const frei = felder.indexOf(null);
+    if (frei !== -1) felder[frei] = e;
+  });
+
+  const kacheln = felder
+    .map((e) => (e ? kachel(e.z, e.farbe) : kachel(null, "#5c6673"))).join("");
 
   return '<div class="eb-blatt eb-blatt--quer" id="eb-druck">'
     + '<div class="eb-kopf">'
@@ -12249,6 +12284,235 @@ function blattDruckAnsicht(blatt, zeilen, stamm, typName, maschine) {
 
 // Zeigt das Blatt als Druckansicht in einem Fenster. Wird im Pad Mode
 // benutzt und lässt sich von dort direkt ausdrucken.
+// =================================================================
+//  BLATT-KONFIGURATOR
+//  Zeigt das Werkzeugblatt als A4 quer mit 30 Plätzen. Jede Kachel
+//  lässt sich auf einen anderen Platz ziehen — mit der Maus sofort,
+//  am Tablet nach kurzem Halten. Gespeichert wird die Position an
+//  platz_nr, entweder am Maschinentyp (Vorlage) oder an einem
+//  einzelnen Einrichtblatt (Ausnahme für dieses Teil).
+// =================================================================
+
+async function blattLayoutFenster({ titel, unter, laden, speichern }) {
+  const huelle = document.createElement("div");
+  huelle.className = "dialog-huelle";
+  huelle.innerHTML = '<div class="dialog dialog--layout">'
+    + '<div class="blatt__kopf"><div><h2>' + esc(titel) + '</h2>'
+    + (unter ? '<span class="klein">' + esc(unter) + '</span>' : "")
+    + '</div><div class="layout-knoepfe">'
+    + '<button class="knopf knopf--klein" data-auto>Nach Toolnummer ordnen</button>'
+    + '<button class="knopf knopf--klein knopf--haupt" data-speichern>Speichern</button>'
+    + '<button class="knopf knopf--klein knopf--still" data-zu>Schliessen</button>'
+    + '</div></div>'
+    + '<p class="klein">Kachel greifen und auf einen anderen Platz ziehen. '
+    + 'Mit der Maus sofort, am Tablet nach kurzem Halten.</p>'
+    + '<div class="layout-flaeche" id="layout-flaeche">'
+    + '<div class="laedt">Wird geladen …</div></div></div>';
+  document.body.appendChild(huelle);
+
+  const kasten = huelle.querySelector(".dialog");
+  const zu = () => huelle.remove();
+  kasten.querySelector("[data-zu]").onclick = zu;
+  dialogSchliessen(huelle, zu);
+
+  const JE_REIHE = 10;
+  let felder = [];          // Array von 30+ Plätzen, je null oder eine Kachel
+
+  try {
+    const plaetze = await laden();
+    const gesamt = Math.max(30, Math.ceil(plaetze.length / JE_REIHE) * JE_REIHE);
+    felder = new Array(gesamt).fill(null);
+    const rest = [];
+    plaetze.forEach((k) => {
+      const pos = Number(k.position) || 0;
+      if (pos >= 1 && pos <= gesamt && !felder[pos - 1]) felder[pos - 1] = k;
+      else rest.push(k);
+    });
+    rest.forEach((k) => {
+      const frei = felder.indexOf(null);
+      if (frei !== -1) felder[frei] = k;
+    });
+  } catch (f) {
+    kasten.querySelector("#layout-flaeche").innerHTML =
+      '<p class="hinweis">' + esc(fehlertext(f)) + '</p>';
+    return;
+  }
+
+  const zeichnen = () => {
+    const flaeche = kasten.querySelector("#layout-flaeche");
+    flaeche.innerHTML = '<div class="eb-blatt eb-blatt--quer layout-blatt">'
+      + '<div class="eb-karten">'
+      + felder.map((k, i) => '<div class="eb-karte layout-zelle'
+          + (k ? " layout-zelle--voll" : " eb-karte--frei") + '" data-platz="' + i + '">'
+          + '<div class="eb-karte__kopf"'
+          + (k ? ' style="background:' + k.farbe + '"' : "") + '>'
+          + esc(k ? (k.tool || "") : "") + '</div>'
+          + '<div class="eb-karte__bild"><span class="layout-nr">' + (i + 1) + '</span></div>'
+          + '<div class="eb-karte__zeile">' + esc(k ? (k.lieferant || "") : "") + '</div>'
+          + '<div class="eb-karte__zeile eb-karte__zeile--letzte">'
+          + esc(k ? (k.artNr || "") : "") + '</div>'
+          + '</div>').join("")
+      + '</div></div>';
+    ziehenBinden();
+  };
+
+  // ----- Ziehen -----
+  function ziehenBinden() {
+    kasten.querySelectorAll(".layout-zelle--voll").forEach((el) => {
+      let halten = null, zieht = false, art = "mouse", startX = 0, startY = 0;
+      let schatten = null, markiert = null;
+
+      const loesen = () => {
+        document.removeEventListener("pointermove", bewegen, true);
+        document.removeEventListener("pointerup", loslassen, true);
+        document.removeEventListener("pointercancel", abbrechen, true);
+      };
+      const aufraeumen = () => {
+        clearTimeout(halten);
+        if (schatten) { schatten.remove(); schatten = null; }
+        if (markiert) { markiert.classList.remove("layout-zelle--ziel"); markiert = null; }
+        el.classList.remove("layout-zelle--zieht");
+        zieht = false;
+        loesen();
+      };
+      const zelleUnter = (e) => {
+        el.style.pointerEvents = "none";
+        const t = document.elementFromPoint(e.clientX, e.clientY);
+        el.style.pointerEvents = "";
+        return t && t.closest(".layout-zelle");
+      };
+      const anheben = (e) => {
+        if (zieht) return;
+        zieht = true;
+        el.classList.add("layout-zelle--zieht");
+        schatten = document.createElement("div");
+        schatten.className = "platz-schatten";
+        schatten.textContent = el.querySelector(".eb-karte__kopf").textContent;
+        document.body.appendChild(schatten);
+        schatten.style.left = e.clientX + "px";
+        schatten.style.top = e.clientY + "px";
+      };
+      function bewegen(e) {
+        if (!zieht) {
+          const weit = Math.abs(e.clientX - startX) > 6 || Math.abs(e.clientY - startY) > 6;
+          if (!weit) return;
+          if (art === "touch") { aufraeumen(); return; }
+          anheben(e);
+        }
+        e.preventDefault();
+        schatten.style.left = e.clientX + "px";
+        schatten.style.top = e.clientY + "px";
+        const ziel = zelleUnter(e);
+        if (markiert && markiert !== ziel) { markiert.classList.remove("layout-zelle--ziel"); markiert = null; }
+        if (ziel && ziel !== el) { ziel.classList.add("layout-zelle--ziel"); markiert = ziel; }
+      }
+      function loslassen(e) {
+        if (!zieht) { aufraeumen(); return; }
+        const ziel = zelleUnter(e);
+        aufraeumen();
+        zuletztGezogen = Date.now();
+        if (!ziel || ziel === el) return;
+        const von = Number(el.dataset.platz);
+        const nach = Number(ziel.dataset.platz);
+        // Tausch: die Zielkachel geht dorthin, wo die gezogene herkam
+        const merk = felder[nach];
+        felder[nach] = felder[von];
+        felder[von] = merk;
+        zeichnen();
+      }
+      function abbrechen() { aufraeumen(); }
+
+      el.addEventListener("pointerdown", (e) => {
+        if (e.button !== undefined && e.button !== 0) return;
+        art = e.pointerType || "mouse";
+        startX = e.clientX; startY = e.clientY;
+        document.addEventListener("pointermove", bewegen, true);
+        document.addEventListener("pointerup", loslassen, true);
+        document.addEventListener("pointercancel", abbrechen, true);
+        if (art === "touch") halten = setTimeout(() => anheben(e), 380);
+      });
+    });
+  }
+
+  zeichnen();
+
+  // Nach Toolnummer ordnen — der schnelle Weg zu einem sauberen Blatt
+  kasten.querySelector("[data-auto]").onclick = () => {
+    const voll = felder.filter((k) => k).slice()
+      .sort((a, b) => toolVergleich(a.tool, b.tool));
+    felder = felder.map(() => null);
+    voll.forEach((k, i) => { felder[i] = k; });
+    zeichnen();
+  };
+
+  kasten.querySelector("[data-speichern]").onclick = async () => {
+    const stand = [];
+    felder.forEach((k, i) => { if (k) stand.push({ id: k.id, position: i + 1 }); });
+    try {
+      await speichern(stand);
+      meldung("Anordnung gespeichert.");
+      zu();
+    } catch (f) { meldung(fehlertext(f), "fehler"); }
+  };
+}
+
+// Vorlage eines Maschinentyps: alle Werkzeugplätze aller Paths
+async function layoutFuerTyp(typId, typName) {
+  await blattLayoutFenster({
+    titel: "Werkzeugblatt-Vorlage",
+    unter: typName || "",
+    laden: async () => {
+      const paths = await ladeTypAufbau(typId);
+      const raus = [];
+      paths.forEach((p, pi) => {
+        (p.type_slots || []).forEach((sl) => {
+          raus.push({ id: sl.id, tool: sl.tool_nr || "", farbe: pathFarbe(pi),
+                      lieferant: "", artNr: "", position: Number(sl.platz_nr) || 0 });
+        });
+      });
+      return raus;
+    },
+    speichern: async (stand) => {
+      for (const e of stand) {
+        const r = await db.from("type_slots")
+          .update({ platz_nr: e.position }).eq("id", e.id);
+        if (r.error) throw r.error;
+      }
+    },
+  });
+}
+
+// Einzelnes Einrichtblatt: gilt nur für dieses Teil auf diesem Typ
+async function layoutFuerBlatt(blatt, titelZusatz) {
+  await blattLayoutFenster({
+    titel: "Werkzeugblatt anordnen",
+    unter: titelZusatz || "",
+    laden: async () => {
+      const zeilen = await ladeBlattZeilen(blatt.id);
+      const pfade = [];
+      zeilen.forEach((z) => {
+        const n = z.path_name || "ohne Path";
+        if (pfade.indexOf(n) === -1) pfade.push(n);
+      });
+      return zeilen.map((z) => ({
+        id: z.id,
+        tool: z.tool_nr || "",
+        farbe: pathFarbe(pfade.indexOf(z.path_name || "ohne Path")),
+        lieferant: z.hersteller || "",
+        artNr: z.articles ? z.articles.article_number : (z.werkzeug || ""),
+        position: Number(z.platz_nr) || 0,
+      }));
+    },
+    speichern: async (stand) => {
+      for (const e of stand) {
+        const r = await db.from("setup_sheet_slots")
+          .update({ platz_nr: e.position }).eq("id", e.id);
+        if (r.error) throw r.error;
+      }
+    },
+  });
+}
+
 async function blattDruckFenster(blatt) {
   const huelle = document.createElement("div");
   huelle.className = "dialog-huelle";
@@ -12471,6 +12735,8 @@ async function blattFenster(blatt, nurLesen) {
     kasten.innerHTML = '<div class="blatt__kopf">'
       + '<h2>Einrichtblatt ' + esc(blatt.hoco_nr || "") + '</h2>'
       + '<span class="marke">' + esc(typName) + '</span>'
+      + (darf ? '<button class="knopf knopf--klein" data-layout>Blatt anordnen</button>' : "")
+      + '<button class="knopf knopf--klein" data-drucken2>Drucken</button>'
       + '<button class="knopf knopf--still" data-zu>Schliessen</button>'
       + '</div>'
 
@@ -12536,6 +12802,13 @@ async function blattFenster(blatt, nurLesen) {
                 + 'Werkzeugplätze vom Typ holen</button>' : ""));
 
     kasten.querySelector("[data-zu]").onclick = zu;
+
+    const layoutK = kasten.querySelector("[data-layout]");
+    if (layoutK) layoutK.onclick = () =>
+      layoutFuerBlatt(blatt, (blatt.hoco_nr || "") + " · " + (typName || "")).then(zeichnen);
+
+    const druckK = kasten.querySelector("[data-drucken2]");
+    if (druckK) druckK.onclick = () => blattDruckFenster(blatt);
 
     // Plätze im Blatt umordnen — genau wie beim Maschinentyp, nur
     // dass es hier bloss dieses eine Blatt betrifft.
