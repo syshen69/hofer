@@ -3899,6 +3899,64 @@ body.dunkel .login input, body.dunkel .login select {
 @media (min-width: 900px) {
   .kopf__rueck { display: none !important; }
 }
+/* ---------- Solaranlage: flach, klar, mit Tagesverlauf ----------
+   Die Anzeige nimmt deutlich weniger Höhe ein: Werte und
+   Eigenverbrauch stehen in einer Zeile, darunter der Verlauf. */
+.solar--schmal { padding: 12px 16px 10px !important; }
+.sol-kopf { display: flex; align-items: baseline; justify-content: space-between;
+            margin-bottom: 8px; }
+.sol-kopf__titel { font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+                   font-size: .72rem; color: #cfe0f5; }
+.sol-kopf__stand { font-size: .68rem; letter-spacing: .1em; text-transform: uppercase;
+                   color: #6ee7a8; }
+
+.sol-reihe { display: grid; grid-template-columns: repeat(3, 1fr) auto; gap: 10px;
+             align-items: center; }
+.sol-zahl { display: flex; flex-direction: column; gap: 1px; padding: 6px 10px;
+            border-left: 2px solid rgba(255,255,255,.18); }
+.sol-zahl__name { font-size: .62rem; letter-spacing: .12em; text-transform: uppercase;
+                  color: #8fa6c6; }
+.sol-zahl__wert { font-size: 1.32rem; font-weight: 800; line-height: 1.1;
+                  font-variant-numeric: tabular-nums; }
+.sol-zahl--prod { border-left-color: #ffc940; }
+.sol-zahl--prod .sol-zahl__wert { color: #ffd463; text-shadow: 0 0 18px rgba(255,201,64,.35); }
+.sol-zahl--verb { border-left-color: #7fb2ff; }
+.sol-zahl--verb .sol-zahl__wert { color: #a9c9ff; }
+.sol-zahl--bezug { border-left-color: #ff6b5e; }
+.sol-zahl--bezug .sol-zahl__wert { color: #ff8e83; }
+.sol-zahl--speisung { border-left-color: #3ddc84; }
+.sol-zahl--speisung .sol-zahl__wert { color: #6ee7a8; }
+
+.sol-ring--klein { width: 62px !important; height: 62px !important; margin: 0 !important;
+                   position: relative; }
+.sol-ring--klein .sol-ring__spur { stroke-width: 5; }
+.sol-ring--klein .sol-ring__voll { stroke-width: 5; filter: drop-shadow(0 0 5px rgba(255,201,64,.6)); }
+.sol-ring--klein .sol-ring__zahl { font-size: .95rem !important; }
+.sol-ring__unten { position: absolute; left: 0; right: 0; bottom: -13px; text-align: center;
+                   font-size: .58rem; letter-spacing: .12em; text-transform: uppercase;
+                   color: #8fa6c6; }
+
+.sol-verlauf { margin: 14px 0 6px; }
+.sol-verlauf svg { width: 100%; height: 96px; display: block; overflow: visible; }
+.sol-gitter { stroke: rgba(255,255,255,.07); stroke-width: 1; }
+.sol-flaeche { fill: url(#solFuellung); stroke: none; }
+.sol-kurve { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round;
+             vector-effect: non-scaling-stroke; }
+.sol-kurve--prod { stroke: #ffc940; filter: drop-shadow(0 0 4px rgba(255,201,64,.5)); }
+.sol-kurve--verb { stroke: #7fb2ff; stroke-dasharray: 4 3; }
+.sol-verlauf__achse { display: flex; justify-content: space-between; margin-top: 2px;
+                      font-size: .6rem; letter-spacing: .1em; text-transform: uppercase;
+                      color: #7c8ea8; }
+.sol-verlauf__mitte { color: #61728c; }
+
+.solar--schmal .solar-tag { margin-top: 6px; gap: 8px; }
+.solar--schmal .solar-tag div { padding: 6px 10px; font-size: .84rem; }
+@media (max-width: 700px) {
+  .sol-reihe { grid-template-columns: repeat(3, 1fr); }
+  .sol-ring--klein { grid-column: 1 / -1; margin: 6px auto 12px !important; }
+  .sol-zahl__wert { font-size: 1.05rem; }
+  .sol-verlauf svg { height: 78px; }
+}
 </style>
 </head>
 <body>
@@ -3947,7 +4005,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "90.0.0";
+const APP_VERSION = "91.0.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -4930,6 +4988,57 @@ function solarFluss(j) {
     + '</div>';
 }
 
+// Verlauf des Tages als Flächengrafik: Erzeugung gefüllt, Verbrauch
+// als Linie darüber. Gezeichnet wird als SVG, ohne fremde Bibliothek.
+function solarVerlauf(reihe) {
+  const punkte = (reihe || []).filter((x) => x && x.gemessen);
+  if (punkte.length < 2) return "";
+
+  const B = 600, H = 120;                       // Zeichenfläche
+  const zeit = (x) => new Date(x.gemessen).getTime();
+  const t0 = zeit(punkte[0]), t1 = zeit(punkte[punkte.length - 1]);
+  const spanne = Math.max(1, t1 - t0);
+  const gross = Math.max(1000,
+    ...punkte.map((x) => Math.max(Number(x.produktion_w) || 0, Number(x.verbrauch_w) || 0)));
+
+  const x = (p) => ((zeit(p) - t0) / spanne) * B;
+  const y = (w) => H - ((Number(w) || 0) / gross) * (H - 6) - 3;
+
+  const linie = (feld) => punkte
+    .map((p, i) => (i ? "L" : "M") + x(p).toFixed(1) + " " + y(p[feld]).toFixed(1))
+    .join(" ");
+
+  const flaeche = linie("produktion_w")
+    + " L" + B + " " + H + " L0 " + H + " Z";
+
+  // Stundenraster, damit man die Tageszeit einordnen kann
+  const striche = [];
+  for (let k = 1; k < 6; k++) {
+    const px = (B / 6) * k;
+    striche.push('<line x1="' + px + '" y1="0" x2="' + px + '" y2="' + H
+      + '" class="sol-gitter"/>');
+  }
+
+  const vonU = uhrzeit(punkte[0].gemessen);
+  const bisU = uhrzeit(punkte[punkte.length - 1].gemessen);
+
+  return '<div class="sol-verlauf">'
+    + '<svg viewBox="0 0 ' + B + ' ' + H + '" preserveAspectRatio="none">'
+    + '<defs><linearGradient id="solFuellung" x1="0" y1="0" x2="0" y2="1">'
+    + '<stop offset="0%" stop-color="#ffc940" stop-opacity=".55"/>'
+    + '<stop offset="100%" stop-color="#ffc940" stop-opacity="0"/>'
+    + '</linearGradient></defs>'
+    + striche.join("")
+    + '<path d="' + flaeche + '" class="sol-flaeche"/>'
+    + '<path d="' + linie("produktion_w") + '" class="sol-kurve sol-kurve--prod"/>'
+    + '<path d="' + linie("verbrauch_w") + '" class="sol-kurve sol-kurve--verb"/>'
+    + '</svg>'
+    + '<div class="sol-verlauf__achse"><span>' + esc(vonU) + '</span>'
+    + '<span class="sol-verlauf__mitte">Erzeugung · Verbrauch</span>'
+    + '<span>' + esc(bisU) + '</span></div>'
+    + '</div>';
+}
+
 function uhrzeit(iso) {
   try {
     return new Date(iso).toLocaleTimeString("de-CH",
@@ -4967,11 +5076,44 @@ async function solarKachel(ziel) {
   const sek = Math.round((Date.now() - new Date(j.gemessen).getTime()) / 1000);
   const alt = Math.round(sek / 60);
 
-  ziel.innerHTML = '<section class="karte solar">'
-    + '<div class="karte__kopf"><h2>Solaranlage</h2>'
-    + '<span class="klein">' + (alt < 2 ? "gerade eben"
-        : "vor " + alt + " Min.") + '</span></div>'
-    + solarFluss(j)
+  const prod = Number(j.produktion_w) || 0;
+  const verb = Number(j.verbrauch_w) || 0;
+  const netz = Number(j.netz_w) || 0;
+  const bezug = netz > 0;
+  const eigen = Math.max(0, Math.min(prod, verb));
+  const anteil = verb > 0 ? Math.round((eigen / verb) * 100) : 0;
+  const ring = 2 * Math.PI * 26;
+  const gefuellt = (ring * Math.min(100, anteil)) / 100;
+
+  const zahl = (wert, name, art) => '<div class="sol-zahl sol-zahl--' + art + '">'
+    + '<span class="sol-zahl__name">' + name + '</span>'
+    + '<span class="sol-zahl__wert">' + solarKw(wert) + '</span></div>';
+
+  ziel.innerHTML = '<section class="karte solar solar--schmal">'
+    + '<div class="sol-kopf">'
+    + '<span class="sol-kopf__titel">Solaranlage</span>'
+    + '<span class="sol-kopf__stand">' + (alt < 2 ? "live" : "vor " + alt + " Min.") + '</span>'
+    + '</div>'
+
+    // Werte und Eigenverbrauch in einer Zeile
+    + '<div class="sol-reihe">'
+    + zahl(prod, "Erzeugung", "prod")
+    + zahl(verb, "Verbrauch", "verb")
+    + zahl(Math.abs(netz), bezug ? "Netzbezug" : "Einspeisung", bezug ? "bezug" : "speisung")
+    + '<div class="sol-ring sol-ring--klein">'
+    + '<svg viewBox="0 0 64 64">'
+    + '<circle cx="32" cy="32" r="26" class="sol-ring__spur"/>'
+    + '<circle cx="32" cy="32" r="26" class="sol-ring__voll"'
+    + ' stroke-dasharray="' + gefuellt.toFixed(1) + ' ' + ring.toFixed(1) + '"/>'
+    + '</svg>'
+    + '<div class="sol-ring__mitte"><span class="sol-ring__zahl">' + anteil
+    + '<small>%</small></span></div>'
+    + '<span class="sol-ring__unten">Eigen</span>'
+    + '</div>'
+    + '</div>'
+
+    + solarVerlauf(reihe)
+
     + '<div class="solar-tag">'
     + (j.ertrag_tag_kwh !== null && j.ertrag_tag_kwh !== undefined
         ? '<div><span>Ertrag heute</span>'
