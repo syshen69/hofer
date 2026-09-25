@@ -4008,6 +4008,137 @@ input[type="month"], input[type="week"] {
   max-width: 100%; min-width: 0; box-sizing: border-box;
 }
 .karte, .dialog, .feld { min-width: 0; }
+/* ---------- Pad Mode: Dashboard ---------- */
+.pad-flaeche { flex: 1; min-height: 0; display: grid; gap: 10px;
+               grid-template-columns: 4fr 5fr 3fr; }
+.pad-spalte { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.pad-karte2 { border-radius: 20px; padding: 13px 16px; display: flex;
+              flex-direction: column; position: relative; overflow: hidden;
+              min-height: 0; background: #101b2e;
+              border: 1px solid rgba(255,255,255,.07); }
+.pad-name { font-size: .6rem; letter-spacing: .16em; text-transform: uppercase;
+            color: #8fa6c6; }
+.pad-wert { font-size: 1.6rem; font-weight: 800; line-height: 1.1; margin-top: 2px; }
+.pad-wert--gross { font-size: 2.2rem; }
+.pad-wert--rot { color: #ff8e83; }
+.pad-wert small { font-size: .78rem; font-weight: 600; color: #9fb3ce; }
+.pad-leer { font-size: .95rem; font-weight: 600; color: #7f97b5; }
+.pad-karte2--hoco { flex: 1 1 auto;
+                    background: linear-gradient(150deg, #16263e, #0c1524); }
+.pad-karte2--abend { flex: none; background: linear-gradient(140deg, #14395f, #0d2138); }
+.pad-karte2--verzug { flex: none; }
+.pad-zeilen { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px;
+              margin-top: 10px; font-size: .84rem; align-content: start; }
+.pad-zeilen b { color: #8fa6c6; font-weight: 600; }
+.pad-notiz { margin-top: 10px; background: rgba(255,255,255,.05);
+             border: 1px dashed rgba(255,255,255,.18); border-radius: 13px;
+             padding: 9px 11px; }
+.pad-notiz p { margin: 0; font-size: .86rem; line-height: 1.3; color: #dce8f8; }
+.pad-notiz p + p { margin-top: 5px; }
+.pad-notiz--material { color: #bcd4ef; }
+
+.pad-karte2--stk { flex: 1; background: linear-gradient(150deg, #1a5aa8, #0c2749);
+                   border-color: #2c6fbf55; }
+.pad-stk-kopf { display: flex; align-items: flex-end; gap: 14px; }
+.pad-stk-zahl { font-size: 3.1rem; font-weight: 800; line-height: 1; }
+.pad-stk-neben { display: flex; flex-direction: column; gap: 1px;
+                 padding-bottom: 5px; font-size: .82rem; color: #cfe0f5; }
+.pad-tage { flex: 1; display: flex; align-items: flex-end; gap: 8px;
+            margin-top: 12px; min-height: 0; }
+.pad-tag { flex: 1; display: flex; flex-direction: column; align-items: center;
+           gap: 3px; height: 100%; justify-content: flex-end; }
+.pad-tag b { font-size: .78rem; font-weight: 800; }
+.pad-tag i { width: 100%; border-radius: 6px 6px 0 0; background: rgba(255,255,255,.28); }
+.pad-tag--heute i { background: #7fc0ff; }
+.pad-tag u { text-decoration: none; font-size: .62rem; color: #b3ccea; }
+.pad-tag small { font-size: .58rem; color: #8fb2d8; }
+.pad-stk-fuss { display: flex; justify-content: space-between; margin-top: 8px;
+                font-size: .78rem; color: #bcd4ef; }
+
+.pad-karte2--saeule { flex: 1; gap: 8px;
+                      background: linear-gradient(165deg, #10283f, #091626); }
+.pad-uhrblock { display: flex; align-items: flex-start; justify-content: space-between;
+                gap: 10px; }
+.pad-wtag { font-size: 1.05rem; font-weight: 800; }
+.pad-uhr { font-size: 2.3rem; font-weight: 800; line-height: 1.05; }
+.pad-wdatum { font-size: .78rem; color: #b8cbe6; }
+.pad-wetterblock { display: flex; flex-direction: column; align-items: flex-end;
+                   gap: 1px; text-align: right; }
+.pad-wzeichen { font-size: 1.6rem; }
+.pad-grad { font-size: 1.7rem; font-weight: 800; line-height: 1; }
+.pad-ort { font-size: .56rem; letter-spacing: .1em; text-transform: uppercase;
+           color: #8fa6c6; line-height: 1.3; }
+.pad-stunden { display: flex; gap: 6px; }
+.pad-stunden div { flex: 1; background: rgba(255,255,255,.05); border-radius: 11px;
+                   padding: 6px 3px; display: flex; flex-direction: column;
+                   align-items: center; gap: 1px; }
+.pad-stunden b { font-size: .64rem; color: #9fb3ce; font-weight: 600; }
+.pad-stunden i { font-style: normal; font-size: 1.05rem; }
+.pad-stunden u { text-decoration: none; font-size: .78rem; font-weight: 700; }
+.pad-klein { font-size: .72rem; color: #9fb3ce; }
+.pad-linie { height: 1px; background: rgba(255,255,255,.1); margin: 2px 0; }
+.pad-danach { display: flex; flex-direction: column; gap: 5px; }
+.pad-danach__zeile { display: flex; justify-content: space-between; gap: 8px;
+                     font-size: .82rem; padding: 6px 9px; border-radius: 10px;
+                     background: rgba(255,255,255,.05); }
+.pad-danach__zeile b { font-weight: 700; }
+.pad-danach__zeile span { color: #9fb3ce; }
+
+.pad-knoepfe { display: grid; grid-template-columns: 1.15fr 1fr 1.3fr 1.45fr 1.5fr;
+               gap: 10px; flex: none; margin-top: 10px; }
+.pad-knopf { border-radius: 16px; height: 78px; display: flex; align-items: center;
+             justify-content: center; font-size: 1.04rem; font-weight: 700;
+             border: 1px solid rgba(255,255,255,.12); color: #eef4ff; cursor: pointer; }
+.pad-knopf--zeichnung { background: linear-gradient(140deg, #1d4f8c, #12365f); }
+.pad-knopf--wbg { background: linear-gradient(140deg, #4a3480, #2d1f55); }
+.pad-knopf--blatt { background: linear-gradient(140deg, #0f5e63, #0a3f43); }
+.pad-knopf--wz { background: linear-gradient(140deg, #8a4a12, #5a2f0b); }
+.pad-knopf--zustand { background: linear-gradient(140deg, #17843f, #0d5226);
+                      font-size: 1.16rem; }
+.pad-knopf--zustand.pad-zustand--geplant { background: linear-gradient(140deg, #384657, #232d3a); }
+.pad-knopf--zustand.pad-zustand--ruesten { background: linear-gradient(140deg, #8a5a12, #5a3a0b); }
+.pad-knopf--zustand.pad-zustand--qs { background: linear-gradient(140deg, #4a3480, #2d1f55); }
+.pad-knopf--start { background: linear-gradient(140deg, #1d4f8c, #12365f); }
+.pad-knopf--leer { opacity: .45; }
+
+@media (max-width: 1000px) {
+  .pad-flaeche { grid-template-columns: 1fr 1fr; }
+  .pad-flaeche .pad-spalte:last-child { grid-column: 1 / -1; }
+  .pad-knoepfe { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 640px) {
+  .pad-flaeche { grid-template-columns: 1fr; }
+  .pad-knoepfe { grid-template-columns: repeat(2, 1fr); }
+  .pad-stk-zahl { font-size: 2.2rem; }
+}
+/* Kopfzeile des Dashboards: Logo links, dann Zurück, Titel, Schliessen */
+.pad__kopf--dash { gap: 12px !important; }
+.pad__logo2 { height: 34px; width: auto; flex: none; filter: brightness(0) invert(1);
+              opacity: .92; }
+@media (max-width: 760px) { .pad__logo2 { height: 26px; } }
+/* Kopfzeile im Werkzeugwechsel: Titel links, Historie rechts */
+.wz-kopf { display: flex; align-items: center; justify-content: space-between;
+           gap: 12px; margin-bottom: 4px; }
+.wz-kopf h2 { margin: 0; }
+/* Kameras auf der Startseite */
+.kamera-reihe { display: flex; flex-wrap: wrap; gap: 10px; }
+.kamera-knopf { display: inline-flex; align-items: center; gap: 8px;
+                text-decoration: none; }
+.kamera-knopf__zeichen { font-size: 1.1rem; }
+/* Kameraseite */
+.kamera-gitter { display: grid; gap: 14px;
+                 grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+.kamera-karte { display: flex; flex-direction: column; }
+.kamera-bild { position: relative; aspect-ratio: 16 / 9; border-radius: 12px;
+               overflow: hidden; background: #0d1622; display: flex;
+               align-items: center; justify-content: center; }
+.kamera-bild iframe { width: 100%; height: 100%; border: 0; display: block; }
+.kamera-bild--zu { flex-direction: column; gap: 6px; text-decoration: none;
+                   color: #cfe0f5; padding: 18px; text-align: center; cursor: pointer; }
+.kamera-bild--zu:hover { background: #142033; }
+.kamera-bild__zeichen { font-size: 2.2rem; }
+.kamera-bild__text { font-size: 1rem; font-weight: 700; }
+.kamera-bild__klein { font-size: .78rem; color: #8fa6c6; max-width: 34ch; line-height: 1.35; }
 </style>
 </head>
 <body>
@@ -4056,7 +4187,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "96.1.0";
+const APP_VERSION = "98.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -4916,6 +5047,178 @@ async function holeWetter() {
     hoch: Math.round(d.daily.temperature_2m_max[0]),
     tief: Math.round(d.daily.temperature_2m_min[0]),
   };
+}
+
+// Wetter samt Stundenverlauf — für die Säule im Pad Mode
+async function holeWetterStunden() {
+  const adresse = "https://api.open-meteo.com/v1/forecast"
+    + "?latitude=" + ORT.lat + "&longitude=" + ORT.lon
+    + "&current=temperature_2m,weather_code"
+    + "&hourly=temperature_2m,weather_code"
+    + "&daily=sunset&timezone=Europe%2FZurich&forecast_days=1";
+
+  const antwort = await zeitlimit(fetch(adresse), 6000, "Wetter");
+  if (!antwort.ok) throw new Error("Wetterdienst antwortet nicht");
+  const d = await antwort.json();
+
+  const jetzt = new Date();
+  const stunden = [];
+  (d.hourly.time || []).forEach((zeit, i) => {
+    const t = new Date(zeit);
+    if (t <= jetzt || stunden.length >= 5) return;
+    stunden.push({
+      stunde: String(t.getHours()).padStart(2, "0"),
+      grad: Math.round(d.hourly.temperature_2m[i]),
+      code: d.hourly.weather_code[i],
+    });
+  });
+
+  return {
+    temperatur: Math.round(d.current.temperature_2m),
+    code: d.current.weather_code,
+    text: WETTER_TEXT[d.current.weather_code] || "",
+    stunden: stunden,
+    untergang: (d.daily && d.daily.sunset && d.daily.sunset[0] || "").slice(11, 16),
+  };
+}
+
+// Zeichen zum Wettercode — grob, aber auf einen Blick verständlich
+function wetterZeichen(code) {
+  if (code === 0) return "☀";
+  if (code === 1 || code === 2) return "⛅";
+  if (code === 3) return "☁";
+  if (code >= 45 && code <= 48) return "🌫";
+  if (code >= 51 && code <= 57) return "🌦";
+  if (code >= 61 && code <= 67) return "🌧";
+  if (code >= 71 && code <= 77) return "🌨";
+  if (code >= 80 && code <= 82) return "🌦";
+  if (code >= 85 && code <= 86) return "🌨";
+  if (code >= 95) return "⛈";
+  return "⛅";
+}
+
+// Was an den letzten sieben Tagen gefertigt wurde, samt Uhrzeit der
+// Erfassung. Gezählt wird die Zunahme gegenüber dem Vortag, weil in
+// den Zählerständen der Stand und nicht die Tagesmenge steht.
+async function padTagesleistung(maschineId) {
+  const bis = new Date();
+  const von = new Date(bis.getTime() - 9 * 86400000);
+  let zeilen = [];
+  try {
+    const r = await db.from("production_records")
+      .select("record_date, quantity, job_id, updated_at, created_at")
+      .eq("machine_id", maschineId)
+      .gte("record_date", isoDatum(von))
+      .order("record_date");
+    zeilen = (r && r.data) || [];
+  } catch (f) { return []; }
+
+  // je Tag der jüngste Stand
+  const jeTag = {};
+  zeilen.forEach((z) => {
+    const alt = jeTag[z.record_date];
+    const zeit = z.updated_at || z.created_at || "";
+    if (!alt || String(zeit) > String(alt.zeit)) {
+      jeTag[z.record_date] = { stand: Number(z.quantity) || 0, zeit: zeit, job: z.job_id };
+    }
+  });
+
+  const tage = [];
+  for (let k = 6; k >= 0; k--) {
+    const d = new Date(bis.getTime() - k * 86400000);
+    const tag = isoDatum(d);
+    const e = jeTag[tag] || null;
+    tage.push({ datum: tag, wochentag: ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"][d.getDay()],
+                nummer: d.getDate(), eintrag: e, heute: k === 0 });
+  }
+
+  // Zunahme gegenüber dem letzten Tag mit Stand desselben Auftrags
+  let vorher = null;
+  tage.forEach((t) => {
+    if (!t.eintrag) { t.menge = null; return; }
+    t.menge = (vorher && vorher.job === t.eintrag.job)
+      ? Math.max(0, t.eintrag.stand - vorher.stand)
+      : t.eintrag.stand;
+    t.uhr = (t.eintrag.zeit || "").slice(11, 16);
+    vorher = t.eintrag;
+  });
+  return tage;
+}
+
+// Was danach auf dieser Maschine eingeplant ist
+async function padNaechsteAuftraege(maschineId, ausserId) {
+  try {
+    const r = await db.from("jobs")
+      .select("id, job_number, planned_from, target_quantity")
+      .eq("machine_id", maschineId).is("ended_at", null)
+      .not("planned_from", "is", null)
+      .neq("plan_status", "fertig")
+      .order("planned_from").limit(6);
+    return ((r && r.data) || []).filter((x) => x.id !== ausserId).slice(0, 4);
+  } catch (f) { return []; }
+}
+
+// Kameras: Name und Adresse stehen in den Einstellungen, je Zeile
+// eine, getrennt durch einen senkrechten Strich. Die App öffnet sie
+// in einem neuen Tab — eingebettet ginge es nur mit eigenem Server.
+async function ladeKameras() {
+  try {
+    const r = await zeitlimit(db.from("app_config").select("wert")
+      .eq("schluessel", "kameras").maybeSingle(), 6000, "Kameras");
+    if (r.error || !r.data) return [];
+    return String(r.data.wert || "").split("\n")
+      .map((z) => z.trim()).filter(Boolean)
+      .map((z) => {
+        const teile = z.split("|");
+        const name = (teile[0] || "").trim();
+        const adresse = (teile[1] || teile[0] || "").trim();
+        return { name: name || "Kamera", adresse: adresse };
+      })
+      .filter((k) => /^https?:\/\//i.test(k.adresse));
+  } catch (f) { return []; }
+}
+
+// Eine eigene Seite für die Kameras. Läuft die App verschlüsselt und
+// der Stream nicht, verweigert der Browser das Einbetten — dann steht
+// dort eine Kachel, die das Bild in einem neuen Tab öffnet. Auf dem
+// eigenen Server mit Zertifikat erscheint das Bild direkt.
+function kameraEinbettbar(adresse) {
+  if (location.protocol !== "https:") return true;
+  return /^https:/i.test(adresse);
+}
+
+async function seiteKameras(b) {
+  b.innerHTML = '<h1 class="seitentitel">Kameras</h1>'
+    + '<div id="kamera-inhalt"><div class="laedt">Wird geladen …</div></div>';
+
+  const liste = await ladeKameras();
+  const ziel = document.getElementById("kamera-inhalt");
+  if (!ziel) return;
+
+  if (!liste.length) {
+    ziel.innerHTML = '<section class="karte"><p class="hinweis">'
+      + 'Noch keine Kamera eingetragen. Unter Einstellungen → Allgemein → Kameras '
+      + 'trägst du je Zeile einen Namen, einen senkrechten Strich und die Adresse ein.'
+      + '</p></section>';
+    return;
+  }
+
+  ziel.innerHTML = '<div class="kamera-gitter">'
+    + liste.map((k) => '<section class="karte kamera-karte">'
+        + '<div class="karte__kopf"><h2>' + esc(k.name) + '</h2>'
+        + '<a class="linkknopf" href="' + esc(k.adresse) + '" target="_blank"'
+        + ' rel="noopener">Gross öffnen</a></div>'
+        + (kameraEinbettbar(k.adresse)
+            ? '<div class="kamera-bild"><iframe src="' + esc(k.adresse)
+              + '" title="' + esc(k.name) + '" allow="autoplay; fullscreen"></iframe></div>'
+            : '<a class="kamera-bild kamera-bild--zu" href="' + esc(k.adresse)
+              + '" target="_blank" rel="noopener">'
+              + '<span class="kamera-bild__zeichen">📹</span>'
+              + '<span class="kamera-bild__text">Antippen und in neuem Tab öffnen</span>'
+              + '<span class="kamera-bild__klein">Das Bild lässt sich hier erst zeigen, '
+              + 'wenn die App und die Kamera beide verschlüsselt laufen.</span></a>')
+        + '</section>').join("")
+    + '</div>';
 }
 
 // ---------- Notizen ----------
@@ -7953,12 +8256,13 @@ function balkenInfoVerhalten() {
             ? zahlText(j.stand || 0) + ' / ' + zahlText(j.target_quantity) + ' Stück'
             : "Keine Stückzahl hinterlegt") + '</div>'
         + '<div class="pw-info__zeile">' + esc(material.join(" · ")) + '</div>'
-        + '<div class="pw-info__zeile">✎ '
-        + (notizTrennen(j.plan_note).notiz
-            ? esc(notizTrennen(j.plan_note).notiz) : "keine Notiz") + '</div>'
+        // Der Hinweis zum Material gehört direkt hinter den Termin
         + (notizTrennen(j.plan_note).ort
             ? '<div class="pw-info__zeile">📦 ' + esc(notizTrennen(j.plan_note).ort) + '</div>'
             : "")
+        + '<div class="pw-info__zeile">✎ '
+        + (notizTrennen(j.plan_note).notiz
+            ? esc(notizTrennen(j.plan_note).notiz) : "keine Notiz") + '</div>' 
         + (j.problem ? '<div class="pw-info__zeile pw-info__zeile--warn">⚠ '
             + esc(j.problem) + '</div>' : "")
         + (j.geplant_von
@@ -8867,8 +9171,8 @@ function planBalken(j, spalte, dauer, angeschnitten, vorlaufTage, dauerWahr) {
     + '<span class="pw-balken__nr">' + esc(j.job_number) + '</span>'
     + (j.problem ? '<span class="pw-balken__warnung" title="'
         + esc(j.problem) + '">⚠</span>' : "")
-    + (!j.fa_erstellt ? '<span class="pw-balken__fehlt" title="FA fehlt">FA</span>' : "")
-    + (!j.material_ok ? '<span class="pw-balken__fehlt" title="Material fehlt">M</span>' : "")
+    // FA und M sind weg: Die Materiallage sagt der Punkt links, den
+    // Rest sieht man im Infofenster.
     + (j.plan_note ? '<span class="pw-balken__zeichen" title="Notiz">✎</span>' : "")
     + (j.drawing_url ? '<span class="pw-balken__zeichen">PDF</span>' : "")
     + (j.wbg_url ? '<span class="pw-balken__zeichen">WBG</span>' : "")
@@ -11232,6 +11536,15 @@ function leerlaufPruefen() {
     if (leerlauf.hinweis) { leerlauf.hinweis.remove(); leerlauf.hinweis = null; }
     return;
   }
+
+  // Im Pad Mode wird nicht abgemeldet. Das Tablet liegt an der
+  // Maschine und soll den ganzen Tag zeigen, was läuft.
+  if (document.getElementById("pad")) {
+    leerlauf.letzte = Date.now();
+    if (leerlauf.hinweis) { leerlauf.hinweis.remove(); leerlauf.hinweis = null; }
+    return;
+  }
+
   const ruhe = Date.now() - leerlauf.letzte;
 
   if (ruhe >= LEERLAUF_MS) {
@@ -11507,6 +11820,13 @@ async function padMaschine(h) {
   // deshalb gibt es hier keine Ausweichsuche.
   const wbg = (j && j.wbg_url) || "";
 
+  // Für das Dashboard: Tagesleistung, was danach kommt, und das Wetter
+  const [tage, danach, wetter] = await Promise.all([
+    padTagesleistung(m.id),
+    padNaechsteAuftraege(m.id, j ? j.id : null),
+    holeWetterStunden().catch(() => null),
+  ]);
+
   if (!pad.reiter) pad.reiter = "uebersicht";
   const datei = pad.reiter === "zeichnung" ? zeichnung
     : (pad.reiter === "wbg" ? wbg : "");
@@ -11518,8 +11838,9 @@ async function padMaschine(h) {
     + (da ? "" : " pad-sprung--leer") + '" data-padreiter="' + wert + '">'
     + text + '</button>';
 
-  const kopf = '<div class="pad__kopf">'
-    + '<button class="pad__zurueck" data-padzurueck>‹</button>'
+  const kopf = '<div class="pad__kopf pad__kopf--dash">'
+    + '<img class="pad__logo2" src="./logo.png" alt="Hofer + Co.">'
+    + '<button class="pad__zurueck" data-padzurueck>‹ Zurück</button>'
     + '<span class="pad__titel pad__titel--links">'
     + esc(m.name) + (m.machine_number
         ? ' <span class="pad__nr">' + esc(m.machine_number) + '</span>' : "")
@@ -11531,7 +11852,7 @@ async function padMaschine(h) {
           + '<button class="pad-sprung" data-padtab>Neuer Tab</button>'
         : "")
     + '</div>'
-    + '<button class="pad__zu" data-padzu>✕</button>'
+    + '<button class="pad__zu" data-padzu>✕ Schliessen</button>'
     + '</div>';
 
   const kachel = (name, wert, stil) => '<div class="pad-karte pad-karte--' + stil + '"'
@@ -11545,79 +11866,193 @@ async function padMaschine(h) {
     + (wert.unten ? '<span class="pad-karte__unten">' + esc(wert.unten) + '</span>' : "")
     + '</div>';
 
-  const uebersicht = '<div class="pad__raster">'
-    + kachel("HOCO Nr.", { text: j ? j.job_number : "",
-        unten: teil && teil.bezeichnung ? teil.bezeichnung : "" }, "haupt")
-    + kachel("Stückzahl", { text: j ? zahlText(j.stand || 0) : "",
-        unten: j && j.target_quantity ? "von " + zahlText(j.target_quantity) : "",
-        tipp: j ? "stand" : "" }, "zahl")
-    // Die Materialkachel bekommt die Farbe des Balkens von der
-    // Planwand — dieselbe Zuordnung, dasselbe Erkennen auf einen Blick.
-    + kachel("Material", { text: (j && j.material_bez) || (teil ? teil.material : ""),
-        unten: "",
-        farbe: (() => {
-          if (!j || !j.color) return null;
-          const f = (typeof PLANFARBEN !== "undefined" ? PLANFARBEN : [])
-            .find((x) => x.wert === j.color);
-          return f ? leuchtend(f.hex) : null;
-        })() }, "breit")
-    // Die Programmnummer stand hier nur zum Ablesen und nahm den Platz
-    // weg. Sie steht weiterhin auf dem Einrichtblatt. Hier zählt, was
-    // der Bediener am Abend eintragen muss.
-    + kachel("Stück am Abend", {
-        text: blattDaten && blattDaten.abend_stk ? zahlText(blattDaten.abend_stk) : "",
-        unten: blattDaten && blattDaten.abend_stk ? "Stk" : "",
-        leer: blattDaten ? "antippen und eintragen" : (programmGrund || "kein Einrichtblatt"),
-        tipp: blattDaten ? "abend" : "" }, "klein")
-    // Wie steht der Auftrag zeitlich? Dieselbe Rechnung wie im
-    // Reiter Fortschritt — aus Tagesleistung und Stückzahl.
-    + (() => {
-        const r = j ? fortschrittRechnen(j) : null;
-        if (!r) return "";
-        const t = r.tage;
-        const wort = t < -0.5 ? "Verzug" : (t > 0.5 ? "Vorsprung" : "Im Plan");
-        return '<div class="pad-karte pad-karte--klein pad-karte--zeit'
-          + (t < -0.5 ? " pad-karte--spaet" : (t > 0.5 ? " pad-karte--frueh" : "")) + '">'
-          + '<span class="pad-karte__name">' + wort + '</span>'
-          + '<span class="pad-karte__wert">'
-          + (Math.abs(t) <= 0.5 ? "\u00b10"
-              : (t > 0 ? "+" : "") + t.toFixed(1).replace(".", ","))
-          + '</span>'
-          + '<span class="pad-karte__unten">Tage'
-          + (r.stueck ? " \u00b7 " + (r.stueck > 0 ? "+" : "") + zahlText(r.stueck) + " Stk" : "")
-          + '</span></div>';
-      })()
+  // ---------- Dashboard ----------
+  // Drei Spalten: links der Auftrag mit Notiz, in der Mitte alles zur
+  // Stückzahl samt Tagesdiagramm, rechts Tag, Wetter und was danach
+  // auf dieser Maschine kommt. Die Kacheln wachsen mit ihrem Inhalt.
+  const notizGeteilt = notizTrennen(j ? j.plan_note : "");
+
+  const zeile = (k, v) => (v
+    ? '<b>' + k + '</b><span>' + esc(v) + '</span>' : "");
+
+  const hoechste = Math.max(1, ...tage.map((t) => t.menge || 0));
+  const heuteMenge = (tage.find((t) => t.heute) || {}).menge || 0;
+  const mitWert = tage.filter((t) => t.menge !== null && t.menge !== undefined);
+  const schnitt = mitWert.length
+    ? Math.round(mitWert.reduce((n, t) => n + (t.menge || 0), 0) / mitWert.length) : 0;
+
+  // Hochrechnung: was fehlt, geteilt durch die Tagesleistung
+  let prognose = "";
+  if (j && j.target_quantity && schnitt > 0) {
+    const offen = Math.max(0, j.target_quantity - (j.stand || 0));
+    const tageNoch = Math.ceil(offen / schnitt);
+    const d = new Date();
+    let zaehler = 0;
+    while (zaehler < tageNoch) {
+      d.setDate(d.getDate() + 1);
+      const w = d.getDay();
+      if (w !== 0 && w !== 6) zaehler++;
+    }
+    prognose = "fertig etwa " + kurzDatum(isoDatum(d));
+  }
+
+  const balkenTage = tage.map((t) => '<div class="pad-tag'
+    + (t.heute ? " pad-tag--heute" : "") + '">'
+    + '<b>' + (t.menge === null || t.menge === undefined ? "–" : zahlText(t.menge)) + '</b>'
+    + '<i style="height:' + (t.menge ? Math.max(3, Math.round(t.menge / hoechste * 100)) : 2)
+    + '%"></i>'
+    + '<u>' + (t.heute ? "Heute" : esc(t.wochentag + " " + t.nummer + ".")) + '</u>'
+    + '<small>' + (t.uhr ? esc(t.uhr) : "—") + '</small>'
+    + '</div>').join("");
+
+  const zustandKnopf = j
+    ? '<button class="pad-knopf pad-knopf--zustand pad-zustand--'
+      + esc(j.plan_status || "geplant") + '" data-padstatus="wechseln">'
+      + esc((PLANSTATUS[j.plan_status] || PLANSTATUS.geplant).zeichen) + ' '
+      + esc((PLANSTATUS[j.plan_status] || PLANSTATUS.geplant).name) + '</button>'
+    : '<button class="pad-knopf pad-knopf--start" data-padstatus="start">'
+      + 'Auftrag starten</button>';
+
+  const jetzt = new Date();
+  const uebersicht = '<div class="pad-flaeche">'
+
+    // ----- linke Spalte -----
+    + '<div class="pad-spalte">'
+    + '<div class="pad-karte2 pad-karte2--hoco">'
+    + '<span class="pad-name">HOCO Nr.</span>'
+    + '<span class="pad-wert pad-wert--gross">'
+    + (j ? esc(j.job_number) : "kein Auftrag") + '</span>'
+    + '<div class="pad-zeilen">'
+    + zeile("Bezeichnung", teil && teil.bezeichnung)
+    + zeile("Zeichnung", teil && teil.zeichnungs_nr)
+    + zeile("FA Nr.", j && j.fa_nr)
+    + zeile("Programm", programm)
+    + zeile("Material", (j && j.material_bez) || (teil && teil.material))
+    + '</div>'
+    + (notizGeteilt.notiz || notizGeteilt.ort
+        ? '<div class="pad-notiz">'
+          + (notizGeteilt.notiz
+              ? '<p>✎ ' + esc(notizGeteilt.notiz) + '</p>' : "")
+          + (notizGeteilt.ort
+              ? '<p class="pad-notiz--material">📦 ' + esc(notizGeteilt.ort) + '</p>' : "")
+          + '</div>'
+        : "")
     + '</div>'
 
-    // Die Sprünge als grosse Kacheln — mit dem Finger gut zu treffen
-    + '<div class="pad__sprungkacheln">'
-    + [["zeichnung", "Zeichnung", !!zeichnung],
-       ["wbg", "WBG", !!wbg],
-       ["blatt", "Einrichtblatt", !!(j && m.type_id)],
-       ["wechsel", "Werkzeugwechsel", !!m.type_id],
-       ["historie", "Historie", true]]
-      .map(([wert, text, da]) => '<button class="pad-sprungkachel'
-        + (da ? "" : " pad-sprungkachel--leer") + '" data-padreiter="' + wert + '">'
-        + text + '</button>').join("")
-    // Zustand direkt an der Maschine: laufenden Auftrag beenden — der
-    // nächste rückt nach — oder, wenn nichts läuft, den nächsten starten
-    // Der Zustand als Knopf: zeigt, was gerade gilt, und öffnet beim
-    // Antippen dieselbe Auswahl wie in der Produktion
-    + (j
-        ? '<button class="pad-sprungkachel pad-sprungkachel--zustand pad-zustand--'
-          + esc(j.plan_status || "geplant") + '" data-padstatus="wechseln">'
-          + '<span class="pad-zustand__zeichen">'
-          + esc((PLANSTATUS[j.plan_status] || PLANSTATUS.geplant).zeichen) + '</span>'
-          + esc((PLANSTATUS[j.plan_status] || PLANSTATUS.geplant).name) + '</button>'
-        : '<button class="pad-sprungkachel pad-sprungkachel--start" data-padstatus="start">'
-          + 'Auftrag starten</button>')
+    + '<div class="pad-karte2 pad-karte2--abend" data-padfeld="'
+    + (j && m.type_id ? "abend" : "") + '">'
+    + '<span class="pad-name">Stück am Abend'
+    + (j && m.type_id ? " · antippen" : "") + '</span>'
+    + '<span class="pad-wert">'
+    + (blattDaten && blattDaten.abend_stk
+        ? zahlText(blattDaten.abend_stk) + " Stk"
+        : '<span class="pad-leer">'
+          + esc(j && m.type_id ? "antippen und eintragen" : (programmGrund || "—"))
+          + '</span>') + '</span>'
     + '</div>'
+
+    + '<div class="pad-karte2 pad-karte2--verzug">'
+    + (() => {
+        const r = j ? fortschrittRechnen(j) : null;
+        if (!r) return '<span class="pad-name">Fortschritt</span>'
+          + '<span class="pad-wert"><span class="pad-leer">kein Auftrag</span></span>';
+        const t = r.tage;
+        const wort = t < -0.5 ? "Verzug" : (t > 0.5 ? "Vorsprung" : "Im Plan");
+        return '<span class="pad-name">' + wort + '</span>'
+          + '<span class="pad-wert ' + (t < -0.5 ? "pad-wert--rot" : "") + '">'
+          + (Math.abs(t) <= 0.5 ? "\u00b10"
+              : (t > 0 ? "+" : "") + t.toFixed(1).replace(".", ","))
+          + ' <small>Tage'
+          + (r.stueck ? " · " + (r.stueck > 0 ? "+" : "") + zahlText(r.stueck) + " Stk" : "")
+          + '</small></span>';
+      })()
+    + '</div>'
+    + '</div>'
+
+    // ----- Mitte: alles zur Stückzahl -----
+    + '<div class="pad-spalte">'
+    + '<div class="pad-karte2 pad-karte2--stk" data-padfeld="' + (j ? "stand" : "") + '">'
+    + '<div class="pad-stk-kopf">'
+    + '<div><span class="pad-name">Stückzahl' + (j ? " · antippen" : "") + '</span>'
+    + '<div class="pad-stk-zahl">' + (j ? zahlText(j.stand || 0) : "—") + '</div></div>'
+    + '<div class="pad-stk-neben">'
+    + (j && j.target_quantity
+        ? '<span>von ' + zahlText(j.target_quantity) + ' · '
+          + Math.min(100, Math.round((j.stand || 0) / j.target_quantity * 100)) + ' %</span>'
+        : "")
+    + '<span>heute ' + zahlText(heuteMenge) + ' Stk</span>'
+    + '</div></div>'
+    + '<div class="pad-tage">' + balkenTage + '</div>'
+    + '<div class="pad-stk-fuss">'
+    + '<span>Schnitt ' + zahlText(schnitt) + ' pro Tag</span>'
+    + '<span>' + esc(prognose) + '</span>'
+    + '</div>'
+    + '</div>'
+    + '</div>'
+
+    // ----- rechte Säule -----
+    + '<div class="pad-spalte">'
+    + '<div class="pad-karte2 pad-karte2--saeule">'
+    + '<div class="pad-uhrblock">'
+    + '<div><span class="pad-wtag">' + WOCHENTAGE[(jetzt.getDay() + 6) % 7] + '</span>'
+    + '<div class="pad-uhr" id="pad-uhr">'
+    + String(jetzt.getHours()).padStart(2, "0") + ":"
+    + String(jetzt.getMinutes()).padStart(2, "0") + '</div>'
+    + '<span class="pad-wdatum">' + kurzDatum(isoDatum(jetzt))
+    + ' · KW ' + kalenderwoche(isoDatum(jetzt)) + '</span></div>'
+    + (wetter
+        ? '<div class="pad-wetterblock">'
+          + '<span class="pad-wzeichen">' + wetterZeichen(wetter.code) + '</span>'
+          + '<span class="pad-grad">' + wetter.temperatur + '°</span>'
+          + '<span class="pad-ort">' + esc(wetter.text) + '<br>Lohn-Ammannsegg</span>'
+          + '</div>'
+        : '<span class="pad-ort">Wetter nicht verfügbar</span>')
+    + '</div>'
+
+    + (wetter && wetter.stunden.length
+        ? '<div class="pad-stunden">'
+          + wetter.stunden.map((x) => '<div><b>' + x.stunde + '</b>'
+              + '<i>' + wetterZeichen(x.code) + '</i><u>' + x.grad + '°</u></div>').join("")
+          + '</div>'
+          + (wetter.untergang
+              ? '<span class="pad-klein">Sonnenuntergang ' + esc(wetter.untergang) + '</span>'
+              : "")
+        : "")
+
+    + '<div class="pad-linie"></div>'
+    + '<span class="pad-name">Als Nächstes auf dieser Maschine</span>'
+    + (danach.length
+        ? '<div class="pad-danach">'
+          + danach.map((x) => '<div class="pad-danach__zeile">'
+              + '<b>' + esc(x.job_number) + '</b>'
+              + '<span>' + (x.planned_from ? "ab " + kurzDatum(x.planned_from) : "")
+              + (x.target_quantity ? " · " + zahlText(x.target_quantity) : "") + '</span>'
+              + '</div>').join("")
+          + '</div>'
+        : '<span class="pad-klein">Nichts weiter eingeplant.</span>')
+    + '</div>'
+    + '</div>'
+    + '</div>'
+
+    // ----- Knöpfe -----
+    + '<div class="pad-knoepfe">'
+    + [["zeichnung", "Zeichnung", !!zeichnung, "zeichnung"],
+       ["wbg", "WBG", !!wbg, "wbg"],
+       ["blatt", "Einrichtblatt", !!m.type_id, "blatt"],
+       ["wechsel", "Werkzeugwechsel", !!m.type_id, "wz"]]
+      .map(([wert, text, da, farbe]) => '<button class="pad-knopf pad-knopf--' + farbe
+        + (da ? "" : " pad-knopf--leer") + '" data-padreiter="' + wert + '">'
+        + text + '</button>').join("")
+    + zustandKnopf
+    + '</div>'
+
     + (j && j.target_quantity
         ? '<div class="pad__balken"><div class="pad__balken__fuellung" style="width:'
           + Math.min(100, Math.round((j.stand || 0) / j.target_quantity * 100))
           + '%"></div><span>'
           + Math.min(100, Math.round((j.stand || 0) / j.target_quantity * 100))
-          + ' %</span></div>'
+          + ' % · ' + zahlText(j.stand || 0)
+          + ' von ' + zahlText(j.target_quantity) + '</span></div>'
         : "");
 
   h.innerHTML = kopf
@@ -11806,7 +12241,10 @@ async function werkzeugWechselDialog(maschine, auftrag) {
   const huelle = document.createElement("div");
   huelle.className = "dialog-huelle";
   huelle.innerHTML = '<div class="dialog dialog--breit">'
-    + '<h2>Werkzeugwechsel</h2>'
+    + '<div class="wz-kopf"><h2>Werkzeugwechsel</h2>'
+    // Die Historie hat keinen eigenen Knopf mehr am Dashboard, sie
+    // sitzt dort, wo man sie braucht: neben dem Wechsel.
+    + '<button class="knopf knopf--klein" data-wzhistorie>Historie</button></div>'
     + '<p class="klein">Alle Werkzeuge antippen, die gewechselt wurden.</p>'
     + reihen.map((p) => '<div class="wz-path">'
         + '<div class="wz-path__name">' + esc(p.name) + '</div>'
@@ -11828,6 +12266,9 @@ async function werkzeugWechselDialog(maschine, auftrag) {
   dialogSchliessen(huelle, zu);
 
   const weiter = huelle.querySelector("#" + nr + "weiter");
+  const histKnopf = huelle.querySelector("[data-wzhistorie]");
+  if (histKnopf) histKnopf.onclick = () => { huelle.remove(); wechselHistorie(maschine, auftrag); };
+
   huelle.querySelectorAll("[data-tool]").forEach((el) => {
     el.onclick = () => {
       const t = el.dataset.tool;
@@ -17673,6 +18114,14 @@ async function seiteEinstellungen(b) {
         + 'Bearbeiten frei. Gilt für alle.</p>'
         + '<label class="feld"><span>Pin</span>'
         + '<input type="text" id="pin-feld" inputmode="numeric"></label>'
+        // Kameras: je Zeile Name und Adresse, getrennt durch einen Strich
+        + '<label class="feld"><span>Kameras</span>'
+        + '<textarea id="kamera-feld" rows="3"'
+        + ' placeholder="Halle 1 | http://192.168.100.20:1984/stream.html?src=halle1"></textarea>'
+        + '<span class="feldhinweis">Je Zeile eine Kamera: Name, senkrechter Strich, '
+        + 'Adresse. Die Knöpfe erscheinen auf der Startseite und öffnen die Kamera '
+        + 'in einem neuen Tab.</span></label>'
+        + '<button class="knopf knopf--klein" id="kamera-speichern">Kameras speichern</button>'
         + '<button class="knopf" id="pin-speichern">Pin speichern</button></section>'
       : "")
     + '<section class="karte"><h2>Über die App</h2>'
@@ -17906,6 +18355,25 @@ async function seiteEinstellungen(b) {
         .upsert({ schluessel: "planwand_pin", wert: wert });
       if (error) meldung(fehlertext(error), "fehler");
       else meldung("Pin gespeichert.");
+    };
+  }
+
+  // ---------- Kameras ----------
+  const kamFeld = document.getElementById("kamera-feld");
+  if (kamFeld) {
+    (async () => {
+      try {
+        const r = await zeitlimit(db.from("app_config").select("wert")
+          .eq("schluessel", "kameras").maybeSingle(), 8000, "Kameras");
+        if (!r.error && r.data) kamFeld.value = r.data.wert || "";
+      } catch (f) { /* gibt es vielleicht noch nicht */ }
+    })();
+
+    document.getElementById("kamera-speichern").onclick = async () => {
+      const { error } = await db.from("app_config")
+        .upsert({ schluessel: "kameras", wert: (kamFeld.value || "").trim() });
+      if (error) meldung(fehlertext(error), "fehler");
+      else meldung("Kameras gespeichert.");
     };
   }
 
@@ -18255,6 +18723,11 @@ SYM.start = svg('<rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/>'
   + '<rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5" fill="currentColor" stroke="none"/>'
   + '<rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/>'
   + '<rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/>');
+
+// Kamera: Gehäuse mit Linse
+SYM.kamera = svg('<rect x="2.5" y="6.5" width="14" height="11" rx="2.5"/>'
+  + '<path d="M16.5 10.5 21.5 8v8l-5-2.5z"/>'
+  + '<circle cx="9.5" cy="12" r="2.6"/>');
 
 // Fortschritt: Zeitstrahl mit Abweichung nach oben und unten
 SYM.fortschritt = svg('<path d="M3 12h18"/>'
@@ -19857,6 +20330,7 @@ const SEITEN = [
   { pfad: "produktion",   titel: "Produktion",   zeichen: SYM.produktion, zeige: seiteProduktion },
   { pfad: "bestellungen", titel: "Bestellungen", zeichen: SYM.bestellungen, zeige: seiteBestellungen },
   { pfad: "einkauf",      titel: "Einkauf",      zeichen: SYM.einkauf, zeige: seiteEinkauf },
+  { pfad: "kameras",      titel: "Kameras",      zeichen: SYM.kamera, zeige: seiteKameras },
   { pfad: "rechner",      titel: "Rechner",      zeichen: SYM.rechner, zeige: seiteRechner },
 ];
 
