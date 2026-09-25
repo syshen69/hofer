@@ -3992,6 +3992,22 @@ body.dunkel .login input, body.dunkel .login select {
   .pad__zurueck--leer { min-width: 0; }
   .pad__titel { font-size: 1.1rem !important; }
 }
+/* ---------- Datumsfelder auf dem iPhone ----------
+   Safari gibt Feldern vom Typ "date" eine eigene Mindestbreite. In
+   engen Karten ragten sie deshalb rechts heraus. Sie richten sich
+   jetzt nach ihrem Feld statt umgekehrt. */
+input[type="date"], input[type="time"], input[type="datetime-local"],
+input[type="month"], input[type="week"] {
+  width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box;
+  -webkit-appearance: none; appearance: none; text-align: left;
+}
+/* Gilt auch für alle anderen Felder in Karten und Fenstern */
+.karte input, .karte select, .karte textarea,
+.dialog input, .dialog select, .dialog textarea,
+.feld input, .feld select, .feld textarea {
+  max-width: 100%; min-width: 0; box-sizing: border-box;
+}
+.karte, .dialog, .feld { min-width: 0; }
 </style>
 </head>
 <body>
@@ -4040,7 +4056,7 @@ const LOGIN_ENDUNG = "@hoferco.ch";
 // Es steht offen im Code — das ist der Preis für die Bequemlichkeit
 // und gilt nur für Konten, die das selbst eingeschaltet haben.
 const OFFENES_PASSWORT = "hofer-offen-2026";
-const APP_VERSION = "95.0.0";
+const APP_VERSION = "96.1.0";
 
 // -----------------------------------------------------------------
 //  Kleine Helfer
@@ -7937,7 +7953,12 @@ function balkenInfoVerhalten() {
             ? zahlText(j.stand || 0) + ' / ' + zahlText(j.target_quantity) + ' Stück'
             : "Keine Stückzahl hinterlegt") + '</div>'
         + '<div class="pw-info__zeile">' + esc(material.join(" · ")) + '</div>'
-        + '<div class="pw-info__zeile">✎ ' + (j.plan_note ? esc(j.plan_note) : "keine Notiz") + '</div>'
+        + '<div class="pw-info__zeile">✎ '
+        + (notizTrennen(j.plan_note).notiz
+            ? esc(notizTrennen(j.plan_note).notiz) : "keine Notiz") + '</div>'
+        + (notizTrennen(j.plan_note).ort
+            ? '<div class="pw-info__zeile">📦 ' + esc(notizTrennen(j.plan_note).ort) + '</div>'
+            : "")
         + (j.problem ? '<div class="pw-info__zeile pw-info__zeile--warn">⚠ '
             + esc(j.problem) + '</div>' : "")
         + (j.geplant_von
@@ -8813,6 +8834,8 @@ function planBalken(j, spalte, dauer, angeschnitten, vorlaufTage, dauerWahr) {
     zeileZwei = teile2.join("   ");
   }
 
+  const mengeDa = String(j.material_menge || "").trim();
+
   return '<div class="pw-balken' + (fertig ? " pw-balken--fertig" : "")
     + (angeschnitten ? " pw-balken--offen" : "") + randKlasse + '"'
     + ' data-auftrag="' + esc(j.id) + '"'
@@ -8825,15 +8848,18 @@ function planBalken(j, spalte, dauer, angeschnitten, vorlaufTage, dauerWahr) {
         ? '<div class="pw-rest" style="left:' + restLinks + '%"></div>' : "")
 
     + '<div class="pw-balken__aussen">'
-    // Bei "geplant" sagt das Zeichen zusätzlich, ob das Material da
-    // ist: leerer Kreis heisst bereit, rot gefüllter heisst fehlt noch.
+    // Bei "geplant" sagt das Zeichen, ob das Material besorgt ist.
+    // Massgebend ist das Feld "Menge vorhanden oder bestellt": steht
+    // dort nichts, ist der Kreis rot gefüllt.
     + '<span class="pw-balken__statusgross'
-    + (st === "geplant" && !j.material_ok ? " pw-balken__statusgross--ohnematerial" : "")
+    + (st === "geplant" && !mengeDa ? " pw-balken__statusgross--ohnematerial" : "")
     + '" title="'
     + esc((PLANSTATUS[st] || PLANSTATUS.geplant).name
-        + (st === "geplant" ? (j.material_ok ? " · Material bereit" : " · Material fehlt") : ""))
+        + (st === "geplant"
+            ? (mengeDa ? " · Material " + mengeDa : " · keine Menge eingetragen")
+            : ""))
     + '">'
-    + (st === "geplant" && !j.material_ok
+    + (st === "geplant" && !mengeDa
         ? "●"
         : (PLANSTATUS[st] || PLANSTATUS.geplant).zeichen) + '</span>'
     + '<div class="pw-balken__inhalt">'
@@ -9767,6 +9793,14 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
     + (darf ? "" : " disabled") + '><span>Material da</span></label>'
     + '</div>'
 
+    // Wo das Material liegt — erscheint erst, wenn der Haken sitzt
+    + '<label class="feld" id="pl-ortfeld"><span>Hinweis zum Material</span>'
+    + '<input type="text" id="pl-matort" maxlength="120"'
+    + ' placeholder="z. B. Regal 4 oben, Palette bei der Säge"'
+    + (darf ? "" : " readonly") + ' value="'
+    + esc(notizTrennen(auftrag ? auftrag.plan_note : (v ? v.plan_note : "")).ort)
+    + '"></label>'
+
     + '<div class="feld"><span class="feldlabel">Eingeplant von</span>'
     + (!PLANER.length
         ? '<span class="feldhinweis">Niemand ist als Planer hinterlegt. '
@@ -9892,6 +9926,16 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
   const $ = (k) => huelle.querySelector("#" + k);
   const zu = () => { plan.imDialog = false; huelle.remove(); };
   $("pl-nein").onclick = zu;
+
+  // Das Ortsfeld gehört zum Haken "Material da"
+  const ortZeigen = () => {
+    const feld = huelle.querySelector("#pl-ortfeld");
+    const haken = huelle.querySelector("#pl-material");
+    if (feld && haken) feld.hidden = !haken.checked;
+  };
+  ortZeigen();
+  const hakenMat = huelle.querySelector("#pl-material");
+  if (hakenMat) hakenMat.addEventListener("change", ortZeigen);
 
   // Zeichnung als Vorschau zeigen. PDFs stellt der Browser selbst dar,
   // Bilder werden direkt eingebettet. Ein Klick öffnet sie gross.
@@ -10167,7 +10211,9 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
       planned_from: $("pl-von").value || null,
       planned_days: Math.max(1, Math.round(Number($("pl-tage").value) || 1)),
       target_quantity: menge === "" ? null : Math.max(0, Math.round(Number(menge))),
-      plan_note: ($("pl-notiz").value || "").trim() || null,
+      // Notiz und Materialhinweis stehen gemeinsam im selben Feld
+      plan_note: notizZusammen($("pl-notiz").value,
+        ($("pl-matort") && $("pl-matort").value) || ""),
       drawing_url: pdfAdresse,
       wbg_url: wbgAdresse,
       plan_status: planZustand,
@@ -10211,7 +10257,12 @@ async function planAuftragDialog(auftrag, b, vorgabeMaschine, vorgabeDatum, vorl
       // höchstens einer auf "läuft".
       const neuerZustand = daten.plan_status;
       delete daten.plan_status;
-      ({ error: fehler } = await db.from("jobs").update(daten).eq("id", auftrag.id));
+      // Über den Ändern-Helfer: fehlt eine Spalte in der Datenbank,
+      // wird sie weggelassen, statt das ganze Speichern scheitern zu lassen.
+      try {
+        await aendernOhneUnbekannte("jobs", daten, "id", auftrag.id);
+        fehler = null;
+      } catch (f) { fehler = f; }
       if (!fehler && neuerZustand && neuerZustand !== auftrag.plan_status) {
         try {
           const rz = await zustandSetzen(Object.assign({}, auftrag,
@@ -10550,6 +10601,30 @@ async function ladeTypenFrisch() {
 // fertigen Werkzeugblatt.
 const PATHFARBEN = ["#003884", "#1c6b42", "#a4231c", "#5b2a9e", "#9c4a0c", "#0d7b8a"];
 function pathFarbe(i) { return PATHFARBEN[i % PATHFARBEN.length]; }
+
+// Der Hinweis, wo das Material liegt, steckt als eigene Zeile in der
+// Notiz — mit dem Vorsatz "Material:". So braucht es keine neue
+// Spalte in der Datenbank, und beides bleibt trotzdem trennbar.
+const MATERIALZEILE = /^\s*Material:\s*(.*)$/i;
+
+function notizTrennen(text) {
+  const zeilen = String(text || "").split("\n");
+  let ort = "";
+  const rest = [];
+  zeilen.forEach((z) => {
+    const t = z.match(MATERIALZEILE);
+    if (t && !ort) ort = t[1].trim();
+    else rest.push(z);
+  });
+  return { notiz: rest.join("\n").trim(), ort: ort };
+}
+
+function notizZusammen(notiz, ort) {
+  const teile = [];
+  if ((notiz || "").trim()) teile.push(notiz.trim());
+  if ((ort || "").trim()) teile.push("Material: " + ort.trim());
+  return teile.join("\n") || null;
+}
 
 function toolVergleich(a, b) {
   const teile = (x) => String(x || "").trim().toUpperCase().match(/\d+|\D+/g) || [];
@@ -12117,6 +12192,23 @@ async function ladeBlattZeilen(sheetId) {
 // gibt. Die Datenbank meldet sie namentlich ("Could not find the 'x'
 // column"), also nehmen wir sie heraus und versuchen es erneut. So
 // läuft die App auch dort, wo eine Spalte fehlt oder anders heisst.
+// Dasselbe fürs Ändern: unbekannte Spalten werden weggelassen.
+async function aendernOhneUnbekannte(tabelle, daten, spalte, wert) {
+  let satz = Object.assign({}, daten);
+  const weggelassen = [];
+  for (let versuch = 0; versuch < 6; versuch++) {
+    const r = await db.from(tabelle).update(satz).eq(spalte, wert);
+    if (!r.error) return { ok: true, weggelassen: weggelassen };
+    const text = String((r.error && r.error.message) || "");
+    const treffer = text.match(/find the '([^']+)' column/i)
+      || text.match(/column "([^"]+)" of relation/i);
+    if (!treffer) throw r.error;
+    weggelassen.push(treffer[1]);
+    delete satz[treffer[1]];
+  }
+  throw new Error("Zu viele unbekannte Spalten in " + tabelle);
+}
+
 async function einfuegenOhneUnbekannte(tabelle, zeilen) {
   let daten = Array.isArray(zeilen) ? zeilen : [zeilen];
   const weggelassen = [];
